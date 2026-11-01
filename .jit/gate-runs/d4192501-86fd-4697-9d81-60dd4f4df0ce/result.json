@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "412403bca8232358ad85aef6c20dacdd3f2610cc",
+  "completed_at": "2026-10-29T06:54:06.049463963Z",
+  "duration_ms": 287759,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared CLI fixture migration satisfies the issue-scoped requirements; the prior blocking finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c5c933f2-01da-4cb8-9711-4f1dd7b4e410",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d4192501-86fd-4697-9d81-60dd4f4df0ce",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T06:49:18.290128835Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 42bdf5aea, 1d583ebf9, 88e7e8dfb, 1772e003b, 27750deda (jit:c5c933f2)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c5c933f2/requirement/REQ-01–REQ-04 (issue description); @/issue/c780514e/requirement/REQ-05 (epic description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-10-29T06:47:50Z)\nTruncation recovery: split oversized patch and search reads by commit and affected path; inspected merge combined diffs and all relevant omitted ranges.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared CLI fixture migration satisfies the issue-scoped requirements; the prior blocking finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

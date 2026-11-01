@@ -472,23 +472,38 @@ fn compiled_modules(file: &Path, is_crate_root: bool) -> Vec<(PathBuf, String)> 
         true => file.parent().unwrap().to_path_buf(),
         false => file.with_extension(""),
     };
-    let children = text
-        .lines()
-        .filter_map(declared_module)
-        .flat_map(|name| {
-            let child = [
-                directory.join(format!("{name}.rs")),
-                directory.join(name).join("mod.rs"),
-            ]
-            .into_iter()
-            .find(|candidate| candidate.is_file())
-            .unwrap_or_else(|| {
-                panic!(
-                    "module `{name}` in {} resolves to no file, so this walk would miss what \
+    let lines = text.lines().collect::<Vec<_>>();
+    let children = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(index, line)| {
+            let name = declared_module(line)?;
+            // A `#[path]` module resolves beside the declaring file.
+            let explicit = index
+                .checked_sub(1)
+                .and_then(|previous| lines[previous].trim().strip_prefix("#[path = \""))
+                .and_then(|rest| rest.strip_suffix("\"]"))
+                .map(|path| file.parent().unwrap().join(path));
+            Some((name, explicit))
+        })
+        .flat_map(|(name, explicit)| {
+            let child = explicit
+                .map(|path| vec![path])
+                .unwrap_or_else(|| {
+                    vec![
+                        directory.join(format!("{name}.rs")),
+                        directory.join(name).join("mod.rs"),
+                    ]
+                })
+                .into_iter()
+                .find(|candidate| candidate.is_file())
+                .unwrap_or_else(|| {
+                    panic!(
+                        "module `{name}` in {} resolves to no file, so this walk would miss what \
                      it compiles",
-                    file.display()
-                )
-            });
+                        file.display()
+                    )
+                });
             compiled_modules(&child, false)
         })
         .collect::<Vec<_>>();
@@ -1236,7 +1251,7 @@ fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values
         .split_once("/// One profile's lifecycle result within an aggregate mutation.")
         .expect("profile lifecycle audit retains its per-profile result type")
         .1
-        .split_once("/// System event types for audit log")
+        .split_once("/// The tagged body of an [`Event`]: its variant and payload fields.")
         .expect("profile lifecycle audit inputs remain separate from unrelated event types")
         .0;
     let bridge_inventory =

@@ -296,7 +296,9 @@ Commands](cli-commands.md#profile-commands).
 ## Inspect, recover, and evolve
 
 Use `jit profile diff` before a change to see every target and semantic
-declaration a selection would create, update, leave unchanged, or conflict on.
+declaration a selection would create, update, leave unchanged, or conflict on. An
+existing declaration whose value differs reports as `unchanged`, because
+publication keeps the repository's entry.
 
 Start with a rehearsal for any mutation. `--dry-run` runs the same planning and
 validation as its corresponding `apply`, `pack`, or `add` command, but writes no target or lifecycle

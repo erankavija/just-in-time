@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "54a683471ba99a20948104fb2b0efed8c1123695",
+  "completed_at": "2026-10-24T19:20:01.159349311Z",
+  "duration_ms": 90791,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/worktree_paths.rs",
+        "id": "F1",
+        "line": 65,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-21",
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "WorktreePaths continues to spawn three bare git processes instead of using the new Git::probe."
+      }
+    ],
+    "summary": "The one-process storage probe is added but production layout detection still bypasses it.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "81664a6a-958e-4e4d-9403-7b6210dc9d6c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ff37c97e-6ac4-441e-b776-bf193650ca8f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-24T19:18:30.368157285Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3416 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.163.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16f59-ad82-7c92-82a5-ababe1bb9c23\n--------\nuser\n--- 3403 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:81664a6a commits 54a683471, e419e5dc0, c7b737985, 91eef7c2c\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 and @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-02, REQ-03, REQ-12 (issue description); @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/shared-test-contracts, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-24T19:16:59Z); code-review pending\nTruncation recovery: recovered omitted policy and caller evidence with narrowed source and line-range reads\n\n1. **F1 — blocking, issue-impact (high):** The new one-process `Git::probe` is not wired into production layout detection. [`worktree_paths.rs`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/worktree_paths.rs:65) still starts bare `git` directly, then does so twice more at lines 88 and 113; the new probe has no production caller. The added test only proves the standalone helper, so shipping this leaves the existing storage path bypassing the intended single storage-owned mechanism and still performing three processes. References: @/charter/D-21, @/invariant/convention-convergence.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The one-process storage probe is added but production layout detection still bypasses it.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"WorktreePaths continues to spawn three bare git processes instead of using the new Git::probe.\",\"file\":\"crates/jit/src/storage/worktree_paths.rs\",\"line\":65,\"references\":[\"@/charter/D-21\",\"@/invariant/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

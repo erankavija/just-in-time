@@ -11,39 +11,21 @@
       "doc_type": "investigation",
       "format": "markdown",
       "label": "Investigation",
-      "path": "dev/active/c780514e-test-topology/investigation.md"
+      "path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/investigation.md"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "ce138ba896f8c4700e9c08f1d4fd2a154b7935544b29389240bbb7c27f713159",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/c780514e-test-topology/breakdown.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "6500ee3c95e123a156bc4925190b8c5ac1d216eb00c09c963c9a996f899b88c5",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/c780514e-test-topology/investigation.md"
-        }
-      ],
       "commit": null,
       "doc_type": "implementation-plan",
       "format": "markdown",
       "label": "Plan",
-      "path": "dev/active/c780514e-test-topology/plan.md"
+      "path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/plan.md"
     },
     {
       "commit": null,
       "doc_type": "breakdown-manifest",
       "format": "markdown",
       "label": "Breakdown manifest",
-      "path": "dev/active/c780514e-test-topology/breakdown.json"
+      "path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/breakdown.json"
     }
   ],
   "done_at": "2026-10-22T14:27:23.137157480Z",
@@ -73,5 +55,5 @@
   "priority": "normal",
   "state": "done",
   "title": "planning: Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-10-22T14:27:23.137157480Z"
+  "updated_at": "2026-11-01T11:26:47.305861750Z"
 }

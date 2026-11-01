@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:planning-lead-c780514e",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:41.505429809Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
@@ -16,13 +16,28 @@
     "9e411075-4c46-4ffd-ae7a-9743ad175080",
     "b90b1660-6ea6-48b3-9866-df8709838ebb"
   ],
-  "description": "Make issue drafts carry the id the mutation already derived, so no issue ever exists with an empty-string id.\n\n## Background\n\n`Issue::draft` sets `id: String::new()` (`crates/jit/src/domain/types.rs:521-526`), and the finalizer overwrites it through `allocate` (`repository_state/mutation.rs:762`, batch path `:802`). Callers already derive issue ids before capture through `MutationContext::identifier_at` (`commands/mod.rs:2369,2869`, `commands/batch_create.rs:303`, `commands/template.rs:468,1068`). The same context also allocates gate-run ids (`commands/gate_check.rs:871`, `storage/gate_runs.rs:33`, `mutation.rs:1074`) and event ids (`mutation.rs:1214`), which keep their own types. A validated issue id cannot represent the empty sentinel.\n\n`Issue::draft` has about 38 callers: `graph/hierarchy.rs` (9), `domain/queries.rs` (8), `visualization.rs` (6), `validation/graph.rs` (2), `validation/local.rs` (2), and one each in `output.rs`, `domain/item.rs`, `domain/types.rs`, `commands/issue.rs`, `commands/batch_create.rs`, `commands/template.rs`, `commands/template_expand.rs`, `crates/server/src/routes.rs` and the `main.rs` of the `cli_query_graph`, `fast_docs_templates`, `fast_issue` and `fast_rules` suites.\n\n## Success Criteria\n\n- [hard] REQ-01: `Issue::draft` takes the issue's `IssueId` as a parameter, and no code path creates an issue whose id is empty.\n- [hard] REQ-02: Issue ids are derived as `IssueId` through a dedicated issue-id accessor on the mutation context; gate-run and event allocations keep their own types.\n- [hard] REQ-03: The finalizer no longer assigns issue ids, and the id recorded in the creation event equals the id the caller derived.\n- [hard] REQ-04: Single, batch and template-driven creation produce the same ids as before for the same mutation seed.\n- [hard] REQ-05: Test callers of `Issue::draft` take their ids from the shared canonical-id fixture.\n\n## Notes\n\nA separate id-less draft type and a nil-UUID placeholder were rejected: the first adds a type, the second is a protocol sentinel.\n",
+  "description": "Make issue drafts carry the id the mutation already derived, so no issue ever exists with an empty-string id.\n\n## Background\n\n`Issue::draft` sets `id: String::new()` (`crates/jit/src/domain/types.rs:521-526`), and the finalizer overwrites it through `allocate` (`repository_state/mutation.rs:762`, batch path `:802`). Callers already derive issue ids before capture through `MutationContext::identifier_at` (`commands/mod.rs:2369,2869`, `commands/batch_create.rs:303`, `commands/template.rs:468,1068`). The same context also allocates gate-run ids (`commands/gate_check.rs:871`, `storage/gate_runs.rs:33`, `mutation.rs:1074`) and event ids (`mutation.rs:1214`), which keep their own types. A validated issue id cannot represent the empty sentinel.\n\n`Issue::draft` has about 38 callers: `graph/hierarchy.rs` (9), `domain/queries.rs` (8), `visualization.rs` (6), `validation/graph.rs` (2), `validation/local.rs` (2), and one each in `output.rs`, `domain/item.rs`, `domain/types.rs`, `commands/issue.rs`, `commands/batch_create.rs`, `commands/template.rs`, `commands/template_expand.rs`, `crates/server/src/routes.rs` and the `main.rs` of the `cli_query_graph`, `fast_docs_templates`, `fast_issue` and `fast_rules` suites.\n\n## Success Criteria\n\n- [hard] REQ-01: `Issue::draft` takes the issue's `IssueId` as a parameter, and no code path creates an issue whose id is empty. While `IssueId` is the staging alias for `String`, this holds by construction at every call site; the type-level guarantee arrives with the newtype switch 7abcc22d (amended with invoker approval, 2026-10-29).\n- [hard] REQ-02: Issue ids are derived as `IssueId` through a dedicated issue-id accessor on the mutation context; gate-run and event allocations keep their own types.\n- [hard] REQ-03: The finalizer no longer assigns issue ids, and the id recorded in the creation event equals the id the caller derived.\n- [hard] REQ-04: Single, batch and template-driven creation produce the same ids as before for the same mutation seed.\n- [hard] REQ-05: Test callers of `Issue::draft` take their ids from the shared canonical-id fixture.\n\n## Notes\n\nA separate id-less draft type and a nil-UUID placeholder were rejected: the first adds a type, the second is a protocol sentinel.",
   "documents": [],
+  "done_at": "2026-10-29T07:00:37.135637716Z",
+  "first_ready_at": "2026-10-28T22:55:51.712408068Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "73b5bf36-5e44-4f29-87f3-c23f22c02ab4",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:00:13.452500447Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1f1653b7-bf90-41c9-98a5-6e9534cf1450",
+      "status": "passed",
+      "updated_at": "2026-10-29T06:57:25.131510710Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5fac48b8-54cc-476b-b9ab-cda5f745923f",
   "labels": [
     "type:task",
@@ -35,7 +50,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Issue drafts carry their pre-derived identifier",
-  "updated_at": "2026-10-22T14:28:47.151441326Z"
+  "updated_at": "2026-10-29T07:00:37.135637716Z"
 }

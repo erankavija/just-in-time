@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T22:06:19.000386280Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Stop the label and query tests in `crates/jit/tests/cli_query_graph` reading ids or values from human-readable output.\n\n## Background\n\nShared test support provides one CLI process fixture, which reads the ids of issues it creates from `--json` output. These files still parse human-readable output with `split_whitespace`, mostly to scrape created ids. This entry covers `label_filter_repeatable_query_tests.rs`, `label_hierarchy_e2e_test.rs`, `query_json_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files reads an id or other value from human-readable output; ids and values come from `--json` output.\n- [hard] REQ-02: Each edited test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
   "documents": [],
+  "done_at": "2026-10-28T23:11:15.671368756Z",
+  "first_ready_at": "2026-10-27T22:39:17.054132762Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6fd9ecc2-cc6a-4d09-9ddd-787ae4a10c6d",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:03:41.541054976Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "efda1593-a5c5-4344-813a-9e88eab85696",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:05:47.489700646Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5001b556-bf9a-42a0-b82e-bcbfaafd622e",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "label and query tests read created ids from JSON output",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T23:11:15.671368756Z"
 }

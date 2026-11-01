@@ -2,14 +2,16 @@
 //!
 //! Tests comprehensive validation including broken references and orphaned data.
 
+use jit::commands::test_helpers::memory_executor;
 use jit::domain::Priority;
 use jit::storage::{InMemoryStorage, IssueStore};
+use jit::test_utils::issue_id;
 
 #[test]
 fn test_validation_detects_broken_dependency() {
     let storage = InMemoryStorage::new();
     storage.add_data_file("config.toml", "");
-    let executor = crate::memory_executor(storage.clone());
+    let executor = memory_executor(storage.clone());
 
     // Create two issues
     let (issue1_id, _) = executor
@@ -46,10 +48,9 @@ fn test_validation_detects_broken_dependency() {
     // Validation should pass
     assert!(executor.validate_silent().is_ok());
 
-    // Corrupt the stored edge directly; production dependency commands reject
-    // this shape before publication.
+    // Add a well-formed dependency id whose target is absent.
     let mut issue2 = storage.load_issue(&issue2_id).unwrap();
-    issue2.dependencies = vec!["00000000-0000-0000-0000-000000000000".to_string()];
+    issue2.dependencies = vec![issue_id(1)];
     jit::test_harness::seed_memory_issue(&storage, &issue2);
 
     // Validation should fail
@@ -63,7 +64,7 @@ fn test_validation_detects_broken_dependency() {
 fn test_validation_detects_cycle() {
     let storage = InMemoryStorage::new();
     storage.add_data_file("config.toml", "");
-    let executor = crate::memory_executor(storage.clone());
+    let executor = memory_executor(storage.clone());
 
     // Create two issues
     let (issue1_id, _) = executor
@@ -112,7 +113,7 @@ fn test_validation_detects_cycle() {
 fn test_validation_passes_with_valid_graph() {
     let storage = InMemoryStorage::new();
     storage.add_data_file("config.toml", "");
-    let executor = crate::memory_executor(storage.clone());
+    let executor = memory_executor(storage.clone());
 
     // Create a valid dependency graph: A -> B -> C
     let (issue_c_id, _) = executor
@@ -165,7 +166,7 @@ fn test_validation_passes_with_valid_graph() {
 #[test]
 fn test_validation_detects_multiple_broken_dependencies() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage.clone());
+    let executor = memory_executor(storage.clone());
 
     let (issue1_id, _) = executor
         .issues()
@@ -181,10 +182,9 @@ fn test_validation_detects_multiple_broken_dependencies() {
         )
         .unwrap();
 
-    // Manually add broken dependencies
+    // Manually add missing targets using canonical issue ids.
     let mut issue = storage.load_issue(&issue1_id).unwrap();
-    issue.dependencies.push("nonexistent1".to_string());
-    issue.dependencies.push("nonexistent2".to_string());
+    issue.dependencies.extend([issue_id(2), issue_id(3)]);
     jit::test_harness::seed_memory_issue(&storage, &issue);
 
     // Validation should fail
@@ -197,7 +197,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
 #[test]
 fn test_validation_empty_repository() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor(storage);
 
     // Empty repository should validate successfully
     assert!(executor.validate_silent().is_ok());
@@ -206,7 +206,7 @@ fn test_validation_empty_repository() {
 #[test]
 fn test_validation_detects_invalid_gate_reference() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage.clone());
+    let executor = memory_executor(storage.clone());
 
     // Create issue with gate requirement
     let (_issue, _) = executor
@@ -215,7 +215,7 @@ fn test_validation_detects_invalid_gate_reference() {
             "Task".to_string(),
             "".to_string(),
             Priority::Normal,
-            vec!["nonexistent-gate".to_string()],
+            vec!["nonexistent-gate".parse().unwrap()],
             vec![],
             None,
             None,
@@ -236,7 +236,7 @@ fn test_validation_detects_invalid_gate_reference() {
 fn test_validation_detects_isolated_issues() {
     let storage = InMemoryStorage::new();
     storage.add_data_file("config.toml", "");
-    let executor = crate::memory_executor(storage.clone());
+    let executor = memory_executor(storage.clone());
 
     // Create connected issues: A -> B
     let (issue_a_id, _) = executor
@@ -295,7 +295,7 @@ fn test_validation_detects_isolated_issues() {
 fn test_validation_passes_with_all_connected_issues() {
     let storage = InMemoryStorage::new();
     storage.add_data_file("config.toml", "");
-    let executor = crate::memory_executor(storage.clone());
+    let executor = memory_executor(storage.clone());
 
     // Create a connected graph: A -> B -> C
     let (issue_a_id, _) = executor
@@ -351,7 +351,7 @@ fn test_validation_passes_with_all_connected_issues() {
 #[test]
 fn test_validation_passes_with_single_issue() {
     let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage.clone());
+    let executor = memory_executor(storage.clone());
 
     // Create a single issue (edge case - should not be considered isolated)
     let (_issue_id, _) = executor

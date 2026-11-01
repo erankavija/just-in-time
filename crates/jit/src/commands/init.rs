@@ -237,7 +237,10 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 .unwrap_or(""),
         )
         .parse()?;
-        let (config, project_name) = match super::image_repo_bytes(&image, ".jit/config.toml")? {
+        let (config, project_name) = match super::image_virtual_bytes(
+            &image,
+            &crate::repository_state::VirtualPath::CONFIG,
+        )? {
             Some(bytes) => {
                 let config =
                     String::from_utf8(bytes).context("existing .jit/config.toml is not UTF-8")?;
@@ -270,28 +273,23 @@ fn init_response_paths(
     gitattributes: GitattributesStatus,
 ) -> Result<(Vec<String>, Vec<String>)> {
     let mut created = [
-        (".jit/index.json", "index.json"),
-        (".jit/gates.toml", "gates.toml"),
-        (".jit/invariants.toml", "invariants.toml"),
-        (".jit/events.jsonl", "events.jsonl"),
-        (".jit/config.toml", "config.toml"),
-        (".jit/rules.toml", "rules.toml"),
+        VirtualPath::INDEX,
+        VirtualPath::GATES,
+        VirtualPath::INVARIANTS,
+        VirtualPath::EVENTS,
+        VirtualPath::CONFIG,
+        VirtualPath::RULES,
     ]
     .into_iter()
-    .map(|(reported, relative)| {
-        let path = VirtualPath::data(relative)?;
-        Ok(plan
-            .delta()
+    .filter_map(|path| {
+        plan.delta()
             .actions()
             .iter()
             .find(|action| action.path() == &path)
             // Each of these paths is a file, so an absent preimage means it is created.
             .is_some_and(|action| *action.expected() == ExpectedPreimage::Absent)
-            .then(|| reported.to_string()))
+            .then(|| path.repository_relative())
     })
-    .collect::<Result<Vec<_>>>()?
-    .into_iter()
-    .flatten()
     .collect::<Vec<_>>();
     let mut modified = Vec::new();
 
@@ -386,9 +384,14 @@ fn worktree_is_git_work_tree(worktree: &Path) -> bool {
 /// The canonical `.jit/events.jsonl` passes through unchanged; patterns containing
 /// whitespace or a quote use Git's C-style quoting layer.
 fn git_events_pattern(relative: &Path) -> String {
-    let path = relative.to_string_lossy();
-    let mut escaped = String::with_capacity(path.len() + "/events.jsonl".len());
-    for ch in path.chars().chain("/events.jsonl".chars()) {
+    let path = relative.join(
+        crate::repository_state::VirtualPath::EVENTS
+            .relative()
+            .as_path(),
+    );
+    let path = path.to_string_lossy();
+    let mut escaped = String::with_capacity(path.len());
+    for ch in path.chars() {
         if ch == std::path::MAIN_SEPARATOR {
             escaped.push('/');
             continue;
@@ -493,6 +496,7 @@ mod tests {
             "back/slash/events.jsonl"
         );
     }
+    use crate::test_utils::file_executor;
     use std::thread;
     use tempfile::TempDir;
 
@@ -509,32 +513,10 @@ mod tests {
         }
     }
 
-    /// A file-backed executor carrying the canonical layout for `worktree`.
-    fn executor_with_layout(
-        storage: &JsonFileStorage,
-        worktree: &Path,
-    ) -> CommandExecutor<JsonFileStorage> {
-        let layout = discover_repository_layout(worktree, storage.root()).unwrap();
-        CommandExecutor::new(storage.clone()).with_layout(layout)
-    }
-
-    /// Assert the published repository validates cleanly through the closed-image
-    /// pipeline.
-    fn assert_repo_valid(worktree: &Path) {
-        let data = worktree.join(".jit");
-        let layout = discover_repository_layout(worktree, &data).unwrap();
-        CommandExecutor::new(JsonFileStorage::new(&data))
-            .with_layout(layout)
-            .validate_repository_report()
-            .unwrap()
-            .unwrap();
-    }
-
     #[test]
     fn test_fresh_init_publishes_complete_valid_repo_without_git() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
 
         let result = executor
             .initialize_fresh_repository(repo.path(), None)
@@ -555,16 +537,18 @@ mod tests {
             );
         }
         assert!(repo.path().join(".jit/issues").is_dir());
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     #[test]
     fn test_fresh_init_over_memory_store_writes_the_files_the_json_backend_writes() {
         let repo = TempDir::new().unwrap();
-        let json = JsonFileStorage::new(repo.path().join(".jit"));
-        executor_with_layout(&json, repo.path())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
+        let json = file_executor(repo.path()).unwrap();
+        json.initialize_fresh_repository(repo.path(), None).unwrap();
 
         let memory = crate::storage::InMemoryStorage::rooted_at(repo.path());
         let layout = memory.repository_layout();
@@ -581,44 +565,11 @@ mod tests {
             ".jit/events.jsonl",
             ".jit/rules.toml",
         ] {
-            let expected = json.read_repo_file(path).unwrap();
+            let expected = json.storage().read_repo_file(path).unwrap();
             assert!(expected.is_some(), "JSON backend wrote no {path}");
             assert_eq!(memory.read_repo_file(path).unwrap(), expected, "{path}");
         }
     }
-
-    /// The `invariant` item kind, declared by the repository itself.
-    ///
-    /// A kind is a declaration like any other, so a repository that applies no
-    /// package obtains one by writing it. This is the smallest declaration that
-    /// makes `@/invariant/<id>` resolve against `.jit/invariants.toml`.
-    const INVARIANT_KIND: &str = "\n[item_kinds.invariant]\n\
-section = \"success_criteria\"\n\
-id-pattern = \"[a-z][a-z0-9-]*\"\n\
-markers = []\n\
-link-namespaces = []\n\
-scope = \"project\"\n\
-source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
-source-of-truth = \"registry-first\"\n";
-
-    /// The `rule` and `gate` item kinds, declared by the repository itself, for
-    /// a case whose package contributes projections naming them.
-    const RULE_AND_GATE_KINDS: &str = "\n[item_kinds.rule]\n\
-section = \"success_criteria\"\n\
-id-pattern = \"[a-z][a-z0-9-]*\"\n\
-markers = []\n\
-link-namespaces = []\n\
-scope = \"project\"\n\
-source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"description\" }\n\
-source-of-truth = \"registry-first\"\n\
-\n[item_kinds.gate]\n\
-section = \"success_criteria\"\n\
-id-pattern = \"[a-z][a-z0-9-]*\"\n\
-markers = []\n\
-link-namespaces = []\n\
-scope = \"project\"\n\
-source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }\n\
-source-of-truth = \"registry-first\"\n";
 
     /// Write `config_toml` as the repository's configuration before it is
     /// initialized, which initialization preserves.
@@ -630,9 +581,11 @@ source-of-truth = \"registry-first\"\n";
     #[test]
     fn test_fresh_init_creates_the_invariant_registry_present_and_empty() {
         let repo = TempDir::new().unwrap();
-        declare_before_init(repo.path(), INVARIANT_KIND);
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        declare_before_init(
+            repo.path(),
+            &crate::test_utils::shipped_item_kind_tables(&["invariant"]),
+        );
+        let executor = file_executor(repo.path()).unwrap();
 
         let result = executor
             .initialize_fresh_repository(repo.path(), None)
@@ -658,15 +611,21 @@ source-of-truth = \"registry-first\"\n";
             .unwrap()
             .items
             .is_empty());
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     #[test]
     fn test_fresh_init_registry_resolves_an_authored_invariant_without_a_package() {
         let repo = TempDir::new().unwrap();
-        declare_before_init(repo.path(), INVARIANT_KIND);
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        declare_before_init(
+            repo.path(),
+            &crate::test_utils::shipped_item_kind_tables(&["invariant"]),
+        );
+        let executor = file_executor(repo.path()).unwrap();
         executor
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
@@ -687,12 +646,17 @@ source-of-truth = \"registry-first\"\n";
         )
         .unwrap();
 
-        let resolved = executor_with_layout(&storage, repo.path())
+        let resolved = file_executor(repo.path())
+            .unwrap()
             .show_item("@/invariant/authored-here")
             .unwrap();
         assert_eq!(resolved.item.self_id, "authored-here");
         assert!(resolved.issue_full_id.is_none());
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     /// The checked-in fixture tree every composition case below stages copies
@@ -730,7 +694,6 @@ source-of-truth = \"registry-first\"\n";
     #[test]
     fn test_fresh_profile_init_applies_the_packages_the_named_one_depends_on() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         // Two packages beside each other inside the worktree the repository is
         // created in, which is where an adopter puts an obtained set.
         crate::test_utils::write_package_declaring(
@@ -746,7 +709,8 @@ source-of-truth = \"registry-first\"\n";
             &["base"],
         );
 
-        let result = executor_with_layout(&storage, repo.path())
+        let result = file_executor(repo.path())
+            .unwrap()
             .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
@@ -793,7 +757,8 @@ source-of-truth = \"registry-first\"\n";
             publications.clone(),
         );
 
-        let result = executor_with_layout(&storage, repo.path())
+        let result = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(repo.path(), storage.root()).unwrap())
             .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
@@ -816,7 +781,6 @@ source-of-truth = \"registry-first\"\n";
     #[test]
     fn test_fresh_profile_init_refuses_a_conflicting_closure_before_scaffolding() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         composition_package_with_namespace(
             &repo,
             "packages/base",
@@ -832,7 +796,8 @@ source-of-truth = \"registry-first\"\n";
             "Workflow initialization definition.",
         );
 
-        let error = executor_with_layout(&storage, repo.path())
+        let error = file_executor(repo.path())
+            .unwrap()
             .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
@@ -849,7 +814,6 @@ source-of-truth = \"registry-first\"\n";
     #[test]
     fn test_fresh_profile_init_preserves_repeated_root_occurrences_in_order() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let location = repo.path().join("packages/workflow");
         crate::test_utils::write_package_declaring(
             &composition_package(),
@@ -858,7 +822,8 @@ source-of-truth = \"registry-first\"\n";
             &[],
         );
 
-        let result = executor_with_layout(&storage, repo.path())
+        let result = file_executor(repo.path())
+            .unwrap()
             .initialize_selected(
                 repo.path(),
                 &[
@@ -896,8 +861,7 @@ source-of-truth = \"registry-first\"\n";
     #[test]
     fn test_fresh_profile_init_applies_every_package_of_the_selected_closure() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
         // The set initialization has to apply is the selected package's whole
         // dependency closure. It is named from the staged package itself, so
         // the two sides reach it by different routes.
@@ -924,13 +888,16 @@ source-of-truth = \"registry-first\"\n";
             ids,
             "initialization applies the whole set the named profile resolves to"
         );
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     #[test]
     fn test_fresh_profile_init_applies_a_declared_dependency_under_a_retained_session() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         // The dependency is named and no location is supplied for it, so it is
         // resolved from the directory beside the package declaring it — the
         // shape an obtained set of packages arrives in.
@@ -945,15 +912,15 @@ source-of-truth = \"registry-first\"\n";
             "workflow",
             &["jit-default"],
         );
-        let layout = discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let executor = file_executor(repo.path()).unwrap();
         // The shape every `jit init` runs in: startup recovers and retains its
         // session, and initialization publishes and applies inside it.
-        let retained = storage
-            .open_and_retain_mutation_session(layout.clone())
+        let retained = executor
+            .storage()
+            .open_and_retain_mutation_session(executor.require_layout().unwrap())
             .unwrap();
 
-        let result = CommandExecutor::new(storage.clone())
-            .with_layout(layout)
+        let result = executor
             .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
@@ -1001,14 +968,17 @@ source-of-truth = \"registry-first\"\n";
             Vec::<&str>::new(),
             "each entry is a type the dependency declares that the published configuration lacks"
         );
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
         drop(retained);
     }
 
     #[test]
     fn test_fresh_profile_init_creates_no_repository_when_a_dependency_cannot_be_resolved() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         crate::test_utils::write_package_declaring(
             &composition_package(),
             &repo.path().join("packages/workflow"),
@@ -1016,7 +986,8 @@ source-of-truth = \"registry-first\"\n";
             &["absent-base"],
         );
 
-        let error = executor_with_layout(&storage, repo.path())
+        let error = file_executor(repo.path())
+            .unwrap()
             .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path(repo.path().join("packages/workflow"))],
@@ -1035,8 +1006,7 @@ source-of-truth = \"registry-first\"\n";
     #[test]
     fn test_fresh_profile_init_publishes_complete_valid_repo_without_git() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
 
         let result = executor
             .initialize_selected(
@@ -1076,7 +1046,11 @@ source-of-truth = \"registry-first\"\n";
         )
         .unwrap()
         .contains("planning"));
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     #[test]
@@ -1084,16 +1058,14 @@ source-of-truth = \"registry-first\"\n";
         let repo = crate::test_utils::profiled_repository_fixture(
             "jit-dogfood",
             crate::test_utils::PROFILE_PACKAGE_SOURCES,
-            None,
         )
         .unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let before_events = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
 
         // A second `jit init` is a fresh process that re-discovers the layout over
         // the now-published root; reuse of the first executor's absent-root layout
         // would be a test artifact, not the real re-init path.
-        let reinit = executor_with_layout(&storage, repo.path());
+        let reinit = file_executor(repo.path()).unwrap();
         let again = reinit
             .initialize_selected(
                 repo.path(),
@@ -1116,9 +1088,8 @@ source-of-truth = \"registry-first\"\n";
 
     #[test]
     fn test_single_profile_reinit_attributes_coupled_schema_repair() {
-        let repo = crate::test_utils::profiled_repository_fixture("jit-default", "packages", None)
-            .unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let repo =
+            crate::test_utils::profiled_repository_fixture("jit-default", "packages").unwrap();
         let schema = repo
             .path()
             .join(".jit/schemas/default-namespace-registry.json");
@@ -1127,7 +1098,8 @@ source-of-truth = \"registry-first\"\n";
         let events_path = repo.path().join(".jit/events.jsonl");
         let events_before = fs::read_to_string(&events_path).unwrap();
 
-        let repaired = executor_with_layout(&storage, repo.path())
+        let repaired = file_executor(repo.path())
+            .unwrap()
             .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path("packages/jit-default")],
@@ -1146,7 +1118,8 @@ source-of-truth = \"registry-first\"\n";
             "a coupled-only repair keeps the current per-profile audit event"
         );
 
-        let again = executor_with_layout(&storage, repo.path())
+        let again = file_executor(repo.path())
+            .unwrap()
             .initialize_selected(
                 repo.path(),
                 &[ProfileSelector::path("packages/jit-default")],
@@ -1165,8 +1138,7 @@ source-of-truth = \"registry-first\"\n";
     #[test]
     fn test_profiled_init_detects_projection_source_outside_final_capture() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
         executor
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
@@ -1178,6 +1150,7 @@ source-of-truth = \"registry-first\"\n";
             .project_name()
             .cloned()
             .unwrap();
+        // `race` is a custom kind; the default package does not ship it.
         config.push_str(
             "\n[item_kinds.race]\nsection = \"race\"\nid-pattern = \"R-[0-9]+\"\n\
              markers = []\nlink-namespaces = []\nscope = \"project\"\n\
@@ -1188,8 +1161,12 @@ source-of-truth = \"registry-first\"\n";
         // The package's own projections name the kinds its dependency declares,
         // and this case composes the package alone, so the repository declares
         // those kinds itself.
-        config.push_str(INVARIANT_KIND);
-        config.push_str(RULE_AND_GATE_KINDS);
+        config.push('\n');
+        config.push_str(&crate::test_utils::shipped_item_kind_tables(&[
+            "invariant",
+            "rule",
+            "gate",
+        ]));
         fs::write(
             repo.path().join("RACE.md"),
             "## Race\n\n- **R-1** — recaptured\n",
@@ -1251,8 +1228,8 @@ unique = true\n";
         // Re-initialization refreshes what the repository's own registry
         // generates, so the repository declares that registry first.
         declare_before_init(repo.path(), &taxonomy.config_fragment());
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        executor_with_layout(&storage, repo.path())
+        file_executor(repo.path())
+            .unwrap()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -1278,7 +1255,8 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         ) + authored_rule;
         fs::write(&rules_path, authored_rules).unwrap();
 
-        executor_with_layout(&storage, repo.path())
+        file_executor(repo.path())
+            .unwrap()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -1294,7 +1272,8 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         .contains("planning"));
 
         fs::write(&config_path, config.replace(SQUAD_NAMESPACE, "")).unwrap();
-        executor_with_layout(&storage, repo.path())
+        file_executor(repo.path())
+            .unwrap()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         let refreshed = fs::read_to_string(&rules_path).unwrap();
@@ -1318,8 +1297,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                 let location = Arc::clone(&location);
                 let barrier = Arc::clone(&barrier);
                 thread::spawn(move || {
-                    let storage = JsonFileStorage::new(repo.path().join(".jit"));
-                    let executor = executor_with_layout(&storage, repo.path());
+                    let executor = file_executor(repo.path()).unwrap();
                     barrier.wait();
                     executor.initialize_selected(
                         repo.path(),
@@ -1339,7 +1317,11 @@ assert = { require-section = { heading = \"Goals\" } }\n";
             .collect::<Vec<_>>();
         assert_eq!(winner.len(), 1);
         assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
-        assert_repo_valid(repo.path());
+        file_executor(repo.path())
+            .unwrap()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
         let events = fs::read_to_string(repo.path().join(".jit/events.jsonl")).unwrap();
         assert_eq!(
             events.lines().count(),
@@ -1351,7 +1333,6 @@ assert = { require-section = { heading = \"Goals\" } }\n";
     #[test]
     fn test_profiled_init_runs_each_selection_stage_once_per_invocation() {
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         crate::test_utils::write_package_declaring(
             &composition_package(),
             &repo.path().join("packages/base"),
@@ -1364,7 +1345,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
             "workflow",
             &["base"],
         );
-        let executor = executor_with_layout(&storage, repo.path());
+        let executor = file_executor(repo.path()).unwrap();
         let location = repo.path().join("packages/workflow");
         let closure = executor
             .resolve_profile_closure(&ProfilePackage::from_directory(&location).unwrap())

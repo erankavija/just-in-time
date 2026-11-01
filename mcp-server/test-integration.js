@@ -615,8 +615,7 @@ async function main() {
         const shown = await profileCall('jit_profile_show', {
           profile: [workflowLocation],
         });
-        assert.strictEqual(shown.count, 1);
-        assert.strictEqual(shown.profiles.length, shown.count);
+        assert.strictEqual(shown.profiles.length, 1);
         assert.strictEqual(shown.profiles[0].manifest.id, 'workflow');
         assert.deepStrictEqual(shown.profiles[0].origin, {
           source: 'directory',
@@ -626,7 +625,6 @@ async function main() {
         const repeatedShown = await profileCall('jit_profile_show', {
           profile: [workflowLocation, workflowLocation],
         });
-        assert.strictEqual(repeatedShown.count, 2);
         assert.deepStrictEqual(
           repeatedShown.profiles.map(profile => profile.manifest.id),
           ['workflow', 'workflow']
@@ -639,8 +637,7 @@ async function main() {
           profile: [baseLocation],
           'dry-run': true,
         });
-        assert.strictEqual(basePreview.count, 1);
-        assert.strictEqual(basePreview.profiles.length, basePreview.count);
+        assert.strictEqual(basePreview.profiles.length, 1);
         assert.strictEqual(basePreview.profiles[0].status, 'would_apply');
 
         // An application reports the aggregate observations: dependency-only
@@ -648,7 +645,6 @@ async function main() {
         const applied = await profileCall('jit_profile_apply', {
           profile: [workflowLocation],
         });
-        assert.strictEqual(applied.count, applied.profiles.length);
         const appliedProfileIds = applied.profiles.map(profile => profile.id);
         const expectedProfileIds = [
           ...shown.profiles[0].manifest.dependency.map(dependency => dependency.id),
@@ -668,7 +664,6 @@ async function main() {
           profile: [workflowLocation],
           'dry-run': true,
         });
-        assert.strictEqual(preview.count, preview.profiles.length);
         const workflowPreview = preview.profiles.find(profile => profile.id === 'workflow');
         assert.ok(workflowPreview.targets.some(target => target.path === 'docs/workflow.txt'));
         assert.ok(preview.profiles.every(profile => profile.status === 'unchanged'));
@@ -686,7 +681,6 @@ async function main() {
           profile: [betaLocation, alphaLocation, betaLocation],
           'dry-run': true,
         });
-        assert.strictEqual(orderedPreview.count, 3);
         assert.deepStrictEqual(
           orderedPreview.profiles.map(profile => profile.id),
           ['beta', 'alpha', 'beta']

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4abae3c9fbf005b976b9d1265f53ba0c1c9c08d8",
+  "completed_at": "2026-10-27T21:58:27.123465869Z",
+  "duration_ms": 236770,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Archive fixture migration uses shared constructors and resolves the prior duplicate-owner finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b469f36d-8fb3-4e73-a199-765c289dfe88",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4b6d3e4e-2321-4713-9e68-392ca1e7dc1c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T21:54:30.352909129Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 737327eb, 43cb9fc9, e942530d, 4abae3c9\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/b469f36d/requirement/REQ-01..REQ-04; @/issue/c780514e/requirement/REQ-05; @/charter/D-18; @/invariant/shared-test-contracts; @/gate/cargo-ci\nGate evidence: cargo-ci passed (2026-10-27T21:54:20Z; exit code unavailable); prior code-review failed, and its duplicate-owner finding is resolved by e942530d\nTruncation recovery: recovered 737327eb archive.rs patch in bounded ranges 1–420, 421–840, 841–1260, and 1261–1553\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Archive fixture migration uses shared constructors and resolves the prior duplicate-owner finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

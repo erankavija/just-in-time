@@ -19,12 +19,16 @@ Using the creation key→UUID evidence and stored records, verify:
 
 Repeat the finest-tier assignment simulation:
 
-| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused implementation/review cycle | No inner decomposition | No mixed deliverables | Result |
-|---|---|---|---|---|---|---|---|---|
+| Key / issue | Coherent change | Observable test boundary | Footprint credible | One focused implementation/review cycle | Not a chain link | Result |
+|---|---|---|---|---|---|---|
 
-Fail a row only when the mis-sizing is material: the worker could not deliver
-the issue in one focused cycle, or the scope genuinely mixes deliverable
-classes. A borderline row or stylistic sizing concern is an advisory note.
+Fail a row only when the mis-sizing is material. Oversize: the worker could not
+deliver the issue in one focused cycle, or it combines implementation with
+release. Undersize: the issue only links a producer-to-remover chain or a bridge
+pair that one task within the module would deliver. Adding a form, moving its
+callers, and deleting the old form within one module is one coherent change. A
+created graph over the validator's issue budget is blocking. A borderline row or
+stylistic sizing concern is an advisory note.
 Judge every visible per-code override. A shared `landing_group` or single final
 landing never excuses oversized implementation work. Do not recount
 criterion labels; the separate coverage gate owns deterministic coverage.

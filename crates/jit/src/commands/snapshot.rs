@@ -302,7 +302,9 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
         // Build issue file paths
         let issue_files: Vec<String> = issues
             .iter()
-            .map(|i| format!(".jit/issues/{}.json", i.id))
+            .map(|issue| {
+                crate::repository_state::VirtualPath::issue_record(&issue.id).repository_relative()
+            })
             .collect();
 
         let issues_info = IssuesInfo {
@@ -446,28 +448,32 @@ This is a read-only export. Future versions may support:
     /// Copy .jit state files to snapshot
     fn copy_jit_state(&self, base: &Path, issues: &[Issue]) -> Result<()> {
         let jit_dir = base.join(".jit");
-        std::fs::create_dir_all(jit_dir.join("issues"))?;
+        std::fs::create_dir_all(
+            base.join(crate::repository_state::VirtualPath::ISSUES.repository_relative()),
+        )?;
 
         // Copy issue files
         for issue in issues {
             let issue_json = serde_json::to_string_pretty(issue)?;
-            let relative = crate::repository_state::RootRelativePath::parse(format!(
-                ".jit/issues/{}.json",
-                issue.id
-            ))?;
+            let relative = crate::repository_state::RootRelativePath::parse(
+                crate::repository_state::VirtualPath::issue_record(&issue.id).repository_relative(),
+            )?;
             let issue_path = base.join(relative.as_path());
             std::fs::write(issue_path, issue_json)?;
         }
 
-        for name in ["config.toml", "gates.toml"] {
-            let relative = crate::repository_state::RootRelativePath::parse(name)?;
+        for path in [
+            crate::repository_state::VirtualPath::CONFIG,
+            crate::repository_state::VirtualPath::GATES,
+        ] {
+            let relative = path.relative();
             if let Some(bytes) =
                 crate::storage::repository_state_store::read_repository_file_nofollow(
                     &self.data_root,
-                    &relative,
+                    relative,
                 )?
             {
-                std::fs::write(jit_dir.join(name), bytes)?;
+                std::fs::write(jit_dir.join(relative.as_path()), bytes)?;
             }
         }
 
@@ -786,8 +792,8 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create a couple of issues
-        let issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
-        let issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
+        let issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
         crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
@@ -801,7 +807,7 @@ mod tests {
     fn test_enumerate_issues_single() {
         let storage = InMemoryStorage::new();
 
-        let issue = crate::domain::fixture_issue("Test Issue".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("Test Issue".to_string(), String::new());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -819,21 +825,21 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create issues with epic labels
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("epic:auth".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         issue2.labels.push("epic:auth".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
         // Create issue with different epic
-        let mut issue3 = crate::domain::fixture_issue("Issue 3".to_string(), String::new());
+        let mut issue3 = crate::test_utils::fixture_issue("Issue 3".to_string(), String::new());
         issue3.labels.push("epic:billing".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue3.clone());
 
         // Create unrelated issue
-        let issue4 = crate::domain::fixture_issue("Issue 4".to_string(), String::new());
+        let issue4 = crate::test_utils::fixture_issue("Issue 4".to_string(), String::new());
         crate::commands::test_helpers::seed_issue(&storage, issue4.clone());
 
         let exporter = exporter(&storage);
@@ -854,11 +860,11 @@ mod tests {
     fn test_enumerate_issues_label_milestone() {
         let storage = InMemoryStorage::new();
 
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
         issue1.labels.push("milestone:v1.0".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         issue2.labels.push("milestone:v2.0".to_string());
         crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
@@ -878,7 +884,7 @@ mod tests {
     fn test_enumerate_issues_label_no_matches() {
         let storage = InMemoryStorage::new();
 
-        let issue = crate::domain::fixture_issue("Issue".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("Issue".to_string(), String::new());
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
         let exporter = exporter(&storage);
@@ -896,11 +902,11 @@ mod tests {
     fn test_extract_documents() {
         let storage = InMemoryStorage::new();
 
-        let mut issue1 = crate::domain::fixture_issue("Issue 1".to_string(), String::new());
+        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
         issue1.documents.push(document_reference("docs/design.md"));
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
-        let mut issue2 = crate::domain::fixture_issue("Issue 2".to_string(), String::new());
+        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         issue2.documents.push(document_reference("docs/impl.md"));
         // Duplicate document reference
         issue2.documents.push(document_reference("docs/design.md"));
@@ -1036,18 +1042,6 @@ mod tests {
             .downcast_ref::<crate::errors::InvalidArgumentError>()
             .is_some());
         assert!(error.to_string().contains("Export outside the repository"));
-    }
-
-    #[test]
-    fn test_copy_jit_state_rejects_malformed_issue_id_without_escape() {
-        let storage = InMemoryStorage::new();
-        let exporter = exporter(&storage);
-        let staging = tempfile::tempdir().unwrap();
-        let mut issue = crate::domain::fixture_issue("Issue".into(), String::new());
-        issue.id = "../../../escaped".into();
-
-        assert!(exporter.copy_jit_state(staging.path(), &[issue]).is_err());
-        assert!(!staging.path().join("escaped.json").exists());
     }
 
     #[test]

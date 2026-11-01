@@ -112,8 +112,8 @@ A wave of N worktrees pays the project's full dependency compilation N times. Th
 
 - **Location.** `LEAD_CACHE_POOL`, default `<repo>/.agents/cache-pool`; point it at a roomier disk-backed filesystem when the repo's disk is tight. Neither the pool nor any worktree cache goes on tmpfs: caches run to RAM-sized multiples, and a full tmpfs fails process spawning host-wide.
 - **Layout.** One subdirectory per cache-directory name, mirroring the worktree root: `pool/<name>` seeds and harvests `worktree/<name>`.
-- **Seed on dispatch** (automatic): each new worktree receives every pool entry, hardlinked when pool and worktree share a filesystem, copied otherwise.
-- **Harvest on reclaim** (automatic): every git-ignored top-level directory of the worktree — build outputs and dependency caches are ignored by definition — merges back into the pool, newest file wins. Set `LEAD_CACHE_DIRS` to name the directories explicitly when that default is too broad.
+- **Seed on dispatch** (automatic): each new worktree receives every pool entry, hardlinked when pool and worktree share a filesystem, copied otherwise. Anything under a directory named `build`, every `*.d` file, and every entry whose name starts with `.`, at any depth, is always copied, because build tools rewrite or lock them in place. A worktree seeded before this rule keeps its shared inodes until reseeded.
+- **Harvest on reclaim** (automatic): every git-ignored top-level directory of the worktree — build outputs and dependency caches are ignored by definition — merges back into the pool, newest file wins. A harvested file replaces the pool's file rather than writing through it. Set `LEAD_CACHE_DIRS` to name the directories explicitly when that default is too broad.
 - **Growth.** Stale artifacts accumulate across revisions. Once the pool outgrows the host, delete it and let the next harvest rebuild it warm — it is a cache, never a source of truth.
 - **Sandboxed workers.** A worker whose sandbox cannot write outside its worktree (observed with codex linked-checkout workspaces) must leave its toolchain's build-output and cache directories at their in-worktree defaults; dispatch-time seeding still reaches it.
 
@@ -170,6 +170,6 @@ The scripts live in this skill's `scripts/` subdirectory and are project-agnosti
 - `.agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh`
 - `.agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh`
 
-Read them directly if you need to understand the invariants. They are shellcheck-clean and smoke-tested. Their only configuration is the optional `LEAD_CACHE_POOL` and `LEAD_CACHE_DIRS`.
+Read them directly if you need to understand the invariants. They are shellcheck-clean and smoke-tested. Their only configuration is the optional `LEAD_CACHE_POOL`, `LEAD_CACHE_DIRS` and `LEAD_SNAPSHOT_DIR`.
 
 Do **not** copy the scripts into individual project trees — the canonical copy lives with the skill, and projects should reference them via the relative path conventions used in this protocol so improvements propagate to every project automatically.

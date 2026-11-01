@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T22:06:43.681493208Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Move the git-backed claim, worktree, checkout, init and document-history tests in `crates/jit/tests/cli_repo_workflow` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\nThese files hold most of the suite's hand-rolled git: `claim_integration_tests.rs` (68 binary sites), `worktree_cli_tests.rs` (38), `cross_worktree_integration_tests.rs` and `init_tests.rs` each run git directly, and `lock_contention_tests.rs` has a private `git_repository_with_jit`.\n\nThis entry covers `archive_preview_cli_tests.rs`, `doc_show_tests.rs`, `document_history_tests.rs`, `derived_documents_cli_tests.rs`.\n\n`initialized_repo` in `doc_show_tests.rs` is also called from `artifact_conformance_cli_tests.rs` and `document_asset_scan_tests.rs`, whose own migration moves them to the shared fixture before this entry retires the helper.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs`: `initialize_with_policy` (`:135`).\n- `crates/jit/tests/cli_repo_workflow/doc_show_tests.rs`: `initialized_repo` (`:176`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper other than the shared fixture's, including one defined in another test file; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-03: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-04: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
   "documents": [],
+  "done_at": "2026-10-28T23:06:00.344307417Z",
+  "first_ready_at": "2026-10-27T00:50:03.906263171Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "dfbd764d-0b8e-4128-b54f-80db0b82de72",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:01:39.834890594Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "05470da4-ed81-4092-a027-a4aa1dc07fd2",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:05:37.201000432Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "26cbc32e-975d-472c-8d5c-27689577b253",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "document and archive tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T23:06:00.344307417Z"
 }

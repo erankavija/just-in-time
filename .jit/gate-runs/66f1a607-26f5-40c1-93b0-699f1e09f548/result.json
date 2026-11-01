@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f3ec4c23fb7b0aeec8cb40aebab3f9a48e0d12b1",
+  "completed_at": "2026-11-01T00:59:17.508820297Z",
+  "duration_ms": 148935,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The current cross-worktree tests use the shared fixture and obtain created IDs from JSON output; no issue-impact defects were found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b8c21611-e798-4674-a0a4-fa1a5688a16c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "66f1a607-26f5-40c1-93b0-699f1e09f548",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T00:56:48.573117093Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fallback: no reachable commit contains `jit:b8c21611`\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/issue/c780514e/requirement/REQ-05 (issue description); @/charter/D-18 (charter); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T00:56:03Z); code-review pending\nTruncation recovery: none\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current cross-worktree tests use the shared fixture and obtain created IDs from JSON output; no issue-impact defects were found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

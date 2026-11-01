@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "4d834432-bb39-4ffc-9683-7dba55c3d06e"
+  ],
+  "description": "Give storage one atomic file-publication core over a parent directory handle, a stage-write-rename sequence with an explicit durability argument and a stage name unique to each writer, with the redo put and the external export writers as its callers, and delete the export stage-name counter.\n\n## Background\n\n- The redo put (`put_file`, `crates/jit/src/storage/redo_apply.rs:233-242`) stages with `write_staged_file` (`redo_apply.rs:256-270`: `create_new`, no-follow, mode, `sync_all`), renames, then syncs the directory as the redo applier's sync policy prescribes. Its stage name comes from `staged_name` (`redo_apply.rs:245-247`, `.redo.<uuid>.tmp`), owned by `test_staged_name_is_unique_across_calls` (`redo_apply.rs:905`) and `test_staged_name_is_reclaimed_by_the_orphan_temp_sweep` (`redo_apply.rs:918`).\n- `write_staged_file` has a second caller: `stage_new_data_root` writes each file of a new data root's stage directory through it under its final name, with no rename (`crates/jit/src/storage/init_publish.rs:63`, imported at `:13`); the whole stage directory is published by one no-replace rename.\n- `write_external_export_atomic` (`crates/jit/src/storage/external_publish.rs:48-90`) is capability-based: synced file, parent revalidation before the rename (`revalidate_external_parent`, `:92-105`), directory sync; its stage name is `.{name}.{pid}.{seq}.tmp` from the module `COUNTER` (`:31`, `:68-70`). `external_temp_name` (`:278-285`) draws the stage names of the no-replace file and directory publishers (`:120`, `:186`) from the same counter.\n- The path-based `write_file_atomic*` writers and their counter are already gone with the user-configuration store (ea5f4536), so the export writers are the last storage writers with a stage-name counter of their own.\n\n## Success Criteria\n\n- [hard] REQ-01: Storage has one publication core, which lives with its stage writer in `crates/jit/src/storage/atomic_write.rs` with `pub(in crate::storage)` visibility, outside every module the cutover scan's `REPOSITORY_STATE_PUBLISHERS` names (`crates/jit/tests/scratch_build/repository_state_cutover_tests.rs:582-599`), so the scan classifies the core's callers. It takes a parent directory handle, a leaf, bytes, a file mode and a durability value: `Full` syncs the file and then the parent directory after the rename, `Deferred` syncs the file and leaves the directory sync to the caller.\n- [hard] REQ-02: Stage names come from one generator that embeds a random UUID and ends in `.tmp`, so the orphan temp sweep reclaims them; `staged_name` no longer exists.\n- [hard] REQ-03: `write_staged_file` becomes the core's stage writer, moved beside the core; the core and `stage_new_data_root` both call it, and storage holds no other create-new, write and sync sequence for a staged file. The redo put publishes through the core with `Deferred`, so the redo applier keeps its directory-sync policy and the redo conformance suite passes unchanged.\n- [hard] REQ-04: Unit tests owned by the core show that a failed write or rename leaves the previous target and no stage behind, that `Full` reports a directory-sync failure, and that stage names from concurrent writers to one target are distinct and reclaimed by the orphan sweep (replacing the two `staged_name` tests).\n- [hard] REQ-05: `write_external_export_atomic` publishes through the core with `Full`, keeping its parent revalidation before the rename, and the no-replace file and directory publishers take their stage names from the core's generator; `external_temp_name` and the `external_publish.rs` `COUNTER` no longer exist.\n- [hard] REQ-06: The external export suites pass unchanged, and an export test shows a published export leaves no stage file beside its destination.\n\n## Notes\n\n- Behaviour change: external export stage names change form; their visibility and cleanup are unchanged.\n- If the redo conformance snapshot filters leftover stages by the `.redo.` prefix, its filter follows the generator's form.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "7fefd776-6e85-428d-a386-a1512c0a94a1",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:storage-primitives",
+    "component:storage",
+    "per:@/charter/D-20",
+    "per:@/charter/D-17",
+    "satisfies:b697a3f7/REQ-17"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "One atomic file publication with a durability argument serves the redo put and external exports",
+  "updated_at": "2026-10-24T21:22:37.717854234Z"
+}

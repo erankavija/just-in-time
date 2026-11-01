@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "81b32fb4211d06881f614fa3b16f26faac4d59ab",
+  "completed_at": "2026-11-01T01:03:07.651550032Z",
+  "duration_ms": 162130,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/test_utils.rs",
+        "id": "F1",
+        "line": 545,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/955aaa9a/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "A successful later retry can erase the failure record before every original waiter receives the failed build's cause."
+      }
+    ],
+    "summary": "A successful later retry can erase a build failure before all original waiters observe its cause.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "955aaa9a-34f7-4304-bed1-ad8102185253",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "394509a8-4768-461b-9729-9711df855d25",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T01:00:25.521016017Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3535 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1949f-3ada-7110-ba1b-c1c9b5be7cf4\n--------\nuser\n--- 3522 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 61a07d756, 934cf05a8, 81b32fb42 (jit:955aaa9a)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/955aaa9a/requirement/REQ-01, REQ-02, REQ-03 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T00:58:45Z); code-review pending\nTruncation recovery: none\n\n1. **F1 — blocking, issue-impact:** The failure handoff can be deleted before every original waiter observes it. A later caller can snapshot the failed record at line 491, win the non-fair exclusive-lock race ahead of an already-waiting caller, retry successfully, and delete the record at line 545. The original waiter then sees the published entry at line 519 and succeeds without receiving the failed build’s cause. This violates REQ-02’s requirement that every waiter receive that cause. The existing test covers only waiters without a concurrent later retry. [crates/jit/src/test_utils.rs:545](@/crates/jit/src/test_utils.rs:545)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A successful later retry can erase a build failure before all original waiters observe its cause.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A successful later retry can erase the failure record before every original waiter receives the failed build's cause.\",\"file\":\"crates/jit/src/test_utils.rs\",\"line\":545,\"references\":[\"@/issue/955aaa9a/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:planning-lead-c780514e",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:38.161156614Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
@@ -11,11 +11,26 @@
   ],
   "description": "Move the `fast_docs_templates` integration suite onto typed, canonical issue ids.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The `crates/jit/tests/fast_docs_templates` suite holds id-carrying helpers, string id assertions and some literal non-UUID ids, for example `PlanTarget::Container { id: \"<uuid>\".to_string() }` at `fast_docs_templates/artifact_plan_model_tests.rs:24` and the id helpers at `fast_docs_templates/template_binding_tests.rs:146,222`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in `crates/jit/tests/fast_docs_templates` that builds an issue, an event, a gate-run result or a lease uses a non-UUID issue id; each takes its id from the shared fixture or from an id the command under test returned.\n- [hard] REQ-02: Helpers in `crates/jit/tests/fast_docs_templates` take and return issue ids as `IssueId`, and assertions compare ids as `IssueId` values or through `as_str()`.\n- [hard] REQ-03: Suite helpers take `&IssueId` and pass `&IssueId` onward, so callees that still take `&str` accept them through deref coercion.\n- [hard] REQ-04: Hierarchy vector tests keep their vector node ids, and a test that asserted a literal id asserts the relationship it cares about instead.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
   "documents": [],
+  "done_at": "2026-10-29T00:07:36.426112401Z",
+  "first_ready_at": "2026-10-28T23:10:54.971524493Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "852f0405-1f9e-4530-bbfb-3f4004be92a0",
+      "status": "passed",
+      "updated_at": "2026-10-29T00:07:29.547627644Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9b198b85-7019-4307-b345-5eb1f62c7dcb",
+      "status": "passed",
+      "updated_at": "2026-10-29T00:06:35.251044234Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b73b3e5a-87d4-455a-961d-20c88a3a7039",
   "labels": [
     "type:task",
@@ -29,7 +44,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "The fast_docs_templates suite carries typed canonical issue ids",
-  "updated_at": "2026-10-22T14:28:39.311245051Z"
+  "updated_at": "2026-10-29T00:07:36.426112401Z"
 }

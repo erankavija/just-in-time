@@ -14,53 +14,18 @@
 //!    baked built-ins.
 
 use jit::repository_state::{Contribution, MapEntryTarget};
+use jit::test_cli::JitCli;
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
 
 /// The package carrying the generic vocabulary, including the item kinds.
 const DEFAULT_PACKAGE: &str = "jit-default";
 
-/// Initialize a fresh repository in a tempdir with that package applied.
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let location = format!("packages/{DEFAULT_PACKAGE}");
-    jit::test_utils::capture_repository_package(DEFAULT_PACKAGE, &temp.path().join(&location))
-        .expect("this repository's default package captures");
-    let output = Command::new(jit_binary())
-        .args(["init", "--profile", &location])
-        .current_dir(temp.path())
-        .output()
-        .expect("failed to run jit init");
-    assert!(
-        output.status.success(),
-        "jit init --profile {DEFAULT_PACKAGE} failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    temp
-}
-
 /// Run `jit item list [--kind <kind>] --json` and return the parsed JSON.
-fn item_list(repo: &Path, kind: Option<&str>) -> Value {
-    let mut cmd = Command::new(jit_binary());
-    cmd.arg("item").arg("list");
-    if let Some(k) = kind {
-        cmd.arg("--kind").arg(k);
-    }
-    cmd.arg("--json");
-    let output = cmd.current_dir(repo).output().unwrap();
-    assert!(
-        output.status.success(),
-        "jit item list failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).unwrap()
+fn item_list(cli: &JitCli, kind: Option<&str>) -> Value {
+    let kind_args = kind.into_iter().flat_map(|kind| ["--kind", kind]);
+    cli.run_json(["item", "list"].into_iter().chain(kind_args))
+        .expect("jit item list failed")
 }
 
 /// The item kinds the default package declares, keyed by kind name.
@@ -88,9 +53,12 @@ fn declared_item_kinds() -> BTreeMap<String, Value> {
 fn test_init_emits_item_kinds_table_the_package_declares() {
     // REQ-04, clause 1: the written `[item_kinds]` table carries exactly the
     // kinds the applied package declares, each with the declaration it gave.
-    let temp = setup_test_repo();
+    let cli = JitCli::with_repository(
+        jit::test_utils::profiled_repository_fixture(DEFAULT_PACKAGE, "packages")
+            .expect("clone a coherent default-package repository fixture"),
+    );
     let config: Value = toml::from_str::<toml::Value>(
-        &std::fs::read_to_string(temp.path().join(".jit").join("config.toml")).unwrap(),
+        &std::fs::read_to_string(cli.root().join(".jit").join("config.toml")).unwrap(),
     )
     .unwrap()
     .try_into()
@@ -118,9 +86,12 @@ fn test_init_emits_the_namespaces_the_registry_first_kinds_link_through() {
     // registry, so a label linking to one is authored against a namespace that
     // must itself be declared — otherwise it would fail the namespace-registry
     // rule even though the item it names resolves (REQ-02, jit:d30695e4).
-    let temp = setup_test_repo();
+    let cli = JitCli::with_repository(
+        jit::test_utils::profiled_repository_fixture(DEFAULT_PACKAGE, "packages")
+            .expect("clone a coherent default-package repository fixture"),
+    );
     let config = toml::from_str::<toml::Value>(
-        &std::fs::read_to_string(temp.path().join(".jit").join("config.toml")).unwrap(),
+        &std::fs::read_to_string(cli.root().join(".jit").join("config.toml")).unwrap(),
     )
     .unwrap();
     let namespaces = config["namespaces"]
@@ -160,49 +131,38 @@ fn test_init_authored_table_indexes_all_kinds() {
     // `invariants.toml` below, which this test writes by hand. `gate`'s registry
     // (`.jit/gates.toml`) starts EMPTY, so this test defines one gate through
     // the real `jit gate define` CLI before asserting.
-    let temp = setup_test_repo();
+    let cli = JitCli::with_repository(
+        jit::test_utils::profiled_repository_fixture(DEFAULT_PACKAGE, "packages")
+            .expect("clone a coherent default-package repository fixture"),
+    );
 
     let issue_body = "\
 ## Success Criteria\n\n- [hard] REQ-01: writes are atomic\n\n\
 ## Decisions\n\n- D-01: store issues as JSON\n\n\
 ## Risks\n\n- RISK-01: concurrent writers\n";
-    let output = Command::new(jit_binary())
-        .args([
-            "issue", "create", "-t", "fixture", "-d", issue_body, "--json",
-        ])
-        .current_dir(temp.path())
-        .output()
+    let id = cli
+        .create_issue(["-t", "fixture", "-d", issue_body])
         .unwrap();
-    assert!(output.status.success(), "issue create failed");
-    let created: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let short: String = created["id"].as_str().unwrap().chars().take(8).collect();
+    let short: String = id.chars().take(8).collect();
 
     std::fs::write(
-        temp.path().join(".jit").join("invariants.toml"),
+        cli.root().join(".jit").join("invariants.toml"),
         "[[invariants]]\nid = \"acyclic\"\nstatement = \"acyclic\"\nkind = \"enforced\"\n",
     )
     .unwrap();
 
-    let define_output = Command::new(jit_binary())
-        .args([
-            "gate",
-            "define",
-            "cargo-ci",
-            "--title",
-            "Cargo CI",
-            "--description",
-            "Full Rust CI pipeline must pass.",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(
-        define_output.status.success(),
-        "gate define failed: {}",
-        String::from_utf8_lossy(&define_output.stderr)
-    );
+    cli.run([
+        "gate",
+        "define",
+        "cargo-ci",
+        "--title",
+        "Cargo CI",
+        "--description",
+        "Full Rust CI pipeline must pass.",
+    ])
+    .expect("gate define failed");
 
-    let all = item_list(temp.path(), None);
+    let all = item_list(&cli, None);
     let kinds: Vec<&str> = all["items"]
         .as_array()
         .unwrap()
@@ -232,37 +192,34 @@ fn test_no_item_kinds_table_indexes_nothing() {
     // REQ-04, clause 3 (no built-ins): with the `[item_kinds]` table removed, a
     // repo carrying issue criteria AND an invariants registry indexes NOTHING —
     // there are no baked default kinds.
-    let temp = setup_test_repo();
+    let cli = JitCli::with_repository(
+        jit::test_utils::profiled_repository_fixture(DEFAULT_PACKAGE, "packages")
+            .expect("clone a coherent default-package repository fixture"),
+    );
 
     let issue_body = "\
 ## Success Criteria\n\n- [hard] REQ-01: writes are atomic\n\n\
 ## Decisions\n\n- D-01: store issues as JSON\n\n\
 ## Risks\n\n- RISK-01: concurrent writers\n";
-    let output = Command::new(jit_binary())
-        .args([
-            "issue", "create", "-t", "fixture", "-d", issue_body, "--json",
-        ])
-        .current_dir(temp.path())
-        .output()
+    cli.create_issue(["-t", "fixture", "-d", issue_body])
         .unwrap();
-    assert!(output.status.success(), "issue create failed");
 
     std::fs::write(
-        temp.path().join(".jit").join("invariants.toml"),
+        cli.root().join(".jit").join("invariants.toml"),
         "[[invariants]]\nid = \"acyclic\"\nstatement = \"acyclic\"\nkind = \"enforced\"\n",
     )
     .unwrap();
 
     // Strip the [item_kinds] table: write a config with none.
     std::fs::write(
-        temp.path().join(".jit").join("config.toml"),
+        cli.root().join(".jit").join("config.toml"),
         "[version]\nschema = 2\n",
     )
     .unwrap();
 
-    let all = item_list(temp.path(), None);
+    let all = item_list(&cli, None);
     assert_eq!(
-        all["count"].as_u64().unwrap(),
+        all["items"].as_array().unwrap().len(),
         0,
         "with no [item_kinds] table there are no kinds (no baked built-ins): {all}"
     );

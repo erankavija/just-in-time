@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-25T00:55:49.200816969Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Move the profile, apply, preset and template-binding tests in `crates/jit/tests/cli_repo_workflow` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\nThe profile files are the suite's largest (`profile_cli_tests.rs` 2,664 lines, `profile_acceptance_tests.rs` 1,323), and `profile_acceptance_tests.rs` removes chosen `JIT_*` variables by hand.\n\nThis entry covers `profile_acceptance_tests.rs`, `profile_cli_tests.rs`, `profile_concurrency_tests.rs`, `profile_no_git_lifecycle_tests.rs`, `profile_publication_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper other than the shared fixture's, including one defined in another test file; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-02: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-03: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
   "documents": [],
+  "done_at": "2026-10-26T23:39:00.816207338Z",
   "first_ready_at": "2026-10-22T15:46:59.611675863Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c803d519-ed9e-452c-94f2-93567b7fb823",
+      "status": "passed",
+      "updated_at": "2026-10-26T22:57:20.993190473Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "dd4a5218-d252-4db2-91cb-aa0b1f490709",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:02:04.897333414Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "37218dff-534d-40e5-b70d-f7c9fa60bea3",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "profile tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-22T15:46:59.611675863Z"
+  "updated_at": "2026-10-26T23:39:00.816207338Z"
 }

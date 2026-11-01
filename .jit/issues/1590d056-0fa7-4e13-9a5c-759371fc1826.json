@@ -1,0 +1,47 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T22:01:08.014378712Z",
+  "context": {},
+  "created_at": "2026-10-26T22:00:38.865158220Z",
+  "dependencies": [
+    "2b49f95b-c99f-4182-bb55-252efa30eea9"
+  ],
+  "description": "Give the shared CLI process fixture the three capabilities migrated tests still reach around it for: committing its repository, spawning an alternate binary, and setting up a linked checkout.\n\n## Background\n\nThe shared fixture in `crates/jit/src/test_cli.rs` (`JitCli`) owns a temporary repository, spawns the `jit` binary of the calling integration target with no inherited `JIT_*` variable, and initialises git with a fixed author identity on request. Three groups of tests cannot move onto it, because it lacks:\n\n- **A commit.** It initialises git but cannot stage and commit, so `HEAD` never resolves. `cli_gate/gate_evaluate_all_test.rs` (8 tests) and `cli_gate/gate_evaluate_rerun_test.rs` (2 tests) need a resolved `HEAD`, and so do the failure-probe tests in `cli_issue/command_exit_code_projection_tests.rs` whose probes include `claim renew`.\n- **An alternate binary.** `cli_issue/command_exit_code_projection_tests.rs::test_command_exit_codes_serve_foreground_passthrough_is_dual_form` copies the `jit` binary beside a stub `jit-server` and spawns the copy. The fixture only spawns the target binary, so this test builds its own `Command` without the environment scrub.\n- **A linked checkout.** `cli_repo_workflow/linked_checkout_write_policy_tests.rs::linked_checkout_fixture` hand-rolls `git init`, its own author identity, `jit init`, a machine-local `.gitignore`, a base commit and `git worktree add`. `divergence_recovery_journey_tests.rs`, `derived_documents_cli_tests.rs` and the failure-probe tests (probe `worktree store-divergence`) depend on that shape.\n\n## Success Criteria\n\n- [hard] REQ-01: The fixture stages and commits its repository's working tree under the fixed author identity, so `HEAD` resolves afterwards. The commit ignores the developer's global and system git configuration.\n- [hard] REQ-02: The fixture spawns a caller-named program, such as a copy of the `jit` binary, under the same environment as its `jit` commands: working directory at the repository, test mode on, and no inherited `JIT_*` variable.\n- [hard] REQ-03: The fixture sets up a primary checkout initialised by `jit init` with one base commit, plus one linked checkout of it. Both checkouts can be addressed as fixtures, and machine-local `.jit/` runtime state is ignored by git in both.\n- [hard] REQ-04: Each of the three capabilities has one owning test in `crates/jit/tests/cli_repo_workflow/cli_process_fixture_tests.rs`, and each test passes alone and in parallel with the rest.\n- [hard] REQ-05: The fixture adds no integration target, and git runs only through the shared test-support git path that `init_git_repository` already uses.\n\n## Notes\n\nScope: this task adds the shared capabilities only. Existing hand-rolled copies (`linked_checkout_fixture`, the copied-binary `Command`, per-file commit helpers) are retired by the adoption tasks that depend on it. `dev/TESTING.md` names the new capabilities alongside the fixture's existing ones.\n",
+  "documents": [],
+  "done_at": "2026-10-27T00:17:44.599594145Z",
+  "first_ready_at": "2026-10-26T22:00:38.865158220Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b5175eff-8478-47fd-9b1b-104ab3748dcd",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:10:00.717444685Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "84c64a38-f75c-4cc8-88db-530ee1924c3e",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:15:00.483593089Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "1590d056-0fa7-4e13-9a5c-759371fc1826",
+  "labels": [
+    "type:task",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "satisfies:c780514e/REQ-05",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/shared-test-contracts",
+    "enforces:@/invariant/orthogonal-tests"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "The shared CLI fixture commits its repository, spawns an alternate binary and sets up a linked checkout",
+  "updated_at": "2026-10-27T00:17:44.599594145Z"
+}

@@ -1,0 +1,44 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T01:34:29.851649694Z",
+  "context": {},
+  "created_at": "2026-11-01T01:33:40.527510216Z",
+  "dependencies": [],
+  "description": "Remove the `gate-prefix` option of the `criteria-to-check` assertion, so a criterion binds to its check through one mechanism and no rule composes a gate key.\n\n## Background\n\n`criteria-to-check` (`crates/jit/src/declarations/rules.rs:588`) accepts `gate-prefix` and `check-namespace`, with at least one required. `gate-prefix` is documented with `verify:`, which composes keys such as `verify:REQ-01` that fail the lowercase-kebab gate-key grammar. `criterion_is_checked` (`crates/jit/src/validation/graph.rs:1376`) ORs a `gates_required` membership test with a check label, so the gate branch never required a per-criterion gate to exist or pass. Both rules in `docs/examples/nyquist/rules.toml` already set `check-namespace`, and no issue in this repository holds a prefixed key. The option also appears in `repository_state/rule_serialize.rs`, `validation/desugar.rs:661`, `docs/how-to/validation-rules.md` and rule tests.\n\n## Success Criteria\n\n- [hard] REQ-01: `criteria-to-check` has no `gate-prefix` option, in the typed declaration, the evaluator, the rule serializer, desugaring and the published rule schema.\n- [hard] REQ-02: `check-namespace` is required and non-optional, the \"at least one of\" check is gone, and the evaluator's unchecked-criterion message names only the check label.\n- [hard] REQ-03: A `rules.toml` naming `gate-prefix` fails to load with a config error naming the rule, and a test shows it.\n- [hard] REQ-04: Documentation, examples and tests describe criteria checks through labels only, and no source outside that rejection test spells `gate-prefix` or composes a `verify:` gate key.\n",
+  "documents": [],
+  "done_at": "2026-11-01T02:16:50.033840604Z",
+  "first_ready_at": "2026-11-01T01:33:40.527510216Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "18e33f87-46ab-413b-a131-2e7db42727fe",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:16:45.897408368Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1e0f3d46-3f16-4037-97f5-2afd45f5b6b2",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:12:49.378743492Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "2ac34492-1119-4fba-8d6b-7038e64dd74b",
+  "labels": [
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:validation",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types",
+    "satisfies:2195c98f/REQ-01",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Criteria checks bind through check labels only",
+  "updated_at": "2026-11-01T02:16:50.033840604Z"
+}

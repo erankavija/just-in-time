@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b3d1a2cb17896413e68f75cba04c19aab6cbeadd",
+  "completed_at": "2026-11-01T11:01:45.537513256Z",
+  "duration_ms": 245199,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/workflow_tests.rs",
+        "id": "F1",
+        "line": 164,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-02",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The CLI workflow test re-proves the dependency auto-transition cascade instead of limiting itself to one wiring case."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/benchmarks/test-topology-c780514e/README.md",
+        "id": "F2",
+        "line": 72,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-11"
+        ],
+        "severity": "medium",
+        "summary": "The cold-fixture fsync and concurrency timing figures lack matching raw evidence or a reproducible capture command."
+      }
+    ],
+    "summary": "REQ-02 retains a CLI re-proof of dependency auto-transitions; several cold-fixture causal measurements remain unsubstantiated.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "c780514e-8491-40a7-8844-3974bba91257",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "06032340-03a2-4267-8b54-604d415eb564",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T10:57:40.337604834Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 17275 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a196c2-069f-72d2-a7af-c47b765572ff\n--------\nuser\n--- 17262 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **[high, blocking]** REQ-02 is unmet. [`workflow_tests.rs`](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_repo_workflow/workflow_tests.rs:164) still re-proves dependency auto-transition semantics: it builds a dependency chain, completes each dependency, and asserts successive `query available` membership. This is more than one CLI wiring case and duplicates the domain-owned cascade property.\n\n2. **[medium, advisory]** The cold-fixture causal figures in [`README.md`](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/test-topology-c780514e/README.md:72)—171 `fsync` calls; 0.96 s/1.1 s; 1.29 s; 77.6 s; and 13.9 s—have no matching raw capture or reproducible tracing/concurrency command. The committed measurement log substantiates the suite-run rows, but not these figures.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-02 retains a CLI re-proof of dependency auto-transitions; several cold-fixture causal measurements remain unsubstantiated.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The CLI workflow test re-proves the dependency auto-transition cascade instead of limiting itself to one wiring case.\",\"file\":\"crates/jit/tests/cli_repo_workflow/workflow_tests.rs\",\"line\":164,\"references\":[\"@/issue/c780514e/requirement/REQ-02\",\"@/invariant/orthogonal-tests\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The cold-fixture fsync and concurrency timing figures lack matching raw evidence or a reproducible capture command.\",\"file\":\"dev/benchmarks/test-topology-c780514e/README.md\",\"line\":72,\"references\":[\"@/issue/c780514e/requirement/REQ-11\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

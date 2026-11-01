@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T23:45:23.901869066Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -9,11 +10,26 @@
   ],
   "description": "Move the `dep add`, `dep rm` and `query` argument-guard cases that only the exit-code suite tests beside the tests of those commands.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:1372` and `:1447`: a too-short and an ambiguous prefix in both `dep add` positions.\n- `:1315`: symmetric argument validation for `dep rm`.\n- `:1280`: the guard against a parent filter given before the `query` subcommand (\"were given before\", `INVALID_ARGUMENT`); the string appears only in `main.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The `dep add` and `dep rm` cases have owning tests in `cli_query_graph/dep_add_redundancy_cli_tests.rs`, and the parent-filter guard has one in `cli_query_graph/query_json_tests.rs`, each with the same non-exit assertions.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test there already owns is not duplicated.\n",
   "documents": [],
+  "done_at": "2026-10-29T07:05:00.557594614Z",
+  "first_ready_at": "2026-10-28T23:30:31.089803771Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "324c221e-fe6d-4eaf-bd4b-8e39c0678104",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:03:16.557764872Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d4142847-d084-40e9-999a-2c77c57fe583",
+      "status": "passed",
+      "updated_at": "2026-10-29T06:57:36.245365231Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2916a306-1b7a-4d23-8976-0a1a5d42006b",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Dependency and query argument-guard cases move beside their owners",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-29T07:05:00.557594614Z"
 }

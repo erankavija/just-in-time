@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3558721b078d7b4e778c128e047fe48b813bbf96",
+  "completed_at": "2026-10-28T23:07:17.722248119Z",
+  "duration_ms": 215570,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
+        "id": "F1",
+        "line": 743,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7208e568/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "The test derives and asserts a profile-line count from human-readable stdout."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
+        "id": "F2",
+        "line": 743,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7208e568/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The human-rendering order assertion was replaced by a count-only assertion."
+      }
+    ],
+    "summary": "Two issue-impact hard criteria remain unmet: human stdout is parsed for a count and its prior ordering assertion was weakened.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7208e568-cef2-4ab0-a2e5-5c85b7882fba",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "aef6aa40-c9a7-483c-9528-9ed7acb70b9b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:03:42.151254621Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3292 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a184c1-49ec-77f1-9926-d0a82a100fc6\n--------\nuser\n--- 3279 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 5630d0e78; 3558721b0 (same profile-test patch via merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/7208e568/requirement/REQ-01, @/issue/7208e568/requirement/REQ-02 (issue description); @/issue/c780514e/requirement/REQ-05 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions ( .jit/invariants.toml)\nGate evidence: cargo-ci passed at 2026-10-28T23:03:41Z; exit code not recorded\nTruncation recovery: narrowed registry and charter reads after a broad item search truncated\n\n1. **[blocking][issue-impact][high]** `profile_cli_tests.rs:743` still derives a value from human-readable stdout by counting `Profile ` lines and asserting it equals `4`. This violates hard REQ-01; the count belongs to the existing JSON assertion, not parsed display output. References: `@/issue/7208e568/requirement/REQ-01`.\n\n2. **[blocking][issue-impact][high]** `profile_cli_tests.rs:743` replaces the prior human-rendered sequence assertion (`second, first, first, second`) with a count-only assertion. JSON output still proves response ordering, but the test no longer proves that human rendering preserves that ordering, so the edited test lost a property it previously asserted. References: `@/issue/7208e568/requirement/REQ-02`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact hard criteria remain unmet: human stdout is parsed for a count and its prior ordering assertion was weakened.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The test derives and asserts a profile-line count from human-readable stdout.\",\"file\":\"crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs\",\"line\":743,\"references\":[\"@/issue/7208e568/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The human-rendering order assertion was replaced by a count-only assertion.\",\"file\":\"crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs\",\"line\":743,\"references\":[\"@/issue/7208e568/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

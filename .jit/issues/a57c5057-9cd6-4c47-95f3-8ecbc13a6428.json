@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-25T01:30:39.020966246Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Parse and resolve each issue-id path parameter once in the server routes, before any executor call.\n\n## Background\n\nServer routes take ids as `Path<String>` (`crates/server/src/routes.rs:97,597,627,791,836,893,910`) and pass them to executor methods that resolve them internally.\n\n## Success Criteria\n\n- [hard] REQ-01: Each issue-id path parameter is parsed once into `IssueIdPrefix` and resolved once to `IssueId` before the executor call.\n- [hard] REQ-02: A too-short prefix yields the route's invalid-prefix response, and an unknown or other malformed id yields its existing not-found response.\n- [hard] REQ-03: No other server code parses an issue-id parameter, and the routes hold no interim call-site parse.\n",
   "documents": [],
+  "done_at": "2026-10-25T02:26:14.879341589Z",
+  "first_ready_at": "2026-10-25T01:28:58.542508989Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "73715df0-6838-450c-9738-c961e3610e57",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:26:14.060177562Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cef82151-2cab-404c-9840-383da43a2bdf",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:22:57.981083616Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a57c5057-9cd6-4c47-95f3-8ecbc13a6428",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "The server resolves each issue-id path parameter once",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T02:26:14.879341589Z"
 }

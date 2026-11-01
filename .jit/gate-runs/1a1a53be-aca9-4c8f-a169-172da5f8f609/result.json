@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9f1a825626d299b9f0ce24a44667263bad7142e4",
+  "completed_at": "2026-11-01T07:26:01.588530469Z",
+  "duration_ms": 89169,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/profile-test-suite.sh",
+        "id": "F1",
+        "line": 301,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "REQ-01 lock-contention and timeout behavior has no owning regression test for the three changed scripts."
+      }
+    ],
+    "summary": "The new lock-timeout paths lack issue-scoped regression coverage.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d6635a93-822d-4f64-b171-f4485dde4a10",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1a1a53be-aca9-4c8f-a169-172da5f8f609",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:24:32.419221523Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5567 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a195fe-e5c3-7db0-b743-71b9d439488c\n--------\nuser\n--- 5554 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 9f1a8256, f8960235, c215a864, bac742fe, 77d9bf99 (`jit:d6635a93`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/essential-code-prose (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit code unavailable); profile-suite-selftest passed (0); session-cost-benchmark-selftest passed (0); code-review failed (1, prior race finding addressed)\nTruncation recovery: re-read parent-specific merge deltas per affected script, current lock paths, and focused self-test paths\n\n1. [blocking][issue-impact] F1 — REQ-01’s new contention/timeout behavior has no owning regression test. The profile self-test bypasses acquisition with `PROFILE_TEST_SUITE_LOCKED=1`; the session-cost self-test bypasses its build path with `SESSION_BENCH_BIN`; and no rust-build benchmark self-test exists. Add focused temporary-lock tests that assert the diagnostic, bounded timeout, non-zero exit, and no child build for all three scripts. References: @/invariant/orthogonal-tests.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The new lock-timeout paths lack issue-scoped regression coverage.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-01 lock-contention and timeout behavior has no owning regression test for the three changed scripts.\",\"file\":\"scripts/profile-test-suite.sh\",\"line\":301,\"references\":[\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

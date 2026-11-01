@@ -11,6 +11,7 @@
 use serde::Serialize;
 
 use crate::declarations::rules::{RuleScope, Severity};
+use crate::domain::identity::IssueId;
 use crate::validation::engine::Finding;
 
 /// One reported finding, scoped to the issue it concerns (if any).
@@ -22,10 +23,10 @@ use crate::validation::engine::Finding;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ReportedFinding {
     /// Full id of the issue this finding concerns, when attributable.
-    pub issue_id: Option<String>,
+    pub issue_id: Option<IssueId>,
     /// Name of the rule that produced this finding.
     pub rule: String,
-    /// Severity of this finding. Serializes as `"off"`/`"warn"`/`"error"`.
+    /// Severity of this finding, serialized as its token.
     pub severity: Severity,
     /// Human-readable message.
     pub message: String,
@@ -33,7 +34,7 @@ pub struct ReportedFinding {
 
 impl ReportedFinding {
     /// Build a [`ReportedFinding`] from a [`Finding`] and an optional issue id.
-    pub fn new(issue_id: Option<String>, finding: &Finding) -> Self {
+    pub fn new(issue_id: Option<IssueId>, finding: &Finding) -> Self {
         Self {
             issue_id,
             rule: finding.rule.clone(),
@@ -91,9 +92,9 @@ impl RuleReport {
 pub struct RuleOutcome {
     /// Name of the rule.
     pub rule: String,
-    /// Evaluation scope. Serializes as `"local"`/`"graph"`.
+    /// Evaluation scope, serialized as its token.
     pub scope: RuleScope,
-    /// Severity. Serializes as `"off"`/`"warn"`/`"error"`.
+    /// Severity, serialized as its token.
     pub severity: Severity,
     /// Human-readable rendering of the rule's authored selector.
     pub selector: String,
@@ -117,7 +118,7 @@ pub struct RuleOutcome {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ExplainReport {
     /// Full id of the explained issue.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// One outcome per rule in the ruleset, in rule order. Matched rules carry a
     /// PASS/FAIL result; non-matched rules carry a skip reason.
     pub outcomes: Vec<RuleOutcome>,
@@ -172,10 +173,9 @@ mod tests {
     }
 
     /// The serialized `ReportedFinding` shape is byte-identical to the old
-    /// String-field layout. Previously `severity` was stored as
-    /// `finding.severity.token().to_string()`; now it is a typed `Severity`
-    /// that serializes via `#[serde(rename_all="snake_case")]`. The token
-    /// values must be identical.
+    /// String-field layout. `severity` is now a typed `Severity` that serializes
+    /// through the vocabulary's explicit serde spellings. The token values must
+    /// be identical.
     #[test]
     fn test_reported_finding_json_round_trip_byte_identical() {
         let finding = Finding {
@@ -183,14 +183,15 @@ mod tests {
             severity: Severity::Error,
             message: "some message".into(),
         };
-        let reported = ReportedFinding::new(Some("abc123".into()), &finding);
+        let issue_id = crate::test_utils::issue_id(0xe1b3_475c_818d_324f_57dd_716b_1c5d_a41d);
+        let reported = ReportedFinding::new(Some(issue_id.clone()), &finding);
         let serialized = serde_json::to_string(&reported).unwrap();
         let back: serde_json::Value = serde_json::from_str(&serialized).unwrap();
         // The JSON must have string values matching the old token strings.
         assert_eq!(back["severity"], "error");
         assert_eq!(back["rule"], "r");
         assert_eq!(back["message"], "some message");
-        assert_eq!(back["issue_id"], "abc123");
+        assert_eq!(back["issue_id"], issue_id.as_str());
     }
 
     // --- RuleOutcome JSON byte-identical round-trip --------------------------
@@ -277,15 +278,16 @@ mod tests {
             passed,
             messages: if passed { Vec::new() } else { vec!["m".into()] },
         };
+        let issue_id = crate::test_utils::issue_id(0xe1b3_475c_818d_324f_57dd_716b_1c5d_a41d);
         let warn_fail = ExplainReport {
-            issue_id: "x".into(),
+            issue_id: issue_id.clone(),
             outcomes: vec![outcome_with(Severity::Warn, false)],
         };
         assert!(warn_fail.has_failures());
         assert!(!warn_fail.has_errors());
 
         let error_fail = ExplainReport {
-            issue_id: "x".into(),
+            issue_id,
             outcomes: vec![outcome_with(Severity::Error, false)],
         };
         assert!(error_fail.has_errors());

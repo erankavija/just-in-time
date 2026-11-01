@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b3347b996ce7a332f4850254bbd745e32565d856",
+  "completed_at": "2026-11-01T10:00:40.109982952Z",
+  "duration_ms": 147514,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are satisfied by the attributable current tree and recorded evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "87d5fd34-a913-4c6e-bad1-344c2fb3adc3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "259746a5-0a06-46a9-9338-91327a2246c2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T09:58:12.595942004Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 413df0ddf, e449f4cfc, b5f2d9730, 78b5e5cdc, 8a71fbc38, 4c8415806, 243842b0b, f416ca99d, 2e7865c4d, b3347b996\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T09:56:46Z); code-review passed (exit 0, 2026-11-01T09:40:55Z)\nTruncation recovery: narrowed the truncated executable-writer/caller search into shebang, direct permission, helper-call-site, and merge-parent reads.\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied by the attributable current tree and recorded evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

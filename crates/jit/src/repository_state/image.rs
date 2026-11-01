@@ -1,6 +1,7 @@
 //! Closed repository images, bounded capture declarations, and exact deltas.
 
 use super::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
+use crate::domain::vocabulary::wire_vocabulary;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -252,6 +253,11 @@ pub enum RepositoryEntry {
         /// Normalized mode.
         mode: FileMode,
     },
+    /// An ordinary file read as its kind alone ([`ReadMode::Kind`]).
+    FileKind {
+        /// Normalized mode.
+        mode: FileMode,
+    },
     /// A symbolic link, never followed.
     Symlink {
         /// Exact link payload and its identity.
@@ -274,7 +280,7 @@ impl RepositoryEntry {
     /// Exact identity when an occupant exists and was read whole.
     pub fn identity(&self) -> Option<&EntryIdentity> {
         match self {
-            Self::Absent | Self::FileTail { .. } => None,
+            Self::Absent | Self::FileTail { .. } | Self::FileKind { .. } => None,
             Self::File { content, .. } => Some(content.identity()),
             Self::Symlink { target, .. } => Some(target.identity()),
             Self::Directory { identity, .. } | Self::Unsupported { identity, .. } => Some(identity),
@@ -301,7 +307,9 @@ impl RepositoryTargetKind {
     /// Classify a captured working-tree entry without filesystem I/O.
     pub fn from_entry(entry: &RepositoryEntry) -> Self {
         match entry {
-            RepositoryEntry::File { .. } | RepositoryEntry::FileTail { .. } => Self::File,
+            RepositoryEntry::File { .. }
+            | RepositoryEntry::FileTail { .. }
+            | RepositoryEntry::FileKind { .. } => Self::File,
             RepositoryEntry::Directory { .. } => Self::Directory,
             RepositoryEntry::Absent => Self::Missing,
             RepositoryEntry::Symlink { .. } | RepositoryEntry::Unsupported { .. } => {
@@ -467,6 +475,8 @@ impl PinnedDocumentEvidence {
             (RepositoryTargetKind::File, Some(identity), Some(bytes), None) => {
                 identity.validate_bytes(bytes)?
             }
+            // A kind-only request's file carries no bytes to identify.
+            (RepositoryTargetKind::File, None, None, None) => {}
             (
                 RepositoryTargetKind::Directory | RepositoryTargetKind::Unsupported,
                 None,
@@ -531,6 +541,9 @@ pub enum ReadMode {
     /// The length and the last [`EVENT_LOG_TAIL_WINDOW`] bytes, reaching back
     /// to the final line's start, as an [`EventLogTail`].
     Tail,
+    /// The target's kind alone: a working-tree file captures as
+    /// [`RepositoryEntry::FileKind`], and pinned file evidence carries no bytes.
+    Kind,
 }
 
 /// Normalized capture request: exact paths with their read modes, listings,
@@ -538,10 +551,14 @@ pub enum ReadMode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CaptureSpec {
     paths: BTreeSet<VirtualPath>,
-    /// The paths read as [`ReadMode::Tail`]; every other path is read whole.
+    /// The paths read as [`ReadMode::Tail`].
     tails: BTreeSet<VirtualPath>,
+    /// The paths read as [`ReadMode::Kind`]; every other path is read whole.
+    kinds: BTreeSet<VirtualPath>,
     listings: BTreeSet<VirtualPath>,
     pinned: BTreeSet<(String, String)>,
+    /// The pinned requests read as [`ReadMode::Kind`]; every other is read whole.
+    pinned_kinds: BTreeSet<(String, String)>,
     budget: CaptureBudget,
 }
 
@@ -554,15 +571,18 @@ impl CaptureSpec {
         let mut spec = Self {
             paths: BTreeSet::new(),
             tails: BTreeSet::new(),
+            kinds: BTreeSet::new(),
             listings: BTreeSet::new(),
             pinned: BTreeSet::new(),
+            pinned_kinds: BTreeSet::new(),
             budget,
         };
         spec.discover_paths(paths)?;
         Ok(spec)
     }
 
-    /// Add paths to read whole; a path requested as a tail is read whole instead.
+    /// Add paths to read whole; a path requested as a tail or kind is read
+    /// whole instead.
     pub fn discover_paths(
         &mut self,
         paths: impl IntoIterator<Item = VirtualPath>,
@@ -570,6 +590,7 @@ impl CaptureSpec {
         let mut candidate = self.clone();
         for path in paths {
             candidate.tails.remove(&path);
+            candidate.kinds.remove(&path);
             candidate.paths.insert(path);
         }
         candidate.validate()?;
@@ -577,11 +598,29 @@ impl CaptureSpec {
         Ok(())
     }
 
-    /// Add a path to read as its length and tail, unless it is already requested.
+    /// Add a path to read as its length and tail, unless it is already
+    /// requested whole or as a tail.
     pub fn discover_tail(&mut self, path: VirtualPath) -> Result<(), CaptureError> {
         let mut candidate = self.clone();
-        if candidate.paths.insert(path.clone()) {
+        if candidate.paths.insert(path.clone()) || candidate.kinds.remove(&path) {
             candidate.tails.insert(path);
+        }
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Add paths to read as their kind alone; an already requested path keeps
+    /// its read mode.
+    pub fn discover_kinds(
+        &mut self,
+        paths: impl IntoIterator<Item = VirtualPath>,
+    ) -> Result<(), CaptureError> {
+        let mut candidate = self.clone();
+        for path in paths {
+            if candidate.paths.insert(path.clone()) {
+                candidate.kinds.insert(path);
+            }
         }
         candidate.validate()?;
         *self = candidate;
@@ -612,7 +651,8 @@ impl CaptureSpec {
         Ok(())
     }
 
-    /// Require immutable pinned evidence.
+    /// Require immutable pinned evidence with its bytes; a request read as its
+    /// kind is read whole instead.
     ///
     /// A pinned request constrains nothing else in the declaration, so only
     /// the new request is validated. Revalidating the whole declaration per
@@ -624,7 +664,23 @@ impl CaptureSpec {
     ) -> Result<(), CaptureError> {
         let request = (revision.into(), path.into());
         validate_pinned_request(&request.0, &request.1)?;
+        self.pinned_kinds.remove(&request);
         self.pinned.insert(request);
+        Ok(())
+    }
+
+    /// Require immutable pinned evidence of the target's kind alone, unless the
+    /// request is already read whole.
+    pub fn discover_pinned_kind(
+        &mut self,
+        revision: impl Into<String>,
+        path: impl Into<String>,
+    ) -> Result<(), CaptureError> {
+        let request = (revision.into(), path.into());
+        validate_pinned_request(&request.0, &request.1)?;
+        if self.pinned.insert(request.clone()) {
+            self.pinned_kinds.insert(request);
+        }
         Ok(())
     }
 
@@ -635,11 +691,15 @@ impl CaptureSpec {
 
     /// How `path` is read, when it is requested.
     pub fn read_mode(&self, path: &VirtualPath) -> Option<ReadMode> {
-        match (self.paths.contains(path), self.tails.contains(path)) {
-            (false, _) => None,
-            (true, false) => Some(ReadMode::Whole),
-            (true, true) => Some(ReadMode::Tail),
-        }
+        self.paths.contains(path).then(|| {
+            if self.tails.contains(path) {
+                ReadMode::Tail
+            } else if self.kinds.contains(path) {
+                ReadMode::Kind
+            } else {
+                ReadMode::Whole
+            }
+        })
     }
 
     /// Every complete-listing request.
@@ -650,6 +710,18 @@ impl CaptureSpec {
     /// Every immutable pinned-document request.
     pub fn pinned(&self) -> &BTreeSet<(String, String)> {
         &self.pinned
+    }
+
+    /// How the pinned `request` is read, [`ReadMode::Whole`] or
+    /// [`ReadMode::Kind`], when it is requested.
+    pub fn pinned_read_mode(&self, request: &(String, String)) -> Option<ReadMode> {
+        self.pinned.contains(request).then(|| {
+            if self.pinned_kinds.contains(request) {
+                ReadMode::Kind
+            } else {
+                ReadMode::Whole
+            }
+        })
     }
 
     /// Capture bounds.
@@ -726,6 +798,22 @@ impl RepositoryImage {
                     reason: "a tail answers only a tail request".into(),
                 });
             }
+            let kind_request = spec.read_mode(path) == Some(ReadMode::Kind);
+            match entry {
+                RepositoryEntry::FileKind { .. } if !kind_request => {
+                    return Err(CaptureError::InvalidCapturedEntry {
+                        path: path.clone(),
+                        reason: "a file's kind answers only a kind request".into(),
+                    });
+                }
+                RepositoryEntry::File { .. } if kind_request => {
+                    return Err(CaptureError::InvalidCapturedEntry {
+                        path: path.clone(),
+                        reason: "a kind request is answered without the file's bytes".into(),
+                    });
+                }
+                _ => {}
+            }
             validate_entry(path, entry)?;
         }
         for path in spec.paths() {
@@ -768,6 +856,14 @@ impl RepositoryImage {
                 return Err(CaptureError::UnexpectedPinnedEvidence(request.clone()));
             }
             evidence.ensure_request(request)?;
+            if evidence.target_kind.is_file()
+                && evidence.bytes.is_some()
+                    != (spec.pinned_read_mode(request) == Some(ReadMode::Whole))
+            {
+                return Err(CaptureError::InvalidPinnedEvidence(
+                    "a pinned file carries its bytes exactly when read whole".into(),
+                ));
+            }
         }
         for request in &spec.pinned {
             if !pinned.contains_key(request) {
@@ -826,6 +922,7 @@ impl RepositoryImage {
         match self.entry(path)? {
             RepositoryEntry::File { content, .. } => Ok(Some(content.bytes())),
             RepositoryEntry::FileTail { .. } => Err(CaptureError::TailOnlyCapture(path.clone())),
+            RepositoryEntry::FileKind { .. } => Err(CaptureError::KindOnlyCapture(path.clone())),
             RepositoryEntry::Absent | RepositoryEntry::Directory { .. } => Ok(None),
             RepositoryEntry::Symlink { .. } | RepositoryEntry::Unsupported { .. } => {
                 Err(CaptureError::UnsafeCapturedOccupant(path.clone()))
@@ -855,7 +952,12 @@ impl RepositoryImage {
                 .filter(|(path, _)| read.read_mode(path) == spec.read_mode(path))
                 .collect(),
             listings,
-            pinned,
+            pinned: pinned
+                .into_iter()
+                .filter(|(request, _)| {
+                    read.pinned_read_mode(request) == spec.pinned_read_mode(request)
+                })
+                .collect(),
         }
     }
 }
@@ -866,6 +968,7 @@ fn validate_entry(path: &VirtualPath, entry: &RepositoryEntry) -> Result<(), Cap
         RepositoryEntry::Absent
         | RepositoryEntry::File { .. }
         | RepositoryEntry::FileTail { .. }
+        | RepositoryEntry::FileKind { .. }
         | RepositoryEntry::Symlink { .. } => Ok(()),
         RepositoryEntry::Directory { identity, .. } => identity.validate(),
         RepositoryEntry::Unsupported {
@@ -934,6 +1037,7 @@ fn captured_byte_count(
             RepositoryEntry::FileTail { tail, .. } => Some(tail.tail().len() as u64),
             RepositoryEntry::Symlink { target, .. } => Some(target.bytes().len() as u64),
             RepositoryEntry::Absent
+            | RepositoryEntry::FileKind { .. }
             | RepositoryEntry::Directory { .. }
             | RepositoryEntry::Unsupported { .. } => None,
         })
@@ -963,7 +1067,9 @@ impl TargetClaim {
     ) -> Result<Self, DeltaError> {
         layout.ensure_canonical(&target)?;
         let owner = owner.into();
-        validate_owner(&owner)?;
+        if owner.is_empty() || owner.chars().any(char::is_control) {
+            return Err(DeltaError::InvalidClaimOwner);
+        }
         Ok(Self { target, owner })
     }
 
@@ -1000,6 +1106,12 @@ pub enum ExpectedPreimage {
     FileTail {
         /// Exact length and bounded tail.
         tail: EventLogTail,
+        /// Normalized file mode.
+        mode: FileMode,
+    },
+    /// An ordinary file known by its kind and mode alone, which no action
+    /// may write over.
+    FileKind {
         /// Normalized file mode.
         mode: FileMode,
     },
@@ -1043,6 +1155,7 @@ impl ExpectedPreimage {
                 tail: tail.clone(),
                 mode: *mode,
             },
+            RepositoryEntry::FileKind { mode } => Self::FileKind { mode: *mode },
             RepositoryEntry::Directory { identity, mode } => Self::Directory {
                 identity: identity.clone(),
                 mode: *mode,
@@ -1067,12 +1180,31 @@ impl ExpectedPreimage {
     /// Exact identity when the preimage expects an occupant read whole.
     pub fn identity(&self) -> Option<&EntryIdentity> {
         match self {
-            Self::Absent | Self::FileTail { .. } => None,
+            Self::Absent | Self::FileTail { .. } | Self::FileKind { .. } => None,
             Self::File { identity, .. }
             | Self::Directory { identity, .. }
             | Self::Symlink { identity, .. }
             | Self::Unsupported { identity, .. } => Some(identity),
         }
+    }
+}
+
+wire_vocabulary! {
+    /// Producer of an exact repository-state action.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum RepositoryActionOwner {
+        RepositoryStateMutation = "repository-state-mutation",
+        RepositoryInit = "repository-init",
+        ProfileApplication = "profile-application",
+        GitattributesMergeDriver = "gitattributes-merge-driver",
+        ArchiveExecution = "archive-execution",
+        PackageCapture = "package-capture",
+        RepositoryExport = "repository-export",
+        ConfiguredProjection = "configured-projection",
+        DataRootIgnore = "data-root-ignore",
+        DefaultRuleMembership = "default-rule-membership",
+        DefaultSchema = "default-schema",
+        AuthoredConfig = "authored-config",
     }
 }
 
@@ -1084,13 +1216,13 @@ pub enum RepositoryAction {
     /// Create an absent directory.
     CreateDirectory {
         path: VirtualPath,
-        owner: String,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
     },
     /// Create or replace an ordinary file.
     WriteFile {
         path: VirtualPath,
-        owner: String,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         /// Exact bytes to publish; serialization carries their digest.
         #[serde(serialize_with = "serialize_content_digest")]
@@ -1100,19 +1232,19 @@ pub enum RepositoryAction {
     /// Change only an ordinary file's mode.
     SetMode {
         path: VirtualPath,
-        owner: String,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         mode: FileMode,
     },
     /// Delete one ordinary file.
     DeleteFile {
         path: VirtualPath,
-        owner: String,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
     },
     /// Write `bytes` into the event log at `offset`, the length its capture read.
     AppendEvents {
-        owner: String,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         offset: u64,
         #[serde(serialize_with = "serialize_content_digest")]
@@ -1124,12 +1256,12 @@ impl RepositoryAction {
     #[cfg(test)]
     pub(crate) fn create_directory(
         path: VirtualPath,
-        owner: impl Into<String>,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
     ) -> Self {
         Self::CreateDirectory {
             path,
-            owner: owner.into(),
+            owner,
             expected,
         }
     }
@@ -1137,14 +1269,14 @@ impl RepositoryAction {
     #[cfg(test)]
     pub(crate) fn write_file(
         path: VirtualPath,
-        owner: impl Into<String>,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         bytes: Vec<u8>,
         mode: FileMode,
     ) -> Self {
         Self::WriteFile {
             path,
-            owner: owner.into(),
+            owner,
             expected,
             bytes,
             mode,
@@ -1154,13 +1286,13 @@ impl RepositoryAction {
     #[cfg(test)]
     pub(crate) fn set_mode(
         path: VirtualPath,
-        owner: impl Into<String>,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         mode: FileMode,
     ) -> Self {
         Self::SetMode {
             path,
-            owner: owner.into(),
+            owner,
             expected,
             mode,
         }
@@ -1169,25 +1301,25 @@ impl RepositoryAction {
     #[cfg(test)]
     pub(crate) fn delete_file(
         path: VirtualPath,
-        owner: impl Into<String>,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
     ) -> Self {
         Self::DeleteFile {
             path,
-            owner: owner.into(),
+            owner,
             expected,
         }
     }
 
     #[cfg(test)]
     pub(crate) fn append_events(
-        owner: impl Into<String>,
+        owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
         offset: u64,
         bytes: Vec<u8>,
     ) -> Self {
         Self::AppendEvents {
-            owner: owner.into(),
+            owner,
             expected,
             offset,
             bytes,
@@ -1206,13 +1338,13 @@ impl RepositoryAction {
     }
 
     /// Stable producer or ownership identity.
-    pub fn owner(&self) -> &str {
+    pub fn owner(&self) -> RepositoryActionOwner {
         match self {
             Self::CreateDirectory { owner, .. }
             | Self::WriteFile { owner, .. }
             | Self::SetMode { owner, .. }
             | Self::DeleteFile { owner, .. }
-            | Self::AppendEvents { owner, .. } => owner,
+            | Self::AppendEvents { owner, .. } => *owner,
         }
     }
 
@@ -1292,8 +1424,7 @@ impl RepositoryDelta {
 }
 
 fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
-    let (owner, expected) = (action.owner(), action.expected());
-    validate_owner(owner)?;
+    let expected = action.expected();
     if *action.path() == EVENT_LOG && !matches!(action, RepositoryAction::AppendEvents { .. }) {
         return Err(DeltaError::InvalidAction(
             "the event log changes only by a positioned append".into(),
@@ -1346,14 +1477,6 @@ fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
     }
 }
 
-fn validate_owner(owner: &str) -> Result<(), DeltaError> {
-    if owner.is_empty() || owner.chars().any(char::is_control) {
-        Err(DeltaError::InvalidOwner)
-    } else {
-        Ok(())
-    }
-}
-
 /// Serialize bytes as their SHA-256 digest and length, so a serialized delta
 /// commits to written content without encoding it byte by byte.
 fn serialize_content_digest<S: serde::Serializer>(
@@ -1378,6 +1501,8 @@ pub enum CaptureError {
     IncompleteCapture(VirtualPath),
     #[error("capture read only the length and tail of {0:?}")]
     TailOnlyCapture(VirtualPath),
+    #[error("capture read only the kind of {0:?}")]
+    KindOnlyCapture(VirtualPath),
     #[error("a tail of a {length}-byte file must hold its last window bytes and its final line")]
     InvalidTail { length: u64 },
     #[error("capture provided unrequested path {0:?}")]
@@ -1424,8 +1549,8 @@ pub enum DeltaError {
         first: VirtualPath,
         second: VirtualPath,
     },
-    #[error("delta action owner is empty or contains control characters")]
-    InvalidOwner,
+    #[error("target claim owner is empty or contains control characters")]
+    InvalidClaimOwner,
     #[error("delta action targets machine-local engine control at {0:?}")]
     EngineControlTarget(VirtualPath),
     #[error("delta action is invalid: {0}")]
@@ -1646,6 +1771,139 @@ mod tests {
         }
     }
 
+    /// A kind request never narrows a request for content: whichever order they
+    /// arrive in, the content read wins.
+    #[test]
+    fn test_capture_spec_kind_requests_yield_to_content_requests() {
+        let path = VirtualPath::worktree("docs/a.md").unwrap();
+        let request = ("HEAD".to_string(), "docs/a.md".to_string());
+        let spec = || CaptureSpec::new([], image().capture_spec().budget()).unwrap();
+
+        let mut kind_first = spec();
+        kind_first.discover_kinds([path.clone()]).unwrap();
+        assert_eq!(kind_first.read_mode(&path), Some(ReadMode::Kind));
+        kind_first.discover_paths([path.clone()]).unwrap();
+        assert_eq!(kind_first.read_mode(&path), Some(ReadMode::Whole));
+        let mut whole_first = spec();
+        whole_first.discover_paths([path.clone()]).unwrap();
+        whole_first.discover_kinds([path.clone()]).unwrap();
+        assert_eq!(whole_first.read_mode(&path), Some(ReadMode::Whole));
+        let mut tail_over_kind = spec();
+        tail_over_kind.discover_kinds([path.clone()]).unwrap();
+        tail_over_kind.discover_tail(path.clone()).unwrap();
+        tail_over_kind.discover_kinds([path.clone()]).unwrap();
+        assert_eq!(tail_over_kind.read_mode(&path), Some(ReadMode::Tail));
+
+        let mut pinned_kind_first = spec();
+        pinned_kind_first
+            .discover_pinned_kind(&request.0, &request.1)
+            .unwrap();
+        assert_eq!(
+            pinned_kind_first.pinned_read_mode(&request),
+            Some(ReadMode::Kind)
+        );
+        pinned_kind_first
+            .discover_pinned(&request.0, &request.1)
+            .unwrap();
+        assert_eq!(
+            pinned_kind_first.pinned_read_mode(&request),
+            Some(ReadMode::Whole)
+        );
+        let mut pinned_whole_first = spec();
+        pinned_whole_first
+            .discover_pinned(&request.0, &request.1)
+            .unwrap();
+        pinned_whole_first
+            .discover_pinned_kind(&request.0, &request.1)
+            .unwrap();
+        assert_eq!(
+            pinned_whole_first.pinned_read_mode(&request),
+            Some(ReadMode::Whole)
+        );
+    }
+
+    /// A kind request is answered by a file's kind alone, which costs no bytes,
+    /// and only a kind request is.
+    #[test]
+    fn test_close_answers_a_kind_request_exactly_with_a_bytes_free_kind() {
+        let path = VirtualPath::worktree("docs/a.md").unwrap();
+        let request = ("HEAD".to_string(), "docs/a.md".to_string());
+        let mode = FileMode::Regular;
+        let budget = CaptureBudget {
+            max_listings: 0,
+            max_bytes: 0,
+            max_depth: 4,
+        };
+        let close = |kind: bool, entry: RepositoryEntry| {
+            let mut spec = CaptureSpec::new([], budget)?;
+            if kind {
+                spec.discover_kinds([path.clone()])?;
+            } else {
+                spec.discover_paths([path.clone()])?;
+            }
+            let entries = BTreeMap::from([(path.clone(), entry)]);
+            RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), BTreeMap::new())
+        };
+        let file = || RepositoryEntry::File {
+            content: CapturedBytes::new("a", b"bytes".to_vec()).unwrap(),
+            mode,
+        };
+
+        let image = close(true, RepositoryEntry::FileKind { mode }).unwrap();
+        assert!(matches!(
+            image.file_bytes(&path),
+            Err(CaptureError::KindOnlyCapture(_))
+        ));
+        assert!(RepositoryTargetKind::from_entry(image.entry(&path).unwrap()).is_file());
+        assert!(close(true, RepositoryEntry::Absent).is_ok());
+        assert!(matches!(
+            close(true, file()),
+            Err(CaptureError::InvalidCapturedEntry { .. })
+        ));
+        assert!(matches!(
+            close(false, RepositoryEntry::FileKind { mode }),
+            Err(CaptureError::InvalidCapturedEntry { .. })
+        ));
+
+        let evidence = |bytes: Option<Vec<u8>>| {
+            let identity = bytes
+                .as_deref()
+                .map(|bytes| EntryIdentity::for_bytes("git-blob:b", bytes).unwrap());
+            PinnedDocumentEvidence::new(
+                &request.0,
+                &request.1,
+                PinnedSourceClass::GitObject,
+                RepositoryTargetKind::File,
+                Some("a".repeat(40)),
+                Some("b".repeat(40)),
+                identity,
+                bytes,
+                None,
+            )
+            .unwrap()
+        };
+        let close_pinned = |kind: bool, evidence: PinnedDocumentEvidence| {
+            let mut spec = CaptureSpec::new([], budget)?;
+            if kind {
+                spec.discover_pinned_kind(&request.0, &request.1)?;
+            } else {
+                spec.discover_pinned(&request.0, &request.1)?;
+            }
+            let pinned = BTreeMap::from([(request.clone(), evidence)]);
+            RepositoryImage::close(layout(), spec, BTreeMap::new(), BTreeMap::new(), pinned)
+        };
+        let image = close_pinned(true, evidence(None)).unwrap();
+        assert!(image.pinned_evidence()[&request].exists());
+        assert!(matches!(
+            close_pinned(true, evidence(Some(b"bytes".to_vec()))),
+            Err(CaptureError::InvalidPinnedEvidence(_))
+        ));
+        assert!(matches!(
+            close_pinned(false, evidence(None)),
+            Err(CaptureError::InvalidPinnedEvidence(_))
+        ));
+    }
+
     /// Requesting a listing is what a caller is bounded on, and the refusal
     /// arrives at declaration time rather than after the reads it would drive.
     #[test]
@@ -1733,12 +1991,14 @@ mod tests {
 
     #[test]
     fn test_close_enforces_depth_for_listed_children() {
-        let result = close_listing("issues", &["one.json"], &[], listing_budget(64, 1));
+        let issue_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
+        let name = issue_path.file_name().unwrap();
+        let result = close_listing("issues", &[name], &[], listing_budget(64, 1));
 
         assert!(matches!(
             result,
             Err(CaptureError::DepthBudgetExceeded(path))
-                if path == VirtualPath::data("issues/one.json").unwrap()
+                if path == issue_path
         ));
     }
 
@@ -1802,7 +2062,7 @@ mod tests {
                 &layout(),
                 vec![RepositoryAction::DeleteFile {
                     path: target.clone(),
-                    owner: "delete".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: directory.clone(),
                 }],
             ),
@@ -1813,7 +2073,7 @@ mod tests {
                 &layout(),
                 vec![RepositoryAction::SetMode {
                     path: target.clone(),
-                    owner: "mode".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: directory,
                     mode: FileMode::Executable,
                 }],
@@ -1825,7 +2085,7 @@ mod tests {
             &layout(),
             vec![RepositoryAction::DeleteFile {
                 path: target,
-                owner: "delete".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::File {
                     identity,
                     mode: FileMode::Regular,
@@ -1849,25 +2109,25 @@ mod tests {
         let actions = [
             RepositoryAction::WriteFile {
                 path: lock.clone(),
-                owner: "write".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: file.clone(),
                 bytes: b"clobber".to_vec(),
                 mode: FileMode::Regular,
             },
             RepositoryAction::DeleteFile {
                 path: lock.clone(),
-                owner: "delete".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: file.clone(),
             },
             RepositoryAction::SetMode {
                 path: lock.clone(),
-                owner: "mode".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: file,
                 mode: FileMode::Executable,
             },
             RepositoryAction::CreateDirectory {
                 path: below,
-                owner: "create".into(),
+                owner: RepositoryActionOwner::RepositoryInit,
                 expected: ExpectedPreimage::Absent,
             },
         ];
@@ -1887,7 +2147,7 @@ mod tests {
             &layout(),
             vec![RepositoryAction::WriteFile {
                 path: VirtualPath::worktree(format!("{BOOTSTRAP_LOCK_FILE}ed")).unwrap(),
-                owner: "write".into(),
+                owner: RepositoryActionOwner::RepositoryStateMutation,
                 expected: ExpectedPreimage::Absent,
                 bytes: b"ordinary".to_vec(),
                 mode: FileMode::Regular,
@@ -1906,14 +2166,27 @@ mod tests {
         let refused = [
             RepositoryAction::write_file(
                 log.clone(),
-                "write",
+                RepositoryActionOwner::RepositoryStateMutation,
                 file.clone(),
                 b"rewritten".to_vec(),
                 FileMode::Regular,
             ),
-            RepositoryAction::delete_file(log.clone(), "delete", file.clone()),
-            RepositoryAction::set_mode(log.clone(), "mode", file.clone(), FileMode::Executable),
-            RepositoryAction::create_directory(log, "create", ExpectedPreimage::Absent),
+            RepositoryAction::delete_file(
+                log.clone(),
+                RepositoryActionOwner::RepositoryStateMutation,
+                file.clone(),
+            ),
+            RepositoryAction::set_mode(
+                log.clone(),
+                RepositoryActionOwner::RepositoryStateMutation,
+                file.clone(),
+                FileMode::Executable,
+            ),
+            RepositoryAction::create_directory(
+                log,
+                RepositoryActionOwner::RepositoryInit,
+                ExpectedPreimage::Absent,
+            ),
         ];
         for action in refused {
             assert!(
@@ -1927,7 +2200,7 @@ mod tests {
         assert!(RepositoryDelta::new(
             &layout(),
             vec![RepositoryAction::append_events(
-                "append",
+                RepositoryActionOwner::RepositoryStateMutation,
                 file,
                 3,
                 b"line\n".to_vec()
@@ -1943,14 +2216,15 @@ mod tests {
             identity: identity.clone(),
             mode: FileMode::Regular,
         };
-        let set_mode = |path: VirtualPath, owner: &str, expected: ExpectedPreimage| {
-            RepositoryAction::SetMode {
-                path,
-                owner: owner.into(),
-                expected,
-                mode: FileMode::Executable,
-            }
-        };
+        let set_mode =
+            |path: VirtualPath, owner: RepositoryActionOwner, expected: ExpectedPreimage| {
+                RepositoryAction::SetMode {
+                    path,
+                    owner,
+                    expected,
+                    mode: FileMode::Executable,
+                }
+            };
 
         // A file hard-linked into both roots captures ONE physical identity at two
         // canonical paths; the cross-root pair is rejected.
@@ -1960,10 +2234,14 @@ mod tests {
                 vec![
                     set_mode(
                         VirtualPath::worktree("shared").unwrap(),
-                        "one",
+                        RepositoryActionOwner::RepositoryStateMutation,
                         file(&shared)
                     ),
-                    set_mode(VirtualPath::data("shared").unwrap(), "two", file(&shared)),
+                    set_mode(
+                        VirtualPath::data("shared").unwrap(),
+                        RepositoryActionOwner::ProfileApplication,
+                        file(&shared)
+                    ),
                 ],
             ),
             Err(DeltaError::PhysicalAlias { .. })
@@ -1976,8 +2254,16 @@ mod tests {
             RepositoryDelta::new(
                 &layout(),
                 vec![
-                    set_mode(VirtualPath::data("a").unwrap(), "one", file(&shared)),
-                    set_mode(VirtualPath::data("b").unwrap(), "two", file(&shared)),
+                    set_mode(
+                        VirtualPath::data("a").unwrap(),
+                        RepositoryActionOwner::RepositoryStateMutation,
+                        file(&shared)
+                    ),
+                    set_mode(
+                        VirtualPath::data("b").unwrap(),
+                        RepositoryActionOwner::ProfileApplication,
+                        file(&shared)
+                    ),
                 ],
             ),
             Err(DeltaError::PhysicalAlias { .. })
@@ -1990,10 +2276,14 @@ mod tests {
             vec![
                 set_mode(
                     VirtualPath::worktree("shared").unwrap(),
-                    "one",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     file(&shared)
                 ),
-                set_mode(VirtualPath::data("shared").unwrap(), "two", file(&other)),
+                set_mode(
+                    VirtualPath::data("shared").unwrap(),
+                    RepositoryActionOwner::ProfileApplication,
+                    file(&other)
+                ),
             ],
         )
         .is_ok());
@@ -2004,14 +2294,14 @@ mod tests {
             vec![
                 RepositoryAction::WriteFile {
                     path: VirtualPath::worktree("fresh-a").unwrap(),
-                    owner: "one".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::Absent,
                     bytes: b"a".to_vec(),
                     mode: FileMode::Regular,
                 },
                 RepositoryAction::WriteFile {
                     path: VirtualPath::data("fresh-b").unwrap(),
-                    owner: "two".into(),
+                    owner: RepositoryActionOwner::ProfileApplication,
                     expected: ExpectedPreimage::Absent,
                     bytes: b"b".to_vec(),
                     mode: FileMode::Regular,
@@ -2049,14 +2339,14 @@ mod tests {
         let path = VirtualPath::data("index.json").unwrap();
         assert!(matches!(
             TargetClaim::new(&layout(), path.clone(), ""),
-            Err(DeltaError::InvalidOwner)
+            Err(DeltaError::InvalidClaimOwner)
         ));
         assert!(matches!(
             RepositoryDelta::new(
                 &layout(),
                 vec![RepositoryAction::CreateDirectory {
                     path,
-                    owner: "producer".into(),
+                    owner: RepositoryActionOwner::RepositoryStateMutation,
                     expected: ExpectedPreimage::File {
                         identity: EntryIdentity::for_bytes("occupant", b"metadata").unwrap(),
                         mode: FileMode::Regular,

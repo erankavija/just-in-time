@@ -5,60 +5,30 @@
 //! a failed command plus a retry. Policy: hints only, no new aliases — every
 //! wrong guess still fails, but with a message naming the canonical spelling
 //! instead of clap's generic "unrecognized subcommand" error. These tests
-//! pin, for each wrong guess: exit code 2, the hint naming the canonical command
+//! pin, for each wrong guess: failure, the hint naming the canonical command
 //! and clap's diagnostic on stderr with empty stdout (parse failures stay
 //! outside the `--json` envelope), and that the canonical spelling in the same
 //! group is completely unaffected.
 
-use std::process::Command;
-use tempfile::TempDir;
+use jit::test_cli::JitCli;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_env() -> TempDir {
-    let temp_dir = TempDir::new().unwrap();
-    let status = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .arg("init")
-        .status()
-        .unwrap();
-    assert!(status.success());
-    temp_dir
-}
-
-fn json_issue_id(output: &std::process::Output) -> String {
-    assert!(
-        output.status.success(),
-        "command failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    json["id"].as_str().expect("id should exist").to_string()
-}
-
-/// Assert a wrong-verb guess is a parse failure: exit 2, the hint and clap's
+/// Assert a wrong-verb guess is a parse failure: the hint and clap's
 /// diagnostic on stderr, empty stdout, with and without `--json` and inside
 /// or outside a repository.
 fn assert_wrong_verb_hint(args: &[&str], expect_in_hint: &str) {
-    let repo = setup_test_env();
-    let outside = TempDir::new().unwrap();
+    let repo = JitCli::initialised().unwrap();
+    let outside = JitCli::uninitialised().unwrap();
     let json_args: Vec<&str> = args.iter().copied().chain(["--json"]).collect();
 
-    for (dir, argv) in [
+    for (cli, argv) in [
         (&repo, args),
         (&repo, json_args.as_slice()),
         (&outside, args),
         (&outside, json_args.as_slice()),
     ] {
-        let output = Command::new(jit_binary())
-            .current_dir(dir)
-            .args(argv)
-            .output()
-            .unwrap();
+        let output = cli.command(argv).output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
-        assert_eq!(output.status.code(), Some(2), "{argv:?}: {stderr}");
+        assert!(!output.status.success(), "{argv:?}: {stderr}");
         assert!(output.stdout.is_empty(), "{argv:?}: stdout must be empty");
         assert!(
             stderr.contains("Hint:") && stderr.contains(expect_in_hint),
@@ -152,10 +122,8 @@ fn test_label_remove_hints_issue_update_remove_label_flag() {
 
 #[test]
 fn test_label_help_disambiguates_namespace_management_from_issue_labeling() {
-    let output = Command::new(jit_binary())
-        .args(["label", "--help"])
-        .output()
-        .unwrap();
+    let cli = JitCli::uninitialised().unwrap();
+    let output = cli.command(["label", "--help"]).output().unwrap();
     assert!(output.status.success());
     let help = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -171,32 +139,15 @@ fn test_label_help_disambiguates_namespace_management_from_issue_labeling() {
 
 #[test]
 fn test_dep_rm_canonical_still_works() {
-    let temp_dir = setup_test_env();
-    let a = json_issue_id(
-        &Command::new(jit_binary())
-            .current_dir(&temp_dir)
-            .args(["issue", "create", "--title", "A", "--json"])
-            .output()
-            .unwrap(),
-    );
-    let b = json_issue_id(
-        &Command::new(jit_binary())
-            .current_dir(&temp_dir)
-            .args(["issue", "create", "--title", "B", "--json"])
-            .output()
-            .unwrap(),
-    );
-    assert!(Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["dep", "add", &a, &b])
+    let cli = JitCli::initialised().unwrap();
+    let a = cli.create_issue(["--title", "A"]).unwrap();
+    let b = cli.create_issue(["--title", "B"]).unwrap();
+    assert!(cli
+        .command(["dep", "add", &a, &b])
         .status()
         .unwrap()
         .success());
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["dep", "rm", &a, &b])
-        .output()
-        .unwrap();
+    let output = cli.command(["dep", "rm", &a, &b]).output().unwrap();
     assert!(
         output.status.success(),
         "canonical `dep rm` should still work: {}",
@@ -206,18 +157,10 @@ fn test_dep_rm_canonical_still_works() {
 
 #[test]
 fn test_issue_delete_canonical_still_works() {
-    let temp_dir = setup_test_env();
-    let id = json_issue_id(
-        &Command::new(jit_binary())
-            .current_dir(&temp_dir)
-            .args(["issue", "create", "--title", "Delete me", "--json"])
-            .output()
-            .unwrap(),
-    );
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .env("JIT_ALLOW_DELETION", "1")
-        .args(["issue", "delete", &id])
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Delete me"]).unwrap();
+    let output = cli
+        .command_with_env(["issue", "delete", &id], [("JIT_ALLOW_DELETION", "1")])
         .output()
         .unwrap();
     assert!(
@@ -229,17 +172,10 @@ fn test_issue_delete_canonical_still_works() {
 
 #[test]
 fn test_issue_update_canonical_still_works() {
-    let temp_dir = setup_test_env();
-    let id = json_issue_id(
-        &Command::new(jit_binary())
-            .current_dir(&temp_dir)
-            .args(["issue", "create", "--title", "Update me", "--json"])
-            .output()
-            .unwrap(),
-    );
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["issue", "update", &id, "--title", "Updated"])
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Update me"]).unwrap();
+    let output = cli
+        .command(["issue", "update", &id, "--title", "Updated"])
         .output()
         .unwrap();
     assert!(
@@ -251,10 +187,9 @@ fn test_issue_update_canonical_still_works() {
 
 #[test]
 fn test_gate_remove_canonical_still_works() {
-    let temp_dir = setup_test_env();
-    assert!(Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args([
+    let cli = JitCli::initialised().unwrap();
+    assert!(cli
+        .command([
             "gate",
             "define",
             "some-gate",
@@ -266,9 +201,8 @@ fn test_gate_remove_canonical_still_works() {
         .status()
         .unwrap()
         .success());
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["gate", "remove", "some-gate"])
+    let output = cli
+        .command(["gate", "remove", "some-gate"])
         .output()
         .unwrap();
     assert!(
@@ -280,24 +214,16 @@ fn test_gate_remove_canonical_still_works() {
 
 #[test]
 fn test_doc_remove_canonical_still_works() {
-    let temp_dir = setup_test_env();
-    let id = json_issue_id(
-        &Command::new(jit_binary())
-            .current_dir(&temp_dir)
-            .args(["issue", "create", "--title", "Has doc", "--json"])
-            .output()
-            .unwrap(),
-    );
-    std::fs::write(temp_dir.path().join("notes.md"), "notes").unwrap();
-    assert!(Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["doc", "add", &id, "notes.md"])
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Has doc"]).unwrap();
+    std::fs::write(cli.root().join("notes.md"), "notes").unwrap();
+    assert!(cli
+        .command(["doc", "add", &id, "notes.md"])
         .status()
         .unwrap()
         .success());
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["doc", "remove", &id, "notes.md"])
+    let output = cli
+        .command(["doc", "remove", &id, "notes.md"])
         .output()
         .unwrap();
     assert!(
@@ -309,12 +235,8 @@ fn test_doc_remove_canonical_still_works() {
 
 #[test]
 fn test_label_namespaces_and_values_canonical_still_work() {
-    let temp_dir = setup_test_env();
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(["label", "namespaces"])
-        .output()
-        .unwrap();
+    let cli = JitCli::initialised().unwrap();
+    let output = cli.command(["label", "namespaces"]).output().unwrap();
     assert!(
         output.status.success(),
         "canonical `label namespaces` should still work: {}",

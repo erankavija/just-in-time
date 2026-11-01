@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dc3d63f6f172cd4916504b23ba61defaad4624f7",
+  "completed_at": "2026-10-27T00:13:36.555821193Z",
+  "duration_ms": 170239,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five attributable domain test modules use the shared fixture without changing their assertions; the completed shared-fixture dependency is integrated.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "58dbb1a0-3eb1-4d34-8ebc-44eb080348b3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dc88951b-6aa8-4aac-9582-ed0f31c7ceb5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:10:46.316399010Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c6b42fb50; a0b4733ee\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml\nResolved items: @/issue/c780514e/requirement/REQ-06 (issue description, markdown-first); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed 2026-10-27T00:10:23Z (exit code unavailable); code-review pending (this review)\nTruncation recovery: bounded rereads of configuration, both merge-parent diffs, targeted patches, current call sites, fixture definitions, and source ranges\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five attributable domain test modules use the shared fixture without changing their assertions; the completed shared-fixture dependency is integrated.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

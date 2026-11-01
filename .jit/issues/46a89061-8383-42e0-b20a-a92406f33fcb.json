@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-10-24T19:27:04.261561586Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -28,5 +29,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Pinned revision reads move into the git module behind a bridge",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-10-24T19:27:04.261561586Z"
 }

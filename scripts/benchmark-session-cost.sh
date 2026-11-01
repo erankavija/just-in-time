@@ -62,6 +62,8 @@ set -euo pipefail
 #   CARGO_CI_BUILD_LOCK         build lock shared with cargo-ci.sh (default
 #                               ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock); held
 #                               only around the release build.
+#   CARGO_CI_LOCK_TIMEOUT       seconds to wait for that lock (default 1800);
+#                               the build exits 2 when the wait passes.
 #
 # Exit codes:
 #   0 — artifact written
@@ -73,6 +75,7 @@ WARMUP="${SESSION_BENCH_WARMUP:-3}"
 SAMPLES="${SESSION_BENCH_SAMPLES:-20}"
 OUT_DIR="${SESSION_BENCH_OUT_DIR:-dev/studies/perf}"
 BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
+LOCK_TIMEOUT="${CARGO_CI_LOCK_TIMEOUT:-1800}"
 
 # Reject malformed numeric overrides rather than letting arithmetic or jq fail
 # later with an unrelated message. The fixture always contains at least the
@@ -181,7 +184,16 @@ else
     exit 2
   }
   exec {LOCK_FD}>"$BUILD_LOCK"
-  flock "$LOCK_FD"
+  if ! flock -n "$LOCK_FD" 2>/dev/null; then
+    echo "[session-bench] another build holds $BUILD_LOCK; waiting up to ${LOCK_TIMEOUT}s" >&2
+    lock_status=0
+    flock -w "$LOCK_TIMEOUT" -E 75 "$LOCK_FD" || lock_status=$?
+    if [[ $lock_status -eq 75 ]]; then
+      echo "ERROR: timed out after ${LOCK_TIMEOUT}s waiting for $BUILD_LOCK" >&2
+      exit 2
+    fi
+    [[ $lock_status -eq 0 ]] || exit "$lock_status"
+  fi
   CARGO_INCREMENTAL=0 \
   CARGO_TARGET_DIR="$TARGET_DIR" \
     cargo build --release -p jit >&2 || {

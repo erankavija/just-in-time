@@ -10,15 +10,15 @@
 //!
 //! - The identifier widths come from the constants that enforce them:
 //!   [`SHORT_ID_LENGTH`], the width [`Issue::short_id`](crate::domain::Issue::short_id)
-//!   truncates to, and [`MIN_ID_PREFIX_LENGTH`], the minimum
-//!   [`IssueIdPrefix`](crate::domain::issue_id::IssueIdPrefix) accepts.
+//!   truncates to, and [`IssueIdPrefix::MIN_ID_PREFIX_LENGTH`], the minimum
+//!   [`IssueIdPrefix`] accepts.
 //! - The event-log sample lines are [`EventTag::sample`] records encoded by
 //!   [`serialize_event`] with the newline terminator the finalizer's positioned
 //!   append adds to each line (`compose_events`). The tag vocabulary is NOT restated here: it is the event
 //!   catalog's own projection ([`crate::domain::event_catalog::event_catalog`]), which this page
 //!   links to.
 //! - The gate-run path comes from
-//!   [`gate_run_result_relative_path`](crate::repository_state::gate_run_result_relative_path),
+//!   [`VirtualPath::gate_run_record`](crate::repository_state::VirtualPath::gate_run_record),
 //!   shared by the repository-state finalizer and storage readers; the record's
 //!   example is a [`GateRunResult`] encoded by [`serialize_gate_run`]; each field's presence when unset is
 //!   read off that encoding.
@@ -31,9 +31,9 @@
 use crate::declarations::GateStage;
 use crate::domain::event_catalog::EventTag;
 use crate::domain::gate_findings::{GateFinding, GateFindings};
-use crate::domain::issue_id::MIN_ID_PREFIX_LENGTH;
+use crate::domain::identity::{GateRunId, IssueIdPrefix};
 use crate::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION, SHORT_ID_LENGTH};
-use crate::repository_state::{gate_run_result_relative_path, serialize_event, serialize_gate_run};
+use crate::repository_state::{serialize_event, serialize_gate_run, VirtualPath};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use std::path::Path;
@@ -51,7 +51,7 @@ pub(crate) mod test_support {
 /// prefix. That holds only while the short id is at least as wide as the
 /// resolvable minimum, so the claim is checked at compile time against the two
 /// constants it is drawn from.
-const _: () = assert!(SHORT_ID_LENGTH >= MIN_ID_PREFIX_LENGTH);
+const _: () = assert!(SHORT_ID_LENGTH >= IssueIdPrefix::MIN_ID_PREFIX_LENGTH);
 
 /// The fields of a recorded gate run: one variant per [`GateRunResult`] field.
 ///
@@ -102,6 +102,21 @@ pub enum GateRunField {
     Origin,
     /// `evaluation_stability`
     EvaluationStability,
+}
+
+/// `tokens` as code spans joined into an English alternative: `a` or `b`, or
+/// `a`, `b`, or `c`.
+fn code_alternatives(tokens: &[&str]) -> String {
+    let spans = tokens
+        .iter()
+        .map(|token| format!("`{token}`"))
+        .collect::<Vec<_>>();
+    match spans.as_slice() {
+        [] => String::new(),
+        [only] => only.clone(),
+        [first, second] => format!("{first} or {second}"),
+        [leading @ .., last] => format!("{}, or {last}", leading.join(", ")),
+    }
 }
 
 impl GateRunField {
@@ -174,7 +189,10 @@ impl GateRunField {
             GateRunField::GateKey => {
                 "Key of the gate that ran, as registered in `.jit/gates.toml`.".to_string()
             }
-            GateRunField::Stage => "Stage the gate ran at: `precheck` or `postcheck`.".to_string(),
+            GateRunField::Stage => format!(
+                "Stage the gate ran at: {}.",
+                code_alternatives(&GateStage::ALL.map(GateStage::as_str))
+            ),
             GateRunField::IssueId => {
                 "Full id of the issue the run is about. An issue's runs are selected by matching \
                  this field across the run directories, so `gate-runs/` is flat rather than \
@@ -193,12 +211,11 @@ impl GateRunField {
                  `commit`."
                     .to_string()
             }
-            GateRunField::Status => {
-                "The run's verdict: `passed`, `failed`, `error`, or `pending`. For an \
-                 executed checker the exit status decides it, as \
-                 [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines."
-                    .to_string()
-            }
+            GateRunField::Status => format!(
+                "The run's verdict: {}. For an executed checker the exit status decides it, as \
+                 [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines.",
+                code_alternatives(&GateRunStatus::ALL.map(GateRunStatus::as_str))
+            ),
             GateRunField::StartedAt => {
                 "RFC 3339 timestamp taken before the checker is launched.".to_string()
             }
@@ -289,7 +306,21 @@ impl Presence {
 
 /// Run id used in the reference's example record, chosen so the example's path
 /// and its `run_id` field are visibly the same string.
-const SAMPLE_RUN_ID: &str = "7b2b0a4c-2f5a-4d3e-9b1a-6c8f0d5e4a21";
+fn sample_run_id() -> GateRunId {
+    GateRunId::from_uuid(uuid::Uuid::from_u128(
+        0x7b2b0a4c_2f5a_4d3e_9b1a_6c8f0d5e4a21,
+    ))
+}
+
+/// The run record's path as the reference prints it, with the id as a placeholder.
+fn documented_result_path() -> String {
+    let id = sample_run_id();
+    Path::new(".jit")
+        .join(VirtualPath::gate_run_record(&id).relative().as_path())
+        .display()
+        .to_string()
+        .replace(id.as_str(), "<run-id>")
+}
 
 /// Fixed timestamp for the reference's sample records, so the projection is
 /// deterministic.
@@ -305,10 +336,12 @@ fn sample_timestamp() -> DateTime<Utc> {
 fn sample_gate_run() -> GateRunResult {
     GateRunResult {
         schema_version: GATE_RUN_SCHEMA_VERSION,
-        run_id: SAMPLE_RUN_ID.to_string(),
-        gate_key: "tests".to_string(),
+        run_id: sample_run_id(),
+        gate_key: "tests".parse().unwrap(),
         stage: GateStage::Postcheck,
-        issue_id: "9d1f6c02-4a77-4f2b-8f3d-5e0b7a1c8e64".to_string(),
+        issue_id: crate::domain::identity::IssueId::from_uuid(uuid::Uuid::from_u128(
+            0x9d1f6c02_4a77_4f2b_8f3d_5e0b7a1c8e64,
+        )),
         commit: Some("9f1c0f0a2b3c4d5e6f708192a3b4c5d6e7f80910".to_string()),
         branch: Some("main".to_string()),
         status: GateRunStatus::Passed,
@@ -319,7 +352,7 @@ fn sample_gate_run() -> GateRunResult {
         stdout: "test result: ok. 812 passed; 0 failed".to_string(),
         stderr: String::new(),
         command: "cargo test --workspace".to_string(),
-        by: Some("agent:worker-1".to_string()),
+        by: Some("agent:worker-1".parse().unwrap()),
         message: Some("all suites green".to_string()),
         findings: Some(GateFindings {
             verdict: "pass".to_string(),
@@ -343,9 +376,9 @@ fn sample_gate_run() -> GateRunResult {
             builder.push_file("crates/jit/src/lib.rs", b"pub mod domain;\n");
             builder.finish()
         }),
-        origin: crate::domain::GateVerdictOrigin::Reused(
-            "1c4e8a90-3d2b-4f61-9a07-5b8c2d1e6f34".to_string(),
-        ),
+        origin: crate::domain::GateVerdictOrigin::Reused(GateRunId::from_uuid(
+            uuid::Uuid::from_u128(0x1c4e8a90_3d2b_4f61_9a07_5b8c2d1e6f34),
+        )),
         evaluation_stability: crate::domain::GateEvaluationStability::InputsMoved,
     }
 }
@@ -428,7 +461,7 @@ fn cell(text: &str) -> String {
 /// from the constants that enforce them, the event-log block from
 /// [`EventTag::sample`] records encoded the way the log is written, and the
 /// gate-run path, example record, and field table from
-/// [`gate_run_result_relative_path`] and [`GateRunResult`] — so the page cannot
+/// [`VirtualPath::gate_run_record`] and [`GateRunResult`] — so the page cannot
 /// drift from the code that writes and reads the files. The conformance test in
 /// this module asserts the committed file equals this output.
 ///
@@ -439,15 +472,15 @@ pub fn render_reference_markdown() -> Result<String> {
     let example_run = String::from_utf8(serialize_gate_run(&sample_gate_run())?)?;
     let events = event_log_sample()?;
 
-    // The run's path, straight from the pure helper finalization and readers
+    // The run's path, straight from the constructor finalization and readers
     // share, so the page names the live layout rather than a prose copy of it.
-    let result_path = Path::new(".jit").join(gate_run_result_relative_path("<run-id>")?.as_path());
-    let result_path = result_path.display();
+    let result_path = documented_result_path();
 
+    let min_prefix_length = IssueIdPrefix::MIN_ID_PREFIX_LENGTH;
     // One line per rule, so the interpolated minimum cannot skew the wrapping.
     let prefix_rules = [
         format!(
-            "- the normalized input must be at least {MIN_ID_PREFIX_LENGTH} characters; below the \
+            "- the normalized input must be at least {min_prefix_length} characters; below the \
              minimum it is refused as an argument error (exit code 2, see \
              [Exit Codes](exit-codes.md)) before any issue record is read;"
         ),
@@ -505,7 +538,7 @@ pub fn render_reference_markdown() -> Result<String> {
          \n\
          {prefix_rules}\n\
          \n\
-         A short id is {SHORT_ID_LENGTH} characters and the minimum is {MIN_ID_PREFIX_LENGTH},\n\
+         A short id is {SHORT_ID_LENGTH} characters and the minimum is {min_prefix_length},\n\
          so a short id printed by one command is always long enough to hand back to the next.\n\
          \n\
          ## Event Log Records\n\
@@ -660,18 +693,20 @@ mod tests {
         assert!(cleared[GateRunField::Commit.as_str()].is_null());
     }
 
-    /// REQ-01: an issue's stored id is a UUID v4, and the short id is the first
-    /// `SHORT_ID_LENGTH` characters of it — derived on read, never a stored field.
+    /// REQ-01: a mutation derives each new issue's id as a UUID v4, and the short
+    /// id is the first `SHORT_ID_LENGTH` characters of an id — derived on read,
+    /// never a stored field.
     #[test]
     fn test_issue_id_is_uuid_v4_and_short_id_is_its_prefix() {
-        let issue = crate::domain::fixture_issue("Probe".to_string(), String::new());
-
-        let parsed = Uuid::parse_str(&issue.id).expect("an issue id is a UUID");
+        let id = crate::repository_state::MutationContext::preview().issue_id_at(0);
+        let parsed = Uuid::parse_str(id.as_str()).expect("an issue id is a UUID");
         assert_eq!(parsed.get_version(), Some(uuid::Version::Random));
-        assert_eq!(parsed.hyphenated().to_string(), issue.id);
+        assert_eq!(parsed.hyphenated().to_string(), id.as_str());
+
+        let issue = crate::test_utils::fixture_issue("Probe".to_string(), String::new());
 
         assert_eq!(issue.short_id().len(), SHORT_ID_LENGTH);
-        assert!(issue.id.starts_with(&issue.short_id()));
+        assert!(issue.id.as_str().starts_with(&issue.short_id()));
 
         // The record stores no short id: the encoded issue carries the full `id`
         // and no key holding its truncation.
@@ -686,13 +721,11 @@ mod tests {
     }
 
     /// REQ-03: the page names the path shared by finalization and readers, taken
-    /// from the canonical relative-path helper rather than reconstructed.
+    /// from the canonical path constructor rather than reconstructed.
     #[test]
     fn test_render_projects_the_storage_result_path() {
         let page = render_reference_markdown().expect("the reference renders");
-        let path =
-            Path::new(".jit").join(gate_run_result_relative_path("<run-id>").unwrap().as_path());
-        assert!(page.contains(&format!("`{}`", path.display())));
+        assert!(page.contains(&format!("`{}`", documented_result_path())));
     }
 
     /// REQ-02: the page states the event-log serialization and links the tag

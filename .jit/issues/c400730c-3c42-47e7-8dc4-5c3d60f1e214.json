@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:31:09.235145639Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Type the input and output of issue-id prefix resolution, so a user-supplied prefix is parsed once and resolves to an `IssueId`.\n\n## Background\n\n`IssueStore::resolve_issue_id(&self, partial_id: &str) -> Result<String>` (`crates/jit/src/storage/mod.rs:191`) takes raw input. On their full-length fast paths the JSON backend (`storage/json.rs:1264-1268`) and the memory backend (`storage/memory.rs:849-853`) pass that raw input to `load_issue`. `MIN_ID_PREFIX_LENGTH` lives in storage (`storage/errors.rs:251`), and `storage/reference.rs:56` const-asserts `SHORT_ID_LENGTH >= MIN_ID_PREFIX_LENGTH`. One shared pure resolver owns prefix normalisation, minimum length and matching; this change keeps that behaviour and types its signature.\n\nThe shared resolver's contract fixes two error classes. A prefix that normalises below the minimum length fails with `InvalidIdPrefixError` (`storage/json.rs:1274`, `storage/memory.rs:858`), refined to `INVALID_ID_PREFIX` (`output.rs:1163`), before any record is read, as `crates/jit/tests/fast_issue/short_hash_tests.rs:84,399`, `crates/jit/tests/cli_issue/issue_status_projection_tests.rs:350`, `crates/jit/tests/cli_issue/exit_code_tests.rs:1220,1372` and `storage/reference.rs:742` assert. Input of well-formed length that lies outside the id alphabet, such as `nonexistent`, or matches no issue is reported as not found with exit code 3, as `cli_issue/error_json_tests.rs:26`, `cli_issue/exit_code_tests.rs:57`, `cli_issue/top_level_failure_envelope_tests.rs:87`, `cli_issue/quiet_mode_tests.rs:188` and `cli_repo_workflow/workflow_tests.rs:438` assert. Where this description and the landed resolver contract differ, the resolver contract governs. Production callers of `resolve_issue_id` sit in `main.rs` and in `commands/claim.rs`, `commands/issue.rs`, `commands/document.rs`, `commands/gate.rs`, `commands/graph.rs`, `commands/gate_check.rs`, `commands/validate.rs`, `commands/item.rs`, `commands/archive.rs` and `commands/mod.rs`. The settled boundary is that only the CLI and server entry points parse and resolve prefixes. So that this change can land green before that boundary exists, each of these callers parses its input where it calls the resolver. These call-site parses are a named temporary bridge: later changes in this epic move parsing to the CLI and server entry points, retype the command methods to take resolved ids and delete each call-site parse, and the bridge is gone when no production `IssueIdPrefix` parse remains outside those entry points.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::identity::IssueIdPrefix` is the parsed form of user-supplied id input. It applies the resolver's normalisation and minimum-length rules, and it owns `MIN_ID_PREFIX_LENGTH`.\n- [hard] REQ-02: The shared prefix resolver and `IssueStore::resolve_issue_id` take `&IssueIdPrefix` and return `IssueId`, and each `IssueStore` implementation, test wrappers included, implements the retyped method.\n- [hard] REQ-03: `IssueIdPrefix` implements an infallible `From<&IssueId>`, because a full id is a valid prefix.\n- [hard] REQ-04: Input that normalises below `MIN_ID_PREFIX_LENGTH` fails at parse with the invalid-prefix error before any record is read. Input of sufficient length that is outside the id alphabet or matches nothing is reported as not found with exit code 3. The listed not-found tests and invalid-prefix tests pass unchanged.\n- [hard] REQ-05: Neither backend passes unparsed user input to `load_issue`, and a full-length prefix resolves through the same resolver as a short one.\n- [hard] REQ-06: Both storage backends pass the shared prefix-resolution conformance tests.\n- [hard] REQ-07: Each call-site parse this change adds sits at an existing production `resolve_issue_id` call and is the only interim parse; no new caller of the resolver is introduced.\n",
   "documents": [],
+  "done_at": "2026-10-25T01:28:58.333117551Z",
+  "first_ready_at": "2026-10-24T23:27:44.326972090Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9f32267b-c22c-46da-b998-b5a8265557e4",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:28:57.421835042Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "42180aa4-2074-4d09-86d1-0be70e77ca44",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:28:01.952864344Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c400730c-3c42-47e7-8dc4-5c3d60f1e214",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Id prefixes parse once into an IssueIdPrefix",
-  "updated_at": "2026-10-21T05:32:33.863526594Z"
+  "updated_at": "2026-10-25T01:28:58.333117551Z"
 }

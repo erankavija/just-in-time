@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-f8523c62",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4eea3a2eb0ad71125f9f6b2c750c3e89e52bfd78",
+  "completed_at": "2026-10-25T00:05:29.133192251Z",
+  "duration_ms": 137316,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard criteria are satisfied by the attributed commit; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f8523c62-72e0-452b-b0a4-a00073a0fe9a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ea388f61-6856-4e93-ba38-c1dd9446bc5d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T00:03:11.816651035Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 678a14154 `feat(jit:f8523c62): parse query assignee filters into Assignee`\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml); @/issue/2195c98f/requirement/REQ-11 and REQ-17 (parent issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T00:01:44Z); doc-review pending; docs-mechanical pending\nTruncation recovery: reread the per-path patch, Assignee/parser/test sources, policy sources, and query boundary in bounded calls; excluded unrelated archived and broad workspace matches\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard criteria are satisfied by the attributed commit; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

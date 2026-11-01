@@ -1,0 +1,44 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T23:42:05.851350525Z",
+  "context": {},
+  "created_at": "2026-10-26T23:41:51.636915630Z",
+  "dependencies": [],
+  "description": "Derive the priority tokens in the validation schema test from the `Priority` vocabulary instead of a handwritten list.\n\n## Background\n\n`Priority` is a closed vocabulary declared once through the vocabulary macro, and `Priority::ALL` enumerates its variants. The local-reference schema test in `crates/jit/src/validation/engine.rs` (around line 893) builds its `State` enum from `State::ALL` but writes the `Priority` enum as the literal list `[\"low\", \"normal\", \"high\", \"critical\"]`, so the test restates the vocabulary and drifts if a priority is added or renamed.\n\n## Success Criteria\n\n- [hard] REQ-01: The schema built by the local-reference test takes its `Priority` tokens from `Priority::ALL` and each variant's token method, as it already does for `State`.\n- [hard] REQ-02: No handwritten list of `Priority` wire tokens remains under `crates/jit/src/validation/`.\n",
+  "documents": [],
+  "done_at": "2026-10-27T00:01:24.766324797Z",
+  "first_ready_at": "2026-10-26T23:41:51.636915630Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3c276c80-cc30-482b-b12d-57675125bef1",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:01:11.876524265Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "fcdecdb2-53db-4361-89b9-6c768342073a",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:51:57.210978867Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "e1940fcf-c673-4b12-8a68-2c919b6bee42",
+  "labels": [
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:wire-vocabularies",
+    "component:validation",
+    "satisfies:2195c98f/REQ-10",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "The validation schema test derives priority tokens from the vocabulary",
+  "updated_at": "2026-10-27T00:01:24.766324797Z"
+}

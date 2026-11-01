@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "320a12bba300f4d6a1e9b7f1abe40131f4ef95ed",
+  "completed_at": "2026-10-26T22:58:47.158087464Z",
+  "duration_ms": 74349,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/apply_cli_tests.rs",
+        "id": "F1",
+        "line": 87,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-05",
+          "@/invariant/shared-test-contracts",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "Private repository setup helpers remain in scope, including a cross-test-file call, violating REQ-02."
+      }
+    ],
+    "summary": "Private repository setup helpers remain outside the shared CLI fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c9442f7f-cf02-4150-a6c6-69483391d90b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e792f0de-fd9c-4d51-9f8f-6582900dbda9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T22:57:32.808410823Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9144 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17a6e-ef35-7463-866b-faeaf0350476\n--------\nuser\n--- 9131 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2b0462f1d, 320a12bba (jit:c9442f7f)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05 (issue description); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit null, 2026-10-26T22:57:13Z); code-review pending (no recorded run)\nTruncation recovery: narrowed the merge patch to the four issue-scoped files; other merge paths carry separate issue tags and are outside this issue’s stated four-file migration scope\n\n1. [blocking][issue-impact] Private repository-initialisation helpers remain in the migration scope: `initialise_with_templates` in `apply_cli_tests.rs:87` performs `jit init`, template/gate setup, and is called from `template_binding_cli_tests.rs:188`; `init_with_default_package` in `init_item_kinds_golden.rs:25` likewise sets up and initialises a repository. This fails hard REQ-02’s prohibition on repository-setup helpers outside the shared fixture, including cross-test-file calls. Move this setup capability into the shared fixture or inline only scenario-specific declarations after fixture initialisation. References: @/issue/c780514e/requirement/REQ-05, @/invariant/shared-test-contracts, @/charter/D-18.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Private repository setup helpers remain outside the shared CLI fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Private repository setup helpers remain in scope, including a cross-test-file call, violating REQ-02.\",\"file\":\"crates/jit/tests/cli_repo_workflow/apply_cli_tests.rs\",\"line\":87,\"references\":[\"@/issue/c780514e/requirement/REQ-05\",\"@/invariant/shared-test-contracts\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

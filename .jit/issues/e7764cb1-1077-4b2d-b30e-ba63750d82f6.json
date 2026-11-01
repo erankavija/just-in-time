@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-24T23:43:55.549909400Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Move the envelope, failure and output-mode tests in `crates/jit/tests/cli_issue` onto the shared CLI process fixture, so they carry no binary locator, repository setup or id scraping of their own.\n\n## Background\n\nShared test support provides one CLI process fixture. It owns a temporary repository, spawns the `jit` binary built for the calling integration target with inherited `JIT_*` variables removed, initialises git on request and reads created ids from `--json` output. Before it existed, each CLI test file carried its own binary locator (`fn jit_binary`, `assert_cmd`'s `cargo_bin!` or `env!(\"CARGO_BIN_EXE_jit\")`), its own repository setup (`setup_test_repo`, `setup_repo`, `setup`, `setup_test_env` and similar), private git helpers (`run_git`, `git`, `init_git`, `setup_git_repo`), and in places scraped ids from human-readable output with `split_whitespace`. Inherited `JIT_AGENT_ID`, `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION` and `JIT_LOCK_TIMEOUT` values leaked into those spawns.\n\nThe remaining `cli_issue` files cover failure envelopes, the recorded-failure probe fixture, quiet mode, recovery, snapshot export, verb hints and the exit-code projection suite. `snapshot_export_tests.rs` alone spawns the binary at 46 sites.\n\nThis entry covers `quiet_mode_tests.rs`, `recover_command_tests.rs`, `snapshot_export_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No file in this migration's scope defines or calls a binary locator, a repository setup or a git initialisation helper other than the shared fixture's, including one defined in another test file; each test spawns `jit` through the shared CLI process fixture.\n- [hard] REQ-02: A test that depends on a `JIT_*` variable sets it through the fixture for the process it spawns.\n- [hard] REQ-03: Each migrated test asserts the property it asserted before and passes alone, in any order and in parallel.\n\n## Notes\n\n`exit_code_tests.rs`, `invocation_exit_status_parity_tests.rs` and `list_envelope_tests.rs` are out of scope: their properties move to single owners and the files are removed or replaced there.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:28:25.110441936Z",
   "first_ready_at": "2026-10-22T15:47:00.966968540Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "079c5495-6d83-4a3d-b57d-7da29624b044",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:23:24.694922004Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f87f6f40-5ba4-4df0-8b10-bcab1e5642cb",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:26:12.615354090Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e7764cb1-1077-4b2d-b30e-ba63750d82f6",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "output-mode and export tests spawn jit through the shared process fixture",
-  "updated_at": "2026-10-22T15:47:00.966968540Z"
+  "updated_at": "2026-10-27T00:28:25.110441936Z"
 }

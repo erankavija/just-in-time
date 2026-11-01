@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T22:04:12.078136498Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Stop the issue show and rollup tests in `crates/jit/tests/cli_issue` reading ids or values from human-readable output.\n\n## Background\n\nShared test support provides one CLI process fixture, which reads the ids of issues it creates from `--json` output. These files still parse human-readable output with `split_whitespace`, mostly to scrape created ids. This entry covers `issue_show_projection_test.rs`, `issue_show_shape_test.rs`, `issue_show_summary_test.rs`, `issue_status_projection_tests.rs`, `container_rollup_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files reads an id or other value from human-readable output; ids and values come from `--json` output.\n- [hard] REQ-02: Each edited test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
   "documents": [],
+  "done_at": "2026-10-28T22:10:03.842999642Z",
+  "first_ready_at": "2026-10-26T23:44:08.907079725Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "dfb1bc1b-f81c-4b0c-abdb-163806556744",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:06:34.207324721Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c67de04e-5c27-4829-b41b-db98306c8117",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:08:58.884472560Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6bd02fa4-c44e-49f4-a729-59eae4edf400",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "issue show and rollup tests read created ids from JSON output",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T22:10:03.842999642Z"
 }

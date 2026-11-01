@@ -1,0 +1,43 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:16:18.038698384Z",
+  "context": {},
+  "created_at": "2026-10-29T07:06:39.353215586Z",
+  "dependencies": [],
+  "description": "Make the first suite run after a crate-source change pass without profiled-fixture lock timeouts.\n\n## Background\n\nThe profiled-repository fixture (`crates/jit/src/test_utils.rs`) is keyed on the package closure and the `jit` crate source digest, and is built in the suite on first use. When a source change produces a new key, the first consumer builds the fixture while the others wait up to `PROFILED_REPOSITORY_FIXTURE_LOCK_BOUND` (12 s) and then fail with \"profiled-repository fixture … is busy\". On a loaded host a cold build exceeds that bound, so the first `cargo-ci` after a source change fails several unit tests that pass on the warm cache. nextest's per-test timeout (`.config/nextest.toml`) caps any waiter at roughly 20 s, so raising the lock bound alone does not help. Runner setup hooks and per-test filters are out (they were removed deliberately).\n\n## Success Criteria\n\n- [hard] REQ-01: A full suite run immediately after a crate-source change (cold fixture keys), on a host under load, passes with no fixture-lock \"busy\" failure; the evidence is recorded with the change.\n- [hard] REQ-02: A consumer waiting on a fixture build fails only when its own build of that fixture fails, and reports that build's cause. A failed or dead holder does not fail a waiter; the waiter builds the fixture itself. A corrupt published entry fails its consumers, naming the entry.\n- [hard] REQ-03: No runner setup hook, no per-test filter and no test-specific timeout is introduced.\n\n## Evidence\n\nFailing the real profiled fixture after its build (`68416fa02`): green 11.7 s, 4650 passed. Red under `cargo-ci`'s default fail-fast: 6.3 s, 7 failed, all with the cause. Red with `--no-fail-fast`: 16.3 s, 76 failed, 76 causes, 0 timeouts. With an artificial 5 s added per build: 21.4 s with 4 causes and 5 timeouts, and 81.6 s with 17 causes and 59 timeouts. A build takes about 0.1 s, against the 20 s limit. The failure-corpus fixture was not forced to fail, so these figures cover the profiled fixture only.\n\nA red run shows a real cause when a build finishes inside the 20 s limit: the consumer holding the lock returns its build's error to its own test. A fixture build longer than that shows timeouts and no cause. If a fixture build approaches that limit, this is a defect to reopen.\n\n`.config/nextest.toml` (`slow-timeout`, `terminate-after = 2`) ends a waiter under `Duration::MAX`: a scratch test blocked on it showed `TERMINATING [> 20.000s]`, then `TIMEOUT [20.004s]`.\n",
+  "documents": [],
+  "done_at": "2026-11-01T08:31:29.149477517Z",
+  "first_ready_at": "2026-10-29T07:06:39.353215586Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2f4b477e-618e-4222-895b-2bffae102192",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:25:59.911539919Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "378f4a8b-1db2-41cd-ac4f-4761212b073e",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:27:37.578604313Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "955aaa9a-34f7-4304-bed1-ad8102185253",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Cold profiled-fixture builds no longer time out their waiters",
+  "updated_at": "2026-11-01T08:31:29.149477517Z"
+}

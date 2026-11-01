@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-bf87bbdb",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bcb2dfce6c78687265e0598977fa9c9027fc8d7b",
+  "completed_at": "2026-10-25T06:34:17.476885417Z",
+  "duration_ms": 76076,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; recorded cargo-ci evidence passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "534b4214-702a-4350-9c27-63a80171c4e0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T06:33:01.400519485Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8d909b2ef785c80f681ef6019a73e64da28fe7e6 (`jit:bf87bbdb`)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml\nResolved items: @/issue/bf87bbdb/requirement/REQ-01..REQ-05 and @/issue/2195c98f/requirement/REQ-01,REQ-17 (.jit issue markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-10-25T06:31:29.196836439+00:00\nTruncation recovery: reread hierarchy and caller patches separately; inspected current query, error, hierarchy, and validation call sites\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; recorded cargo-ci evidence passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

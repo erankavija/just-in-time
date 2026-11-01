@@ -220,7 +220,7 @@ impl LocalEvaluation {
 /// "#;
 /// let rules = RuleSet::parse(toml, None, []).unwrap();
 ///
-/// let mut task = Issue::draft("A task".to_string(), String::new());
+/// let mut task = Issue::draft(jit::test_utils::issue_id(1), "A task".to_string(), String::new());
 /// task.labels = vec!["type:task".to_string()];
 /// let evaluation = evaluate_local(&task, &rules, ContentFormat::Markdown).unwrap();
 /// // A warn rule produces a (non-blocking) finding.
@@ -386,14 +386,14 @@ fn schema_needs_sections(schema: &serde_json::Value) -> bool {
 mod tests {
     use super::*;
     use crate::domain::Issue;
-    use crate::test_utils::document_reference_typed;
+    use crate::test_utils::{document_reference_typed, fixture_issue};
 
     fn rules_from(toml: &str) -> RuleSet {
         RuleSet::parse(toml, None, []).unwrap()
     }
 
     fn epic_without_req() -> Issue {
-        let mut issue = crate::domain::fixture_issue("An epic".to_string(), String::new());
+        let mut issue = fixture_issue("An epic".to_string(), String::new());
         issue.labels = vec!["type:epic".to_string()];
         issue
     }
@@ -729,7 +729,7 @@ enforce = true
 assert = { require-doc-type = { doc-type = "design" } }
 "#,
         );
-        let mut task = crate::domain::fixture_issue("A task".to_string(), String::new());
+        let mut task = fixture_issue("A task".to_string(), String::new());
         task.labels = vec!["type:task".to_string()];
         // No design doc -> blocks.
         assert!(evaluate_local(&task, &rules, ContentFormat::Markdown)
@@ -846,7 +846,7 @@ assert = { json-schema = "schemas/bad.json" }
 "#;
         std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
         let rules = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();

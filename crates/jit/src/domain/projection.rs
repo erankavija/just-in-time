@@ -44,7 +44,7 @@
 //! function of the issue description and the supplied parser.
 
 use crate::document::{ContentParser, ParsedContent};
-use crate::domain::Issue;
+use crate::domain::{Issue, Priority, State};
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -59,12 +59,11 @@ pub struct Projection {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub type_: Option<String>,
 
-    /// The issue's lifecycle state, serialized like [`crate::domain::State`]
-    /// (snake_case, e.g. `"in_progress"`).
-    pub state: String,
+    /// The issue's lifecycle state (serialized snake_case, e.g. `"in_progress"`).
+    pub state: State,
 
-    /// The issue's priority (snake_case, e.g. `"high"`).
-    pub priority: String,
+    /// The issue's priority (serialized snake_case, e.g. `"high"`).
+    pub priority: Priority,
 
     /// All labels grouped by namespace. The key is the namespace
     /// (`"req"`), the value is the list of values in that namespace in label
@@ -150,32 +149,13 @@ pub fn project(issue: &Issue) -> Projection {
 
     Projection {
         type_,
-        state: serde_plain_state(&issue.state),
-        priority: serde_plain_priority(&issue.priority),
+        state: issue.state,
+        priority: issue.priority,
         labels,
         raw_labels: issue.labels.clone(),
         doc_types: collect_doc_types(issue),
         sections: None,
     }
-}
-
-/// Render a [`State`](crate::domain::State) as its canonical snake_case string,
-/// reusing its serde representation so the projection never drifts from the type.
-fn serde_plain_state(state: &crate::domain::State) -> String {
-    // serde_json renders the enum as a quoted string; strip the quotes.
-    serde_json::to_value(state)
-        .ok()
-        .and_then(|v| v.as_str().map(str::to_string))
-        .unwrap_or_default()
-}
-
-/// Render a [`Priority`](crate::domain::Priority) as its canonical snake_case
-/// string, reusing its serde representation.
-fn serde_plain_priority(priority: &crate::domain::Priority) -> String {
-    serde_json::to_value(priority)
-        .ok()
-        .and_then(|v| v.as_str().map(str::to_string))
-        .unwrap_or_default()
 }
 
 impl Projection {
@@ -217,7 +197,8 @@ mod tests {
     use crate::test_utils::document_reference_typed;
 
     fn issue_with(labels: Vec<&str>, description: &str) -> Issue {
-        let mut issue = crate::domain::fixture_issue("Title".to_string(), description.to_string());
+        let mut issue =
+            crate::test_utils::fixture_issue("Title".to_string(), description.to_string());
         issue.labels = labels.into_iter().map(str::to_string).collect();
         issue
     }
@@ -261,8 +242,11 @@ mod tests {
         issue.state = crate::domain::State::InProgress;
         issue.priority = crate::domain::Priority::High;
         let p = project(&issue);
-        assert_eq!(p.state, "in_progress");
-        assert_eq!(p.priority, "high");
+        assert_eq!(p.state, crate::domain::State::InProgress);
+        assert_eq!(p.priority, crate::domain::Priority::High);
+        let value = serde_json::to_value(&p).unwrap();
+        assert_eq!(value["state"], "in_progress");
+        assert_eq!(value["priority"], "high");
     }
 
     #[test]
@@ -413,8 +397,44 @@ mod tests {
         );
 
         // --- Scalar top-level shapes. ---
-        assert_eq!(props["state"]["type"], "string");
-        assert_eq!(props["priority"]["type"], "string");
+        // state and priority publish their enums' own schemas, which admit
+        // exactly the wire tokens.
+        fn assert_publishes_enum<T: JsonSchema>(
+            schema: &serde_json::Value,
+            field: &str,
+            definition: &str,
+            tokens: Vec<&'static str>,
+        ) {
+            assert_eq!(
+                schema["properties"][field]["allOf"][0]["$ref"],
+                format!("#/definitions/{definition}"),
+                "`{field}` must reference the {definition} schema"
+            );
+            let own = serde_json::to_value(schemars::schema_for!(T)).unwrap();
+            let published = &schema["definitions"][definition];
+            assert_eq!(published["description"], own["description"]);
+            let rendered = published.to_string();
+            tokens.into_iter().for_each(|token| {
+                assert!(
+                    rendered.contains(&format!("\"{token}\"")),
+                    "{definition} schema must admit `{token}`"
+                );
+            });
+            assert_eq!(published.get("enum"), own.get("enum"));
+            assert_eq!(published.get("oneOf"), own.get("oneOf"));
+        }
+        assert_publishes_enum::<State>(
+            &schema,
+            "state",
+            "State",
+            State::ALL.into_iter().map(State::as_str).collect(),
+        );
+        assert_publishes_enum::<Priority>(
+            &schema,
+            "priority",
+            "Priority",
+            Priority::ALL.into_iter().map(Priority::as_str).collect(),
+        );
 
         // labels is an object whose values are arrays of strings.
         assert_eq!(props["labels"]["type"], "object");

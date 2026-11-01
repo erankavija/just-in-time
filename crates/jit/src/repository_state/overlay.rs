@@ -147,6 +147,7 @@ fn parent_and_name(path: &VirtualPath) -> Option<(VirtualPath, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository_state::RepositoryActionOwner;
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, ExpectedPreimage, RepositoryLayout, RepositoryRootEvidence,
     };
@@ -212,7 +213,7 @@ mod tests {
     fn test_action_overrides_extend_the_captured_log_by_its_append() {
         let base = base_image(&[(".jit/events.jsonl", "prior")], None);
         let append = RepositoryAction::append_events(
-            "append",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(base.entry(&VirtualPath::EVENTS).unwrap()),
             5,
             b"\nnext\n".to_vec(),
@@ -250,18 +251,20 @@ mod tests {
 
     #[test]
     fn test_apply_overlay_updates_captured_issue_listing() {
-        let base = base_image(&[(".jit/issues/a.json", "{}")], Some(&["a.json"]));
+        let first_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
+        let second_path = VirtualPath::issue_record(&crate::test_utils::issue_id(2));
+        let first_name = first_path.file_name().unwrap().to_owned();
+        let second_name = second_path.file_name().unwrap().to_owned();
+        let first_repository_path = first_path.repository_relative();
+        let base = base_image(&[(&first_repository_path, "{}")], Some(&[&first_name]));
         let overlaid = apply_overlay(
             &base,
-            [
-                (vpath(".jit/issues/b.json"), Some(b"{}".to_vec())),
-                (vpath(".jit/issues/a.json"), None),
-            ],
+            [(second_path, Some(b"{}".to_vec())), (first_path, None)],
         )
         .unwrap();
         let dir = VirtualPath::data("issues").unwrap();
         let names = overlaid.directory_listings()[&dir].names();
-        assert!(names.contains("b.json"));
-        assert!(!names.contains("a.json"));
+        assert!(names.contains(&second_name));
+        assert!(!names.contains(&first_name));
     }
 }

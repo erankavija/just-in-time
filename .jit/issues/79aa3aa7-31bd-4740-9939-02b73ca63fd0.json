@@ -1,18 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:03:23.992629189Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
     "0102769f-e3d8-4cbf-8da5-674aebd71c01",
     "faa19def-4484-4706-becf-dab559f0f3d4"
   ],
-  "description": "Type gate-run ids from creation to storage, so run records are addressed through one infallible path constructor.\n\n## Background\n\n`GateRunResult.run_id` is a `String` (`crates/jit/src/domain/types.rs:941`), and `IssueStore::load_gate_run_result(run_id: &str)` (`storage/mod.rs:262`) takes a raw id. Run ids are validated only by `gate_run_result_relative_path` (`repository_state/mutation.rs:512-520`), which returns a `Result`; `gate-runs/{run_id}` is also spelled at `mutation.rs:535` and `storage/gate_runs.rs:34`. Run ids are allocated from the mutation context (`commands/gate_check.rs:871`, `storage/gate_runs.rs:33`, `mutation.rs:1074`). Drafts set `run_id: String::new()` (`gate_execution.rs:160`, `commands/gate_check.rs:41,1204`), and the finalizer assigns the id (`mutation.rs:1074-1076`). `GateVerdictOrigin::Reused` and the server's gate-run route (`crates/server/src/routes.rs:910`) carry run ids as strings. Every recorded run id in this repository is a canonical UUID.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::identity::GateRunId` accepts only canonical UUIDs and serializes as a plain string.\n- [hard] REQ-02: The mutation context derives gate-run ids as `GateRunId` through a dedicated accessor.\n- [hard] REQ-03: `GateRunResult.run_id`, `GateVerdictOrigin::Reused` and `load_gate_run_result` use `GateRunId`, and the server parses its run-id path parameter once.\n- [hard] REQ-04: Gate-run drafts carry their pre-derived run id. No empty run id exists, and the finalizer no longer assigns one.\n- [hard] REQ-05: `VirtualPath::gate_run_record(&GateRunId)` is infallible and is the only builder of a gate-run record path, and recorded gate runs in this repository load and re-serialize byte-identically.\n",
+  "description": "Type gate-run ids from creation to storage, so run records are addressed through one infallible path constructor.\n\n## Background\n\n`GateRunResult.run_id` is a `String` (`crates/jit/src/domain/types.rs:941`), and `IssueStore::load_gate_run_result(run_id: &str)` (`storage/mod.rs:262`) takes a raw id. Run ids are validated only by `gate_run_result_relative_path` (`repository_state/mutation.rs:512-520`), which returns a `Result`; `gate-runs/{run_id}` is also spelled at `mutation.rs:535` and `storage/gate_runs.rs:34`. Run ids are allocated from the mutation context (`commands/gate_check.rs:871`, `storage/gate_runs.rs:33`, `mutation.rs:1074`). Drafts set `run_id: String::new()` (`gate_execution.rs:160`, `commands/gate_check.rs:41,1204`), and the finalizer assigns the id (`mutation.rs:1074-1076`). `GateVerdictOrigin::Reused` and the server's gate-run route (`crates/server/src/routes.rs:910`) carry run ids as strings. Every recorded run id in this repository is a canonical UUID.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::identity::GateRunId` accepts only canonical UUIDs and serializes as a plain string.\n- [hard] REQ-02: The mutation context derives gate-run ids as `GateRunId` through a dedicated accessor.\n- [hard] REQ-03: `GateRunResult.run_id`, `GateVerdictOrigin::Reused` and `load_gate_run_result` use `GateRunId`, and the server parses its run-id path parameter once.\n- [hard] REQ-04: Gate-run drafts carry their pre-derived run id. No empty run id exists, and the finalizer no longer assigns one.\n- [hard] REQ-05: `VirtualPath::gate_run_record(&GateRunId)` is infallible and is the only builder of a gate-run record path, current-format recorded gate runs in this repository load and re-serialize byte-identically, and every other stored gate-run record decodes and reproduces its id fields.\n",
   "documents": [],
+  "done_at": "2026-11-01T02:56:43.898437279Z",
+  "first_ready_at": "2026-11-01T00:45:10.002385098Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a30753de-1b1c-4e8f-89cc-4ec26f98c2d1",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:56:43.543009435Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "29ef432b-54f5-4273-8934-cca2b214f08f",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:55:25.533914527Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate runs are identified by a validated GateRunId",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-11-01T02:56:43.898437279Z"
 }

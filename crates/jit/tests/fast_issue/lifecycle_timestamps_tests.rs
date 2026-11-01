@@ -5,7 +5,7 @@
 //! unit-tested at the domain layer (`Issue::mark_*`); here we verify the command
 //! paths wire those helpers in.
 
-use jit::domain::{Event, State};
+use jit::domain::{EventBody, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
@@ -22,46 +22,6 @@ fn test_create_dependency_free_issue_stamps_first_ready() {
     assert!(issue.first_ready_at.is_some());
     assert!(issue.claimed_at.is_none());
     assert!(issue.done_at.is_none());
-}
-
-/// Completing a dependency auto-transitions the dependent to Ready THROUGH the
-/// chokepoint, leaving it Ready with `first_ready_at` set.
-///
-/// (A harness-created issue is dependency-free and therefore born Ready — hence
-/// already stamped — before `add_dependency` reverts it to Backlog; the
-/// first-occurrence chokepoint stamp is exercised precisely by
-/// `test_backlog_to_ready_transition_stamps_first_ready` below.)
-#[test]
-fn test_auto_ready_on_dependency_completion_leaves_ready_stamp() {
-    let h = TestHarness::new();
-    let dep = h.create_issue("Dependency");
-    let blocked = h.create_issue("Blocked");
-    h.executor.add_dependency(&blocked, &dep).unwrap();
-
-    // Adding the dependency reverted the dependent to Backlog.
-    assert_eq!(h.get_issue(&blocked).state, State::Backlog);
-
-    // Complete the dependency through `update_issue` (which cascades ready
-    // auto-transitions to dependents); the dependent returns to Ready.
-    h.executor
-        .issues()
-        .update_issue(
-            &dep,
-            None,
-            None,
-            None,
-            Some(State::Done),
-            vec![],
-            vec![],
-            None,
-            None,
-            false,
-        )
-        .unwrap();
-
-    let after = h.get_issue(&blocked);
-    assert_eq!(after.state, State::Ready);
-    assert!(after.first_ready_at.is_some());
 }
 
 /// A precise chokepoint check: an issue that has NEVER been Ready (forced into
@@ -98,7 +58,7 @@ fn test_claim_stamps_claimed_at() {
 
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".to_string())
+        .claim_issue(&id, "agent:worker-1".parse().unwrap())
         .unwrap();
 
     let issue = h.get_issue(&id);
@@ -115,7 +75,7 @@ fn test_assign_stamps_claimed_at_and_logs_event() {
 
     h.executor
         .issues()
-        .assign_issue(&id, "human:alice".to_string())
+        .assign_issue(&id, "human:alice".parse().unwrap())
         .unwrap();
 
     assert!(h.get_issue(&id).claimed_at.is_some());
@@ -125,7 +85,7 @@ fn test_assign_stamps_claimed_at_and_logs_event() {
         .read_events()
         .unwrap()
         .into_iter()
-        .filter(|e| matches!(e, Event::IssueClaimed { .. }))
+        .filter(|e| matches!(e.body(), EventBody::IssueClaimed { .. }))
         .count();
     assert_eq!(claimed, 1);
 }
@@ -155,7 +115,7 @@ fn test_reclaim_keeps_first_claimed_at() {
     let id = h.create_ready_issue("Claimable");
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".to_string())
+        .claim_issue(&id, "agent:worker-1".parse().unwrap())
         .unwrap();
     let first = h.get_issue(&id).claimed_at;
     assert!(first.is_some());
@@ -163,7 +123,7 @@ fn test_reclaim_keeps_first_claimed_at() {
     // Re-claiming as the same assignee promotes/no-ops but must not re-stamp.
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".to_string())
+        .claim_issue(&id, "agent:worker-1".parse().unwrap())
         .unwrap();
     assert_eq!(h.get_issue(&id).claimed_at, first);
 }

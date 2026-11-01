@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9995395086ddab1291c2ade785daa2b9e1eb814f",
+  "completed_at": "2026-11-01T10:03:03.363405112Z",
+  "duration_ms": 193097,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/benchmarks/test-topology-c780514e/README.md",
+        "id": "F1",
+        "line": 127,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7721a2a9/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "The before baseline figures name a commit and command but do not record a host load, leaving hard REQ-03 unmet."
+      }
+    ],
+    "summary": "The baseline measurement report omits the required host-load value.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7721a2a9-76ef-469c-b2d9-5e4d59f3eccc",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6a27da0a-62f5-4883-a41b-bcd999ba36c2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T09:59:50.265746111Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 23240 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1968d-13a0-7bb0-89a7-078e3650400b\n--------\nuser\n--- 23227 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: a6d4edb38a52f639ea0da36c17101ce73cb8bd00 (`jit:7721a2a9`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/7721a2a9/requirement/REQ-01, REQ-02, REQ-03 (issue Markdown); @/issue/c780514e/requirement/REQ-12, REQ-13 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T09:59:32Z); code-review pending\nTruncation recovery: separately read the README patch, current report lines, and summarized both profile-artifact versions rather than relying on the truncated full JSON patch\n\n1. **F1 — blocking, issue-impact (high):** The report does not record a host load for the before baseline figures. It identifies the baseline commit and command at [README.md:127](</home/vkaskivuo/Projects/just-in-time/dev/benchmarks/test-topology-c780514e/README.md:127>) and [README.md:138](</home/vkaskivuo/Projects/just-in-time/dev/benchmarks/test-topology-c780514e/README.md:138>), but gives no baseline load; the later start-load table covers only after runs. This leaves hard REQ-03 unmet. References: @/issue/7721a2a9/requirement/REQ-03.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The baseline measurement report omits the required host-load value.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The before baseline figures name a commit and command but do not record a host load, leaving hard REQ-03 unmet.\",\"file\":\"dev/benchmarks/test-topology-c780514e/README.md\",\"line\":127,\"references\":[\"@/issue/7721a2a9/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

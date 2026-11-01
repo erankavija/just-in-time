@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-29T07:06:13.092722157Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -9,11 +10,26 @@
   ],
   "description": "Move the claim and confirmed-delete cases that only the exit-code suite tests into the claim and issue-lifecycle suites.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:652`, `:702` and `:765`: claim and claim-next blocked by dependencies or a precheck gate, with `BLOCKED` details and remediation.\n- `:820`: claim-next skipping non-ready issues.\n- `:897` and `:920`: blocked-claim messages naming `--assign`, human and JSON.\n- `:954` and `:999`: an assign-only claim sets the assignee without a transition, and claiming a ready issue moves it to in-progress.\n- `:1590` and `:1616`: confirmed delete in text mode (\"Deleted issue:\") and JSON mode. These strings appear in no other test.\n\n## Success Criteria\n\n- [hard] REQ-01: Each claim case listed in the Background has an owning test in `cli_repo_workflow/claim_integration_tests.rs`, and each confirmed-delete case has one in `cli_repo_workflow/integration_test.rs`, with the same non-exit assertions.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test in those files already owns is not duplicated.\n",
   "documents": [],
+  "done_at": "2026-10-29T07:29:57.808622778Z",
+  "first_ready_at": "2026-10-29T06:54:32.007818821Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b025300c-6e77-43ce-b0f4-b3de6d2633b3",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:25:24.997230160Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "4a9d8c7d-fe24-43af-a756-3c49b284e2f8",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:29:18.250214812Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "966d0627-e3d4-40e6-b887-14cd1b6e8cd5",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Claim and confirmed-delete cases move beside their owners",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-29T07:29:57.808622778Z"
 }

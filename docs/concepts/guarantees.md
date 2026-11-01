@@ -533,7 +533,7 @@ generated source of that value.
 
 ```bash
 jit claim list
-Lease: lease-001
+Lease: b53beeba-32f2-4671-a407-2d94e4d13d41
   Issue: abc123
   Agent: agent:worker-1
   Expires: <timestamp in the past> ⚠️ STALE
@@ -553,14 +553,14 @@ jit issue release abc123 "return to the available pool"
 jit query available
 
 # Manual eviction if needed
-jit claim force-evict lease-001 --reason "agent crashed"
+jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "agent crashed"
 ```
 
 **Prevention:** Use heartbeats to renew leases:
 
 ```bash
 # Renew lease before expiry
-jit claim renew lease-001 --extension 600
+jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41 --extension 600
 ```
 
 ### Missing File Handling

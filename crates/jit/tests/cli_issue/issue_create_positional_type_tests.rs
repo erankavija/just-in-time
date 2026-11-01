@@ -5,50 +5,14 @@
 //! REQ-02: `issue create` and `issue update` accept `--type <kind>`, write a
 //!         `type:<kind>` label, and reject a kind not declared in config.
 
-use crate::{setup_test_repo_with_taxonomy, TaxonomyRepo};
-use std::process::Command;
+use jit::test_cli::JitCli;
+use jit::test_taxonomy::type_label;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-/// A repository whose configuration declares the type vocabulary these cases
-/// name, so a rejected type is one the repository never declared rather than
-/// one no repository could have.
-fn setup_repo() -> TaxonomyRepo {
-    setup_test_repo_with_taxonomy()
-}
-
-/// Run `jit issue create` with the given args; return stdout + status.
-fn create(repo: &TaxonomyRepo, args: &[&str]) -> std::process::Output {
-    Command::new(jit_binary())
-        .arg("issue")
-        .arg("create")
-        .args(args)
-        .current_dir(repo.path())
-        .output()
-        .expect("failed to spawn jit")
-}
-
-/// Parse the first issue ID out of `jit issue list` stdout.
-fn first_issue_id(repo: &TaxonomyRepo) -> String {
-    let out = Command::new(jit_binary())
-        .args(["issue", "list", "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    v["issues"][0]["id"].as_str().unwrap().to_string()
-}
-
-/// Load a single issue as JSON via `jit issue show <id> --json`.
-fn show(repo: &TaxonomyRepo, id: &str) -> serde_json::Value {
-    let out = Command::new(jit_binary())
-        .args(["issue", "show", id, "--json"])
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-    serde_json::from_slice(&out.stdout).unwrap()
+fn first_issue_id(repo: &JitCli) -> String {
+    repo.run_json(["issue", "list"]).unwrap()["issues"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned()
 }
 
 // ---------------------------------------------------------------------------
@@ -58,8 +22,12 @@ fn show(repo: &TaxonomyRepo, id: &str) -> serde_json::Value {
 /// The canonical new form: `jit issue create "Title"` (no --title flag).
 #[test]
 fn test_create_positional_title_succeeds() {
-    let repo = setup_repo();
-    let out = create(&repo, &["Positional Title Here"]);
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    let repo = JitCli::with_repository(taxonomy_repo.temp);
+    let out = repo
+        .command(["issue", "create", "Positional Title Here"])
+        .output()
+        .unwrap();
     assert!(
         out.status.success(),
         "positional title should succeed; stderr: {}",
@@ -67,37 +35,45 @@ fn test_create_positional_title_succeeds() {
     );
     // The created issue title should match.
     let id = first_issue_id(&repo);
-    let issue = show(&repo, &id);
+    let issue = repo.run_json(["issue", "show", &id]).unwrap();
     assert_eq!(issue["title"].as_str().unwrap(), "Positional Title Here");
 }
 
 /// Legacy `--title` flag must still work.
 #[test]
 fn test_create_flag_title_still_works() {
-    let repo = setup_repo();
-    let out = create(&repo, &["--title", "Flag Title"]);
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    let repo = JitCli::with_repository(taxonomy_repo.temp);
+    let out = repo
+        .command(["issue", "create", "--title", "Flag Title"])
+        .output()
+        .unwrap();
     assert!(
         out.status.success(),
         "--title flag should still work; stderr: {}",
         String::from_utf8_lossy(&out.stderr)
     );
     let id = first_issue_id(&repo);
-    let issue = show(&repo, &id);
+    let issue = repo.run_json(["issue", "show", &id]).unwrap();
     assert_eq!(issue["title"].as_str().unwrap(), "Flag Title");
 }
 
 /// Short `-t` alias must still work.
 #[test]
 fn test_create_short_t_title_still_works() {
-    let repo = setup_repo();
-    let out = create(&repo, &["-t", "Short Flag Title"]);
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    let repo = JitCli::with_repository(taxonomy_repo.temp);
+    let out = repo
+        .command(["issue", "create", "-t", "Short Flag Title"])
+        .output()
+        .unwrap();
     assert!(
         out.status.success(),
         "-t flag should still work; stderr: {}",
         String::from_utf8_lossy(&out.stderr)
     );
     let id = first_issue_id(&repo);
-    let issue = show(&repo, &id);
+    let issue = repo.run_json(["issue", "show", &id]).unwrap();
     assert_eq!(issue["title"].as_str().unwrap(), "Short Flag Title");
 }
 
@@ -108,16 +84,20 @@ fn test_create_short_t_title_still_works() {
 /// `--type <declared>` writes the matching `type:<declared>` label.
 #[test]
 fn test_create_type_flag_writes_label() {
-    let repo = setup_repo();
-    let leaf = repo.taxonomy.type_at_level(4).to_string();
-    let out = create(&repo, &["Type Label Test", "--type", &leaf]);
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    let repo = JitCli::with_repository(taxonomy_repo.temp);
+    let leaf = taxonomy_repo.taxonomy.type_at_level(4).to_string();
+    let out = repo
+        .command(["issue", "create", "Type Label Test", "--type", &leaf])
+        .output()
+        .unwrap();
     assert!(
         out.status.success(),
         "--type {leaf} should succeed; stderr: {}",
         String::from_utf8_lossy(&out.stderr)
     );
     let id = first_issue_id(&repo);
-    let issue = show(&repo, &id);
+    let issue = repo.run_json(["issue", "show", &id]).unwrap();
     let labels: Vec<&str> = issue["labels"]
         .as_array()
         .unwrap()
@@ -125,7 +105,7 @@ fn test_create_type_flag_writes_label() {
         .map(|v| v.as_str().unwrap())
         .collect();
     assert!(
-        labels.contains(&format!("type:{leaf}").as_str()),
+        labels.contains(&type_label(&taxonomy_repo.taxonomy, 4).as_str()),
         "labels should contain type:{leaf}, got: {labels:?}"
     );
 }
@@ -134,8 +114,18 @@ fn test_create_type_flag_writes_label() {
 /// (exits non-zero).
 #[test]
 fn test_create_unknown_type_is_rejected() {
-    let repo = setup_repo();
-    let out = create(&repo, &["Type Test Issue", "--type", "xyzzy-unknown-type"]);
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    let repo = JitCli::with_repository(taxonomy_repo.temp);
+    let out = repo
+        .command([
+            "issue",
+            "create",
+            "Type Test Issue",
+            "--type",
+            "xyzzy-unknown-type",
+        ])
+        .output()
+        .unwrap();
     assert!(
         !out.status.success(),
         "unknown type should be rejected; stdout: {}, stderr: {}",
@@ -151,17 +141,20 @@ fn test_create_unknown_type_is_rejected() {
 /// `issue update <id> --type <declared>` writes the matching label.
 #[test]
 fn test_update_type_flag_writes_label() {
-    let repo = setup_repo();
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    let repo = JitCli::with_repository(taxonomy_repo.temp);
     // Create without explicit type (gets default).
-    let out = create(&repo, &["Update Type Test"]);
+    let out = repo
+        .command(["issue", "create", "Update Type Test"])
+        .output()
+        .unwrap();
     assert!(out.status.success());
 
     let id = first_issue_id(&repo);
-    let container = repo.taxonomy.type_at_level(3).to_string();
+    let container = taxonomy_repo.taxonomy.type_at_level(3).to_string();
 
-    let out = Command::new(jit_binary())
-        .args(["issue", "update", &id, "--type", &container])
-        .current_dir(repo.path())
+    let out = repo
+        .command(["issue", "update", &id, "--type", &container])
         .output()
         .unwrap();
     assert!(
@@ -170,7 +163,7 @@ fn test_update_type_flag_writes_label() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let issue = show(&repo, &id);
+    let issue = repo.run_json(["issue", "show", &id]).unwrap();
     let labels: Vec<&str> = issue["labels"]
         .as_array()
         .unwrap()
@@ -178,7 +171,7 @@ fn test_update_type_flag_writes_label() {
         .map(|v| v.as_str().unwrap())
         .collect();
     assert!(
-        labels.contains(&format!("type:{container}").as_str()),
+        labels.contains(&type_label(&taxonomy_repo.taxonomy, 3).as_str()),
         "labels should contain type:{container} after update, got: {labels:?}"
     );
 }
@@ -189,16 +182,19 @@ fn test_update_type_flag_writes_label() {
 /// one `type:` label.
 #[test]
 fn test_update_type_flag_replaces_existing_type_label() {
-    let repo = setup_repo();
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    let repo = JitCli::with_repository(taxonomy_repo.temp);
     // Create without explicit type (gets the configured default type label).
-    let out = create(&repo, &["Replace Type Test"]);
+    let out = repo
+        .command(["issue", "create", "Replace Type Test"])
+        .output()
+        .unwrap();
     assert!(out.status.success());
     let id = first_issue_id(&repo);
-    let container = repo.taxonomy.type_at_level(3).to_string();
+    let container = taxonomy_repo.taxonomy.type_at_level(3).to_string();
 
-    let out = Command::new(jit_binary())
-        .args(["issue", "update", &id, "--type", &container])
-        .current_dir(repo.path())
+    let out = repo
+        .command(["issue", "update", &id, "--type", &container])
         .output()
         .unwrap();
     assert!(
@@ -207,7 +203,7 @@ fn test_update_type_flag_replaces_existing_type_label() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let issue = show(&repo, &id);
+    let issue = repo.run_json(["issue", "show", &id]).unwrap();
     let type_labels: Vec<&str> = issue["labels"]
         .as_array()
         .unwrap()
@@ -217,7 +213,7 @@ fn test_update_type_flag_replaces_existing_type_label() {
         .collect();
     assert_eq!(
         type_labels,
-        vec![format!("type:{container}")],
+        vec![type_label(&taxonomy_repo.taxonomy, 3)],
         "update --type must leave exactly one type label, got: {type_labels:?}"
     );
 }
@@ -226,17 +222,27 @@ fn test_update_type_flag_replaces_existing_type_label() {
 /// second `type:*` label.
 #[test]
 fn test_create_type_flag_overrides_default_type() {
-    let repo = setup_repo();
-    let strategic = repo.taxonomy.type_at_level(2).to_string();
-    assert_ne!(strategic, repo.taxonomy.default_type);
-    let out = create(&repo, &["Override Default Type", "--type", &strategic]);
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    let repo = JitCli::with_repository(taxonomy_repo.temp);
+    let strategic = taxonomy_repo.taxonomy.type_at_level(2).to_string();
+    assert_ne!(strategic, taxonomy_repo.taxonomy.default_type);
+    let out = repo
+        .command([
+            "issue",
+            "create",
+            "Override Default Type",
+            "--type",
+            &strategic,
+        ])
+        .output()
+        .unwrap();
     assert!(
         out.status.success(),
         "--type {strategic} should succeed; stderr: {}",
         String::from_utf8_lossy(&out.stderr)
     );
     let id = first_issue_id(&repo);
-    let issue = show(&repo, &id);
+    let issue = repo.run_json(["issue", "show", &id]).unwrap();
     let type_labels: Vec<&str> = issue["labels"]
         .as_array()
         .unwrap()
@@ -246,7 +252,7 @@ fn test_create_type_flag_overrides_default_type() {
         .collect();
     assert_eq!(
         type_labels,
-        vec![format!("type:{strategic}")],
+        vec![type_label(&taxonomy_repo.taxonomy, 2)],
         "create --type must produce exactly one type label, got: {type_labels:?}"
     );
 }
@@ -254,15 +260,18 @@ fn test_create_type_flag_overrides_default_type() {
 /// `issue update <id> --type <undeclared>` is rejected.
 #[test]
 fn test_update_unknown_type_is_rejected() {
-    let repo = setup_repo();
-    let out = create(&repo, &["Update Unknown Type Test"]);
+    let taxonomy_repo = jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    let repo = JitCli::with_repository(taxonomy_repo.temp);
+    let out = repo
+        .command(["issue", "create", "Update Unknown Type Test"])
+        .output()
+        .unwrap();
     assert!(out.status.success());
 
     let id = first_issue_id(&repo);
 
-    let out = Command::new(jit_binary())
-        .args(["issue", "update", &id, "--type", "xyzzy-unknown-type"])
-        .current_dir(repo.path())
+    let out = repo
+        .command(["issue", "update", &id, "--type", "xyzzy-unknown-type"])
         .output()
         .unwrap();
     assert!(

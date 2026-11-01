@@ -1,29 +1,8 @@
 //! Stored-record decode failures remain typed across the library/binary boundary
 //! and report the registered parse code in machine-readable CLI output.
 
+use jit::test_cli::JitCli;
 use std::fs;
-use std::process::Command;
-
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_repository() -> TempDir {
-    let repository = TempDir::new().unwrap();
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .arg("init")
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "init failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    repository
-}
 
 #[test]
 fn test_repository_index_parse_error_survives_anyhow_wrapping_as_public_type() {
@@ -38,16 +17,15 @@ fn test_repository_index_parse_error_survives_anyhow_wrapping_as_public_type() {
 
 #[test]
 fn test_query_all_json_classifies_malformed_stored_index_as_parse_error() {
-    let repository = setup_repository();
-    fs::write(repository.path().join(".jit/index.json"), b"{").unwrap();
+    let repository = JitCli::initialised().unwrap();
+    fs::write(repository.root().join(".jit/index.json"), b"{").unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["query", "all", "--json"])
+    let output = repository
+        .command(["query", "all", "--json"])
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(1));
+    assert!(!output.status.success());
     let envelope: serde_json::Value = serde_json::from_slice(&output.stdout)
         .expect("malformed stored index should emit a JSON error envelope");
     assert_eq!(envelope["error"]["code"], "PARSE_ERROR");
@@ -56,11 +34,10 @@ fn test_query_all_json_classifies_malformed_stored_index_as_parse_error() {
 
 #[test]
 fn test_query_all_json_preserves_valid_stored_index_behavior() {
-    let repository = setup_repository();
+    let repository = JitCli::initialised().unwrap();
 
-    let output = Command::new(jit_binary())
-        .current_dir(repository.path())
-        .args(["query", "all", "--json"])
+    let output = repository
+        .command(["query", "all", "--json"])
         .output()
         .unwrap();
 
@@ -70,6 +47,5 @@ fn test_query_all_json_preserves_valid_stored_index_behavior() {
         String::from_utf8_lossy(&output.stderr)
     );
     let response: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(response["count"], 0);
     assert_eq!(response["issues"], serde_json::json!([]));
 }

@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-f71504cd",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a86aac8364631024186ad9dcd6d01781a5fa0867",
+  "completed_at": "2026-10-29T07:28:48.559301652Z",
+  "duration_ms": 294495,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/commands/document.rs",
+        "id": "F1",
+        "line": 1129,
+        "origin": "pre-existing",
+        "references": [
+          "@/charter/D-21"
+        ],
+        "severity": "medium",
+        "summary": "Link checking still accesses Git through git2 outside the storage-owned Git CLI boundary."
+      }
+    ],
+    "summary": "The link-check capture change satisfies the hard requirements; one pre-existing Git-boundary violation remains advisory.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f71504cd-e282-477c-a609-5f7e1c08a36e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6af15079-958f-483e-b2e5-1be88e4ab367",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T07:23:54.063818690Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5fc860a58, 0efbf40fd, d1c4e9a16, bf9fa4c74, 677fa800c, a86aac836 (`jit:f71504cd`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4, @/charter/D-19, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-29T07:22:29Z)\nTruncation recovery: Re-read policies, registries, charter entries, individual patches, and current source in bounded ranges; excluded unrelated historical `.jit` records.\n\n1. [advisory][pre-existing] `crates/jit/src/commands/document.rs:1129` still opens Git through `git2::Repository::discover` on the link-check path, contrary to the storage-owned Git-CLI boundary required by @/charter/D-21. Blame predates this issue’s commits.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The link-check capture change satisfies the hard requirements; one pre-existing Git-boundary violation remains advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Link checking still accesses Git through git2 outside the storage-owned Git CLI boundary.\",\"file\":\"crates/jit/src/commands/document.rs\",\"line\":1129,\"references\":[\"@/charter/D-21\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

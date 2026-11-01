@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "086f080e6e0958908b05237712a96f2ef45c6322",
+  "completed_at": "2026-10-31T23:20:07.089530265Z",
+  "duration_ms": 167451,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Tagged changes remove projected numeric exit-code checks while preserving each test's command-specific behavior assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d3549d1d-1ebc-432d-9a2f-66223e1aaee0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "54c199b4-b9ee-47b3-9529-0c3a4d3a57d8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:17:19.637923735Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 963635b97, 498692654, f4a2e5bfe, c25ce771d\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-01 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts ( .jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-10-31); code-review pending\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Tagged changes remove projected numeric exit-code checks while preserving each test's command-specific behavior assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

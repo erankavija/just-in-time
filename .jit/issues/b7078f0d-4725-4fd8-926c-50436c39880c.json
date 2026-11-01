@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T20:38:28.082372773Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Retire the private memory executors of the item and validate command unit tests.\n\n## Background\n\nShared test support builds a memory store and executor from declarations passed as data, on top of the shared memory executor, which product initialisation sets up. Helpers that act on an executor or repository they are given are scenario steps, not setups. Backend unit tests of `storage/memory.rs` and `storage/json.rs` construct the backend they test and are not setups. `finish_dangling_executor` in `commands/validate.rs` also writes a literal `\"schema_version\": 2` index body.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/jit/src/commands/item.rs`: `executor_with` (`:614`), `project_exec_with_name` (`:629`), `project_exec` (`:728`), `two_project_kinds_exec` (`:826`), `policy_exec` (`:1122`), `registry_exec` (`:1207`), `registry_exec_with_rules` (`:1225`), `registry_exec_with_gates` (`:1344`), `registry_exec_with_rules_and_gates` (`:1428`), `config_exec` (`:1536`).\n- `crates/jit/src/commands/validate.rs`: `dangling_exec` (`:3004`), `dangling_exec_with_namespaces` (`:3023`), `finish_dangling_executor` (`:3043`), `dangling_exec_with_rules_and_gates` (`:3103`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No test module in `commands/item.rs` or `commands/validate.rs` defines a function that constructs an `InMemoryStorage` or a memory executor; no test writes an index body or restates a value product initialisation already writes, and scenario values (for example `enforce_leases = \"off\"`) reach the shared constructor as declarations.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T22:14:42.492419313Z",
+  "first_ready_at": "2026-10-27T20:54:26.419077492Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6ae55017-ca0d-4596-a826-c0152a5477c3",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:12:42.591246717Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "80443928-13c9-44a7-b2cd-dd35c0eee0c5",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:14:14.723700692Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b7078f0d-4725-4fd8-926c-50436c39880c",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Item and validate unit tests use the shared memory seeding",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-27T22:14:42.492419313Z"
 }

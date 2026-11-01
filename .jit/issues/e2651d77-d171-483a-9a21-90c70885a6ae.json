@@ -1,20 +1,45 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:03:24.107275848Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
+    "1a3db2c3-0faa-42c9-9498-d7bf7c0efaee",
     "417be079-1de3-43e3-816a-03f4a70e2f63",
+    "75951558-accb-4ee9-be38-e97fee0326ee",
     "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
+    "804a8605-267b-4934-a9ef-08422fc3686d",
+    "83413035-17f2-4fe0-a503-b8086ea28ac7",
     "855d027d-2575-4c9d-8c6a-049f406fe397",
-    "be18da9e-bfe2-4813-a69e-72ee1904c344"
+    "8e82fa49-1859-4e29-8972-f2da05e90b0a",
+    "a57c5057-9cd6-4c47-95f3-8ecbc13a6428",
+    "be18da9e-bfe2-4813-a69e-72ee1904c344",
+    "c1c86312-33aa-42c0-bd9a-d716b52dd9e4",
+    "cd8adfc1-791c-4d92-a9b2-9f5d0bbf1ba6",
+    "d50d6976-f978-4900-a218-6bb9d1b3fa52"
   ],
-  "description": "Aggregate the work that delivers this outcome: issue identity, prefixes, gate-run ids, gate keys and record paths are typed end to end, with the staging bridge removed.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: `IssueId`, `IssueIdPrefix`, `GateRunId` and `GateKey` are the identity types in domain, storage, commands, tests and the server, the staging alias no longer exists, and prefixes are resolved only at the CLI and server entry points, except dependency removal over an issue's own dependencies and item-address segments decoded from documents.\n- [hard] REQ-02: Outside CLI argument structs, server extractors, serde impls and rendering, no production code carries these identities as raw strings.\n- [hard] REQ-03: Issue and gate-run record paths come only from `VirtualPath` constructors.\n- [hard] REQ-04: Short ids are derived only by `IssueId`, including in the web UI.\n- [hard] REQ-05: Stored issue, index, event and gate-run data loads and re-serializes byte-identically.\n",
+  "description": "Aggregate the work that delivers this outcome: issue identity, prefixes, gate-run ids, gate keys and record paths are typed end to end, with the staging bridge removed.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: `IssueId`, `IssueIdPrefix`, `GateRunId` and `GateKey` are the identity types in domain, storage, commands, tests and the server, the staging alias no longer exists, and prefixes are resolved only at the CLI and server entry points, except dependency removal over an issue's own dependencies and item-address segments decoded from documents.\n- [hard] REQ-02: Outside CLI argument structs, server extractors, serde impls and rendering, no production code carries these identities as raw strings.\n- [hard] REQ-03: Issue and gate-run record paths come only from `VirtualPath` constructors.\n- [hard] REQ-04: Short ids are derived only by `IssueId`, including in the web UI.\n- [hard] REQ-05: Stored index, event and current-format gate-run data loads and re-serializes byte-identically, and every other stored gate-run record decodes and reproduces its id fields. Every stored issue record decodes and re-serializes to the same canonical JSON, and re-serializing the serializer's output is byte-identical.\n",
   "documents": [],
+  "done_at": "2026-11-01T04:44:12.991018748Z",
+  "first_ready_at": "2026-11-01T03:55:23.007556806Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9d67d071-32d7-4af5-9abb-c1ed9faec757",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:41:47.423020615Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "a90d7860-6905-4a4e-a128-484330195534",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:43:59.067277218Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e2651d77-d171-483a-9a21-90c70885a6ae",
   "labels": [
     "type:story",
@@ -30,7 +55,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Issue identity is one validated type end to end",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-11-01T04:44:12.991018748Z"
 }

@@ -310,7 +310,7 @@ impl ResolvedProfileContent {
         let mut frames = BTreeMap::<String, Vec<Vec<u8>>>::new();
         for contribution in &self.model.contributions {
             frames
-                .entry(contribution.registry_path().to_string())
+                .entry(contribution.registry_path().repository_relative())
                 .or_default()
                 .push(canonical_json_bytes(contribution)?);
         }

@@ -34,6 +34,8 @@
 //! - Validate dependencies (dependencies are unrestricted by type)
 //! - Check organizational membership (future: via `epic:*`, `milestone:*` labels)
 
+use crate::domain::identity::IssueId;
+use crate::domain::LabelNamespaces;
 use crate::labels::is_type_label;
 use std::collections::HashMap;
 use thiserror::Error;
@@ -43,7 +45,7 @@ use thiserror::Error;
 pub enum ValidationIssue {
     /// An issue has an unknown type label
     UnknownType {
-        issue_id: String,
+        issue_id: IssueId,
         unknown_type: String,
         suggested_fix: Option<String>,
     },
@@ -54,7 +56,7 @@ pub enum ValidationIssue {
 pub enum ValidationFix {
     /// Replace an unknown type with a suggested type
     ReplaceType {
-        issue_id: String,
+        issue_id: IssueId,
         old_type: String,
         new_type: String,
     },
@@ -65,12 +67,15 @@ pub enum ValidationFix {
 pub enum ValidationWarning {
     /// A strategic type issue (epic, milestone) is missing its identifying label
     MissingStrategicLabel {
-        issue_id: String,
+        issue_id: IssueId,
         type_name: String,
         expected_namespace: String,
     },
     /// A leaf-level issue (task) has no parent association labels
-    OrphanedLeaf { issue_id: String, type_name: String },
+    OrphanedLeaf {
+        issue_id: IssueId,
+        type_name: String,
+    },
 }
 
 /// Errors that can occur during configuration validation.
@@ -109,6 +114,14 @@ impl HierarchyConfig {
             types: HashMap::new(),
             label_associations: HashMap::new(),
         }
+    }
+
+    /// Builds a hierarchy from the repository's type and membership declarations.
+    pub fn from_declarations(declarations: &LabelNamespaces) -> Result<Self, ConfigError> {
+        Self::new(
+            declarations.declared_type_hierarchy(),
+            declarations.label_associations.clone().unwrap_or_default(),
+        )
     }
 
     /// Creates a new hierarchy configuration from a map of type names to levels.
@@ -266,7 +279,7 @@ pub fn suggest_type_fix(config: &HierarchyConfig, unknown_type: &str) -> Option<
 /// A vector of validation issues found (empty if no issues)
 pub fn detect_validation_issues(
     config: &HierarchyConfig,
-    issue_id: &str,
+    issue_id: &IssueId,
     labels: &[String],
 ) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
@@ -281,7 +294,7 @@ pub fn detect_validation_issues(
         .filter(|t| !config.contains_type(t))
     {
         issues.push(ValidationIssue::UnknownType {
-            issue_id: issue_id.to_string(),
+            issue_id: issue_id.clone(),
             suggested_fix: suggest_type_fix(config, &type_name),
             unknown_type: type_name,
         });
@@ -469,6 +482,19 @@ mod tests {
     }
 
     #[test]
+    fn test_from_declarations_invalid_hierarchy_returns_config_error() {
+        let declarations = LabelNamespaces {
+            type_hierarchy: Some(HashMap::from([(test_type(4), 0)])),
+            ..LabelNamespaces::empty(1)
+        };
+
+        assert_eq!(
+            HierarchyConfig::from_declarations(&declarations),
+            Err(ConfigError::InvalidLevel(0))
+        );
+    }
+
+    #[test]
     fn test_extract_type_valid() {
         let action = test_type(4);
         let initiative = test_type(2);
@@ -579,7 +605,7 @@ mod tests {
         let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
         let labels = vec!["type:acton".to_string()]; // typo
 
-        let issues = detect_validation_issues(&config, "01ABC", &labels);
+        let issues = detect_validation_issues(&config, &crate::test_utils::issue_id(68), &labels);
 
         assert_eq!(issues.len(), 1);
         match &issues[0] {
@@ -588,7 +614,7 @@ mod tests {
                 unknown_type,
                 suggested_fix,
             } => {
-                assert_eq!(issue_id, "01ABC");
+                assert_eq!(issue_id, &crate::test_utils::issue_id(68));
                 assert_eq!(unknown_type, "acton");
                 assert_eq!(suggested_fix, &Some(test_type(4)));
             }
@@ -602,7 +628,7 @@ mod tests {
         let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
         let labels = vec![format!("type:{}", test_type(4))];
 
-        let issues = detect_validation_issues(&config, "01ABC", &labels);
+        let issues = detect_validation_issues(&config, &crate::test_utils::issue_id(68), &labels);
         assert!(issues.is_empty());
     }
 
@@ -615,7 +641,7 @@ mod tests {
         let config = HierarchyConfig::new(types, associations).unwrap();
 
         let orphaned = |labels: &[&str]| {
-            let mut issue = crate::domain::fixture_issue("leaf".into(), String::new());
+            let mut issue = crate::test_utils::fixture_issue("leaf".into(), String::new());
             issue.labels = std::iter::once("type:task")
                 .chain(labels.iter().copied())
                 .map(String::from)
@@ -641,7 +667,7 @@ mod tests {
         use super::{generate_fixes, ValidationFix, ValidationIssue};
 
         let issues = vec![ValidationIssue::UnknownType {
-            issue_id: "01ABC".to_string(),
+            issue_id: crate::test_utils::issue_id(68),
             unknown_type: "acton".to_string(),
             suggested_fix: Some(test_type(4)),
         }];
@@ -652,7 +678,7 @@ mod tests {
         assert_eq!(
             fixes[0],
             ValidationFix::ReplaceType {
-                issue_id: "01ABC".to_string(),
+                issue_id: crate::test_utils::issue_id(68),
                 old_type: "acton".to_string(),
                 new_type: test_type(4),
             }
@@ -667,7 +693,7 @@ mod tests {
         use super::{generate_fixes, ValidationIssue};
 
         let issues = vec![ValidationIssue::UnknownType {
-            issue_id: "01ABC".to_string(),
+            issue_id: crate::test_utils::issue_id(68),
             unknown_type: "completely_unknown".to_string(),
             suggested_fix: None,
         }];

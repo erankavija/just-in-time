@@ -5,11 +5,8 @@
 //! to that neutral owner. Mutation sessions own publication.
 
 use crate::declarations::{parse_gate_registry, GateRegistry};
+use crate::repository_state::{RepositoryLayout, VirtualPath};
 use anyhow::{Context, Result};
-use std::path::Path;
-
-/// The gate registry file, relative to the `.jit` root.
-const GATES_FILE: &str = "gates.toml";
 
 /// Load the gate registry from `<jit_root>/gates.toml`.
 ///
@@ -21,8 +18,8 @@ const GATES_FILE: &str = "gates.toml";
 /// registry identity (and the `gate` item kind's addressable self-id), and
 /// silently keeping one row would discard the other. A parse failure keeps its
 /// typed source for exit-code classification and names the offending key.
-pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
-    let path = jit_root.join(GATES_FILE);
+pub fn load_gate_registry(layout: &RepositoryLayout) -> Result<GateRegistry> {
+    let path = layout.resolve(&VirtualPath::GATES)?;
     if !path.exists() {
         return Ok(GateRegistry::default());
     }
@@ -38,13 +35,17 @@ mod tests {
     #[test]
     fn test_load_gate_registry_absent_file_is_empty() {
         let dir = tempfile::tempdir().unwrap();
-        let registry = load_gate_registry(dir.path()).unwrap();
+        let registry = load_gate_registry(&crate::test_utils::repository_layout_for_data_root(
+            dir.path(),
+        ))
+        .unwrap();
         assert!(registry.gates.is_empty());
     }
 
     #[test]
     fn test_load_gate_registry_rejects_duplicate_keys() {
         let dir = tempfile::tempdir().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         let registry_toml = "\
 [[gates]]
 version = 1
@@ -64,9 +65,9 @@ stage = \"postcheck\"
 mode = \"manual\"
 priority = 100
 ";
-        std::fs::write(dir.path().join("gates.toml"), registry_toml).unwrap();
+        std::fs::write(layout.resolve(&VirtualPath::GATES).unwrap(), registry_toml).unwrap();
 
-        let err = load_gate_registry(dir.path()).unwrap_err();
+        let err = load_gate_registry(&layout).unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("duplicate gate key 'cargo-ci'"),
@@ -77,14 +78,15 @@ priority = 100
     #[test]
     fn test_load_gate_registry_unknown_key_is_named_parse_error() {
         let dir = tempfile::tempdir().unwrap();
+        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
         std::fs::write(
-            dir.path().join("gates.toml"),
+            layout.resolve(&VirtualPath::GATES).unwrap(),
             "[[gates]]\nkey = \"review\"\ntitle = \"Review\"\ndescription = \"Review\"\n\
              stage = \"postcheck\"\nmode = \"auto\"\nundeclared_key = true\n",
         )
         .unwrap();
 
-        let err = load_gate_registry(dir.path()).unwrap_err();
+        let err = load_gate_registry(&layout).unwrap_err();
         assert!(
             err.to_string().contains("unknown field `undeclared_key`"),
             "error names the unknown key: {err}"

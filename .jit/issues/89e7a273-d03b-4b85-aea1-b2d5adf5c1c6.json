@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-29T07:48:23.783144569Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -9,11 +10,26 @@
   ],
   "description": "Retype the issue-id parameters of the storage trait, its backends and the repository index.\n\n## Background\n\n`IssueStore` methods `load_issue` (`crates/jit/src/storage/mod.rs:155`), `load_issue_or_not_found` (`:176`) and `list_gate_runs_for_issue` (`:269`) take raw ids. Implementors are `InMemoryStorage` (`storage/memory.rs:820`) and `JsonFileStorage` (`storage/json.rs:1045`), plus the test wrappers `PublicationProbeStore` (`crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs:125`) and `FailingMutationStorage` (`crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs:840`). `RepositoryIndex.all_ids` and `deleted_ids` are `Vec<String>` (`repository_state/index.rs:13-15`), with `storage/json.rs` the heaviest consumer. `storage/warnings.rs` carries ids in three fields, `storage/artifact_planning.rs:32` takes `container_id: &str`, and `storage/repository_state_store_tests.rs` is the shared store test module.\n\n## Success Criteria\n\n- [hard] REQ-01: `load_issue`, `load_issue_or_not_found` and `list_gate_runs_for_issue` take `&IssueId`, and both backends and both test wrappers implement the retyped trait; the rest of the wrappers' test files belongs to their suites.\n- [hard] REQ-02: `RepositoryIndex` holds `all_ids` and `deleted_ids` as `Vec<IssueId>`, and the stored index is byte-identical.\n- [hard] REQ-03: No struct field or function parameter under `crates/jit/src/storage/`, lease records excepted, holds an issue id as `String`, `&str` or `Vec<String>`.\n- [hard] REQ-04: The shared storage conformance suite passes against both backends.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
   "documents": [],
+  "done_at": "2026-10-29T08:12:17.118523017Z",
+  "first_ready_at": "2026-10-29T07:48:17.666508739Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3e02c659-29d6-49b5-a5ef-ab818634c926",
+      "status": "passed",
+      "updated_at": "2026-10-29T08:12:07.690389696Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "57c91662-2ee1-4c46-b840-f340214ef97b",
+      "status": "passed",
+      "updated_at": "2026-10-29T08:10:32.514340767Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "89e7a273-d03b-4b85-aea1-b2d5adf5c1c6",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Storage trait and backends take issue ids as IssueId",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-29T08:12:17.118523017Z"
 }

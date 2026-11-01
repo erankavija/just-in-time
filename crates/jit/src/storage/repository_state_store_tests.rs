@@ -1,12 +1,17 @@
 use super::*;
-use crate::repository_state::{CaptureBudget, RepositoryAction, EVENT_LOG_TAIL_WINDOW};
+use crate::domain::EventBody;
+use crate::repository_state::{
+    serialize_gate_run, CaptureBudget, RepositoryAction, RepositoryActionOwner,
+    EVENT_LOG_TAIL_WINDOW,
+};
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
     data_root as redo_root, record_relative_path, record_scratch_relative_path,
     repository as redo_repository, seed_repository, snapshot, SnapshotEntry, CAPTURED_LOG,
 };
 use crate::storage::{EventAppend, PutFile, RedoPoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use crate::test_harness::git::GitStandIn;
+use std::collections::{BTreeMap, BTreeSet};
 use std::process::Command;
 use std::sync::Mutex;
 use tempfile::TempDir;
@@ -55,7 +60,7 @@ fn test_json_apply_admits_a_listing_that_changed_since_capture() {
         &layout,
         vec![RepositoryAction::write_file(
             published_path.clone(),
-            "archive",
+            RepositoryActionOwner::ArchiveExecution,
             ExpectedPreimage::Absent,
             b"published".to_vec(),
             FileMode::Regular,
@@ -126,19 +131,19 @@ fn initialization_delta(layout: &RepositoryLayout) -> RepositoryDelta {
         vec![
             RepositoryAction::create_directory(
                 VirtualPath::data("").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("index.json").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
                 b"{}".to_vec(),
                 FileMode::Regular,
             ),
             RepositoryAction::write_file(
                 VirtualPath::worktree("note.txt").unwrap(),
-                "init",
+                RepositoryActionOwner::RepositoryInit,
                 ExpectedPreimage::Absent,
                 b"note".to_vec(),
                 FileMode::Regular,
@@ -151,278 +156,6 @@ fn initialization_delta(layout: &RepositoryLayout) -> RepositoryDelta {
 /// Close a hand-built test delta over its captured image.
 fn test_plan(image: &RepositoryImage, delta: &RepositoryDelta) -> MaterializationPlan {
     MaterializationPlan::new(image, delta.clone())
-}
-
-/// A fresh-init delta that publishes one issue record plus the enclosing
-/// data root, `index.json`, and `issues/` directory, using the canonical
-/// issue serializer so the published bytes match every other mutation path.
-fn issue_creation_delta(
-    layout: &RepositoryLayout,
-    issue: &Issue,
-    issue_bytes: &[u8],
-) -> RepositoryDelta {
-    RepositoryDelta::new(
-        layout,
-        vec![
-            RepositoryAction::create_directory(
-                VirtualPath::data("").unwrap(),
-                "init",
-                ExpectedPreimage::Absent,
-            ),
-            RepositoryAction::write_file(
-                VirtualPath::data("index.json").unwrap(),
-                "init",
-                ExpectedPreimage::Absent,
-                serde_json::to_vec(&serde_json::json!({
-                    "schema_version": 2,
-                    "all_ids": [issue.id],
-                    "deleted_ids": [],
-                }))
-                .unwrap(),
-                FileMode::Regular,
-            ),
-            RepositoryAction::create_directory(
-                VirtualPath::data("issues").unwrap(),
-                "issue",
-                ExpectedPreimage::Absent,
-            ),
-            RepositoryAction::write_file(
-                VirtualPath::data(format!("issues/{}.json", issue.id)).unwrap(),
-                "issue",
-                ExpectedPreimage::Absent,
-                issue_bytes.to_vec(),
-                FileMode::Regular,
-            ),
-        ],
-    )
-    .unwrap()
-}
-
-fn issue_creation_spec(issue_id: &str) -> CaptureSpec {
-    CaptureSpec::new(
-        [
-            VirtualPath::data("").unwrap(),
-            VirtualPath::data("index.json").unwrap(),
-            VirtualPath::data("issues").unwrap(),
-            VirtualPath::data(format!("issues/{issue_id}.json")).unwrap(),
-        ],
-        budget(),
-    )
-    .unwrap()
-}
-
-/// Crossing regression: an issue published by a mutation session reads back
-/// as the identical typed record through `load_issue`/`list_issues` on both
-/// backends. Wave-3 session tests never crossed apply → typed read, so a
-/// divergence between the published bytes and the reader's deserialization
-/// would have gone unnoticed; this pins that parity.
-#[test]
-fn test_session_published_issue_reads_back_typed_on_both_backends() {
-    let issue = crate::domain::fixture_issue("Crossing".to_string(), "body".to_string());
-    let issue_bytes = serialize_issue(&issue).unwrap();
-
-    // Memory backend.
-    let memory = InMemoryStorage::new();
-    let mtemp = TempDir::new().unwrap();
-    let mlayout = discover_repository_layout(mtemp.path(), mtemp.path().join(".jit")).unwrap();
-    let mut msession = memory.open_mutation_session(mlayout.clone()).unwrap();
-    let mimage = msession.capture(issue_creation_spec(&issue.id)).unwrap();
-    msession
-        .apply(&test_plan(
-            &mimage,
-            &issue_creation_delta(&mlayout, &issue, &issue_bytes),
-        ))
-        .unwrap();
-    assert_eq!(memory.load_issue(&issue.id).unwrap(), issue);
-    assert_eq!(memory.list_issues().unwrap(), vec![issue.clone()]);
-    assert_eq!(
-        memory
-            .resolve_issue_id(
-                &crate::domain::issue_id::IssueIdPrefix::parse(&issue.short_id()).unwrap()
-            )
-            .unwrap(),
-        issue.id
-    );
-
-    // JSON backend.
-    let jtemp = TempDir::new().unwrap();
-    let jdata = jtemp.path().join(".jit");
-    let jlayout = discover_repository_layout(jtemp.path(), &jdata).unwrap();
-    let json = JsonFileStorage::new(&jdata);
-    let mut jsession = json.open_mutation_session(jlayout.clone()).unwrap();
-    let jimage = jsession.capture(issue_creation_spec(&issue.id)).unwrap();
-    jsession
-        .apply(&test_plan(
-            &jimage,
-            &issue_creation_delta(&jlayout, &issue, &issue_bytes),
-        ))
-        .unwrap();
-    assert_eq!(json.load_issue(&issue.id).unwrap(), issue);
-    assert_eq!(json.list_issues().unwrap(), vec![issue]);
-}
-
-/// Publish `issue` through a mutation session on `storage` rooted at `worktree`.
-fn publish_issue<S: RepositoryStateStore>(storage: &S, worktree: &Path, issue: &Issue) {
-    let layout = discover_repository_layout(worktree, worktree.join(".jit")).unwrap();
-    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let image = session.capture(issue_creation_spec(&issue.id)).unwrap();
-    let bytes = serialize_issue(issue).unwrap();
-    session
-        .apply(&test_plan(
-            &image,
-            &issue_creation_delta(&layout, issue, &bytes),
-        ))
-        .unwrap();
-}
-
-/// Each backend resolves a full id in any case or hyphenation to the issue.
-#[test]
-fn test_conformance_resolve_issue_id_normalises_full_ids_on_both_backends() {
-    fn assert_resolution(backend: &str, storage: &impl IssueStore, id: &str) {
-        for requested in [id.to_string(), id.to_uppercase(), id.replace('-', "")] {
-            let prefix = crate::domain::issue_id::IssueIdPrefix::parse(&requested).unwrap();
-            assert_eq!(
-                storage.resolve_issue_id(&prefix).ok().as_deref(),
-                Some(id),
-                "{backend} must resolve {requested}"
-            );
-        }
-    }
-
-    let issue = crate::domain::fixture_issue("Resolve".to_string(), String::new());
-    let memory = InMemoryStorage::new();
-    let memory_tree = TempDir::new().unwrap();
-    publish_issue(&memory, memory_tree.path(), &issue);
-    assert_resolution("memory", &memory, &issue.id);
-
-    let json_tree = TempDir::new().unwrap();
-    let json = JsonFileStorage::new(json_tree.path().join(".jit"));
-    publish_issue(&json, json_tree.path(), &issue);
-    assert_resolution("json", &json, &issue.id);
-}
-
-#[test]
-fn test_json_and_memory_share_absent_root_actions_and_outcome() {
-    let temp = TempDir::new().unwrap();
-    let data = temp.path().join(".jit");
-    let layout = discover_repository_layout(temp.path(), &data).unwrap();
-    let delta = initialization_delta(&layout);
-
-    let memory = InMemoryStorage::new();
-    let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
-    let memory_image = memory_session.capture(initial_spec()).unwrap();
-    let memory_outcome = memory_session
-        .apply(&test_plan(&memory_image, &delta))
-        .unwrap();
-
-    let json = JsonFileStorage::new(&data);
-    let mut json_session = json.open_mutation_session(layout).unwrap();
-    let json_image = json_session.capture(initial_spec()).unwrap();
-    let json_outcome = json_session.apply(&test_plan(&json_image, &delta)).unwrap();
-
-    assert_eq!(memory_outcome, json_outcome);
-    assert_eq!(std::fs::read(data.join("index.json")).unwrap(), b"{}");
-    assert_eq!(
-        std::fs::read(temp.path().join("note.txt")).unwrap(),
-        b"note"
-    );
-}
-
-fn image_binding_spec() -> CaptureSpec {
-    CaptureSpec::new(
-        [
-            VirtualPath::data("target.txt").unwrap(),
-            VirtualPath::data("evidence.txt").unwrap(),
-        ],
-        budget(),
-    )
-    .unwrap()
-}
-
-fn image_binding_delta(layout: &RepositoryLayout) -> RepositoryDelta {
-    RepositoryDelta::new(
-        layout,
-        vec![RepositoryAction::write_file(
-            VirtualPath::data("target.txt").unwrap(),
-            "image-binding-test",
-            ExpectedPreimage::Absent,
-            b"materialized".to_vec(),
-            FileMode::Regular,
-        )],
-    )
-    .unwrap()
-}
-
-#[test]
-fn test_json_plan_owns_exact_image_and_applies_only_against_it() {
-    let temp = TempDir::new().unwrap();
-    let data = temp.path().join(".jit");
-    std::fs::create_dir(&data).unwrap();
-    std::fs::write(data.join("evidence.txt"), b"image-a").unwrap();
-    let layout = discover_repository_layout(temp.path(), &data).unwrap();
-    let delta = image_binding_delta(&layout);
-    let json_a = JsonFileStorage::new(&data);
-    let image_a = {
-        let mut session = json_a.open_mutation_session(layout.clone()).unwrap();
-        session.capture(image_binding_spec()).unwrap()
-    };
-    let plan_a = test_plan(&image_a, &delta);
-    assert_eq!(plan_a.image(), &image_a);
-
-    std::fs::write(data.join("evidence.txt"), b"image-b").unwrap();
-    let json = JsonFileStorage::new(&data);
-    let mut session = json.open_mutation_session(layout).unwrap();
-    let image_b = session.capture(image_binding_spec()).unwrap();
-    let target = VirtualPath::data("target.txt").unwrap();
-    assert_eq!(
-        image_a.entry(&target).unwrap(),
-        image_b.entry(&target).unwrap()
-    );
-    assert_ne!(plan_a.image(), &image_b);
-    assert!(matches!(
-        session.apply(&plan_a),
-        Err(RepositoryStateStoreError::RetryableConflict { .. })
-    ));
-    let plan_b = test_plan(&image_b, &delta);
-    let outcome = session.apply(&plan_b).unwrap();
-    assert_eq!(outcome.actions_applied, delta.actions().len());
-}
-
-#[test]
-fn test_memory_plan_owns_exact_image_and_applies_only_against_it() {
-    let temp = TempDir::new().unwrap();
-    let layout = RepositoryLayout::new(
-        RepositoryRootEvidence::new(temp.path(), "wt", true),
-        RepositoryRootEvidence::new(temp.path().join(".jit"), "data", true),
-    )
-    .unwrap();
-    let evidence = VirtualPath::data("evidence.txt").unwrap();
-    let memory = InMemoryStorage::new();
-    seed_memory_existing(&memory, &[(evidence.clone(), b"image-a")]);
-    let delta = image_binding_delta(&layout);
-    let image_a = {
-        let mut session = memory.open_mutation_session(layout.clone()).unwrap();
-        session.capture(image_binding_spec()).unwrap()
-    };
-    let plan_a = test_plan(&image_a, &delta);
-    assert_eq!(plan_a.image(), &image_a);
-
-    seed_memory_existing(&memory, &[(evidence, b"image-b")]);
-    let mut session = memory.open_mutation_session(layout).unwrap();
-    let image_b = session.capture(image_binding_spec()).unwrap();
-    let target = VirtualPath::data("target.txt").unwrap();
-    assert_eq!(
-        image_a.entry(&target).unwrap(),
-        image_b.entry(&target).unwrap()
-    );
-    assert_ne!(plan_a.image(), &image_b);
-    assert!(matches!(
-        session.apply(&plan_a),
-        Err(RepositoryStateStoreError::RetryableConflict { .. })
-    ));
-    let plan_b = test_plan(&image_b, &delta);
-    let outcome = session.apply(&plan_b).unwrap();
-    assert_eq!(outcome.actions_applied, delta.actions().len());
 }
 
 #[cfg(unix)]
@@ -451,7 +184,7 @@ fn test_set_mode_replaces_inode_without_chmodding_external_hard_link() {
         &layout,
         vec![RepositoryAction::set_mode(
             path,
-            "mode",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(
                 image
                     .entry(&VirtualPath::data("mode.txt").unwrap())
@@ -490,7 +223,7 @@ fn test_same_storage_reuses_its_own_absent_root_publication_evidence() {
         &stale_layout,
         vec![RepositoryAction::write_file(
             path.clone(),
-            "initialize",
+            RepositoryActionOwner::RepositoryInit,
             ExpectedPreimage::Absent,
             b"{}".to_vec(),
             FileMode::Regular,
@@ -596,58 +329,12 @@ fn test_shared_retained_lock_chain_reenters_same_layout() {
     assert_eq!(session.layout().data_root(), data);
 }
 
-#[test]
-fn test_memory_set_mode_uses_exact_file_preimage() {
-    let temp = TempDir::new().unwrap();
-    let layout = RepositoryLayout::new(
-        RepositoryRootEvidence::new(temp.path(), "memory-worktree", true),
-        RepositoryRootEvidence::new(temp.path().join(".jit"), "memory-data", true),
-    )
-    .unwrap();
-    let storage = InMemoryStorage::new();
-    {
-        let mut state = storage.repository_state();
-        let path = VirtualPath::data("tool").unwrap();
-        state.data_root_exists = true;
-        state.entries.insert(
-            path,
-            RepositoryEntry::File {
-                content: CapturedBytes::new("memory-tool", b"tool".to_vec()).unwrap(),
-                mode: FileMode::Regular,
-            },
-        );
-    }
-    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let spec = CaptureSpec::new([VirtualPath::data("tool").unwrap()], budget()).unwrap();
-    let image = session.capture(spec).unwrap();
-    let path = VirtualPath::data("tool").unwrap();
-    let delta = RepositoryDelta::new(
-        &layout,
-        vec![RepositoryAction::set_mode(
-            path.clone(),
-            "mode",
-            ExpectedPreimage::of(image.entry(&path).unwrap()),
-            FileMode::Executable,
-        )],
-    )
-    .unwrap();
-    session.apply(&test_plan(&image, &delta)).unwrap();
-    drop(session);
-    let state = storage.repository_state();
-    assert!(matches!(
-        state.entries.get(&path),
-        Some(RepositoryEntry::File {
-            mode: FileMode::Executable,
-            ..
-        })
-    ));
-}
-
-// --- Cross-backend conformance matrix ------------------------------------
+// --- Cross-backend session matrix ---------------------------------------
 //
-// One suite exercises identical canonical semantics on the JSON and memory
-// backends: equivalent captured semantics, complete per-image result hashes,
-// every action kind, nested and disjoint existing/absent roots, and aliases.
+// These cases exercise identical mutation-session semantics on the JSON and
+// memory backends: equivalent captured semantics, complete per-image result
+// hashes, every action kind, nested and disjoint existing/absent roots, and
+// aliases. The `IssueStore` contract is `issue_store_conformance`.
 // Object identity differs by construction (device/inode versus a synthesized
 // memory id), so parity is asserted over the identity-independent semantic
 // projection.
@@ -658,6 +345,7 @@ enum SemanticEntry {
     Directory(FileMode),
     File(Vec<u8>, FileMode),
     FileTail(u64, Vec<u8>, FileMode),
+    FileKind(FileMode),
     Symlink(Vec<u8>),
     Unsupported,
 }
@@ -672,6 +360,7 @@ fn semantic_entry(entry: &RepositoryEntry) -> SemanticEntry {
         RepositoryEntry::FileTail { tail, mode } => {
             SemanticEntry::FileTail(tail.length(), tail.tail().to_vec(), *mode)
         }
+        RepositoryEntry::FileKind { mode } => SemanticEntry::FileKind(*mode),
         RepositoryEntry::Symlink { target, .. } => SemanticEntry::Symlink(target.bytes().to_vec()),
         RepositoryEntry::Unsupported { .. } => SemanticEntry::Unsupported,
     }
@@ -683,54 +372,6 @@ fn semantic_view(image: &RepositoryImage) -> BTreeMap<VirtualPath, SemanticEntry
         .iter()
         .map(|(path, entry)| (path.clone(), semantic_entry(entry)))
         .collect()
-}
-
-fn read_events_for_log<S: IssueStore>(store: &S) -> Option<Vec<Event>> {
-    store.read_events().ok()
-}
-
-#[test]
-fn test_conformance_event_log_skips_retired_tags_and_rejects_malformed_known_records() {
-    let known = |id: &str| Event::IssueCreated {
-        id: id.to_string(),
-        issue_id: "issue-id".to_string(),
-        timestamp: chrono::Utc::now(),
-        title: "Known".to_string(),
-        priority: crate::domain::Priority::Normal,
-    };
-    let (first, second) = (known("first"), known("second"));
-    let retired = concat!(
-        "{\"type\":\"retired_",
-        "event\",\"id\":\"historical\",\"timestamp\":\"2025-01-01T00:00:00Z\"}"
-    );
-    let line = |event: &Event| serde_json::to_string(event).unwrap();
-    let logs = [
-        format!(
-            "{retired}\n{}\n{retired}\n{}\n",
-            line(&first),
-            line(&second)
-        ),
-        "{\"type\":\"issue_created\"}\n".to_string(),
-        "{not-json}\n".to_string(),
-    ];
-    let expected = [Some(vec![first, second]), None, None];
-
-    for (log, expected) in logs.iter().zip(expected) {
-        let worktree = TempDir::new().unwrap();
-        let data = worktree.path().join(".jit");
-        std::fs::create_dir_all(&data).unwrap();
-        std::fs::write(data.join("events.jsonl"), log).unwrap();
-        let json = JsonFileStorage::new(&data);
-        json.configure_repository_layout(
-            &discover_repository_layout(worktree.path(), &data).unwrap(),
-        );
-
-        let memory = InMemoryStorage::new();
-        seed_memory_existing(&memory, &[(VirtualPath::EVENTS, log.as_bytes())]);
-
-        assert_eq!(read_events_for_log(&json), expected, "json log {log:?}");
-        assert_eq!(read_events_for_log(&memory), expected, "memory log {log:?}");
-    }
 }
 
 #[test]
@@ -829,37 +470,37 @@ fn apply_all_action_kinds<S: RepositoryStateStore>(
         vec![
             RepositoryAction::create_directory(
                 VirtualPath::data("generated").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("generated/new.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 b"created".to_vec(),
                 FileMode::Regular,
             ),
             RepositoryAction::write_file(
                 VirtualPath::data("replace.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 preimage("replace.txt"),
                 b"replaced".to_vec(),
                 FileMode::Regular,
             ),
             RepositoryAction::set_mode(
                 VirtualPath::data("chmod.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 preimage("chmod.txt"),
                 FileMode::Executable,
             ),
             RepositoryAction::delete_file(
                 VirtualPath::data("remove.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 preimage("remove.txt"),
             ),
             RepositoryAction::write_file(
                 VirtualPath::worktree("out.txt").unwrap(),
-                "conformance",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 b"worktree".to_vec(),
                 FileMode::Regular,
@@ -949,7 +590,7 @@ fn test_conformance_worktree_only_absent_root_is_refused_as_uncommittable() {
         &layout,
         vec![RepositoryAction::write_file(
             VirtualPath::worktree("note.txt").unwrap(),
-            "wt",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"note".to_vec(),
             FileMode::Regular,
@@ -1067,7 +708,7 @@ fn test_conformance_a_nested_write_creates_its_parent_on_both_backends() {
         &layout,
         vec![RepositoryAction::write_file(
             nested.clone(),
-            "p0",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"x".to_vec(),
             FileMode::Regular,
@@ -1311,7 +952,8 @@ fn capture_listing_errors(
             },
         );
         for (name, bytes) in children {
-            let path = VirtualPath::data(format!("issues/{name}")).unwrap();
+            let path =
+                VirtualPath::data(VirtualPath::ISSUES.relative().as_path().join(name)).unwrap();
             state.entries.insert(
                 path.clone(),
                 RepositoryEntry::File {
@@ -1442,13 +1084,13 @@ fn test_conformance_absent_root_data_only_materializes_data_root_dir() {
         if explicit_root_dir {
             actions.push(RepositoryAction::create_directory(
                 VirtualPath::data("").unwrap(),
-                "g",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
             ));
         }
         actions.push(RepositoryAction::write_file(
             VirtualPath::data("index.json").unwrap(),
-            "g",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"{}".to_vec(),
             FileMode::Regular,
@@ -1597,7 +1239,7 @@ fn test_json_apply_rejects_data_root_replaced_since_capture_as_retryable_conflic
         &layout,
         vec![RepositoryAction::write_file(
             VirtualPath::data("new.txt").unwrap(),
-            "f4",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::Absent,
             b"new".to_vec(),
             FileMode::Regular,
@@ -1640,7 +1282,7 @@ fn test_absent_data_parent_replacement_before_publication_never_succeeds() {
         &layout,
         vec![RepositoryAction::write_file(
             path,
-            "root-publication",
+            RepositoryActionOwner::RepositoryInit,
             ExpectedPreimage::Absent,
             b"{}".to_vec(),
             FileMode::Regular,
@@ -1690,13 +1332,13 @@ fn test_delta_rejects_captured_cross_root_hard_link_alias() {
         vec![
             RepositoryAction::set_mode(
                 VirtualPath::worktree("shared").unwrap(),
-                "one",
+                RepositoryActionOwner::RepositoryStateMutation,
                 worktree_pre,
                 FileMode::Executable,
             ),
             RepositoryAction::set_mode(
                 VirtualPath::data("shared").unwrap(),
-                "two",
+                RepositoryActionOwner::ProfileApplication,
                 data_pre,
                 FileMode::Executable,
             ),
@@ -1727,7 +1369,7 @@ fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
         &layout,
         vec![RepositoryAction::write_file(
             VirtualPath::data("x").unwrap(),
-            "a4",
+            RepositoryActionOwner::RepositoryStateMutation,
             expected,
             b"v2".to_vec(),
             FileMode::Regular,
@@ -1753,505 +1395,50 @@ fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
     ));
 }
 
-// --- REQ-01: typed mutation determinism across both backends -------------
-//
-// The finalizer's serialized issue/gate/provenance/event bytes and the exact
-// identifiers/timestamps it assigns are a pure function of the captured image
-// and the injected mutation context, so a fixed seed and clock yield
-// byte-identical results regardless of backend. No-op operations sample
-// neither an identifier nor the mutation timestamp.
+// --- Backend publication of prebuilt payload bytes -----------------------
 
-use crate::domain::{Assignee, Event, GateState, GateStatus, Issue};
-use crate::repository_state::{
-    finalize, serialize_gate_run, serialize_issue, MutationClock, MutationContext, MutationIntent,
-};
-
-fn req01_instant() -> chrono::DateTime<chrono::Utc> {
-    chrono::DateTime::parse_from_rfc3339("2026-07-19T12:00:00Z")
-        .unwrap()
-        .with_timezone(&chrono::Utc)
-}
-
-fn req01_issue(id: &str, assignee: Option<Assignee>) -> Issue {
-    let mut issue = crate::domain::fixture_issue("Determinism".into(), "Body".into());
-    issue.id = id.to_string();
-    issue.assignee = assignee;
-    issue.created_at = chrono::DateTime::parse_from_rfc3339("2020-01-01T00:00:00Z")
+#[test]
+fn test_backends_publish_prebuilt_gate_run_and_event_bytes() {
+    let worktree = TempDir::new().unwrap();
+    let timestamp = chrono::DateTime::parse_from_rfc3339("2026-07-19T12:00:00Z")
         .unwrap()
         .with_timezone(&chrono::Utc);
-    issue.updated_at = issue.created_at;
-    issue
-}
-
-fn req01_map_issue(reverse: bool) -> Issue {
-    let mut issue = crate::domain::fixture_issue("Canonical backend retry".into(), "Body".into());
-    issue.id = "11111111-1111-4111-8111-111111111111".into();
-    let order = if reverse { [1, 0] } else { [0, 1] };
-    let context = [("alpha", "one"), ("zeta", "two")];
-    let gates = [
-        (
-            "alpha-gate",
-            GateState {
-                status: GateStatus::Passed,
-                updated_by: Some("agent:alpha".parse().unwrap()),
-                updated_at: req01_instant(),
-                run_id: None,
-            },
-        ),
-        (
-            "zeta-gate",
-            GateState {
-                status: GateStatus::Failed,
-                updated_by: Some("agent:zeta".parse().unwrap()),
-                updated_at: req01_instant(),
-                run_id: None,
-            },
-        ),
-    ];
-    issue.context = order
-        .iter()
-        .map(|index| {
-            let (key, value) = context[*index];
-            (key.to_string(), value.to_string())
-        })
-        .collect::<HashMap<_, _>>();
-    issue.gates_status = order
-        .iter()
-        .map(|index| gates[*index].clone())
-        .map(|(key, value)| (key.to_string(), value))
-        .collect::<HashMap<_, _>>();
-    issue
-}
-
-/// Seed one existing issue (and optional event log) into the memory backend's
-/// repository-state image, including the `issues` directory parent.
-fn seed_memory_issue(memory: &InMemoryStorage, id: &str, issue: &Issue, events: &[u8]) {
-    let mut state = memory.repository_state();
-    state.data_root_exists = true;
-    for dir in ["", "issues"] {
-        state.entries.insert(
-            VirtualPath::data(dir).unwrap(),
-            RepositoryEntry::Directory {
-                identity: EntryIdentity::for_bytes(format!("mem-dir:{dir}"), b"directory").unwrap(),
-                mode: FileMode::Executable,
-            },
-        );
-    }
-    let issue_bytes = serialize_issue(issue).unwrap();
-    state.entries.insert(
-        VirtualPath::data(format!("issues/{id}.json")).unwrap(),
-        RepositoryEntry::File {
-            content: CapturedBytes::new("mem-issue", issue_bytes).unwrap(),
-            mode: FileMode::Regular,
-        },
-    );
-    if !events.is_empty() {
-        state.entries.insert(
-            VirtualPath::data("events.jsonl").unwrap(),
-            RepositoryEntry::File {
-                content: CapturedBytes::new("mem-events", events.to_vec()).unwrap(),
-                mode: FileMode::Regular,
-            },
-        );
-    }
-}
-
-fn claim_spec(id: &str) -> CaptureSpec {
-    CaptureSpec::new(
-        [
-            VirtualPath::data(format!("issues/{id}.json")).unwrap(),
-            VirtualPath::data("events.jsonl").unwrap(),
-        ],
-        budget(),
-    )
-    .unwrap()
-}
-
-#[test]
-fn test_conformance_claim_finalizer_bytes_match_across_backends() {
-    let worktree = TempDir::new().unwrap();
     let data = worktree.path().join(".jit");
-    let id = "44444444-4444-4444-8444-444444444444";
-    let agent: Assignee = "agent:worker-1".parse().unwrap();
-    let issue = req01_issue(id, None);
-    let issue_bytes = serialize_issue(&issue).unwrap();
-
-    // Seed identical state on the JSON backend (real files).
-    std::fs::create_dir_all(data.join("issues")).unwrap();
-    std::fs::write(data.join(format!("issues/{id}.json")), &issue_bytes).unwrap();
-    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-
-    // Seed identical state on the memory backend's image.
-    let memory = InMemoryStorage::new();
-    seed_memory_issue(&memory, id, &issue, &[]);
-
-    let intents = [MutationIntent::ClaimIssue {
-        issue_id: id.to_string(),
-        agent: agent.clone(),
-    }];
-
-    // A deterministic context: fixed seed and clock, one per backend.
-    let json = JsonFileStorage::new(&data);
-    let json_actions = {
-        let mut session = json.open_mutation_session(layout.clone()).unwrap();
-        let image = session.capture(claim_spec(id)).unwrap();
-        let context = MutationContext::deterministic([7u8; 32], req01_instant());
-        let delta = finalize(&layout, &image, &context, &intents).unwrap();
-        let outcome = session.apply(&delta).unwrap();
-        outcome.actions_applied
-    };
-    let memory_actions = {
-        let mut session = memory.open_mutation_session(layout.clone()).unwrap();
-        let image = session.capture(claim_spec(id)).unwrap();
-        let context = MutationContext::deterministic([7u8; 32], req01_instant());
-        let delta = finalize(&layout, &image, &context, &intents).unwrap();
-        let outcome = session.apply(&delta).unwrap();
-        outcome.actions_applied
-    };
-    assert_eq!(json_actions, memory_actions, "identical action count");
-
-    // Post-state bytes are byte-identical across backends.
-    let json_issue = std::fs::read(data.join(format!("issues/{id}.json"))).unwrap();
-    let json_events = std::fs::read(data.join("events.jsonl")).unwrap();
-    let (memory_issue, memory_events) = {
-        let state = memory.repository_state();
-        let issue = match state
-            .entries
-            .get(&VirtualPath::data(format!("issues/{id}.json")).unwrap())
-            .unwrap()
-        {
-            RepositoryEntry::File { content, .. } => content.bytes().to_vec(),
-            other => panic!("expected issue file, got {other:?}"),
-        };
-        let events = match state
-            .entries
-            .get(&VirtualPath::data("events.jsonl").unwrap())
-            .unwrap()
-        {
-            RepositoryEntry::File { content, .. } => content.bytes().to_vec(),
-            other => panic!("expected events file, got {other:?}"),
-        };
-        (issue, events)
-    };
-    assert_eq!(json_issue, memory_issue, "issue bytes deterministic");
-    assert_eq!(json_events, memory_events, "event bytes deterministic");
-
-    // The finalized issue carries the assignee and the exact mutation time.
-    let written: Issue = serde_json::from_slice(&json_issue).unwrap();
-    assert_eq!(written.assignee, Some(agent));
-    assert_eq!(written.claimed_at, Some(req01_instant()));
-    assert_eq!(written.updated_at, req01_instant());
-    // Exactly one event line, stamped with the mutation timestamp.
-    let events =
-        crate::domain::event_log::parse_known_events(std::str::from_utf8(&json_events).unwrap())
-            .unwrap();
-    assert_eq!(events.len(), 1);
-    let Event::IssueClaimed { timestamp, .. } = &events[0] else {
-        panic!("expected an issue_claimed event");
-    };
-    assert_eq!(*timestamp, req01_instant());
-}
-
-#[test]
-fn test_conformance_claim_noop_samples_nothing_on_both_backends() {
-    // A clock that panics on use proves neither backend samples time for a
-    // fully reflected claim.
-    struct PanicClock;
-    impl MutationClock for PanicClock {
-        fn now(&self) -> chrono::DateTime<chrono::Utc> {
-            panic!("no-op must not sample the mutation clock");
-        }
-    }
-
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    let id = "55555555-5555-4555-8555-555555555555";
-    let agent: Assignee = "agent:worker-1".parse().unwrap();
-    let issue = req01_issue(id, Some(agent.clone()));
-    // A committed claim event so both issue and tail already reflect the claim.
-    let claim_event = Event::IssueClaimed {
-        id: "evt".into(),
-        issue_id: id.to_string(),
-        timestamp: req01_instant(),
-        assignee: agent.clone(),
-    };
-    let mut events_bytes: Vec<u8> = crate::repository_state::serialize_event(&claim_event).unwrap();
-    events_bytes.push(b'\n');
-
-    std::fs::create_dir_all(data.join("issues")).unwrap();
-    std::fs::write(
-        data.join(format!("issues/{id}.json")),
-        serialize_issue(&issue).unwrap(),
-    )
-    .unwrap();
-    std::fs::write(data.join("events.jsonl"), &events_bytes).unwrap();
-    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-
-    let memory = InMemoryStorage::new();
-    seed_memory_issue(&memory, id, &issue, &events_bytes);
-
-    let intents = [MutationIntent::ClaimIssue {
-        issue_id: id.to_string(),
-        agent,
-    }];
-
-    for run_memory in [false, true] {
-        let context = MutationContext::new(
-            crate::repository_state::IdAuthority::from_seed([3u8; 32]),
-            Box::new(PanicClock),
-        );
-        let actions = if run_memory {
-            let mut session = memory.open_mutation_session(layout.clone()).unwrap();
-            let image = session.capture(claim_spec(id)).unwrap();
-            let delta = finalize(&layout, &image, &context, &intents).unwrap();
-            session.apply(&delta).unwrap().actions_applied
-        } else {
-            let json = JsonFileStorage::new(&data);
-            let mut session = json.open_mutation_session(layout.clone()).unwrap();
-            let image = session.capture(claim_spec(id)).unwrap();
-            let delta = finalize(&layout, &image, &context, &intents).unwrap();
-            session.apply(&delta).unwrap().actions_applied
-        };
-        assert_eq!(
-            actions, 0,
-            "no-op emits no actions (run_memory={run_memory})"
-        );
-    }
-}
-
-#[test]
-fn test_conformance_identical_full_finalizer_plan_matches_both_backends() {
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    std::fs::create_dir(&data).unwrap();
-    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    let spec = CaptureSpec::new([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
-    let event = Event::GateDefinitionCreated {
-        id: String::new(),
-        timestamp: req01_instant(),
-        gate_key: "cargo-ci".to_string(),
-    };
-    let intents = [MutationIntent::RecordEvent {
-        phase: 0,
-        event: Box::new(event),
-    }];
-
-    let json = JsonFileStorage::new(&data);
-    let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
-    let json_image = json_session.capture(spec.clone()).unwrap();
-    let json_context = MutationContext::deterministic([21u8; 32], req01_instant());
-    let json_plan = finalize(&layout, &json_image, &json_context, &intents).unwrap();
-
-    let memory = InMemoryStorage::new();
-    memory.repository_state().data_root_exists = true;
-    let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
-    let memory_image = memory_session.capture(spec).unwrap();
-    let memory_context = MutationContext::deterministic([21u8; 32], req01_instant());
-    let memory_plan = finalize(&layout, &memory_image, &memory_context, &intents).unwrap();
-
-    assert_eq!(
-        json_image, memory_image,
-        "captured evidence must be identical"
-    );
-    assert_eq!(json_plan, memory_plan);
-    let json_outcome = json_session.apply(&json_plan).unwrap();
-    let memory_outcome = memory_session.apply(&memory_plan).unwrap();
-    assert_eq!(json_outcome, memory_outcome);
-}
-
-#[test]
-fn test_conformance_reconstructed_issue_maps_match_across_backends() {
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    std::fs::create_dir_all(data.join("issues")).unwrap();
-    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    let issue_id = crate::repository_state::IdAuthority::from_seed([31u8; 32]).uuid_at(0);
-    let spec = CaptureSpec::new(
-        [
-            VirtualPath::data("issues").unwrap(),
-            VirtualPath::data("index.json").unwrap(),
-            VirtualPath::data("events.jsonl").unwrap(),
-            VirtualPath::data(format!("issues/{issue_id}.json")).unwrap(),
-        ],
-        budget(),
-    )
-    .unwrap();
-    let json_draft = req01_map_issue(false);
-    let memory_draft = req01_map_issue(true);
-    assert_eq!(json_draft, memory_draft);
-    assert_eq!(
-        serialize_issue(&json_draft).unwrap(),
-        serialize_issue(&memory_draft).unwrap()
-    );
-
-    let json = JsonFileStorage::new(&data);
-    let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
-    let json_image = json_session.capture(spec.clone()).unwrap();
-    let json_plan = finalize(
-        &layout,
-        &json_image,
-        &MutationContext::deterministic([31u8; 32], req01_instant()),
-        &[MutationIntent::CreateIssue {
-            draft: Box::new(json_draft),
-        }],
-    )
-    .unwrap();
-
-    let memory = InMemoryStorage::new();
-    {
-        let mut state = memory.repository_state();
-        state.data_root_exists = true;
-        let issues_dir = VirtualPath::data("issues").unwrap();
-        state.entries.insert(
-            issues_dir.clone(),
-            json_image.entries().get(&issues_dir).unwrap().clone(),
-        );
-    }
-    let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
-    let memory_image = memory_session.capture(spec).unwrap();
-    let memory_plan = finalize(
-        &layout,
-        &memory_image,
-        &MutationContext::deterministic([31u8; 32], req01_instant()),
-        &[MutationIntent::CreateIssue {
-            draft: Box::new(memory_draft),
-        }],
-    )
-    .unwrap();
-
-    assert_eq!(json_image, memory_image);
-    assert_eq!(
-        serde_json::to_vec(json_plan.delta()).unwrap(),
-        serde_json::to_vec(memory_plan.delta()).unwrap()
-    );
-    assert_eq!(json_plan, memory_plan);
-    let json_outcome = json_session.apply(&json_plan).unwrap();
-    let memory_outcome = memory_session.apply(&memory_plan).unwrap();
-    assert_eq!(json_outcome, memory_outcome);
-}
-
-#[test]
-fn test_full_finalizer_allocated_ids_enter_delta_and_retry_reuses_plan() {
-    let temp = TempDir::new().unwrap();
-    let layout = RepositoryLayout::new(
-        RepositoryRootEvidence::new(temp.path(), "wt", true),
-        RepositoryRootEvidence::new(temp.path().join(".jit"), "data", true),
-    )
-    .unwrap();
-    let id = "58585858-5858-4585-8585-585858585858";
-    let agent: Assignee = "agent:worker-1".parse().unwrap();
-    let issue = req01_issue(id, None);
-    let memory = InMemoryStorage::new();
-    seed_memory_issue(&memory, id, &issue, &[]);
-    let mut session = memory.open_mutation_session(layout.clone()).unwrap();
-    let image = session.capture(claim_spec(id)).unwrap();
-    let intents = [MutationIntent::ClaimIssue {
-        issue_id: id.to_string(),
-        agent,
-    }];
-    let context = MutationContext::deterministic([23u8; 32], req01_instant());
-
-    let first = finalize(&layout, &image, &context, &intents).unwrap();
-    let retry = finalize(&layout, &image, &context, &intents).unwrap();
-    assert_eq!(first, retry, "a retry reuses the same plan");
-
-    let event_bytes = first.delta().appended_event_bytes().unwrap();
-    let events =
-        crate::domain::event_log::parse_known_events(std::str::from_utf8(event_bytes).unwrap())
-            .unwrap();
-    let Event::IssueClaimed { id: event_id, .. } = &events[0] else {
-        panic!("expected allocated claim event");
-    };
-    assert_eq!(
-        event_id,
-        &crate::repository_state::IdAuthority::from_seed([23u8; 32]).uuid_at(0)
-    );
-}
-
-#[test]
-fn test_conformance_empty_finalizer_noop_plan_matches_without_clock_sampling() {
-    struct PanicClock;
-    impl MutationClock for PanicClock {
-        fn now(&self) -> chrono::DateTime<chrono::Utc> {
-            panic!("empty no-op must not sample time");
-        }
-    }
-
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    std::fs::create_dir(&data).unwrap();
-    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    let spec = CaptureSpec::new([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
-    let json = JsonFileStorage::new(&data);
-    let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
-    let json_image = json_session.capture(spec.clone()).unwrap();
-    let json_context = MutationContext::new(
-        crate::repository_state::IdAuthority::from_seed([24u8; 32]),
-        Box::new(PanicClock),
-    );
-    let json_plan = finalize(&layout, &json_image, &json_context, &[]).unwrap();
-
-    let memory = InMemoryStorage::new();
-    memory.repository_state().data_root_exists = true;
-    let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
-    let memory_image = memory_session.capture(spec).unwrap();
-    let memory_context = MutationContext::new(
-        crate::repository_state::IdAuthority::from_seed([24u8; 32]),
-        Box::new(PanicClock),
-    );
-    let memory_plan = finalize(&layout, &memory_image, &memory_context, &[]).unwrap();
-
-    assert_eq!(json_plan, memory_plan);
-    assert!(json_plan.delta().actions().is_empty());
-    let json_outcome = json_session.apply(&json_plan).unwrap();
-    let memory_outcome = memory_session.apply(&memory_plan).unwrap();
-    assert_eq!(json_outcome, memory_outcome);
-    assert_eq!(json_outcome.actions_applied, 0);
-}
-
-#[test]
-fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    let run_id = "run-deterministic-1";
+    let run_id = crate::test_utils::gate_run_id(1);
     let result = crate::domain::GateRunResult {
         schema_version: 1,
-        run_id: run_id.to_string(),
-        gate_key: "cargo-ci".to_string(),
+        run_id: run_id.clone(),
+        gate_key: "cargo-ci".parse().unwrap(),
         stage: crate::declarations::GateStage::Postcheck,
-        issue_id: "issue-1".to_string(),
+        issue_id: crate::test_utils::issue_id(7),
         commit: Some("abc123".to_string()),
         branch: Some("main".to_string()),
         status: crate::domain::GateRunStatus::Passed,
-        started_at: req01_instant(),
-        completed_at: Some(req01_instant()),
+        started_at: timestamp,
+        completed_at: Some(timestamp),
         duration_ms: Some(1500),
         exit_code: Some(0),
         stdout: "ok".to_string(),
         stderr: String::new(),
         command: "cargo test".to_string(),
-        by: Some("agent:worker-1".to_string()),
+        by: Some("agent:worker-1".parse().unwrap()),
         message: None,
         findings: None,
         inputs_digest: None,
         origin: crate::domain::GateVerdictOrigin::Executed,
         evaluation_stability: crate::domain::GateEvaluationStability::Stable,
     };
-    let provenance = Event::GateDefinitionCreated {
-        id: "prov-1".into(),
-        timestamp: req01_instant(),
-        gate_key: "cargo-ci".to_string(),
-    };
+    let provenance = crate::test_utils::stamped_event(
+        EventBody::draft_gate_definition_created("cargo-ci".parse().unwrap()),
+        "prov-1",
+        timestamp,
+    );
     let mut event_line = crate::repository_state::serialize_event(&provenance).unwrap();
     event_line.push(b'\n');
     let gate_bytes = serialize_gate_run(&result).unwrap();
-    assert!(gate_bytes.starts_with(b"{\n"));
-    assert!(!gate_bytes.ends_with(b"\n"));
-
-    // Build one delta persisting the gate-run artifact plus the provenance
-    // event; both backends must write byte-identical content.
-    let run_dir = VirtualPath::data(format!("gate-runs/{run_id}")).unwrap();
-    let run_file = VirtualPath::data(format!("gate-runs/{run_id}/result.json")).unwrap();
+    // Both backends must publish these prebuilt payloads unchanged.
+    let run_dir = VirtualPath::gate_run_directory(&run_id);
+    let run_file = VirtualPath::gate_run_record(&run_id);
     let events = VirtualPath::data("events.jsonl").unwrap();
     let build_delta = |layout: &RepositoryLayout| {
         RepositoryDelta::new(
@@ -2259,18 +1446,18 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
             vec![
                 RepositoryAction::create_directory(
                     run_dir.clone(),
-                    "gate",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     ExpectedPreimage::Absent,
                 ),
                 RepositoryAction::write_file(
                     run_file.clone(),
-                    "gate",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     ExpectedPreimage::Absent,
                     gate_bytes.clone(),
                     FileMode::Regular,
                 ),
                 RepositoryAction::append_events(
-                    "provenance",
+                    RepositoryActionOwner::RepositoryStateMutation,
                     ExpectedPreimage::Absent,
                     0,
                     event_line.clone(),
@@ -2325,7 +1512,7 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
     }
 
     // Gate-run and provenance bytes are byte-identical across backends.
-    let json_gate = std::fs::read(data.join(format!("gate-runs/{run_id}/result.json"))).unwrap();
+    let json_gate = std::fs::read(data.join(run_file.relative().as_path())).unwrap();
     let json_events = std::fs::read(data.join("events.jsonl")).unwrap();
     let state = memory.repository_state();
     let memory_gate = match state.entries.get(&run_file).unwrap() {
@@ -2338,313 +1525,20 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
     };
     assert_eq!(
         json_gate, gate_bytes,
-        "gate-run bytes are the serializer output"
-    );
-    assert_eq!(json_gate, memory_gate, "gate-run bytes deterministic");
-    assert_eq!(json_events, memory_events, "provenance bytes deterministic");
-}
-
-// Drive the full finalizer (not a hand-built delta) on both backends and
-// assert byte-identical serialized output, deterministic identifiers, and
-// canonical event ordering.
-
-fn finalize_apply<S: RepositoryStateStore>(
-    store: &S,
-    layout: &RepositoryLayout,
-    spec: CaptureSpec,
-    intents: &[MutationIntent],
-) {
-    let mut session = store.open_mutation_session(layout.clone()).unwrap();
-    let image = session.capture(spec).unwrap();
-    let context = MutationContext::deterministic([7u8; 32], req01_instant());
-    let delta = finalize(layout, &image, &context, intents).unwrap();
-    session.apply(&delta).unwrap();
-}
-
-fn memory_dir(name: &str) -> (VirtualPath, RepositoryEntry) {
-    (
-        VirtualPath::data(name).unwrap(),
-        RepositoryEntry::Directory {
-            identity: EntryIdentity::for_bytes(format!("mem-dir:{name}"), b"directory").unwrap(),
-            mode: FileMode::Executable,
-        },
-    )
-}
-
-fn memory_file(path: &VirtualPath, bytes: &[u8]) -> (VirtualPath, RepositoryEntry) {
-    (
-        path.clone(),
-        RepositoryEntry::File {
-            content: CapturedBytes::new(format!("mem-file:{path:?}"), bytes.to_vec()).unwrap(),
-            mode: FileMode::Regular,
-        },
-    )
-}
-
-fn memory_bytes(memory: &InMemoryStorage, path: &VirtualPath) -> Vec<u8> {
-    match memory.repository_state().entries.get(path).unwrap() {
-        RepositoryEntry::File { content, .. } => content.bytes().to_vec(),
-        other => panic!("expected a file at {path:?}, got {other:?}"),
-    }
-}
-
-fn lifecycle_event() -> Event {
-    Event::ProfileLifecycle {
-        id: String::new(),
-        timestamp: req01_instant(),
-        operation: crate::domain::ProfileLifecycleOperation::Apply,
-        profiles: vec![crate::domain::ProfileLifecycleProfile {
-            id: "example"
-                .try_into()
-                .expect("the conformance profile id is canonical"),
-            version: "1.0.0".to_string(),
-            status: crate::domain::ProfileLifecycleStatus::Installed,
-            variables: Default::default(),
-        }],
-        isolated_torn_tail: false,
-    }
-}
-
-fn gate_def_created(gate_key: &str) -> Event {
-    Event::GateDefinitionCreated {
-        id: String::new(),
-        timestamp: req01_instant(),
-        gate_key: gate_key.into(),
-    }
-}
-
-#[test]
-fn test_conformance_finalize_gate_run_and_provenance_match_across_backends() {
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    let run_id = crate::repository_state::IdAuthority::from_seed([7u8; 32]).uuid_at(0);
-    let run_dir = VirtualPath::data(format!("gate-runs/{run_id}")).unwrap();
-    let run_file = VirtualPath::data(format!("gate-runs/{run_id}/result.json")).unwrap();
-    let events = VirtualPath::data("events.jsonl").unwrap();
-    let draft = crate::domain::GateRunResult {
-        schema_version: 1,
-        run_id: "PLACEHOLDER".to_string(),
-        gate_key: "cargo-ci".to_string(),
-        stage: crate::declarations::GateStage::Postcheck,
-        issue_id: "issue-1".to_string(),
-        commit: Some("abc123".to_string()),
-        branch: Some("main".to_string()),
-        status: crate::domain::GateRunStatus::Passed,
-        started_at: req01_instant(),
-        completed_at: Some(req01_instant()),
-        duration_ms: Some(1500),
-        exit_code: Some(0),
-        stdout: "ok".to_string(),
-        stderr: String::new(),
-        command: "cargo test".to_string(),
-        by: Some("agent:worker-1".to_string()),
-        message: None,
-        findings: None,
-        inputs_digest: None,
-        origin: crate::domain::GateVerdictOrigin::Executed,
-        evaluation_stability: crate::domain::GateEvaluationStability::Stable,
-    };
-    let intents = || {
-        [
-            MutationIntent::RecordGateRun {
-                draft: Box::new(draft.clone()),
-            },
-            MutationIntent::RecordEvent {
-                phase: 5,
-                event: Box::new(lifecycle_event()),
-            },
-        ]
-    };
-    let spec = || {
-        CaptureSpec::new(
-            [
-                VirtualPath::data("gate-runs").unwrap(),
-                run_dir.clone(),
-                run_file.clone(),
-                events.clone(),
-            ],
-            budget(),
-        )
-        .unwrap()
-    };
-
-    std::fs::create_dir_all(data.join("gate-runs")).unwrap();
-    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    finalize_apply(&JsonFileStorage::new(&data), &layout, spec(), &intents());
-
-    let memory = InMemoryStorage::new();
-    {
-        let mut state = memory.repository_state();
-        state.data_root_exists = true;
-        for (path, entry) in [memory_dir(""), memory_dir("gate-runs")] {
-            state.entries.insert(path, entry);
-        }
-    }
-    finalize_apply(&memory, &layout, spec(), &intents());
-
-    let json_gate = std::fs::read(data.join(format!("gate-runs/{run_id}/result.json"))).unwrap();
-    let json_events = std::fs::read(data.join("events.jsonl")).unwrap();
-    assert_eq!(
-        json_gate,
-        memory_bytes(&memory, &run_file),
-        "finalize gate-run bytes deterministic across backends"
+        "JSON storage publishes the gate-run payload"
     );
     assert_eq!(
-        json_events,
-        memory_bytes(&memory, &events),
-        "finalize provenance bytes deterministic across backends"
+        memory_gate, gate_bytes,
+        "memory storage publishes the gate-run payload"
     );
-    // The finalizer assigned the deterministic run id.
-    let persisted: crate::domain::GateRunResult = serde_json::from_slice(&json_gate).unwrap();
-    assert_eq!(persisted.run_id, run_id);
-}
-
-#[test]
-fn test_conformance_finalize_create_issue_multi_event_match_across_backends() {
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    let ids = crate::repository_state::IdAuthority::from_seed([7u8; 32]);
-    let issue_id = ids.uuid_at(0);
-    let issue_file = VirtualPath::data(format!("issues/{issue_id}.json")).unwrap();
-    let index = VirtualPath::data("index.json").unwrap();
-    let events = VirtualPath::data("events.jsonl").unwrap();
-    let index_bytes = crate::repository_state::fresh_index_bytes().unwrap();
-
-    let mut draft = crate::domain::fixture_issue("New".into(), "Body".into());
-    draft.state = crate::domain::State::Ready;
-    let intents = || {
-        [
-            MutationIntent::CreateIssue {
-                draft: Box::new(draft.clone()),
-            },
-            MutationIntent::RecordEvent {
-                phase: 5,
-                event: Box::new(gate_def_created("aaa")),
-            },
-            MutationIntent::RecordEvent {
-                phase: 5,
-                event: Box::new(gate_def_created("bbb")),
-            },
-        ]
-    };
-    let spec = || {
-        CaptureSpec::new(
-            [
-                VirtualPath::data("issues").unwrap(),
-                issue_file.clone(),
-                index.clone(),
-                events.clone(),
-            ],
-            budget(),
-        )
-        .unwrap()
-    };
-
-    std::fs::create_dir_all(data.join("issues")).unwrap();
-    std::fs::write(data.join("index.json"), &index_bytes).unwrap();
-    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    finalize_apply(&JsonFileStorage::new(&data), &layout, spec(), &intents());
-
-    let memory = InMemoryStorage::new();
-    {
-        let mut state = memory.repository_state();
-        state.data_root_exists = true;
-        for (path, entry) in [memory_dir(""), memory_dir("issues")] {
-            state.entries.insert(path, entry);
-        }
-        let (path, entry) = memory_file(&index, &index_bytes);
-        state.entries.insert(path, entry);
-    }
-    finalize_apply(&memory, &layout, spec(), &intents());
-
-    // Byte-identical issue, index membership, and event log across backends.
-    let json_issue = std::fs::read(data.join(format!("issues/{issue_id}.json"))).unwrap();
-    let json_index = std::fs::read(data.join("index.json")).unwrap();
-    let json_events = std::fs::read(data.join("events.jsonl")).unwrap();
-    assert_eq!(json_issue, memory_bytes(&memory, &issue_file));
-    assert_eq!(json_index, memory_bytes(&memory, &index));
-    assert_eq!(json_events, memory_bytes(&memory, &events));
-    assert!(String::from_utf8_lossy(&json_index).contains(&issue_id));
-
-    // Canonical event order and the frozen identifier sequence (issue id is
-    // uuid_at(0), so the three events take uuid_at(1..=3)).
-    let parsed =
-        crate::domain::event_log::parse_known_events(std::str::from_utf8(&json_events).unwrap())
-            .unwrap();
-    assert_eq!(parsed.len(), 3);
-    let event_id = |event: &Event| match event {
-        Event::IssueCreated { id, .. } | Event::GateDefinitionCreated { id, .. } => id.clone(),
-        other => panic!("unexpected event {other:?}"),
-    };
-    assert!(matches!(&parsed[0], Event::IssueCreated { .. }));
-    assert!(
-        matches!(&parsed[1], Event::GateDefinitionCreated { gate_key, .. } if gate_key == "aaa")
+    assert_eq!(
+        json_events, event_line,
+        "JSON storage publishes the event payload"
     );
-    assert!(
-        matches!(&parsed[2], Event::GateDefinitionCreated { gate_key, .. } if gate_key == "bbb")
+    assert_eq!(
+        memory_events, event_line,
+        "memory storage publishes the event payload"
     );
-    assert_eq!(event_id(&parsed[0]), ids.uuid_at(1));
-    assert_eq!(event_id(&parsed[1]), ids.uuid_at(2));
-    assert_eq!(event_id(&parsed[2]), ids.uuid_at(3));
-}
-
-#[cfg(unix)]
-fn capture_git_fixture() -> (TempDir, PathBuf, PathBuf, String) {
-    use std::os::unix::fs::PermissionsExt;
-
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    std::fs::create_dir(&data).unwrap();
-    let run_git = |args: &[&str]| {
-        let output = Command::new("git")
-            .current_dir(worktree.path())
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "git {args:?} failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    };
-    run_git(&["init"]);
-    run_git(&["config", "user.name", "Test User"]);
-    run_git(&["config", "user.email", "test@example.com"]);
-    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
-    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
-    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
-    run_git(&["add", "-A"]);
-    run_git(&["commit", "-m", "first"]);
-    let first = {
-        let output = Command::new("git")
-            .current_dir(worktree.path())
-            .args(["rev-parse", "HEAD"])
-            .output()
-            .unwrap();
-        assert!(output.status.success());
-        String::from_utf8(output.stdout).unwrap().trim().to_string()
-    };
-    let log = worktree.path().join("git-processes.log");
-    let wrapper = worktree.path().join("git-wrapper.sh");
-    let log_literal = log.to_string_lossy().replace('\'', "'\\''");
-    std::fs::write(
-        &wrapper,
-        format!("#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{log_literal}'\nexec git \"$@\"\n"),
-    )
-    .unwrap();
-    let mut permissions = std::fs::metadata(&wrapper).unwrap().permissions();
-    permissions.set_mode(0o755);
-    std::fs::set_permissions(&wrapper, permissions).unwrap();
-    (worktree, data, wrapper, first)
-}
-
-#[cfg(unix)]
-fn capture_process_log(log: &Path) -> Vec<String> {
-    std::fs::read_to_string(log)
-        .unwrap_or_default()
-        .lines()
-        .map(str::to_owned)
-        .collect()
 }
 
 #[cfg(unix)]
@@ -2657,39 +1551,125 @@ fn pinned_capture_spec(paths: impl IntoIterator<Item = &'static str>) -> Capture
     spec
 }
 
+/// A kind-only pinned request classifies its file from the commit tree without
+/// reading the blob, and its bytes-free answer never serves a later whole read.
+#[cfg(unix)]
+#[test]
+fn test_json_capture_reads_no_blob_for_a_kind_only_pinned_request() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    crate::test_cli::init_git_repository(worktree.path()).unwrap();
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"pinned a").unwrap();
+    for args in [&["add", "-A"][..], &["commit", "-m", "first"]] {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "git {args:?} failed");
+    }
+    let stand_in = GitStandIn::new();
+    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let mut session = storage.open_mutation_session(layout).unwrap();
+    let request = ("HEAD".to_string(), "docs/a.md".to_string());
+    let blob_reads = || {
+        stand_in
+            .invocations()
+            .iter()
+            .filter(|invocation| invocation.args() == ["cat-file", "--batch"])
+            .count()
+    };
+    let mut kind = CaptureSpec::new([], budget()).unwrap();
+    kind.discover_pinned_kind(&request.0, &request.1).unwrap();
+
+    let image = session.capture(kind).unwrap();
+
+    let evidence = &image.pinned_evidence()[&request];
+    assert!(evidence.exists());
+    assert_eq!(evidence.bytes(), None);
+    assert_eq!(blob_reads(), 0);
+
+    let whole = session.capture(pinned_capture_spec(["docs/a.md"])).unwrap();
+
+    assert_eq!(
+        whole.pinned_evidence()[&request].bytes(),
+        Some(&b"pinned a"[..])
+    );
+    assert_eq!(blob_reads(), 1);
+}
+
 #[cfg(unix)]
 #[test]
 fn test_json_capture_reuses_pinned_target_cache_for_unchanged_commit() {
-    let (worktree, data, wrapper, _) = capture_git_fixture();
-    let storage = JsonFileStorage::with_git_program(&data, wrapper);
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    crate::test_cli::init_git_repository(worktree.path()).unwrap();
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
+    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
+    let run_git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run_git(&["add", "-A"]);
+    run_git(&["commit", "-m", "first"]);
+    let _revision = {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    let stand_in = GitStandIn::new();
+    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
     let spec = pinned_capture_spec(["docs/a.md", "docs/b.md"]);
 
     session.capture(spec.clone()).unwrap();
-    let first_capture_processes = capture_process_log(&worktree.path().join("git-processes.log"));
+    let first_capture_processes = stand_in.invocations();
     assert_eq!(first_capture_processes.len(), 3);
     session.capture(spec).unwrap();
-    let all_processes = capture_process_log(&worktree.path().join("git-processes.log"));
+    let all_processes = stand_in.invocations();
     assert_eq!(all_processes.len(), 4);
     assert_eq!(
         all_processes
             .iter()
-            .filter(|line| line.starts_with("rev-parse "))
+            .filter(|invocation| invocation
+                .args()
+                .first()
+                .is_some_and(|argument| argument == "rev-parse"))
             .count(),
         2
     );
     assert_eq!(
         all_processes
             .iter()
-            .filter(|line| line.contains(" ls-tree "))
+            .filter(|invocation| invocation
+                .args()
+                .iter()
+                .any(|argument| argument == "ls-tree"))
             .count(),
         1
     );
     assert_eq!(
         all_processes
             .iter()
-            .filter(|line| *line == "cat-file --batch")
+            .filter(|invocation| invocation.args() == ["cat-file", "--batch"])
             .count(),
         1
     );
@@ -2698,8 +1678,38 @@ fn test_json_capture_reuses_pinned_target_cache_for_unchanged_commit() {
 #[cfg(unix)]
 #[test]
 fn test_json_capture_re_resolves_moved_head_and_rekeys_pinned_cache() {
-    let (worktree, data, wrapper, first) = capture_git_fixture();
-    let storage = JsonFileStorage::with_git_program(&data, wrapper);
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    crate::test_cli::init_git_repository(worktree.path()).unwrap();
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
+    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
+    let run_git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run_git(&["add", "-A"]);
+    run_git(&["commit", "-m", "first"]);
+    let first = {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    let stand_in = GitStandIn::new();
+    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
     let spec = pinned_capture_spec(["docs/a.md"]);
@@ -2747,17 +1757,45 @@ fn test_json_capture_re_resolves_moved_head_and_rekeys_pinned_cache() {
 #[cfg(unix)]
 #[test]
 fn test_json_capture_keeps_pinned_target_cache_across_captures_that_pin_nothing() {
-    let (worktree, data, wrapper, revision) = capture_git_fixture();
-    let storage = JsonFileStorage::with_git_program(&data, wrapper);
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    crate::test_cli::init_git_repository(worktree.path()).unwrap();
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
+    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
+    let run_git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run_git(&["add", "-A"]);
+    run_git(&["commit", "-m", "first"]);
+    let revision = {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    let stand_in = GitStandIn::new();
+    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
     let spec = pinned_capture_spec(["docs/a.md", "docs/b.md"]);
-    let log = worktree.path().join("git-processes.log");
-
     session.capture(spec.clone()).unwrap();
-    let after_first = capture_process_log(&log).len();
+    let after_first = stand_in.invocations().len();
     session.capture(pinned_capture_spec([])).unwrap();
-    assert_eq!(capture_process_log(&log).len(), after_first);
+    assert_eq!(stand_in.invocations().len(), after_first);
     assert_eq!(
         storage.pinned_target_cache_keys(),
         vec![
@@ -2766,17 +1804,51 @@ fn test_json_capture_keeps_pinned_target_cache_across_captures_that_pin_nothing(
         ]
     );
     session.capture(spec).unwrap();
-    let repeated = capture_process_log(&log)[after_first..].to_vec();
+    let repeated = stand_in.invocations()[after_first..].to_vec();
     assert!(
-        repeated.len() == 1 && repeated[0].starts_with("rev-parse "),
+        repeated.len() == 1
+            && repeated[0]
+                .args()
+                .first()
+                .is_some_and(|argument| argument == "rev-parse"),
         "a capture after one that pins nothing must reuse cached evidence, spawned {repeated:?}"
     );
 }
 
 #[test]
 fn test_json_capture_retains_only_pairs_used_by_the_most_recent_capture() {
-    let (worktree, data, wrapper, revision) = capture_git_fixture();
-    let storage = JsonFileStorage::with_git_program(&data, wrapper);
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    crate::test_cli::init_git_repository(worktree.path()).unwrap();
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
+    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
+    let run_git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run_git(&["add", "-A"]);
+    run_git(&["commit", "-m", "first"]);
+    let revision = {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    let stand_in = GitStandIn::new();
+    let storage = JsonFileStorage::with_git_program(&data, stand_in.program());
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
 
@@ -2806,7 +1878,7 @@ impl WriteSetFixture {
     fn new(files: &[(&str, &[u8])]) -> Self {
         let worktree = TempDir::new().unwrap();
         let data = worktree.path().join(".jit");
-        std::fs::create_dir_all(data.join("issues")).unwrap();
+        std::fs::create_dir_all(data.join("records")).unwrap();
         for (relative, bytes) in files {
             std::fs::write(data.join(relative), bytes).unwrap();
         }
@@ -2885,17 +1957,20 @@ fn seeded_log() -> &'static [u8] {
 #[test]
 fn test_ensure_write_set_unchanged_admits_a_write_set_nothing_moved() {
     let fixture = WriteSetFixture::new(&[
-        ("issues/one.json", b"{\"id\":\"one\"}"),
-        ("issues/stale.json", b"{\"id\":\"stale\"}"),
+        ("records/one.json", b"{\"value\":\"one\"}"),
+        ("records/stale.json", b"{\"value\":\"stale\"}"),
         ("events.jsonl", seeded_log()),
     ]);
-    let written = data_path("issues/one.json");
-    let removed = data_path("issues/stale.json");
+    let written = data_path("records/one.json");
+    let removed = data_path("records/stale.json");
     let image = fixture.capture([written.clone(), removed.clone(), VirtualPath::EVENTS]);
 
     let record = RedoRecord::new(
         Vec::new(),
-        vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
+        vec![put_file(
+            written,
+            b"{\"value\":\"one\",\"state\":\"ready\"}",
+        )],
         vec![removed],
         event_append(seeded_log().len() as u64),
     )
@@ -2945,11 +2020,19 @@ fn test_redo_record_for_carries_only_a_directory_no_other_action_lies_beneath() 
     let delta = RepositoryDelta::new(
         &fixture.layout,
         vec![
-            RepositoryAction::create_directory(empty.clone(), "p0", ExpectedPreimage::Absent),
-            RepositoryAction::create_directory(ancestor, "p0", ExpectedPreimage::Absent),
+            RepositoryAction::create_directory(
+                empty.clone(),
+                RepositoryActionOwner::RepositoryStateMutation,
+                ExpectedPreimage::Absent,
+            ),
+            RepositoryAction::create_directory(
+                ancestor,
+                RepositoryActionOwner::RepositoryStateMutation,
+                ExpectedPreimage::Absent,
+            ),
             RepositoryAction::write_file(
                 written,
-                "p0",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 b"{}".to_vec(),
                 FileMode::Regular,
@@ -2975,7 +2058,7 @@ fn test_redo_record_for_carries_the_event_log_change_as_its_offset_and_appended_
     let delta = RepositoryDelta::new(
         &fixture.layout,
         vec![RepositoryAction::append_events(
-            "p0",
+            RepositoryActionOwner::RepositoryStateMutation,
             ExpectedPreimage::of(image.entry(&VirtualPath::EVENTS).unwrap()),
             offset,
             b"{\"tag\":\"next\"}\n".to_vec(),
@@ -3001,23 +2084,23 @@ fn test_redo_record_for_carries_the_event_log_change_as_its_offset_and_appended_
 #[test]
 fn test_ensure_write_set_unchanged_refuses_a_put_target_whose_bytes_changed() {
     let fixture = WriteSetFixture::new(&[
-        ("issues/one.json", b"{\"id\":\"one\"}"),
+        ("records/one.json", b"{\"value\":\"one\"}"),
         ("events.jsonl", seeded_log()),
     ]);
-    let written = data_path("issues/one.json");
+    let written = data_path("records/one.json");
     let image = fixture.capture([written.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
         vec![put_file(
             written.clone(),
-            b"{\"id\":\"one\",\"state\":\"ready\"}",
+            b"{\"value\":\"one\",\"state\":\"ready\"}",
         )],
         Vec::new(),
         event_append(seeded_log().len() as u64),
     )
     .unwrap();
 
-    fixture.write("issues/one.json", b"{\"id\":\"one\",\"raced\":true}");
+    fixture.write("records/one.json", b"{\"value\":\"one\",\"raced\":true}");
 
     let error = fixture.check(&image, &record).unwrap_err();
     assert!(
@@ -3029,10 +2112,10 @@ fn test_ensure_write_set_unchanged_refuses_a_put_target_whose_bytes_changed() {
 #[test]
 fn test_ensure_write_set_unchanged_refuses_a_delete_target_whose_bytes_changed() {
     let fixture = WriteSetFixture::new(&[
-        ("issues/stale.json", b"{\"id\":\"stale\"}"),
+        ("records/stale.json", b"{\"value\":\"stale\"}"),
         ("events.jsonl", seeded_log()),
     ]);
-    let removed = data_path("issues/stale.json");
+    let removed = data_path("records/stale.json");
     let image = fixture.capture([removed.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
@@ -3042,7 +2125,10 @@ fn test_ensure_write_set_unchanged_refuses_a_delete_target_whose_bytes_changed()
     )
     .unwrap();
 
-    fixture.write("issues/stale.json", b"{\"id\":\"stale\",\"raced\":true}");
+    fixture.write(
+        "records/stale.json",
+        b"{\"value\":\"stale\",\"raced\":true}",
+    );
 
     let error = fixture.check(&image, &record).unwrap_err();
     assert!(
@@ -3054,22 +2140,25 @@ fn test_ensure_write_set_unchanged_refuses_a_delete_target_whose_bytes_changed()
 #[test]
 fn test_ensure_write_set_unchanged_admits_a_read_but_unwritten_file_that_changed() {
     let fixture = WriteSetFixture::new(&[
-        ("index.json", b"{\"issues\":[]}"),
-        ("issues/one.json", b"{\"id\":\"one\"}"),
+        ("index.json", b"{\"values\":[]}"),
+        ("records/one.json", b"{\"value\":\"one\"}"),
         ("events.jsonl", seeded_log()),
     ]);
     let read_only = data_path("index.json");
-    let written = data_path("issues/one.json");
+    let written = data_path("records/one.json");
     let image = fixture.capture([read_only, written.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
-        vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
+        vec![put_file(
+            written,
+            b"{\"value\":\"one\",\"state\":\"ready\"}",
+        )],
         Vec::new(),
         event_append(seeded_log().len() as u64),
     )
     .unwrap();
 
-    fixture.write("index.json", b"{\"issues\":[\"raced\"]}");
+    fixture.write("index.json", b"{\"values\":[\"raced\"]}");
 
     assert!(
         fixture.check(&image, &record).is_ok(),
@@ -3080,11 +2169,11 @@ fn test_ensure_write_set_unchanged_admits_a_read_but_unwritten_file_that_changed
 #[test]
 fn test_ensure_write_set_unchanged_admits_a_target_expected_absent_that_is_still_absent() {
     let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
-    let created = data_path("issues/new.json");
+    let created = data_path("records/new.json");
     let image = fixture.capture([created.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
-        vec![put_file(created, b"{\"id\":\"new\"}")],
+        vec![put_file(created, b"{\"value\":\"new\"}")],
         Vec::new(),
         event_append(seeded_log().len() as u64),
     )
@@ -3096,17 +2185,17 @@ fn test_ensure_write_set_unchanged_admits_a_target_expected_absent_that_is_still
 #[test]
 fn test_ensure_write_set_unchanged_refuses_a_target_expected_absent_that_became_occupied() {
     let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
-    let created = data_path("issues/new.json");
+    let created = data_path("records/new.json");
     let image = fixture.capture([created.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
-        vec![put_file(created.clone(), b"{\"id\":\"new\"}")],
+        vec![put_file(created.clone(), b"{\"value\":\"new\"}")],
         Vec::new(),
         event_append(seeded_log().len() as u64),
     )
     .unwrap();
 
-    fixture.write("issues/new.json", b"{\"id\":\"new\",\"raced\":true}");
+    fixture.write("records/new.json", b"{\"value\":\"new\",\"raced\":true}");
 
     let error = fixture.check(&image, &record).unwrap_err();
     assert!(
@@ -3224,7 +2313,7 @@ fn test_ensure_write_set_unchanged_admits_an_event_log_edited_before_the_tail_wi
 
 /// An event log longer than the tail window, so a prefix edit falls outside it.
 fn long_log() -> Vec<u8> {
-    let line = b"{\"tag\":\"issue_created\",\"id\":\"padding-padding-padding\"}\n";
+    let line = b"{\"tag\":\"issue_created\",\"padding\":\"padding-padding-padding\"}\n";
     line.iter()
         .copied()
         .cycle()
@@ -3401,10 +2490,10 @@ fn leftover_record() -> RedoRecord {
 }
 
 fn leftover_target() -> VirtualPath {
-    data_path("issues/left.json")
+    data_path("records/left.json")
 }
 
-const LEFTOVER_BYTES: &[u8] = b"{\"id\":\"left\"}";
+const LEFTOVER_BYTES: &[u8] = b"{\"value\":\"left\"}";
 
 fn appended_log() -> Vec<u8> {
     [CAPTURED_LOG, &event_append(0).unwrap().bytes].concat()
@@ -3463,7 +2552,7 @@ fn assert_an_interrupted_publication_converges<B: SessionRecordBackend>() {
             session.layout(),
             vec![RepositoryAction::write_file(
                 target.clone(),
-                "interrupted-publication",
+                RepositoryActionOwner::RepositoryStateMutation,
                 ExpectedPreimage::Absent,
                 LEFTOVER_BYTES.to_vec(),
                 FileMode::Regular,

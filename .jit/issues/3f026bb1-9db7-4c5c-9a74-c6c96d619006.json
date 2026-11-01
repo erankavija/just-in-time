@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:17:58.220236854Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,12 +9,26 @@
   ],
   "description": "Add the crate-local macro that states each variant's wire spelling once, and prove it on gate status.\n\n## Background\n\nClosed vocabularies restate their wire spelling by hand. `EventTag` pairs a serde rename with a hand-written `as_str` and `ALL` (`crates/jit/src/domain/event_catalog.rs:77-182`), and the artifact-plan codes follow the same pattern (`domain/artifact_plan.rs:369-543`). `errors::gate_status_name` (`errors.rs:987-993`) copies `GateStatus::as_str` (`domain/types.rs:257-263`) and is called at `errors.rs:959` and `output.rs:1294`. No derive crate such as strum is in `Cargo.lock`. `declare_well_known_paths!` (`repository_state/path.rs:259-310`) is the crate's precedent for emitting several items from one declaration list.\n\n## Success Criteria\n\n- [hard] REQ-01: A crate-local macro in `domain/vocabulary.rs` takes `Variant = \"wire\"` entries and emits the enum with per-variant serde renames, a `const fn as_str`, a complete `ALL`, an exact-match `FromStr` and `Display`.\n- [hard] REQ-02: One owning test shows, for a vocabulary declared through the macro, that each `as_str` equals its serde encoding, that `FromStr` inverts it and rejects input other than an exact token, and that `ALL` lists each variant once, matching the derived schema.\n- [hard] REQ-03: `GateStatus` is declared through the macro, and `errors::gate_status_name` is gone.\n- [hard] REQ-04: No dependency is added.\n",
   "documents": [],
+  "done_at": "2026-10-24T23:55:24.688897128Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "13a55957-8f74-4110-a582-a4847d459d00",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:50:19.490839354Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "21beb0ad-8b0e-4328-b6c8-92bea3ae76b8",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:43:53.920942874Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3f026bb1-9db7-4c5c-9a74-c6c96d619006",
   "labels": [
     "type:task",
@@ -27,7 +42,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "One macro declares a closed wire vocabulary",
-  "updated_at": "2026-10-22T19:43:22.259340637Z"
+  "updated_at": "2026-10-24T23:55:24.688897128Z"
 }

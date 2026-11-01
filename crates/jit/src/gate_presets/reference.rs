@@ -123,8 +123,9 @@ pub fn render_reference_markdown() -> String {
            repository.\n\
          - `issue_validation` runs declarative validation for the gated issue.\n\
          - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label\n\
-           from the gated issue and runs scoped validation for that target. Its checker table\n\
-           must set `label_namespace`.\n\
+           from the gated issue, where the target is a full issue id or unique prefix, and\n\
+           runs scoped validation for that target. Its checker table must set\n\
+           `label_namespace`.\n\
          - `rule_validation` names one configured graph rule with `rule` and evaluates it\n\
            with the gated issue as its sole firing subject. The complete repository may be\n\
            used for graph and identifier-resolution context, but unrelated issues cannot\n\
@@ -194,28 +195,37 @@ mod tests {
         )
         .unwrap();
 
-        let registry = crate::storage::gate_store::load_gate_registry(dir.path()).unwrap();
+        let registry = crate::storage::gate_store::load_gate_registry(
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
+        )
+        .unwrap();
         assert_eq!(registry.gates.len(), 5);
         assert!(matches!(
-            registry.gates["repository-policy"].checker.as_ref(),
+            registry.gates[&"repository-policy".parse().unwrap()]
+                .checker
+                .as_ref(),
             Some(GateChecker::RepositoryValidation)
         ));
         assert!(matches!(
-            registry.gates["work-item-policy"].checker.as_ref(),
+            registry.gates[&"work-item-policy".parse().unwrap()]
+                .checker
+                .as_ref(),
             Some(GateChecker::IssueValidation)
         ));
         assert!(matches!(
-            registry.gates["container-coverage"].checker.as_ref(),
+            registry.gates[&"container-coverage".parse().unwrap()].checker.as_ref(),
             Some(GateChecker::LabelTargetValidation {
                 label_namespace
             }) if label_namespace == "covers"
         ));
         assert!(matches!(
-            registry.gates["selected-rule"].checker.as_ref(),
+            registry.gates[&"selected-rule".parse().unwrap()].checker.as_ref(),
             Some(GateChecker::RuleValidation { rule }) if rule == "coverage-preview"
         ));
         assert!(matches!(
-            registry.gates["external-review"].checker.as_ref(),
+            registry.gates[&"external-review".parse().unwrap()]
+                .checker
+                .as_ref(),
             Some(GateChecker::ReviewPlaceholder)
         ));
     }
@@ -230,7 +240,10 @@ mod tests {
             PORTABLE_CHECKER_REGISTRY_EXAMPLES,
         )
         .unwrap();
-        let registry = crate::storage::gate_store::load_gate_registry(dir.path()).unwrap();
+        let registry = crate::storage::gate_store::load_gate_registry(
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
+        )
+        .unwrap();
         let page = render_reference_markdown();
 
         for gate in registry.gates.values() {

@@ -1,6 +1,7 @@
 //! Issue CRUD operations and lifecycle management
 
 use super::*;
+use crate::domain::identity::GateKey;
 use crate::errors::{DeletionNotConfirmedError, TransitionBlocker};
 use crate::storage::StorageWarning;
 
@@ -34,15 +35,15 @@ impl DescriptionUpdate {
 /// its field changes. `unassign` takes precedence over `assignee`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct IssueLocalUpdate {
-    pub add_gates: Vec<String>,
-    pub remove_gates: Vec<String>,
-    pub assignee: Option<String>,
+    pub add_gates: Vec<GateKey>,
+    pub remove_gates: Vec<GateKey>,
+    pub assignee: Option<crate::domain::Assignee>,
     pub unassign: bool,
 }
 
 pub(super) fn blocking_dependencies(
     issue: &Issue,
-    resolved_issues: &std::collections::HashMap<String, &Issue>,
+    resolved_issues: &std::collections::HashMap<IssueId, &Issue>,
 ) -> Vec<TransitionBlocker> {
     issue
         .dependencies
@@ -68,7 +69,7 @@ fn derive_issue_deletion(
     image: &crate::repository_state::RepositoryImage,
     context: &crate::repository_state::MutationContext,
     issues: &[Issue],
-    target_id: &str,
+    target_id: &IssueId,
 ) -> Result<DerivedIssueDeletion> {
     use crate::repository_state::MutationIntent;
 
@@ -76,7 +77,7 @@ fn derive_issue_deletion(
     let config = crate::repository_state::assemble_config(image)?;
     let mut projected = issues
         .iter()
-        .filter(|issue| issue.id != target_id)
+        .filter(|issue| &issue.id != target_id)
         .cloned()
         .collect::<Vec<_>>();
     let dependent_ids = projected
@@ -88,9 +89,10 @@ fn derive_issue_deletion(
         })
         .collect::<Vec<_>>();
     let plan_content = validate::plan_content_from_image(image, &projected)?;
+    let ready_ids = crate::domain::queries::issues_becoming_ready(&projected);
 
     let mut intents = vec![MutationIntent::DeleteIssue {
-        issue_id: target_id.to_string(),
+        issue_id: target_id.clone(),
     }];
     let mut error_after_apply = None;
     for dependent_id in dependent_ids {
@@ -99,8 +101,7 @@ fn derive_issue_deletion(
             .position(|issue| issue.id == dependent_id)
             .ok_or_else(|| anyhow!("captured dependent {dependent_id} disappeared"))?;
         let mut dependent = projected[position].clone();
-        let resolved = crate::domain::queries::build_issue_map(&projected);
-        if dependent.should_auto_transition_to_ready(&resolved) {
+        if ready_ids.contains(&dependent_id) {
             match derive_state_transition(
                 dependent.clone(),
                 State::Ready,
@@ -145,7 +146,7 @@ fn derive_issue_deletion(
         });
         intents.push(MutationIntent::RecordEvent {
             phase: 2,
-            event: Box::new(Event::draft_issue_updated(
+            event: Box::new(EventBody::draft_issue_updated(
                 dependent_id,
                 "dependency-cascade-delete".to_string(),
                 vec!["dependencies".to_string()],
@@ -154,7 +155,7 @@ fn derive_issue_deletion(
     }
     intents.push(MutationIntent::RecordEvent {
         phase: 1,
-        event: Box::new(Event::draft_issue_deleted(target_id.to_string())),
+        event: Box::new(EventBody::draft_issue_deleted(target_id.clone())),
     });
     Ok(DerivedIssueDeletion {
         intents,
@@ -181,12 +182,12 @@ impl<S: IssueStore> IssueOps<'_, S> {
         title: String,
         description: String,
         priority: Priority,
-        gates: Vec<String>,
+        gates: Vec<GateKey>,
         mut labels: Vec<String>,
         content_format: Option<crate::domain::ContentFormat>,
         issue_type: Option<String>,
         force: bool,
-    ) -> Result<(String, Vec<String>)>
+    ) -> Result<(IssueId, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -202,7 +203,8 @@ impl<S: IssueStore> IssueOps<'_, S> {
             labels.push(label_utils::type_label(&kind));
         }
 
-        let mut issue = Issue::draft(title, description);
+        let context = super::production_mutation_context();
+        let mut issue = Issue::draft(context.issue_id_at(0), title, description);
         issue.priority = priority;
         issue.gates_required = gates;
         issue.labels = labels;
@@ -234,7 +236,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         // behavior; runs before the write so a bad type changes nothing.
         let (issue_id, validation) =
             self.exec
-                .publish_issue_creation(issue, explicit_type, force)?;
+                .publish_issue_creation(&context, issue, explicit_type, force)?;
 
         Ok((issue_id, validation.warnings))
     }
@@ -242,7 +244,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     pub fn list_issues(
         &self,
         state_filter: Option<State>,
-        assignee_filter: Option<String>,
+        assignee_filter: Option<crate::domain::Assignee>,
         priority_filter: Option<Priority>,
     ) -> Result<Vec<Issue>> {
         let issues = self.exec.storage.list_issues()?;
@@ -256,11 +258,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                     }
                 }
                 if let Some(ref assignee) = assignee_filter {
-                    if !issue
-                        .assignee
-                        .as_ref()
-                        .is_some_and(|a| a == assignee.as_str())
-                    {
+                    if !issue.assignee.as_ref().is_some_and(|a| a == assignee) {
                         return false;
                     }
                 }
@@ -276,11 +274,8 @@ impl<S: IssueStore> IssueOps<'_, S> {
         Ok(filtered)
     }
 
-    pub fn show_issue(&self, id: &str) -> Result<Issue> {
-        let full_id = self
-            .exec
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+    pub fn show_issue(&self, id: &IssueId) -> Result<Issue> {
+        let full_id = id.clone();
         self.exec.storage.load_issue(&full_id)
     }
 
@@ -337,7 +332,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// precedent) rather than silently dropped. Only a not-found id is treated
     /// as dangling: any genuine storage error (I/O, deserialization) propagates
     /// via `?` instead of being swallowed. Dangling ids are returned sorted.
-    fn resolve_direct_children(&self, container: &Issue) -> Result<(Vec<Issue>, Vec<String>)> {
+    fn resolve_direct_children(&self, container: &Issue) -> Result<(Vec<Issue>, Vec<IssueId>)> {
         let mut children = Vec::new();
         let mut dangling = Vec::new();
         for dep_id in &container.dependencies {
@@ -388,11 +383,11 @@ impl<S: IssueStore> IssueOps<'_, S> {
     ///
     /// let response = executor.issues().issue_children(&epic).unwrap();
     /// assert_eq!(response.extras.container.title, "Epic");
-    /// assert_eq!(response.count(), 1);
+    /// assert_eq!(response.items.len(), 1);
     /// assert_eq!(response.items[0].title, "Child");
     /// assert!(response.extras.dangling.is_empty());
     /// ```
-    pub fn issue_children(&self, id: &str) -> Result<crate::output::IssueChildrenResponse> {
+    pub fn issue_children(&self, id: &IssueId) -> Result<crate::output::IssueChildrenResponse> {
         let container = self.show_issue(id)?;
         let (children, dangling) = self.resolve_direct_children(&container)?;
 
@@ -453,7 +448,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// assert_eq!(progress.rollup.extras.percent, 50);
     /// assert!(progress.dangling.is_empty());
     /// ```
-    pub fn issue_progress(&self, id: &str) -> Result<crate::output::ContainerProgressResponse> {
+    pub fn issue_progress(&self, id: &IssueId) -> Result<crate::output::ContainerProgressResponse> {
         let container = self.show_issue(id)?;
         let (children, dangling) = self.resolve_direct_children(&container)?;
 
@@ -475,7 +470,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     #[allow(clippy::too_many_arguments)]
     pub fn update_issue(
         &self,
-        id: &str,
+        id: &IssueId,
         title: Option<String>,
         description: Option<DescriptionUpdate>,
         priority: Option<Priority>,
@@ -514,7 +509,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     #[allow(clippy::too_many_arguments)]
     pub fn update_issue_resolved(
         &self,
-        id: &str,
+        id: &IssueId,
         title: Option<String>,
         description: Option<DescriptionUpdate>,
         priority: Option<Priority>,
@@ -525,18 +520,15 @@ impl<S: IssueStore> IssueOps<'_, S> {
         issue_type: Option<String>,
         local: IssueLocalUpdate,
         force: bool,
-    ) -> Result<(String, Vec<String>)>
+    ) -> Result<(IssueId, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let assignee = local
-            .assignee
-            .map(|assignee| assignee.parse::<crate::domain::Assignee>())
-            .transpose()?;
+        let assignee = local.assignee;
         let outcome = self
             .exec
             .publish_captured_field_update(CapturedFieldUpdate {
-                issue_id: IssueIdPrefix::parse(id)?,
+                issue_id: id.clone(),
                 title,
                 description,
                 priority,
@@ -574,18 +566,16 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// without mutating global process state. Returns
     /// [`DeletionNotConfirmedError`] (classified by `output::failure::classify` as
     /// `ExitCode::InvalidArgument`, exit code 2) rather than performing the
-    /// delete when `allowed` is `false`; `id` is echoed verbatim in the
-    /// refusal's example remediation command, so it need not be a resolved
-    /// full id.
+    /// delete when `allowed` is `false`; the resolved `id` names the refused deletion.
     pub fn confirm_deletion_allowed(
         &self,
-        id: &str,
+        id: &IssueId,
         allowed: bool,
     ) -> std::result::Result<(), DeletionNotConfirmedError> {
         if allowed {
             Ok(())
         } else {
-            Err(DeletionNotConfirmedError::new(id))
+            Err(DeletionNotConfirmedError::new(id.clone()))
         }
     }
 
@@ -609,13 +599,13 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// requiring target resolution) and `jit issue show --json`'s
     /// `dangling_dependency_ids` field remain as defense-in-depth for legacy or
     /// externally edited data.
-    pub fn delete_issue(&self, id: &str) -> Result<Vec<String>>
+    pub fn delete_issue(&self, id: &IssueId) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::finalize;
 
-        let id = &IssueIdPrefix::parse(id)?;
+        let id = &id.clone();
         let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("issue deletion", || {
@@ -643,7 +633,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let target_id = resolve_issue_from_capture(&issues, id)?;
+            let target_id = require_issue_in_capture(&issues, id)?;
             let config = crate::repository_state::assemble_config(&image)?;
             let current_mode = config.enforcement_mode();
             if target_id != expected_target || current_mode != expected_mode {
@@ -652,7 +642,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
             let warnings = captured_lease_warnings(
                 current_mode,
                 std::slice::from_ref(&target_id),
-                &issues,
                 claims_guard.as_ref(),
             )?;
             let derived = derive_issue_deletion(&image, &context, &issues, &target_id)?;
@@ -683,12 +672,12 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// the actual state mutation/publication are delegated to captured transition
     /// derivation (which skips enforcement for
     /// `Rejected`), so this path never sets `issue.state` directly.
-    pub fn update_issue_state(&self, id: &str, new_state: State) -> Result<Vec<String>>
+    pub fn update_issue_state(&self, id: &IssueId, new_state: State) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
         let outcome = self.exec.publish_captured_state_transition(
-            IssueIdPrefix::parse(id)?,
+            id,
             new_state,
             false,
             new_state == State::Done,
@@ -704,7 +693,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// Reject an issue, recording `reason` as its `resolution:` label in the
     /// same mutation. Rejection bypasses rule enforcement, so label-rule
     /// findings surface as warnings.
-    pub fn reject_issue(&self, id: &str, reason: Option<&str>) -> Result<Vec<String>>
+    pub fn reject_issue(&self, id: &IssueId, reason: Option<&str>) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -712,7 +701,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             return self.update_issue_state(id, State::Rejected);
         };
         let mut request = CapturedFieldUpdate::label_edit(
-            IssueIdPrefix::parse(id)?,
+            id.clone(),
             CapturedLabelEdit::AppendUnchecked(format!("resolution:{reason}")),
         );
         request.state = Some(State::Rejected);
@@ -723,14 +712,15 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// Assign an issue to someone.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn assign_issue(&self, id: &str, assignee: String) -> Result<Vec<String>>
+    pub fn assign_issue(
+        &self,
+        id: &IssueId,
+        assignee: crate::domain::Assignee,
+    ) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .exec
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+        let full_id = id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -738,9 +728,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
             warnings.push(warning);
         }
 
-        // Validate through the one `Assignee` path so `assign` cannot persist a
-        // raw, malformed assignee (this command previously skipped validation).
-        let assignee: crate::domain::Assignee = assignee.parse()?;
         self.exec
             .publish_captured_issue_mutation(CapturedIssueMutation::Assign {
                 issue_id: full_id,
@@ -754,29 +741,28 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// Returns any non-fatal [`StorageWarning`]s (e.g. a worktree relocation
     /// observed while checking leases) so the calling command can surface them
     /// at its own output boundary; this method never writes to stderr.
-    pub fn claim_issue(&self, id: &str, assignee: String) -> Result<Vec<StorageWarning>>
+    pub fn claim_issue(
+        &self,
+        id: &IssueId,
+        assignee: crate::domain::Assignee,
+    ) -> Result<Vec<StorageWarning>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let claimant: crate::domain::Assignee = assignee.parse()?;
         // The captured claim owns the precheck capture/checker/recapture loop so
         // checker success and coordinator evidence cannot be applied to a
         // different source state or short-id target.
-        self.exec
-            .publish_captured_claim(IssueIdPrefix::parse(id)?, claimant)
+        self.exec.publish_captured_claim(id, assignee)
     }
 
     /// Unassign an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn unassign_issue(&self, id: &str) -> Result<Vec<String>>
+    pub fn unassign_issue(&self, id: &IssueId) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .exec
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+        let full_id = id.clone();
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -791,16 +777,13 @@ impl<S: IssueStore> IssueOps<'_, S> {
         Ok(warnings)
     }
 
-    pub fn release_issue(&self, id: &str, reason: &str) -> Result<()>
+    pub fn release_issue(&self, id: &IssueId, reason: &str) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .exec
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+        let full_id = id.clone();
         self.exec
-            .publish_captured_release(IssueIdPrefix::of_stored(&full_id), reason.to_string())
+            .publish_captured_release(&full_id, reason.to_string())
     }
 
     /// Claim the highest-priority ready issue matching `filter`, a
@@ -810,9 +793,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// [`InvalidArgumentError`](crate::errors::InvalidArgumentError).
     pub fn claim_next(
         &self,
-        assignee: String,
+        assignee: crate::domain::Assignee,
         filter: Option<String>,
-    ) -> Result<(String, Vec<StorageWarning>)>
+    ) -> Result<(IssueId, Vec<StorageWarning>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -843,14 +826,12 @@ impl<S: IssueStore> IssueOps<'_, S> {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    pub(super) fn auto_transition_to_ready(&self, issue_id: &str) -> Result<bool>
+    pub(super) fn auto_transition_to_ready(&self, issue_id: &IssueId) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        self.publish_captured_auto_transition(IssueIdPrefix::of_stored(&full_id), State::Ready)
+        let full_id = issue_id.clone();
+        self.publish_captured_auto_transition(&full_id, State::Ready)
     }
 
     /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`.
@@ -860,24 +841,20 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// stored readiness drifted from its graph converges from either side. Returns
     /// whether the issue changed state; an issue whose stored state already agrees
     /// with the graph is left untouched.
-    pub(super) fn auto_transition_to_backlog(&self, issue_id: &str) -> Result<bool>
+    pub(super) fn auto_transition_to_backlog(&self, issue_id: &IssueId) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        self.publish_captured_auto_transition(IssueIdPrefix::of_stored(&full_id), State::Backlog)
+        let full_id = issue_id.clone();
+        self.publish_captured_auto_transition(&full_id, State::Backlog)
     }
 
-    pub(super) fn auto_transition_to_done(&self, issue_id: &str) -> Result<bool>
+    pub(super) fn auto_transition_to_done(&self, issue_id: &IssueId) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        if self.publish_captured_auto_transition(IssueIdPrefix::of_stored(&full_id), State::Done)? {
+        let full_id = issue_id.clone();
+        if self.publish_captured_auto_transition(&full_id, State::Done)? {
             // Check if any dependent issues can now transition to ready
             self.check_auto_transitions()?;
             Ok(true)
@@ -886,31 +863,25 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
+    /// Apply the promotions [`issues_becoming_ready`](crate::domain::queries::issues_becoming_ready) decides.
     pub(super) fn check_auto_transitions(&self) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
     {
         let issues = self.storage.list_issues()?;
-        let resolved = crate::domain::queries::build_issue_map(&issues);
-        let backlog_issues: Vec<_> = issues
+        crate::domain::queries::issues_becoming_ready(&issues)
             .iter()
-            .filter(|issue| issue.should_auto_transition_to_ready(&resolved))
-            .map(|i| i.id.clone())
-            .collect();
-
-        for issue_id in backlog_issues {
-            self.auto_transition_to_ready(&issue_id)?;
-        }
-
-        Ok(())
+            .try_for_each(|issue_id| self.auto_transition_to_ready(issue_id).map(|_| ()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
+    use crate::domain::EventBody;
     use crate::domain::State;
     use crate::storage::{InMemoryStorage, MutationPoint};
     use std::collections::HashMap;
@@ -943,27 +914,24 @@ mod tests {
         }
     }
 
-    fn setup() -> CommandExecutor<InMemoryStorage> {
-        setup_over(InMemoryStorage::new())
-    }
-
-    fn setup_over(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
-        // Enforcement off, plus the type vocabulary these tests assert on: an
-        // explicit `--type` is accepted or rejected against what this
-        // configuration declares.
-        let config_toml = format!(
+    /// Enforcement off, plus the type vocabulary these tests assert on: an
+    /// explicit `--type` is accepted or rejected against what this
+    /// configuration declares.
+    fn scenario_config() -> String {
+        format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             crate::test_taxonomy::test_taxonomy().config_fragment()
-        );
-        storage.add_data_file("config.toml", &config_toml);
+        )
+    }
 
+    fn seed_scenario_gates(storage: &InMemoryStorage) {
         let mut registry = storage.load_gate_registry().unwrap();
-        for key in ["tests", "code-review"] {
+        for key in ["tests", "code-review"].map(|key| key.parse::<GateKey>().unwrap()) {
             registry.gates.insert(
-                key.to_string(),
+                key.clone(),
                 GateDefinition {
                     version: 1,
-                    key: key.to_string(),
+                    key: key.clone(),
                     title: key.to_string(),
                     description: String::new(),
                     stage: GateStage::Postcheck,
@@ -975,16 +943,23 @@ mod tests {
                 },
             );
         }
-        crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
-
-        crate::commands::test_helpers::memory_executor(storage)
+        crate::commands::test_helpers::seed_gate_registry(storage, &registry);
     }
 
     #[test]
     fn test_claim_next_without_ready_issue_returns_typed_not_found_error() {
-        let error = setup()
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let error = executor
             .issues()
-            .claim_next("agent:test".to_string(), None)
+            .claim_next("agent:test".parse().unwrap(), None)
             .expect_err("an empty ready set must reject claim-next");
 
         assert!(
@@ -995,13 +970,86 @@ mod tests {
         );
     }
 
+    /// Seed one issue in `state` that depends on `dependencies`.
+    fn seed_in_state(
+        storage: &InMemoryStorage,
+        title: &str,
+        state: State,
+        dependencies: &[&IssueId],
+    ) -> IssueId {
+        let mut issue = crate::test_utils::fixture_issue(title.into(), String::new());
+        issue.state = state;
+        issue.dependencies = dependencies.iter().map(|id| (*id).clone()).collect();
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(storage, issue);
+        id
+    }
+
+    /// Progress counts done and rejected children apart and every non-terminal
+    /// child as open; children are the direct dependencies in short-id order.
+    #[test]
+    fn test_issue_progress_and_issue_children_over_children_in_mixed_states() {
+        let storage = InMemoryStorage::new();
+        let done = seed_in_state(&storage, "Done child", State::Done, &[]);
+        let wip = seed_in_state(&storage, "WIP child", State::InProgress, &[]);
+        let rejected = seed_in_state(&storage, "Rejected child", State::Rejected, &[]);
+        let ready = seed_in_state(&storage, "Ready child", State::Ready, &[]);
+        let epic = seed_in_state(
+            &storage,
+            "Epic",
+            State::Backlog,
+            &[&done, &wip, &rejected, &ready],
+        );
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        let progress = executor.issues().issue_progress(&epic).unwrap();
+        assert_eq!(progress.container.title, "Epic");
+        assert!(progress.dangling.is_empty());
+        let rollup = &progress.rollup;
+        assert_eq!(rollup.extras.total, 4);
+        assert_eq!(rollup.extras.done, 1);
+        assert_eq!(rollup.extras.rejected, 1);
+        assert_eq!(rollup.extras.open, 2);
+        assert_eq!(rollup.extras.percent, 25);
+        assert_eq!(rollup.items.len(), State::ALL.len());
+        let bucket = |s: State| rollup.items.iter().find(|c| c.state == s).unwrap().count;
+        assert_eq!(bucket(State::Done), 1);
+        assert_eq!(bucket(State::Gated), 0);
+
+        let children = executor.issues().issue_children(&epic).unwrap();
+        assert_eq!(children.items.len(), 4);
+        assert!(children.extras.dangling.is_empty());
+        let short_ids: Vec<&str> = children.items.iter().map(|c| c.short_id.as_str()).collect();
+        assert!(short_ids.is_sorted(), "children sorted by short id");
+    }
+
+    /// The status projection carries the issue's per-gate status and its
+    /// non-terminal dependencies as unmet.
+    #[test]
+    fn test_issue_status_response_projects_gates_and_unmet_dependencies() {
+        let storage = InMemoryStorage::new();
+        let dep = seed_in_state(&storage, "Upstream", State::Ready, &[]);
+        let mut child = crate::test_utils::fixture_issue("Gated child".into(), String::new());
+        child.dependencies = vec![dep.clone()];
+        child.gates_required = vec!["tests".parse().unwrap()];
+        crate::commands::test_helpers::seed_issue(&storage, child.clone());
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        let status = executor.issues().issue_status_response(child).unwrap();
+
+        assert_eq!(status.title, "Gated child");
+        assert_eq!(status.gates.len(), 1);
+        assert_eq!(status.gates[0].key, "tests".parse().unwrap());
+        assert_eq!(status.unmet_dependencies, [dep.short_id()]);
+    }
+
     fn seed_ready(
         executor: &CommandExecutor<InMemoryStorage>,
         title: &str,
         priority: Priority,
         label: &str,
-    ) -> String {
-        let mut issue = crate::domain::fixture_issue(title.into(), String::new());
+    ) -> IssueId {
+        let mut issue = crate::test_utils::fixture_issue(title.into(), String::new());
         issue.state = State::Ready;
         issue.priority = priority;
         issue.labels = vec![label.to_string()];
@@ -1012,14 +1060,25 @@ mod tests {
 
     #[test]
     fn test_claim_next_filter_excluding_top_priority_claims_best_matching_issue() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
         seed_ready(&executor, "Alpha", Priority::Critical, "type:task");
         let beta = seed_ready(&executor, "Beta", Priority::Low, "type:epic");
         let gamma = seed_ready(&executor, "Gamma", Priority::High, "type:epic");
 
         let (claimed, _) = executor
             .issues()
-            .claim_next("agent:w1".to_string(), Some("label:type:epic".to_string()))
+            .claim_next(
+                "agent:w1".parse().unwrap(),
+                Some("label:type:epic".to_string()),
+            )
             .unwrap();
 
         assert_eq!(claimed, gamma);
@@ -1029,12 +1088,23 @@ mod tests {
 
     #[test]
     fn test_claim_next_filter_matching_no_ready_issue_returns_not_found_and_claims_nothing() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
         let alpha = seed_ready(&executor, "Alpha", Priority::Critical, "type:task");
 
         let error = executor
             .issues()
-            .claim_next("agent:w1".to_string(), Some("label:type:epic".to_string()))
+            .claim_next(
+                "agent:w1".parse().unwrap(),
+                Some("label:type:epic".to_string()),
+            )
             .expect_err("a filter matching no ready issue must not claim");
 
         assert!(error
@@ -1050,12 +1120,20 @@ mod tests {
 
     #[test]
     fn test_claim_next_unparseable_filter_returns_invalid_argument_and_claims_nothing() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
         let alpha = seed_ready(&executor, "Alpha", Priority::Critical, "type:task");
 
         let error = executor
             .issues()
-            .claim_next("agent:w1".to_string(), Some("garbage %%%".to_string()))
+            .claim_next("agent:w1".parse().unwrap(), Some("garbage %%%".to_string()))
             .expect_err("a malformed filter must be rejected");
 
         assert!(error
@@ -1075,18 +1153,18 @@ mod tests {
         let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        let eligible = crate::domain::fixture_issue("Eligible backlog".into(), String::new());
+        let eligible = crate::test_utils::fixture_issue("Eligible backlog".into(), String::new());
         let eligible_id = eligible.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, eligible);
 
-        let mut blocker = crate::domain::fixture_issue("Open dependency".into(), String::new());
+        let mut blocker = crate::test_utils::fixture_issue("Open dependency".into(), String::new());
         blocker.state = State::InProgress;
         let blocker_id = blocker.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, blocker);
 
         let blocked_ids = (0..64)
             .map(|index| {
-                let mut blocked = crate::domain::fixture_issue(
+                let mut blocked = crate::test_utils::fixture_issue(
                     format!("Blocked dependent {index}"),
                     String::new(),
                 );
@@ -1125,15 +1203,23 @@ mod tests {
 
     #[test]
     fn test_claim_issue_enforces_prechecks() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         // Define a manual precheck gate (TDD reminder)
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "tdd-reminder".to_string(),
+            "tdd-reminder".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "tdd-reminder".to_string(),
+                key: "tdd-reminder".parse().unwrap(),
                 title: "TDD Reminder".to_string(),
                 description: "Write tests first".to_string(),
                 stage: GateStage::Precheck,
@@ -1147,18 +1233,19 @@ mod tests {
         crate::commands::test_helpers::seed_gate_registry(&executor.storage, &registry);
 
         // Create issue with precheck gate
-        let mut issue = crate::domain::fixture_issue("Test task".to_string(), "Test".to_string());
+        let mut issue =
+            crate::test_utils::fixture_issue("Test task".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
-            .add_gate(&issue_id, "tdd-reminder".to_string())
+            .add_gate(&issue_id, &"tdd-reminder".parse().unwrap())
             .unwrap();
 
         // Try to claim the issue - should fail because precheck hasn't passed
         let result = executor
             .issues()
-            .claim_issue(&issue_id, "agent:test".to_string());
+            .claim_issue(&issue_id, "agent:test".parse().unwrap());
 
         // Currently this test FAILS because claim_issue bypasses prechecks
         // After fix, claiming should fail with "Manual precheck 'tdd-reminder' has not been passed"
@@ -1183,15 +1270,23 @@ mod tests {
 
     #[test]
     fn test_claim_issue_succeeds_when_prechecks_pass() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         // Define a manual precheck gate
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "tdd-reminder".to_string(),
+            "tdd-reminder".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "tdd-reminder".to_string(),
+                key: "tdd-reminder".parse().unwrap(),
                 title: "TDD Reminder".to_string(),
                 description: "Write tests first".to_string(),
                 stage: GateStage::Precheck,
@@ -1205,20 +1300,21 @@ mod tests {
         crate::commands::test_helpers::seed_gate_registry(&executor.storage, &registry);
 
         // Create issue with precheck gate
-        let mut issue = crate::domain::fixture_issue("Test task".to_string(), "Test".to_string());
+        let mut issue =
+            crate::test_utils::fixture_issue("Test task".to_string(), "Test".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
-            .add_gate(&issue_id, "tdd-reminder".to_string())
+            .add_gate(&issue_id, &"tdd-reminder".parse().unwrap())
             .unwrap();
 
         // Pass the precheck manually
         executor
             .pass_gate(
                 &issue_id,
-                "tdd-reminder".to_string(),
-                Some("human:dev".to_string()),
+                &"tdd-reminder".parse().unwrap(),
+                Some("human:dev".parse().unwrap()),
                 false,
             )
             .unwrap();
@@ -1226,7 +1322,7 @@ mod tests {
         // Now claiming should succeed
         let result = executor
             .issues()
-            .claim_issue(&issue_id, "agent:test".to_string());
+            .claim_issue(&issue_id, "agent:test".parse().unwrap());
         assert!(
             result.is_ok(),
             "Claiming should succeed when precheck passes"
@@ -1245,13 +1341,22 @@ mod tests {
     /// promotion sequence container stewardship produces.
     #[test]
     fn test_claim_promotes_existing_same_assignee_assignment_once_unblocked() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let dependency = crate::domain::fixture_issue("Dependency".to_string(), "".to_string());
+        let dependency = crate::test_utils::fixture_issue("Dependency".to_string(), "".to_string());
         let dependency_id = dependency.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, dependency);
 
-        let mut dependent = crate::domain::fixture_issue("Dependent".to_string(), "".to_string());
+        let mut dependent =
+            crate::test_utils::fixture_issue("Dependent".to_string(), "".to_string());
         dependent.dependencies.push(dependency_id.clone());
         let dependent_id = dependent.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
@@ -1260,7 +1365,7 @@ mod tests {
         // (a full claim here would exit 4 on the blocked in_progress transition).
         executor
             .issues()
-            .assign_issue(&dependent_id, "agent:test".to_string())
+            .assign_issue(&dependent_id, "agent:test".parse().unwrap())
             .unwrap();
         let assigned = executor.storage.load_issue(&dependent_id).unwrap();
         assert_eq!(assigned.state, State::Backlog);
@@ -1292,7 +1397,7 @@ mod tests {
         // Claim as the SAME assignee: must proceed rather than erroring.
         let result = executor
             .issues()
-            .claim_issue(&dependent_id, "agent:test".to_string());
+            .claim_issue(&dependent_id, "agent:test".parse().unwrap());
         assert!(
             result.is_ok(),
             "same-assignee claim should promote the assignment, got: {:?}",
@@ -1314,21 +1419,29 @@ mod tests {
     /// holder succeeds (jit:30a3b5c1 error message polish).
     #[test]
     fn test_claim_rejects_different_assignee_when_already_assigned() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let mut issue = crate::domain::fixture_issue("Task".to_string(), "".to_string());
+        let mut issue = crate::test_utils::fixture_issue("Task".to_string(), "".to_string());
         issue.state = State::Ready;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         executor
             .issues()
-            .claim_issue(&issue_id, "agent:first".to_string())
+            .claim_issue(&issue_id, "agent:first".parse().unwrap())
             .unwrap();
 
         let result = executor
             .issues()
-            .claim_issue(&issue_id, "agent:second".to_string());
+            .claim_issue(&issue_id, "agent:second".parse().unwrap());
         assert!(
             result.is_err(),
             "claim by a different assignee must still be rejected"
@@ -1373,17 +1486,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#,
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
-        let mut issue = crate::domain::fixture_issue("Epic".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("Epic".to_string(), String::new());
         issue.state = State::Ready;
         issue.labels = vec!["type:epic".to_string()];
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         let error = executor
-            .publish_captured_claim(
-                IssueIdPrefix::parse(&issue_id).unwrap(),
-                "agent:test".parse().unwrap(),
-            )
+            .publish_captured_claim(&issue_id, "agent:test".parse().unwrap())
             .expect_err("the graph rule must block the claim");
         assert!(
             error
@@ -1406,8 +1516,16 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_captured_same_assignee_in_progress_reclaim_is_exact_noop() {
-        let executor = setup();
-        let mut issue = crate::domain::fixture_issue("Task".to_string(), String::new());
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let mut issue = crate::test_utils::fixture_issue("Task".to_string(), String::new());
         issue.state = State::InProgress;
         issue.assignee = Some("agent:test".parse().unwrap());
         let issue_id = issue.id.clone();
@@ -1417,7 +1535,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let outcome = executor
             .publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
-                issue_id: IssueIdPrefix::parse(&issue_id).unwrap(),
+                issue_id: issue_id.clone(),
                 assignee: "agent:test".parse().unwrap(),
             })
             .unwrap();
@@ -1432,10 +1550,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut registry = storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "manual-start".to_string(),
+            "manual-start".parse().unwrap(),
             GateDefinition {
                 version: 1,
-                key: "manual-start".to_string(),
+                key: "manual-start".parse().unwrap(),
                 title: "Manual start".to_string(),
                 description: String::new(),
                 stage: GateStage::Precheck,
@@ -1447,8 +1565,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             },
         );
         crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
-        let mut issue = crate::domain::fixture_issue("Race".to_string(), String::new());
-        issue.gates_required.push("manual-start".to_string());
+        let mut issue = crate::test_utils::fixture_issue("Race".to_string(), String::new());
+        issue.gates_required.push("manual-start".parse().unwrap());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue.clone());
         issue.state = State::Ready;
@@ -1460,10 +1578,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         let error = executor
-            .publish_captured_claim(
-                IssueIdPrefix::parse(&issue_id).unwrap(),
-                "agent:test".parse().unwrap(),
-            )
+            .publish_captured_claim(&issue_id, "agent:test".parse().unwrap())
             .expect_err("the newly required manual precheck must block the claim");
 
         assert!(error
@@ -1476,30 +1591,29 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
-    fn test_gated_postchecks_use_canonical_transition_target_after_short_id_race() {
-        let executor = setup();
-        let mut issue = crate::domain::fixture_issue("Target".to_string(), String::new());
-        issue.id = "abcd1111111111111111111111111111".to_string();
+    fn test_gated_postchecks_keep_resolved_target_after_a_new_issue_appears() {
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let mut issue = crate::test_utils::fixture_issue("Target".to_string(), String::new());
+        issue.id = crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_abcd_1111);
         issue.state = State::InProgress;
         crate::commands::test_helpers::seed_issue(&executor.storage, issue.clone());
 
         let outcome = executor
-            .publish_captured_state_transition(
-                IssueIdPrefix::parse("abcd").unwrap(),
-                State::Gated,
-                false,
-                false,
-                true,
-            )
+            .publish_captured_state_transition(&issue.id, State::Gated, false, false, true)
             .unwrap();
-        let mut collision = crate::domain::fixture_issue("Collision".to_string(), String::new());
-        collision.id = "abcd2222222222222222222222222222".to_string();
+        let mut collision =
+            crate::test_utils::fixture_issue("Collision".to_string(), String::new());
+        collision.id = crate::test_utils::issue_id(0x2222_2222_2222_2222_2222_2222_abcd_2222);
         crate::commands::test_helpers::seed_issue(&executor.storage, collision);
 
-        assert!(executor
-            .storage
-            .resolve_issue_id(&IssueIdPrefix::parse("abcd").unwrap())
-            .is_err());
         executor.run_postchecks(&outcome.target_id).unwrap();
         assert_eq!(outcome.target_id, issue.id);
         assert_eq!(
@@ -1510,18 +1624,28 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_rejected_state_bypasses_gates() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         // Create issue with gates
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         // Add gates that haven't been passed
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
         executor
-            .add_gate(&issue_id, "code-review".to_string())
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, &"code-review".parse().unwrap())
             .unwrap();
 
         // Transition to Rejected should succeed without passing gates
@@ -1540,16 +1664,24 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_rejected_state_bypasses_dependencies() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         // Create dependency
-        let mut dep = crate::domain::fixture_issue("Dependency".to_string(), "Dep".to_string());
+        let mut dep = crate::test_utils::fixture_issue("Dependency".to_string(), "Dep".to_string());
         dep.state = State::InProgress; // Not done
         let dep_id = dep.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, dep);
 
         // Create issue that depends on it
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         issue.dependencies.push(dep_id.clone());
         issue.state = State::Backlog; // Blocked
         let issue_id = issue.id.clone();
@@ -1571,14 +1703,24 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_done_state_still_enforces_gates() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         // Create issue with unpassed gates
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
 
         // Transition to Done should fail (gates not passed)
         let result = executor.issues().update_issue_state(&issue_id, State::Done);
@@ -1594,14 +1736,24 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_retry_done_on_gated_issue_is_event_log_noop() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         // Issue in progress with an unpassed gate.
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
 
         // First `--state done`: a genuine in_progress -> gated transition, which
         // should persist and emit exactly one state-change event.
@@ -1637,13 +1789,23 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     /// must be a no-op for the audit log and timestamp.
     #[test]
     fn test_update_issue_pure_done_retry_on_gated_is_noop() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
 
         // First done attempt: genuine transition to Gated.
         assert!(executor
@@ -1702,9 +1864,17 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_update_issue_content_format_tristate_set_keep_clear() {
         use crate::domain::ContentFormat;
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Body".to_string());
+        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Body".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
@@ -1792,13 +1962,24 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     /// logging a spurious `gated -> gated` state-change event.
     #[test]
     fn test_update_issue_field_edits_persist_when_done_blocked_on_gated() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let mut issue = crate::domain::fixture_issue("Old Title".to_string(), "Test".to_string());
+        let mut issue =
+            crate::test_utils::fixture_issue("Old Title".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
 
         // Move to Gated via a first blocked done attempt.
         assert!(executor
@@ -1849,10 +2030,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let logged = events
             .iter()
-            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == issue_id)
+            .find(|e| {
+                e.get_type() == "issue_updated"
+                    && e.issue_id().map(|id| id.as_str()) == Some(issue_id.as_str())
+            })
             .expect("a gate-blocked field edit must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "title"),
                 "issue_updated must record the changed field, got: {fields:?}"
             ),
@@ -1865,13 +2049,24 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     /// emit an event on a gate-blocked `--state done` retry.
     #[test]
     fn test_update_issue_idempotent_field_on_gated_retry_is_noop() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let mut issue = crate::domain::fixture_issue("Same Title".to_string(), "Test".to_string());
+        let mut issue =
+            crate::test_utils::fixture_issue("Same Title".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
 
         // First blocked done attempt: transition to Gated.
         assert!(executor
@@ -1923,22 +2118,30 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_assign_same_assignee_is_noop() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         executor
             .issues()
-            .assign_issue(&issue_id, "agent:a".to_string())
+            .assign_issue(&issue_id, "agent:a".parse().unwrap())
             .unwrap();
         let updated_after_assign = executor.storage.load_issue(&issue_id).unwrap().updated_at;
 
         // Re-assigning the same assignee is a no-op.
         executor
             .issues()
-            .assign_issue(&issue_id, "agent:a".to_string())
+            .assign_issue(&issue_id, "agent:a".parse().unwrap())
             .unwrap();
         assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().updated_at,
@@ -1949,9 +2152,17 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_unassign_already_unassigned_is_noop() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
@@ -1967,9 +2178,17 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_update_issue_with_no_changes_is_noop() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
@@ -2006,9 +2225,17 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_update_issue_description_logs_issue_updated_event() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let issue = crate::domain::fixture_issue("Test".to_string(), "old".to_string());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "old".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         let events_before = executor.storage.read_events().unwrap().len();
@@ -2039,10 +2266,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let logged = events
             .iter()
-            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == issue_id)
+            .find(|e| {
+                e.get_type() == "issue_updated"
+                    && e.issue_id().map(|id| id.as_str()) == Some(issue_id.as_str())
+            })
             .expect("description edit must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "description"),
                 "issue_updated must record the changed field, got: {fields:?}"
             ),
@@ -2052,11 +2282,19 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_confirm_deletion_allowed_refuses_when_not_allowed() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         let result = executor
             .issues()
-            .confirm_deletion_allowed("abc12345", false);
+            .confirm_deletion_allowed(&crate::test_utils::issue_id(0xabc1_2345), false);
 
         let err = result.expect_err("must refuse without confirmation");
         assert!(err.message().contains("JIT_ALLOW_DELETION=1"));
@@ -2065,19 +2303,35 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_confirm_deletion_allowed_ok_when_allowed() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         assert!(executor
             .issues()
-            .confirm_deletion_allowed("abc12345", true)
+            .confirm_deletion_allowed(&crate::test_utils::issue_id(0xabc1_2345), true)
             .is_ok());
     }
 
     #[test]
     fn test_delete_issue_logs_issue_deleted_event() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let issue = crate::domain::fixture_issue("Doomed".to_string(), "Test".to_string());
+        let issue = crate::test_utils::fixture_issue("Doomed".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         let events_before = executor.storage.read_events().unwrap().len();
@@ -2093,19 +2347,85 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let logged = events
             .iter()
-            .find(|e| e.get_type() == "issue_deleted" && e.get_issue_id() == issue_id)
+            .find(|e| {
+                e.get_type() == "issue_deleted"
+                    && e.issue_id().map(|id| id.as_str()) == Some(issue_id.as_str())
+            })
             .expect("deletion must log an issue_deleted event");
-        assert!(matches!(logged, Event::IssueDeleted { .. }));
+        assert!(matches!(logged.body(), EventBody::IssueDeleted { .. }));
+    }
+
+    #[test]
+    fn test_delete_issue_cascade_preserves_promotion_event_order() {
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let mut dependency = crate::test_utils::fixture_issue("Dependency".into(), String::new());
+        dependency.state = State::Ready;
+        let dependency_id = dependency.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, dependency);
+        let dependent_ids = [
+            crate::test_utils::issue_id(1),
+            crate::test_utils::issue_id(2),
+        ];
+        for id in dependent_ids.iter().rev() {
+            let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
+            dependent.id = id.clone();
+            dependent.state = State::Backlog;
+            dependent.dependencies = vec![dependency_id.clone()];
+            crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
+        }
+        let mut unrelated = crate::test_utils::fixture_issue("Unrelated".into(), String::new());
+        unrelated.state = State::Backlog;
+        crate::commands::test_helpers::seed_issue(&executor.storage, unrelated);
+        let events_before = executor.storage.read_events().unwrap().len();
+
+        executor.issues().delete_issue(&dependency_id).unwrap();
+
+        let events = executor.storage.read_events().unwrap();
+        let bodies = events[events_before..]
+            .iter()
+            .map(|event| event.body().clone())
+            .collect::<Vec<_>>();
+        let expected = std::iter::once(EventBody::draft_issue_deleted(dependency_id))
+            .chain(dependent_ids.iter().map(|id| {
+                EventBody::draft_issue_state_changed(id.clone(), State::Backlog, State::Ready)
+            }))
+            .chain(dependent_ids.iter().map(|id| {
+                EventBody::draft_issue_updated(
+                    id.clone(),
+                    "dependency-cascade-delete".into(),
+                    vec!["dependencies".into()],
+                )
+            }))
+            .collect::<Vec<_>>();
+        assert_eq!(bodies, expected);
     }
 
     #[test]
     fn test_delete_issue_cascade_auto_ready_commits_one_timestamp() {
-        let executor = setup();
-        let mut dependency = crate::domain::fixture_issue("Dependency".to_string(), String::new());
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let mut dependency =
+            crate::test_utils::fixture_issue("Dependency".to_string(), String::new());
         dependency.state = State::Ready;
         let dependency_id = dependency.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, dependency);
-        let mut dependent = crate::domain::fixture_issue("Dependent".to_string(), String::new());
+        let mut dependent =
+            crate::test_utils::fixture_issue("Dependent".to_string(), String::new());
         dependent.state = State::Backlog;
         dependent.dependencies = vec![dependency_id.clone()];
         let dependent_id = dependent.id.clone();
@@ -2134,7 +2454,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let mutation_events = events
             .iter()
             .filter(|event| {
-                event.get_issue_id() == dependency_id || event.get_issue_id() == dependent_id
+                event.issue_id().map(|id| id.as_str()) == Some(dependency_id.as_str())
+                    || event.issue_id().map(|id| id.as_str()) == Some(dependent_id.as_str())
             })
             .collect::<Vec<_>>();
         assert_eq!(mutation_events.len(), 3);
@@ -2158,11 +2479,12 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_delete_issue_missing_index_changes_nothing() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-        let issue = crate::domain::fixture_issue("Doomed".into(), String::new());
-        let issue_relative = format!("issues/{}.json", issue.id);
-        let issue_path = format!(".jit/{issue_relative}");
+        let issue = crate::test_utils::fixture_issue("Doomed".into(), String::new());
+        let record = crate::repository_state::VirtualPath::issue_record(&issue.id);
+        let issue_relative = record.relative().as_str();
+        let issue_path = record.repository_relative();
         let issue_bytes = serde_json::to_string_pretty(&issue).unwrap();
-        storage.add_data_file(&issue_relative, &issue_bytes);
+        storage.add_data_file(issue_relative, &issue_bytes);
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
         storage
             .repository_state()
@@ -2180,14 +2502,23 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_delete_issue_malformed_index_changes_nothing() {
-        let executor = setup();
-        let issue = crate::domain::fixture_issue("Doomed".into(), String::new());
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let issue = crate::test_utils::fixture_issue("Doomed".into(), String::new());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
             .storage
             .add_data_file("index.json", "not valid JSON");
-        let issue_path = format!(".jit/issues/{issue_id}.json");
+        let issue_path =
+            crate::repository_state::VirtualPath::issue_record(&issue_id).repository_relative();
         let issue_before = executor.storage.read_repo_file(&issue_path).unwrap();
 
         assert!(executor.issues().delete_issue(&issue_id).is_err());
@@ -2206,7 +2537,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_delete_issue_retries_when_lease_mode_changes_after_preflight() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-        let issue = crate::domain::fixture_issue("Doomed".into(), String::new());
+        let issue = crate::test_utils::fixture_issue("Doomed".into(), String::new());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
         let storage = crate::commands::test_helpers::with_open_race(
@@ -2237,14 +2568,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
-    fn test_delete_issue_rechecks_ambiguous_target_after_preflight() {
+    fn test_delete_issue_keeps_resolved_target_after_a_new_issue_appears() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-        let mut target = crate::domain::fixture_issue("Target".into(), String::new());
-        target.id = "22221111111111111111111111111111".to_string();
+        let mut target = crate::test_utils::fixture_issue("Target".into(), String::new());
+        target.id = crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_2222_1111);
         crate::commands::test_helpers::seed_issue(&storage, target.clone());
-        let mut collision = crate::domain::fixture_issue("Collision".into(), String::new());
-        collision.id = "22222222222222222222222222222222".to_string();
+        let mut collision = crate::test_utils::fixture_issue("Collision".into(), String::new());
+        collision.id = crate::test_utils::issue_id(0x2222_2222_2222_2222_2222_2222_2222_2222);
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
             2,
@@ -2252,17 +2583,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        let error = executor
-            .issues()
-            .delete_issue("2222")
-            .expect_err("recaptured prefix must become ambiguous");
+        executor.issues().delete_issue(&target.id).unwrap();
 
-        assert!(error
-            .downcast_ref::<crate::storage::AmbiguousIdError>()
-            .is_some());
-        assert!(executor.storage.load_issue(&target.id).is_ok());
+        assert!(executor.storage.load_issue(&target.id).is_err());
         assert!(executor.storage.load_issue(&collision.id).is_ok());
-        assert!(executor.storage.read_events().unwrap().is_empty());
+        assert_eq!(executor.storage.read_events().unwrap().len(), 1);
     }
 
     #[test]
@@ -2276,10 +2601,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let recovered = storage.without_mutation_interruptions();
         let layout = storage.repository_layout();
-        let dependency = crate::domain::fixture_issue("Dependency".to_string(), String::new());
+        let dependency = crate::test_utils::fixture_issue("Dependency".to_string(), String::new());
         let dependency_id = dependency.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, dependency);
-        let mut dependent = crate::domain::fixture_issue("Dependent".to_string(), String::new());
+        let mut dependent =
+            crate::test_utils::fixture_issue("Dependent".to_string(), String::new());
         dependent.state = State::Backlog;
         dependent.dependencies = vec![dependency_id.clone()];
         let dependent_id = dependent.id.clone();
@@ -2308,7 +2634,15 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_add_dependency_logs_issue_updated_event() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         let create = |title: &str| {
             executor
@@ -2339,10 +2673,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap()
             .into_iter()
             .skip(events_before)
-            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
+            .find(|e| {
+                e.get_type() == "issue_updated"
+                    && e.issue_id().map(|id| id.as_str()) == Some(a_id.as_str())
+            })
             .expect("dependency addition must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "issue_updated must record the dependencies edit, got: {fields:?}"
             ),
@@ -2352,7 +2689,15 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_remove_dependency_logs_issue_updated_event() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         let create = |title: &str| {
             executor
@@ -2385,10 +2730,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap()
             .into_iter()
             .skip(events_before)
-            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
+            .find(|e| {
+                e.get_type() == "issue_updated"
+                    && e.issue_id().map(|id| id.as_str()) == Some(a_id.as_str())
+            })
             .expect("dependency removal must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "issue_updated must record the dependencies edit, got: {fields:?}"
             ),
@@ -2400,12 +2748,20 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_remove_dependencies_logs_issue_updated_event() {
         // The CLI `jit dep rm` path goes through the plural `remove_dependencies`,
         // which must also event-log the edit.
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let a = crate::domain::fixture_issue("A".to_string(), "Test".to_string());
+        let a = crate::test_utils::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, a);
-        let b = crate::domain::fixture_issue("B".to_string(), "Test".to_string());
+        let b = crate::test_utils::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, b);
         executor.add_dependency(&a_id, &b_id).unwrap();
@@ -2421,10 +2777,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap()
             .into_iter()
             .skip(events_before)
-            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
+            .find(|e| {
+                e.get_type() == "issue_updated"
+                    && e.issue_id().map(|id| id.as_str()) == Some(a_id.as_str())
+            })
             .expect("CLI dependency removal must log an issue_updated event");
-        match logged {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match logged.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "issue_updated must record the dependencies edit, got: {fields:?}"
             ),
@@ -2436,13 +2795,21 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_remove_dependency_noop_does_not_save_or_log() {
         // Removing an edge that is not present must not persist (no `updated_at`
         // bump) and must not append an event, both for the single and bulk paths.
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let a = crate::domain::fixture_issue("A".to_string(), "Test".to_string());
+        let a = crate::test_utils::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, a);
         // B exists but A does NOT depend on it, so removing B from A is a no-op.
-        let b = crate::domain::fixture_issue("B".to_string(), "Test".to_string());
+        let b = crate::test_utils::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, b);
 
@@ -2473,12 +2840,20 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         // A depends on B. Deleting B must remove B's id from A's stored
         // `dependencies`, not just B's own file — otherwise A is left with a
         // dangling edge that corrupts the graph (jit:f847df3f).
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let a = crate::domain::fixture_issue("A".to_string(), "Test".to_string());
+        let a = crate::test_utils::fixture_issue("A".to_string(), "Test".to_string());
         let a_id = a.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, a);
-        let b = crate::domain::fixture_issue("B".to_string(), "Test".to_string());
+        let b = crate::test_utils::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, b);
         executor.add_dependency(&a_id, &b_id).unwrap();
@@ -2504,10 +2879,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let cascade_event = events
             .iter()
             .skip(events_before)
-            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
+            .find(|e| {
+                e.get_type() == "issue_updated"
+                    && e.issue_id().map(|id| id.as_str()) == Some(a_id.as_str())
+            })
             .expect("the cascade cleanup of A's dependencies must be event-logged");
-        match cascade_event {
-            Event::IssueUpdated { fields, .. } => assert!(
+        match cascade_event.body() {
+            EventBody::IssueUpdated { fields, .. } => assert!(
                 fields.iter().any(|f| f == "dependencies"),
                 "cascade event must record the dependencies edit, got: {fields:?}"
             ),
@@ -2516,16 +2894,30 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let delete_event = events
             .iter()
             .skip(events_before)
-            .find(|e| e.get_type() == "issue_deleted" && e.get_issue_id() == b_id)
+            .find(|e| {
+                e.get_type() == "issue_deleted"
+                    && e.issue_id().map(|id| id.as_str()) == Some(b_id.as_str())
+            })
             .expect("deleting B must still log its own issue_deleted event");
-        assert!(matches!(delete_event, Event::IssueDeleted { .. }));
+        assert!(matches!(
+            delete_event.body(),
+            EventBody::IssueDeleted { .. }
+        ));
     }
 
     #[test]
     fn test_delete_issue_then_validate_reports_no_dangling_dependency() {
         // After deleting a dependency through the executor, `jit validate`
         // must not report "depends on ... which does not exist" (jit:f847df3f).
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         let (a_id, _) = executor
             .issues()
@@ -2578,18 +2970,23 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         // must still remove the edge by matching A's raw stored id, even
         // though B can no longer be resolved through the repo index
         // (jit:f847df3f).
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let b_id = crate::domain::fixture_issue("B".to_string(), "Test".to_string()).id;
-        let mut a = crate::domain::fixture_issue("A".to_string(), "Test".to_string());
+        let b_id = crate::test_utils::fixture_issue("B".to_string(), "Test".to_string()).id;
+        let mut a = crate::test_utils::fixture_issue("A".to_string(), "Test".to_string());
         a.dependencies.push(b_id.clone());
         let a_id = a.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, a);
         assert!(
-            executor
-                .storage
-                .resolve_issue_id(&IssueIdPrefix::parse(&b_id).unwrap())
-                .is_err(),
+            executor.storage.load_issue(&b_id).is_err(),
             "the missing dependency must not resolve, matching the reported bug"
         );
 
@@ -2611,73 +3008,30 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
-    fn test_remove_dependencies_removes_dangling_edge_by_short_prefix() {
-        // Same as above but the CLI caller supplies a short prefix of the
-        // dangling id (as `jit dep rm` accepts for live ids); matching must
-        // work against the raw stored id, not via global resolution.
-        let executor = setup();
-
-        let b_id = crate::domain::fixture_issue("B".to_string(), "Test".to_string()).id;
-        let mut a = crate::domain::fixture_issue("A".to_string(), "Test".to_string());
-        a.dependencies.push(b_id.clone());
-        let a_id = a.id.clone();
-        crate::commands::test_helpers::seed_issue(&executor.storage, a);
-
-        let prefix = b_id[..8].to_string();
-        let result = executor
-            .remove_dependencies(&a_id, std::slice::from_ref(&prefix))
-            .unwrap();
-
-        assert_eq!(result.removed, vec![prefix]);
-        let issue = executor.storage.load_issue(&a_id).unwrap();
-        assert!(!issue.dependencies.contains(&b_id));
-    }
-
-    #[test]
-    fn test_remove_dependencies_ambiguous_prefix_errors_and_removes_nothing() {
-        // Two stored dependency ids share a normalized prefix. `jit dep rm`
-        // with that prefix must error (mirroring resolve_issue_id's ambiguity
-        // rejection) instead of silently removing whichever appears first, and
-        // neither edge is removed (jit:f847df3f review).
-        let executor = setup();
-
-        let mut a = crate::domain::fixture_issue("A".to_string(), "Test".to_string());
-        let dep1 = "abcd1234-0000-0000-0000-000000000001".to_string();
-        let dep2 = "abcd1234-0000-0000-0000-000000000002".to_string();
-        a.dependencies = vec![dep1.clone(), dep2.clone()];
-        let a_id = a.id.clone();
-        crate::commands::test_helpers::seed_issue(&executor.storage, a);
-
-        let prefix = "abcd1234".to_string();
-        let err = executor
-            .remove_dependencies(&a_id, std::slice::from_ref(&prefix))
-            .unwrap_err();
-        assert!(
-            err.to_string().to_lowercase().contains("ambiguous"),
-            "expected an ambiguity error, got: {err}"
-        );
-
-        let issue = executor.storage.load_issue(&a_id).unwrap();
-        assert!(
-            issue.dependencies.contains(&dep1) && issue.dependencies.contains(&dep2),
-            "an ambiguous dep rm must remove nothing"
-        );
-    }
-
-    #[test]
     fn test_get_dependencies_enriched_omits_dangling_id_from_resolved_list() {
         // `get_dependencies_enriched` itself only returns resolvable
         // dependencies (dangling ids are recovered downstream by
         // `IssueShowResponse::from_issue`, see its doc comment and tests in
         // `output.rs`). This pins that contract so the two stay in sync.
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
-        let dep = crate::domain::fixture_issue("Dep".to_string(), "Test".to_string());
+        let dep = crate::test_utils::fixture_issue("Dep".to_string(), "Test".to_string());
         let dep_id = dep.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, dep);
 
-        let mut issue = crate::domain::fixture_issue("Parent".to_string(), "Test".to_string());
-        issue.dependencies = vec![dep_id.clone(), "missing-id".to_string()];
+        let mut issue = crate::test_utils::fixture_issue("Parent".to_string(), "Test".to_string());
+        issue.dependencies = vec![
+            dep_id.clone(),
+            crate::test_utils::issue_id(0x7b54_5f2b_8415_68e1_de5a_3bf9_592c_59ad),
+        ];
 
         let resolved = executor.issues().get_dependencies_enriched(&issue);
         assert_eq!(resolved.len(), 1, "only the resolvable dep must appear");
@@ -2691,7 +3045,15 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     /// kind, the SAME validation layer the write path uses.
     #[test]
     fn test_create_explicit_declared_type_accepted_via_rule_engine() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
         // The kind the fixture repository declares at the leaf level, read from
         // the declaration it was configured from.
         let declared = crate::test_taxonomy::test_taxonomy()
@@ -2727,7 +3089,15 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     /// nothing — NOT via a parallel config containment check.
     #[test]
     fn test_create_explicit_undeclared_type_rejected_via_rule_engine() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
         let before = executor.storage.list_issues().unwrap().len();
         let err = executor
             .issues()
@@ -2758,11 +3128,19 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     /// and leaves exactly one canonical `type:` label.
     #[test]
     fn test_update_explicit_declared_type_accepted_via_rule_engine() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
         let declared = crate::test_taxonomy::test_taxonomy()
             .type_at_level(3)
             .to_string();
-        let issue = crate::domain::fixture_issue("T".to_string(), String::new());
+        let issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
@@ -2799,8 +3177,16 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     /// rule engine (mirroring create), as a `ValidationFailedError`.
     #[test]
     fn test_update_explicit_undeclared_type_rejected_via_rule_engine() {
-        let executor = setup();
-        let issue = crate::domain::fixture_issue("T".to_string(), String::new());
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
@@ -2828,16 +3214,24 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_manual_transition_to_ready_state_actually_changes_state() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
 
         // Create dependency issue that is Done
-        let mut dep = crate::domain::fixture_issue("Dependency".to_string(), "Dep".to_string());
+        let mut dep = crate::test_utils::fixture_issue("Dependency".to_string(), "Dep".to_string());
         dep.state = State::Done;
         let dep_id = dep.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, dep);
 
         // Create issue in Backlog that depends on the Done dependency
-        let mut issue = crate::domain::fixture_issue("Test".to_string(), "Test".to_string());
+        let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         issue.state = State::Backlog;
         issue.dependencies.push(dep_id.clone());
         let issue_id = issue.id.clone();
@@ -2872,19 +3266,19 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
     }
 
-    fn seed_fixture_issue(executor: &CommandExecutor<InMemoryStorage>, issue: Issue) -> String {
+    fn seed_fixture_issue(executor: &CommandExecutor<InMemoryStorage>, issue: Issue) -> IssueId {
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         id
     }
 
-    fn issue_event_types(executor: &CommandExecutor<InMemoryStorage>, id: &str) -> Vec<String> {
+    fn issue_event_types(executor: &CommandExecutor<InMemoryStorage>, id: &IssueId) -> Vec<String> {
         let mut types = executor
             .storage
             .read_events()
             .unwrap()
             .iter()
-            .filter(|event| event.get_issue_id() == id)
+            .filter(|event| event.issue_id() == Some(id))
             .map(|event| event.get_type().to_string())
             .collect::<Vec<_>>();
         types.sort();
@@ -2893,9 +3287,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     fn combined_update(
         executor: &CommandExecutor<InMemoryStorage>,
-        id: &str,
+        id: &IssueId,
         local: IssueLocalUpdate,
-    ) -> Result<(String, Vec<String>)> {
+    ) -> Result<(IssueId, Vec<String>)> {
         executor.issues().update_issue_resolved(
             id,
             None,
@@ -2914,11 +3308,18 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_update_issue_resolved_publishes_gate_assignee_and_field_changes_in_one_session() {
         let counter = Arc::new(SessionOpenCounter(AtomicUsize::new(0)));
-        let executor =
-            setup_over(InMemoryStorage::new().with_mutation_interruption_view(counter.clone()));
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
         let id = seed_fixture_issue(
             &executor,
-            crate::domain::fixture_issue("Combined".into(), String::new()),
+            crate::test_utils::fixture_issue("Combined".into(), String::new()),
         );
         let opened = counter.0.load(Ordering::SeqCst);
 
@@ -2926,8 +3327,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             &executor,
             &id,
             IssueLocalUpdate {
-                add_gates: vec!["tests".into()],
-                assignee: Some("agent:w1".into()),
+                add_gates: vec!["tests".parse().unwrap()],
+                assignee: Some("agent:w1".parse().unwrap()),
                 ..Default::default()
             },
         )
@@ -2935,7 +3336,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         assert_eq!(counter.0.load(Ordering::SeqCst) - opened, 1);
         let issue = executor.storage.load_issue(&id).unwrap();
-        assert!(issue.gates_required.contains(&"tests".to_string()));
+        assert!(issue.gates_required.contains(&"tests".parse().unwrap()));
         assert_eq!(
             issue.assignee.map(|a| a.to_string()),
             Some("agent:w1".into())
@@ -2946,9 +3347,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_update_issue_resolved_combined_update_matches_separate_steps() {
         let assign = IssueLocalUpdate {
-            add_gates: vec!["tests".into()],
-            remove_gates: vec!["code-review".into()],
-            assignee: Some("agent:w1".into()),
+            add_gates: vec!["tests".parse().unwrap()],
+            remove_gates: vec!["code-review".parse().unwrap()],
+            assignee: Some("agent:w1".parse().unwrap()),
             unassign: false,
         };
         let unassign = IssueLocalUpdate {
@@ -2957,12 +3358,20 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             ..assign.clone()
         };
         for local in [assign, unassign] {
-            let executor = setup();
-            let mut template = crate::domain::fixture_issue("Twin".into(), String::new());
-            template.gates_required = vec!["code-review".into()];
+            let storage = InMemoryStorage::new();
+            seed_scenario_gates(&storage);
+            let executor = memory_executor_declaring(
+                storage,
+                MemoryDeclarations {
+                    config: Some(&scenario_config()),
+                    ..MemoryDeclarations::default()
+                },
+            );
+            let mut template = crate::test_utils::fixture_issue("Twin".into(), String::new());
+            template.gates_required = vec!["code-review".parse().unwrap()];
             template.assignee = Some("agent:prior".parse().unwrap());
             let separate = seed_fixture_issue(&executor, template.clone());
-            template.id = uuid::Uuid::new_v4().to_string();
+            template.id = crate::test_utils::fixture_issue(String::new(), String::new()).id;
             let combined = seed_fixture_issue(&executor, template);
 
             executor.add_gates(&separate, &local.add_gates).unwrap();
@@ -2994,7 +3403,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 .unwrap();
             combined_update(&executor, &combined, local).unwrap();
 
-            let observable = |id: &str| {
+            let observable = |id: &IssueId| {
                 let issue = executor.storage.load_issue(id).unwrap();
                 let gates = issue
                     .gates_status
@@ -3021,11 +3430,18 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_reject_issue_with_reason_publishes_in_one_session() {
         let counter = Arc::new(SessionOpenCounter(AtomicUsize::new(0)));
-        let executor =
-            setup_over(InMemoryStorage::new().with_mutation_interruption_view(counter.clone()));
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
         let id = seed_fixture_issue(
             &executor,
-            crate::domain::fixture_issue("Reject".into(), String::new()),
+            crate::test_utils::fixture_issue("Reject".into(), String::new()),
         );
         let opened = counter.0.load(Ordering::SeqCst);
 
@@ -3039,10 +3455,18 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_reject_issue_with_reason_records_state_events_and_resolution_label() {
-        let executor = setup();
-        let template = crate::domain::fixture_issue("Reject".into(), String::new());
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let template = crate::test_utils::fixture_issue("Reject".into(), String::new());
         let mut twin = template.clone();
-        twin.id = uuid::Uuid::new_v4().to_string();
+        twin.id = crate::test_utils::fixture_issue(String::new(), String::new()).id;
         let with_reason = seed_fixture_issue(&executor, template);
         let state_only = seed_fixture_issue(&executor, twin);
 
@@ -3072,8 +3496,15 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         ))));
         let storage = InMemoryStorage::with_mutation_interruptions(failures);
         let recovered = storage.without_mutation_interruptions();
-        let executor = setup_over(storage);
-        let issue = crate::domain::fixture_issue("Reject".into(), String::new());
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let issue = crate::test_utils::fixture_issue("Reject".into(), String::new());
         let prior = issue.state;
         let id = seed_fixture_issue(&executor, issue);
         let events_before = recovered.read_events().unwrap().len();
@@ -3095,10 +3526,17 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_reject_issue_recaptures_after_concurrent_issue_change() {
         let storage = InMemoryStorage::new();
-        let executor = setup_over(storage.clone());
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
         let id = seed_fixture_issue(
             &executor,
-            crate::domain::fixture_issue("Reject race".into(), String::new()),
+            crate::test_utils::fixture_issue("Reject race".into(), String::new()),
         );
         let mut concurrent = storage.load_issue(&id).unwrap();
         concurrent.labels.push("owner:concurrent".to_string());
@@ -3118,10 +3556,18 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
     #[test]
     fn test_reject_issue_appends_resolution_label_unchecked() {
-        let executor = setup();
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
         let id = seed_fixture_issue(
             &executor,
-            crate::domain::fixture_issue("Reject twice".into(), String::new()),
+            crate::test_utils::fixture_issue("Reject twice".into(), String::new()),
         );
 
         executor.issues().reject_issue(&id, Some("done")).unwrap();

@@ -5,36 +5,51 @@
 
 ## Outcome and criterion approach
 
-Every preview and read runs the mutation session of the operation it describes and never publishes (`read-only-session`, `@/charter/D-20`). Every mutation derives its coupled state, readiness, field events and lease checks inside its own plan and publishes one redo record (`@/charter/D-17`). Each duplicated loader, primitive or rule converges on one form (`@/charter/D-18`). Each issue body is written against the code as it stands after the entries and external tasks it follows, and cites current lines.
+Every preview and read runs the capture and derivation of the operation it describes, never publishes, and captures without the repository lock behind one admission check (`read-session-driver`, `@/charter/D-20`, `@/charter/D-22`); every redo record appends an event (`event-append-invariant`). Every mutation derives its coupled state, readiness, field events and lease checks inside its own plan and publishes one redo record (`@/charter/D-17`). Each duplicated loader, primitive or rule converges on one form (`@/charter/D-18`). Each issue body is written against the code as it stands after the entries and external tasks it follows, and cites current lines.
 
 | Criterion | Approach | Evidence / open gap |
 |---|---|---|
-| REQ-01 | `readiness-derivation` adds the pure derivation (`readiness-corrections`). `readiness-correction-intents` gives the graph edits one helper. `readiness-in-update-plans` and `readiness-in-auto-done-plan` put the corrections in the field, lifecycle and automatic-Done plans. `validate-fix-readiness-convergence` moves the one-mutation `--fix` onto the helper (DEC-05, DEC-10). | Investigation, session §1 C1–C3, G1–G3, §5 REQ-01/02 |
-| REQ-02 | Corrections ride in the primary plan, and `readiness-follow-up-removal` deletes the post-commit publishers. | Session §1 REQ-02 |
-| REQ-03 | `state-derivation-convergence` builds one state derivation with prechecks (DEC-11). `bulk-field-events-converge` and `dedicated-field-commands-through-update` give one field derivation, owned by a property test over the three paths. | Session §4 field divergences, G4 |
-| REQ-04 | `lease-required-error` defines the message once. `lease-check-in-session` and `template-lease-in-session` move the checks into the publishing session under the claims-first lock order. They keep the lifecycle's preliminary refusal, and a strict unleased automated pass is refused before its checker runs. `lease-check-coverage` extends the checked set to bulk and `dep add`/`dep rm` (`lease-checked-writes`, DEC-04, DEC-08). | Session C5, C6, G5, G6; review A1, A2 |
-| REQ-05 | `bulk-preview-removal` deletes the uncalled preview (DEC-06). `bulk-apply-one-session` folds the apply derivation over one session and one record. | Session C7, C7f, §5 REQ-05 B2 |
-| REQ-06 | `archive-preview-through-execute-planner` runs the execute planner read-only and owns the preview-equals-execute test. `archive-candidates-one-session` plans every candidate on one growing image after `image-identity-token` (DEC-12). `citation-scan-module`, `archive-discovery-tests-to-domain` and `archive-storage-planners-removal` remove the storage-only planners. | Archive §1 C1–C3, §5.1–5.2 |
-| REQ-07 | `container-marker-constant` declares the marker once. `container-destination-evidence-once` extracts the one evidence request. | Archive C4, C5 |
+| REQ-01 | `readiness-derivation` adds the pure derivation (`readiness-corrections`) and the graph-edit intents (`readiness-correction-intents`). `readiness-in-mutation-plans` puts the corrections in the field, lifecycle, automatic-Done and creation plans. `validate-fix-readiness-convergence` moves the one-mutation `--fix` onto the intents (DEC-05, DEC-10). | Investigation, session §1 C1–C3, G1–G3, §5 REQ-01/02 |
+| REQ-02 | Corrections ride in the primary plan, and `readiness-in-mutation-plans` deletes the post-commit publishers. | Session §1 REQ-02 |
+| REQ-03 | `state-derivation-convergence` builds one state derivation with prechecks (DEC-11). `field-derivation-convergence` gives one field derivation, owned by a property test over the three paths. | Session §4 field divergences, G4 |
+| REQ-04 | `lease-check-in-session` defines the missing-lease error once (`lease-required-error`) and moves every existing check, template application included, into the publishing session under the claims-first lock order, keeping the lifecycle's preliminary refusal and refusing a strict unleased automated pass before its checker runs. `lease-check-coverage` extends the checked set to bulk and `dep add`/`dep rm` (`lease-checked-writes`, DEC-04, DEC-08). | Session C5, C6, G5, G6 |
+| REQ-05 | `bulk-apply-one-session` deletes the uncalled preview (DEC-06) and folds the apply derivation over one session and one record. | Session C7, C7f, §5 REQ-05 B2 |
+| REQ-06 | `archive-preview-through-execute-planner` moves the citation scan and inspector out of the planning module, runs the execute planner through `read-session-driver`, owns the preview-equals-execute test and deletes the storage-only planners. `archive-candidates-one-session` plans every candidate on one growing image (DEC-12, DEC-22). | Archive §1 C1–C3, §5.1–5.2 |
+| REQ-07 | `container-destination-once` declares the marker once and extracts the one evidence request. | Archive C4, C5 |
 | REQ-08 | `archive-reference-resolution-once` | Archive C6 |
-| REQ-09 | `configuration-assembler` adds the public assembler (DEC-15). `configuration-assembler-adoption` moves disk loading and image capture onto it. `configuration-assembly-callers` moves the remaining assemblies, including `config set` validation. `configuration-declarations-mirror-removal` deletes the mirror fields. | Configuration C2, C3, §5 REQ-09 A |
-| REQ-10 | `declaration-capture-helper` gives reads a public captured bundle. `frontend-reads-captured-declarations` adds the session-capable server bound and moves the CLI and server reads. `command-reads-captured-declarations` moves the command reads (1f24e3e9 removes the hierarchy fix pass), and `effective-rules-tests-onto-declarations` moves the tests. `executor-config-caches-removal` migrates the last cached read (`container_anchor`) and deletes the caches, and then `config-manager-disk-readers-removal` deletes the disk readers. `mutation-base-carries-declarations` and `derivations-use-base-declarations` parse once per captured image (DEC-07). | Configuration C1, C4, C5 |
-| REQ-11 | `gate-preset-catalog` adds the public catalog. `gate-preset-catalog-adoption` moves preset apply and template apply onto it. `gate-preset-reads-captured` moves list and show, and `gate-preset-manager-removal` deletes the storage preset I/O. | Configuration C6 |
-| REQ-12 | `gate-evidence-capture`, `gate-evaluation-resolves-once` (DEC-07) | Configuration C7–C9 |
+| REQ-09 | `configuration-assembly` adds the public assembler (DEC-15), moves disk loading, image capture and the remaining assemblies onto it, and deletes the mirror fields. | Configuration C2, C3, §5 REQ-09 A |
+| REQ-10 | `captured-declaration-reads` gives reads a captured bundle through `read-session-driver` and moves the CLI, server and command reads (1f24e3e9 removes the hierarchy fix pass). `executor-config-caches-removal` moves the remaining tests and reads, deletes the caches, the ConfigManager disk readers and `JitConfig::load`. `declarations-on-mutation-base` parses once per captured image (DEC-07). | Configuration C1, C4, C5 |
+| REQ-11 | `gate-preset-catalog` adds the public catalog, moves apply, template apply, list and show onto it, and deletes the storage preset I/O. | Configuration C6 |
+| REQ-12 | `gate-evidence-capture` (DEC-07) | Configuration C7–C9 |
 | REQ-13 | `image-identity-token` (`image-identity`) | Configuration C10–C12, §5 REQ-13 A |
-| REQ-14 | `redo-parent-handles-once` | Storage C1, C2 |
-| REQ-15 | `redo-subset-crash-proof` proves replay from any subset of persisted operations under `redo-crash-model`. `redo-directory-sync-coalescing` coalesces syncs only if that proof passes, and otherwise documents why per-operation syncs stay (DEC-18). | Storage C3, §4 |
-| REQ-16 | `capability-fs-module` moves the primitives behind `capability-fs-bridge`. `capability-fs-importers` repoints importers and removes the bridge. `capability-fs-error` gives the module its own error type, which ends the import cycle. Then `leaf-open-once`, `profile-reads-through-storage` (DEC-19) and `record-commit-through-capabilities`. | Storage C4–C7 |
-| REQ-17 | `atomic-publication-core` (`atomic-publication`) adds the core with the redo put as first caller. `export-and-user-config-publication` moves the export and user-config writers and deletes the duplicate counters and writers. `lease-records-publish-through-core` covers the lease records and claims sequence that replace the claims index (DEC-07, DEC-21). `control-files-publish-through-core` lands last and owns the assertion that no other stage-and-rename remains. | Storage C8–C10, §5 D3–D4 |
-| REQ-18 | `layout-violation-domain-type` and `classifier-evidence-helper` cover the classifier. The `RootRelativePath` move is six leaves: `root-relative-path-parse-error`, then `root-relative-path-in-domain` with `root-relative-path-bridge`, the three importer families, and `root-relative-path-bridge-removal`, which owns the domain-purity assertion (DEC-13). `domain-typed-errors` completes the set. | Archive C7–C10; storage REQ-18 row |
-| REQ-19 | `declaration-file-set` names the declaration set from the layout (DEC-14). `snapshot-from-one-image` writes stored bytes from one image. `one-form-docs` states the contents. | Archive C11, C12, §5.4 |
-| REQ-20 | One or more entries per sub-item, each crediting REQ-20 and naming its sub-item in the outcome. Process liveness: `process-liveness-primitive`, `pid-guard-signal-sites` (DEC-20). Declaration modules: `declaration-loaders-removal`, `configuration-store`, `configuration-store-callers`, `configuration-load-tests-to-store`, `config-load-function-removal`. Safe paths: the two `safe-path-validator-*` entries. Scopes: `issue-scope-type`, `check-links-through-issue-scope`, `snapshot-scope-to-issue-scope`. Status summary: `status-summary-beside-queries` (DEC-17). Type extraction: `type-extraction-exact-values` (DEC-16). Edit distance: `edit-distance-in-domain`, `edit-distance-once`. Claims coordinator: `claim-coordinator-opening`. Issue loading: `issue-lookup-one-path`. No-follow reads: `nofollow-store-reads`. Ancestor walking: `ancestor-walker-once`, `present-or-create-helper`. Write-if-changed: `write-if-changed-constructor`, `write-if-changed-adoption`. Creation stamping: `creation-stamping-one-derivation`, `creation-initial-readiness`. Initialization errors: `initialization-errors-typed`. Archive destination: `archive-destination-no-legacy-fallback`, with its docs in `one-form-docs`. | Investigation part sweeps for each sub-item |
+| REQ-14 | `redo-apply-parents-once` | Storage C1, C2 |
+| REQ-15 | `redo-apply-parents-once` first proves replay from any subset of persisted operations under `redo-crash-model`, then coalesces syncs only if that proof passes, and otherwise documents why per-operation syncs stay (DEC-18). | Storage C3, §4 |
+| REQ-16 | `capability-fs-module` moves the primitives into their own module, repoints every importer and gives the module its own error type, which ends the import cycle. Then `leaf-open-once` (with DEC-19's profile reads and the exact-store read) and `record-commit-through-capabilities`. | Storage C4–C7 |
+| REQ-17 | `atomic-publication-core` (`atomic-publication`) adds the core with the redo put as first caller and moves the export writers. `control-files-publication` adds the path entry for `.git/jit` control files and moves the lease records and claims sequence onto it, publishes the data-root worktree identity and PID file through an entry that accepts only those two files, and owns the assertion that no other stage-and-rename remains (DEC-07, DEC-21). | Storage C8–C10, §5 D3–D4 |
+| REQ-18 | `domain-typed-errors` gives the classifier its layout-violation type and one missing-evidence helper and types every domain error. `root-relative-path-in-domain` moves `RootRelativePath` into the domain, repoints every importer and owns the domain-purity assertion (DEC-13). | Archive C7–C10; storage REQ-18 row |
+| REQ-19 | `snapshot-from-one-image` names the declaration set from the layout (DEC-14), writes stored bytes from one image and documents the contents. | Archive C11, C12, §5.4 |
+| REQ-20 | The kept sub-items, grouped by module: process liveness (`process-liveness-primitive`, DEC-20); declaration modules (`configuration-store`, with `executor-config-caches-removal` deleting the last loader); safe paths (`one-safe-path-validator`); scopes (`issue-scope-type`); type extraction (`type-extraction-exact-values`, DEC-16); no-follow reads (`leaf-open-once`); archive destination (`archive-destination-no-legacy-fallback`). The rest are dropped (DEC-26). | Investigation part sweeps for each sub-item |
+| REQ-21 | `read-session` adds the capture-only interface (`read-session`), the lock-free session with its admission on both backends (`optimistic-read-admission`) and `with_read_session` with the locked fallback, the recovery-failed error and the eight-reader barrier test (`read-session-driver`). `lock-free-read-consumers` moves validate, check-links and the profile previews (DEC-24) and states the read discipline in the storage-format reference; the archive, declaration and gate-preset tasks follow it, read through the driver and add their commands to that reference. `read-concurrency-benchmark` records the throughput ratios (DEC-25). | [Read concurrency](investigation-read-concurrency.md) §1–§6 |
+| REQ-22 | `cost-evidence` builds the harness, measures the four claims on base `369d35a42` and on the tip after the four reductions land, and records the verdict (DEC-25). | Read concurrency §6; session C7b; archive C3; configuration C5; storage C1 |
+| REQ-23 | `event-per-commit` gives plan construction its mutation context, adds the generic event and the plan's publication (`event-append-invariant`), and refuses a record over a present data root without an append on both backends; the publication that creates an absent data root is exempt (DEC-23). | Read concurrency §2 |
 
 ## Shared architectural contracts
 
-### `read-only-session` [plan-fixed] — Previews and reads use the mutation session
+### `read-session` [implementation-produced] — Capture-only session interface
 
-A preview, candidate listing, snapshot read or declaration read opens the operation's own mutation session through `with_mutation_session`, captures and derives exactly as the operation does, and returns `SessionStep::Done` without applying a plan. It holds the repository write lock and completes a leftover redo record at open, as `jit validate` does today. No separate read-session type exists (DEC-09).
+`RepositoryReadSession` declares `layout`, `capture` and `extend`, and `RepositoryMutationSession` extends it with `recovery_report` and `apply`. Shared capture helpers and every preview's capture-and-derive function take `&mut dyn RepositoryReadSession`, so an operation and its preview run one function (`@/charter/D-20`). Producer: `read-session`.
+
+### `optimistic-read-admission` [implementation-produced] — Lock-free capture admission
+
+`RepositoryStateStore::open_read_session` takes no lock. Open probes the redo record by name and then reads the event-log tail; `admit` revalidates the roots, probes the record, then reads the tail. An attempt is admitted only when no record was present at either probe, the tail is unchanged, the data root's presence is unchanged and neither root was replaced; otherwise it is `Busy` (a record) or `Moved`. Both backends run one admission helper and one contract suite. Producer: `read-session`.
+
+### `read-session-driver` [implementation-produced] — One read driver
+
+`with_read_session` runs a read closure in up to four admitted lock-free attempts with jittered backoff, surfaces the closure's value or error only after admission, and then runs the same closure once through `with_mutation_session`, which completes a leftover redo record. A leftover record the locked attempt cannot apply fails the read with `RecoveryFailedError`, classified `recovery_failed`. Every lock-free read in REQ-21 goes through it. Producer: `read-session`.
+
+### `event-append-invariant` [implementation-produced] — Every commit appends an event
+
+`MaterializationPlan::new` takes the operation's context. `delta()` stays the derived delta for reports and previews; `publication()` adds one `files_published` event naming the written paths when the delta writes over a present data root and carries no append. Sessions publish `publication()`, and storage refuses a record over a present root without an append. Producer: `event-per-commit`.
 
 ### `lease-checked-writes` [plan-fixed] — Which writes check leases
 
@@ -50,11 +65,11 @@ File data is durable after `sync_all`. A directory entry is durable after its di
 
 ### `readiness-correction-intents` [implementation-produced] — Readiness intents in a plan
 
-One command helper turns the corrections into plan intents. Promotion passes graph rules through `derive_state_transition` and records a blocked transition as today. Demotion is direct (DEC-10). Producer: `readiness-correction-intents`.
+One command helper turns the corrections into plan intents. Promotion passes graph rules through `derive_state_transition` and records a blocked transition as today. Demotion is direct (DEC-10). Producer: `readiness-derivation`.
 
 ### `lease-required-error` [implementation-produced] — Missing-lease error
 
-`LeaseRequiredError { issue_id }` in `errors.rs` carries the only definition of the missing-lease message. Strict mode returns it, and warn mode renders its `Display`. Producer: `lease-required-error`.
+`LeaseRequiredError { issue_id }` in `errors.rs` carries the only definition of the missing-lease message. Strict mode returns it, and warn mode renders its `Display`. Producer: `lease-check-in-session`.
 
 ### `archive-planner-session` [implementation-produced] — Generic archive planner
 
@@ -62,23 +77,23 @@ The archive execute planner runs over any `IssueStore + RepositoryStateStore`, a
 
 ### `declaration-file-set` [implementation-produced] — Declaration files from the layout
 
-One repository-layout function names the declaration files and declaration directories the layout defines, including the gate-presets directory. Base capture and snapshot read through it. Producer: `declaration-file-set`.
+One repository-layout function names the declaration files and declaration directories the layout defines, including the gate-presets directory. Base capture and snapshot read through it. Producer: `snapshot-from-one-image`.
 
 ### `configuration-assembler` [implementation-produced] — One configuration assembly
 
-A pure `declarations` function builds a `JitConfig` from optional config, template and invariant bytes. An absent config yields the empty config, and a malformed `[item_kinds]` is a structural error. Producer: `configuration-assembler`.
+A pure `declarations` function builds a `JitConfig` from optional config, template and invariant bytes. An absent config yields the empty config, and a malformed `[item_kinds]` is a structural error. Producer: `configuration-assembly`.
 
 ### `declaration-capture` [implementation-produced] — Captured declarations for reads
 
-An executor helper captures the declaration set read-only and returns the parsed declarations with namespaces and a fallible `hierarchy()`. Producer: `declaration-capture-helper`.
+An executor helper captures the declaration set read-only and returns the parsed declarations with namespaces and a fallible `hierarchy()`. Producer: `captured-declaration-reads`.
 
 ### `mutation-base-declarations` [implementation-produced] — Declarations on the mutation base
 
-The captured mutation base carries its declarations, parsed at most once per captured image on first use. Producer: `mutation-base-carries-declarations`.
+The captured mutation base carries its declarations, parsed at most once per captured image on first use. Producer: `declarations-on-mutation-base`.
 
 ### `gate-preset-catalog` [implementation-produced] — One preset catalog
 
-A pure catalog over built-in presets and captured preset bytes keyed by the gate-presets path, with listing and lookup. Producer: `gate-preset-catalog`.
+A pure catalog over the captured preset bytes keyed by the gate-presets path, with listing and lookup. Producer: `gate-preset-catalog`.
 
 ### `gate-evidence` [implementation-produced] — One gate evidence capture
 
@@ -90,11 +105,7 @@ One function captures gate evidence for evaluation and prechecks and enforces th
 
 ### `capability-fs` [implementation-produced] — No-follow primitive module
 
-`storage/capability_fs.rs` owns `CapabilityRoots`, the parent walks, the no-follow opens (including `inspect_capability_leaf`) and the repository-file readers. After `capability-fs-error` it has its own error type with conversions into the session and redo-apply errors, and redo apply imports nothing from the session. Producer: `capability-fs-module`.
-
-### `capability-fs-bridge` [implementation-produced] — Session-module re-export bridge
-
-A temporary re-export, in `storage/repository_state_store.rs`, of exactly the moved items other files name through that module. It is two `use` items: `pub(crate)` for `CapabilityRoots`, the three no-follow opens, the two repository-file readers and `capability_dir_identity`; and `pub(in crate::storage)` for `open_capability_parent`, `open_or_create_capability_parent` and `capability_metadata_identity`. Moved items keep the narrowest visibility their callers need, and helpers used only inside `capability_fs` stay private. `storage/mod.rs` declares `pub(crate) mod capability_fs`. Producer: `capability-fs-module`. Its one remover is `capability-fs-importers`, which repoints every importer and deletes the re-export. Removal criterion: `repository_state_store.rs` re-exports nothing from `capability_fs`.
+`storage/capability_fs.rs` owns `CapabilityRoots`, the parent walks, the no-follow opens (including `inspect_capability_leaf`) and the repository-file readers. After `capability-fs-module` it has its own error type with conversions into the session and redo-apply errors, and redo apply imports nothing from the session. Producer: `capability-fs-module`.
 
 ### `leaf-open` [implementation-produced] — One leaf open
 
@@ -102,19 +113,15 @@ One non-blocking, no-follow leaf open with an fstat recheck serves every storage
 
 ### `redo-subset-proof` [implementation-produced] — Subset-replay verdict
 
-The verdict on whether replaying a record after any subset of its operations persisted converges, on both backends, under `redo-crash-model`. If it converges, the verdict is a passing property test. If not, it is a deterministic test asserting that the recorded failing subset diverges. Either way, no failing or ignored test lands. Producer: `redo-subset-crash-proof`. The verdict decides `redo-directory-sync-coalescing`.
+The verdict on whether replaying a record after any subset of its operations persisted converges, on both backends, under `redo-crash-model`. If it converges, the verdict is a passing property test. If not, it is a deterministic test asserting that the recorded failing subset diverges. Either way, no failing or ignored test lands. Producer: `redo-apply-parents-once`, whose coalescing step the verdict decides.
 
 ### `atomic-publication` [implementation-produced] — One file publication
 
-One capability-rooted publish with a uuid stage name and a `Durability` argument, plus a path entry for control files outside the repository roots. Producer: `atomic-publication-core`.
+One storage-private capability-rooted publish in `storage/atomic_write.rs` with a uuid stage name and a `Durability` argument, whose stage writer also serves initialization's stage files, plus a storage-private path entry for `.git/jit` control files and one crate-visible entry over a closed type naming the two data-root control files (worktree identity, server PID file). Producer: `atomic-publication-core`; `control-files-publication` adds the two entries.
 
 ### `domain-root-relative-path` [implementation-produced] — Domain path type
 
 `RootRelativePath` and its own parse error (with a conversion into the repository layout error) live in a pure domain module. Producer: `root-relative-path-in-domain`.
-
-### `root-relative-path-bridge` [implementation-produced] — Path re-export bridge
-
-A temporary `pub use` of the domain `RootRelativePath` in `repository_state::path`, so the importer families move one at a time. Producer: `root-relative-path-in-domain`. Its one remover is `root-relative-path-bridge-removal`, which deletes the re-export and asserts that no domain source names `repository_state`. Removal criterion: nothing re-exports `RootRelativePath` outside the domain.
 
 ### `issue-scope` [implementation-produced] — One issue scope
 
@@ -122,353 +129,166 @@ A domain `IssueScope<I> { All, Issue(I), Label }` with one parser producing `Iss
 
 ### `configuration-store` [implementation-produced] — Storage configuration loader
 
-A storage module that reads the repository's configuration, template and invariant files, and any other configuration directory a command names (the user directory `config validate` checks), and hands the bytes to `configuration-assembler`. Producer: `configuration-store`.
+A storage module that reads the repository's configuration, template and invariant files and hands the bytes to `configuration-assembler`. Producer: `configuration-store`.
 
 ## Generated decomposition overview
 
 <!-- jit:breakdown-overview:begin -->
 | Key | Title | Type | Outcome | Contracts | Sources | Footprint | Landing | Depends on |
 |---|---|---|---|---|---|---|---|---|
-| readiness-derivation | One pure readiness derivation over a projected issue set | task | A pure domain function returns the Ready and Backlog corrections that a projected issue set implies. | — | REQ-01, DEC-10 | creates 1, touches 1 | — | — |
-| readiness-correction-intents | Graph edits carry readiness corrections through one helper | task | Deletion, dependency edits and template edges derive dependent readiness through one command helper. | readiness-corrections | REQ-01, DEC-10 | touches 4 | — | readiness-derivation |
-| readiness-in-update-plans | Field and lifecycle updates carry their readiness corrections | task | Single-issue field and lifecycle state changes include dependent readiness corrections in their own redo record. | readiness-correction-intents | REQ-01, REQ-02, DEC-10 | touches 3 | — | readiness-correction-intents |
-| readiness-in-auto-done-plan | Automatic Done carries its readiness corrections | task | The automatic Done plan includes dependent promotions in its own redo record instead of a follow-up pass. | readiness-correction-intents | REQ-01, REQ-02, DEC-10 | touches 2 | — | readiness-in-update-plans |
-| validate-fix-readiness-convergence | Validate fix derives readiness through the shared helper | task | validate --fix computes readiness repairs with the shared derivation over the whole projected set. | readiness-correction-intents | REQ-01, REQ-02, DEC-05 | touches 1 | — | readiness-correction-intents |
-| readiness-follow-up-removal | Post-commit readiness publishers are gone | task | No command publishes a follow-up session to correct readiness after its primary mutation commits. | — | REQ-02 | touches 3 | — | validate-fix-readiness-convergence, bulk-field-events-converge |
-| lease-required-error | Missing-lease refusal is one typed error | task | LeaseRequiredError defines the missing-lease message once for strict refusals and warn-mode warnings. | — | REQ-04, DEC-08 | touches 2 | — | — |
-| lease-check-in-session | Claims-first lease checks inside the publishing session | task | Assign, unassign and gate commands check leases inside their publishing session, and the pre-session check is gone. | lease-required-error, lease-checked-writes | REQ-04, DEC-04, DEC-08 | touches 5 | — | lease-required-error, readiness-in-auto-done-plan |
-| template-lease-in-session | Template application checks leases in its publishing session | task | Template application checks the leases of the issues it edits inside the session that publishes the edits. | lease-required-error, lease-checked-writes | REQ-04, DEC-08 | touches 2 | — | lease-check-in-session |
+| readiness-derivation | One readiness derivation carried into graph-editing commands | task | One pure domain function derives readiness corrections, and graph edits apply them through one command helper. | — | REQ-01, DEC-10 | creates 1, touches 5 | — | — |
+| readiness-in-mutation-plans | Every state-changing plan carries its readiness corrections and creation takes initial readiness from the derivation | task | Field, lifecycle, automatic-Done and creation plans carry their readiness corrections; no post-commit publisher remains. | readiness-correction-intents, readiness-corrections | REQ-01, REQ-02, REQ-20, DEC-10 | touches 8 | — | validate-fix-readiness-convergence |
+| validate-fix-readiness-convergence | Validate fix derives readiness through the shared helper | task | validate --fix computes readiness repairs with the shared derivation over the whole projected set. | readiness-correction-intents | REQ-01, REQ-02, DEC-05 | touches 1 | — | readiness-derivation |
 | state-derivation-convergence | One state derivation for update and lifecycle transitions | task | issue update --state and the lifecycle path share one state derivation with prechecks and one Done divert. | — | REQ-03, DEC-11 | touches 3 | — | lease-check-in-session |
-| bulk-field-events-converge | Bulk field changes write the single-update events | task | Bulk assign, unassign and gate edits compose the single-issue field mutations and write their events. | — | REQ-03, DEC-11 | touches 3 | — | state-derivation-convergence |
-| dedicated-field-commands-through-update | Dedicated field commands share the general field derivation | task | Dedicated assignee and gate-attachment commands share the general field derivation and its events. | — | REQ-03, DEC-11 | touches 4 | — | bulk-field-events-converge |
-| bulk-preview-removal | The uncalled bulk-update preview is gone | task | preview_bulk_update and its private helpers are removed, leaving apply as the only bulk derivation. | — | REQ-05, DEC-06 | touches 2 | — | — |
-| bulk-apply-one-session | Bulk edits apply their matches in one session | task | One session derives each matched issue's change for a bulk edit and commits one redo record. | read-only-session | REQ-05, DEC-06, DEC-09 | touches 4 | — | dedicated-field-commands-through-update, readiness-follow-up-removal, bulk-preview-removal |
-| lease-check-coverage | Bulk and dependency edits check leases in session | task | Bulk edits and dependency edges check each targeted issue's lease inside their publishing session. | lease-required-error, lease-checked-writes | REQ-04, DEC-08 | touches 4 | — | bulk-apply-one-session, template-lease-in-session |
-| session-coherence-docs | Adopter docs for readiness, lease and bulk semantics | task | User docs state same-record readiness corrections, in-session lease coverage and one-session bulk semantics. | — | REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, DEC-08, DEC-10, DEC-11 | touches 4 | — | lease-check-coverage |
-| archive-reference-resolution-once | Archive discovery resolves each reference once | task | Archive planning resolves each artifact reference once per plan and walks reachability once per distinct root. | — | REQ-08 | touches 1 | — | — |
-| archive-preview-through-execute-planner | Archive preview runs the execute planner read-only | task | Archive preview runs capture_archive_plan in a read-only mutation session and reports the plan execute applies. | read-only-session | REQ-06, DEC-09, DEC-12 | touches 4 | — | root-relative-path-command-importers |
-| archive-candidates-one-session | Archive candidates plan in one read-only session | task | Candidate listing derives its base once and plans each candidate on the one growing image. | archive-planner-session, read-only-session, image-identity | REQ-06, DEC-09, DEC-12, DEC-22 | touches 1 | — | archive-preview-through-execute-planner, image-identity-token |
-| citation-scan-module | Citation scanning lives in its own storage module | task | The archive citation scan and its no-follow walker move to a storage module built on the shared primitives. | capability-fs | REQ-06, REQ-16 | creates 1, touches 6 | — | archive-candidates-one-session, root-relative-path-storage-importers |
-| archive-discovery-tests-to-domain | Archive discovery tests run against the domain discovery | task | The storage-level archive discovery properties are owned by domain tests over evidence maps. | — | REQ-06 | touches 3 | — | archive-reference-resolution-once |
-| archive-storage-planners-removal | Storage-only archive planning helpers are gone | task | storage/artifact_planning.rs and storage/artifact_discovery.rs and the evidence read only preview used are removed. | — | REQ-06 | touches 7 | — | citation-scan-module, archive-discovery-tests-to-domain |
-| container-marker-constant | The container marker name is declared once | task | One domain constant and path constructor name the container marker for the classifier, archive planning and archive execution. | — | REQ-07 | touches 3 | — | archive-storage-planners-removal, layout-violation-domain-type |
-| container-destination-evidence-once | One request for container-destination evidence | task | One function requests container-destination evidence for archive planning. | — | REQ-07 | touches 1 | — | container-marker-constant |
-| declaration-file-set | The repository layout names its declaration files | task | One layout-level set names the declaration files, and the base capture reads through it. | — | REQ-19, DEC-14 | touches 2 | — | — |
-| snapshot-from-one-image | Snapshot export copies stored bytes from one image | task | Snapshot export writes each issue's stored bytes and the declaration files from one captured image. | declaration-file-set, read-only-session | REQ-19, DEC-14, DEC-09 | touches 2 | — | declaration-file-set, root-relative-path-command-importers |
-| configuration-assembler | One pure assembler builds JitConfig from source bytes | task | A public pure function assembles JitConfig from config, template and invariant bytes. | — | REQ-09, DEC-15 | touches 1 | — | — |
-| configuration-assembler-adoption | Disk loading and image capture assemble configuration through the assembler | task | JitConfig::load and the image declaration path obtain JitConfig from the one assembler. | configuration-assembler | REQ-09, DEC-15 | touches 4 | — | configuration-assembler |
-| configuration-assembly-callers | Remaining configuration assemblies call the assembler | task | Validation overlays, template images, initialization and profile apply obtain JitConfig from the one assembler. | configuration-assembler | REQ-09, DEC-15 | touches 7 | — | configuration-assembler-adoption |
-| configuration-declarations-mirror-removal | Configuration declarations stop mirroring JitConfig fields | task | ConfigurationDeclarations carries no field that duplicates the assembled JitConfig. | configuration-assembler | REQ-09 | touches 7 | — | configuration-assembly-callers |
-| declaration-capture-helper | Read paths capture declarations through one helper | task | One executor helper captures the declaration files read-only and returns parsed declarations with namespaces and hierarchy. | read-only-session, declaration-file-set, configuration-assembler | REQ-10, DEC-09 | touches 3 | — | configuration-declarations-mirror-removal, declaration-file-set |
-| command-reads-captured-declarations | Graph, item, document and query commands read captured declarations | task | Command read paths take hierarchy, namespaces and rules from captured declarations instead of disk. | declaration-capture | REQ-10 | touches 6 | — | frontend-reads-captured-declarations |
-| frontend-reads-captured-declarations | CLI and server read paths use captured declarations | task | main.rs and server routes read hierarchy, namespaces, icons and write policy from captured declarations. | declaration-capture | REQ-10 | touches 3 | — | declaration-capture-helper, configuration-store-callers |
-| config-manager-disk-readers-removal | ConfigManager disk readers and get_hierarchy_config are gone | task | get_hierarchy_config and the ConfigManager methods that read declaration files from disk are removed. | — | REQ-10 | touches 9 | — | archive-candidates-one-session, validate-fix-readiness-convergence, executor-config-caches-removal |
-| effective-rules-tests-onto-declarations | Rule-registry tests read captured declarations | task | Integration tests that read the executor's cached rule set read captured declarations instead. | declaration-capture | REQ-10 | touches 3 | — | declaration-capture-helper |
-| executor-config-caches-removal | The executor holds no disk-backed configuration caches | task | The executor's rules, effective-rules, config and namespace caches and their disk loaders are removed. | declaration-capture | REQ-10 | touches 4 | — | effective-rules-tests-onto-declarations, bulk-preview-removal, lease-check-in-session, command-reads-captured-declarations |
-| mutation-base-carries-declarations | Mutation bases carry their parsed declarations | task | The captured mutation base carries declarations parsed once per captured image, and the lifecycle mutation reuses them. | — | REQ-10, DEC-07 | touches 6 | — | configuration-declarations-mirror-removal, lease-check-coverage, gate-evidence-capture |
-| derivations-use-base-declarations | Command derivations reuse the base's declarations | task | Delete, dependency, gate, project and template derivations reuse the declarations the base already parsed. | mutation-base-declarations | REQ-10, DEC-07 | touches 5 | — | mutation-base-carries-declarations, gate-preset-catalog-adoption |
-| gate-preset-catalog | One pure gate-preset catalog over captured bytes | task | A public pure catalog lists and looks up gate presets from bytes keyed by the gate-presets path. | — | REQ-11 | touches 1 | — | — |
-| gate-preset-catalog-adoption | Preset apply and template apply use the preset catalog | task | gate preset apply and template apply read presets through the catalog, and their private preset parsers are removed. | gate-preset-catalog | REQ-11 | touches 2 | — | gate-preset-catalog |
-| gate-preset-reads-captured | Gate preset list and show read the captured catalog | task | gate preset list and show read presets from a read-only captured image through the one catalog. | gate-preset-catalog, read-only-session | REQ-11 | touches 1 | — | gate-preset-catalog-adoption |
-| gate-preset-manager-removal | PresetManager and the storage preset methods are gone | task | PresetManager and the IssueStore preset methods are removed, leaving no preset file I/O outside storage capture. | — | REQ-11 | touches 8 | — | gate-preset-reads-captured |
-| gate-evidence-capture | One gate evidence capture with the prompt limit | task | Gate evaluation and precheck capture evidence through one function that enforces the prompt size limit once. | — | REQ-12, DEC-07 | touches 2 | — | state-derivation-convergence |
-| gate-evaluation-resolves-once | Gate evaluation resolves its inputs once per image | task | Each gate evaluation resolves its issue, registry and gate definition once per captured image. | gate-evidence | REQ-12, DEC-07 | touches 1 | — | gate-evidence-capture |
+| field-derivation-convergence | One field derivation for bulk, dedicated and single-issue changes | task | Bulk, dedicated and single-issue field changes share one field derivation, state and events. | — | REQ-03, DEC-11 | touches 5 | — | state-derivation-convergence |
+| lease-check-in-session | Dedicated, gate and template writes check their leases in their publishing session | task | Assign, unassign, gate and template writes check the leases of the issues they target inside their publishing session through one typed missing-lease error. | lease-checked-writes | REQ-04, DEC-04, DEC-08 | touches 7 | — | readiness-in-mutation-plans |
+| bulk-apply-one-session | Bulk update applies its matches in one session with no preview | task | One session derives each matched issue's change for a bulk edit and commits one redo record, with the preview removed and the CLI reference updated. | — | REQ-05, DEC-06 | touches 5 | — | field-derivation-convergence |
+| lease-check-coverage | Bulk and dependency edits check leases in their publishing session | task | Bulk edits and dependency edges check each targeted issue's lease inside their publishing session, and the docs state the rule. | lease-required-error, lease-checked-writes | REQ-04, DEC-08 | touches 6 | — | bulk-apply-one-session |
+| session-coherence | Mutations derive their coupled readiness, field, lease and bulk state in one session | story | Readiness, field derivations, lease checks and bulk apply run inside the publishing mutation session. | — | REQ-01, REQ-02, REQ-03, REQ-04, REQ-05 | — | — | lease-check-coverage |
+| event-per-commit | Every redo record appends an event, enforced by plan construction and storage | task | Every plan that writes repository state carries an event append, and both backends refuse a record over a present data root without one. | — | REQ-23, DEC-23 | touches 20 | — | configuration-assembly, image-identity-token, record-commit-through-capabilities |
+| read-session | Lock-free read session with commit admission and one read driver | task | A capture-only session trait, a lock-free admitted session per backend, and with_read_session with its locked fallback. | event-append-invariant | REQ-21, DEC-09 | touches 14 | — | event-per-commit |
+| lock-free-read-consumers | Validate, link checks and profile previews read through the read driver | task | Validation reads, link checks and profile previews read through with_read_session, and the storage format reference states the read discipline. | read-session-driver | REQ-21, DEC-24 | touches 5 | — | read-session |
+| read-concurrency-benchmark | Benchmark: concurrent readers beside a continuous writer | task | A benchmark records that eight readers beside a continuous writer reach 4x one reader's rate and keep 80% of writes. | — | REQ-21, DEC-25 | creates 5, touches 1 | — | lock-free-read-consumers |
+| cost-evidence | Cost evidence: the epic's four cost reductions against the base binary | task | One harness measures the four REQ-22 cost claims against base 369d35a42 and the tip record passes each ratio threshold. | — | REQ-22, DEC-25 | creates 7 | — | archive-candidates-one-session, declarations-on-mutation-base, redo-apply-parents-once |
+| read-concurrency | Reads run beside writers, every commit appends an event, and the cost reductions are evidenced | story | Reads capture lock-free behind one admission check, every commit appends an event, and cost reductions are measured. | — | REQ-21, REQ-22, REQ-23 | — | — | cost-evidence, read-concurrency-benchmark, captured-declaration-reads |
+| configuration-assembly | One pure assembler builds every JitConfig from source bytes | task | One public pure function assembles JitConfig from source bytes; every assembly site calls it and the mirror fields are gone. | — | REQ-09, DEC-15 | touches 12 | — | — |
+| configuration-store | Storage reads configuration files and the registry file loaders are gone | task | A storage loader reads the declaration files through the assembler; callers and tests use it and the registry loaders are gone. | configuration-assembler | REQ-20, DEC-15 | creates 1, touches 13 | — | configuration-assembly |
+| captured-declaration-reads | Read paths take declarations from one captured-declaration helper | task | Command, CLI and server reads take hierarchy, namespaces, icons and rules from one captured-declaration helper. | declaration-file-set, configuration-assembler, configuration-store, read-session-driver | REQ-10, DEC-09, REQ-21, DEC-22 | touches 16 | — | configuration-store, snapshot-from-one-image, lock-free-read-consumers |
+| executor-config-caches-removal | The executor holds no disk-backed configuration; ConfigManager and JitConfig::load are gone | task | The executor caches, their disk loaders, ConfigManager's disk readers and JitConfig::load are deleted. | declaration-capture, configuration-assembler, configuration-store | REQ-10, REQ-20 | touches 16 | — | archive-candidates-one-session, bulk-apply-one-session, captured-declaration-reads |
+| declarations-on-mutation-base | Mutation bases carry their parsed declarations and derivations reuse them | task | The mutation base carries declarations parsed once per captured image, and every mutation derivation reuses them. | gate-preset-catalog | REQ-10, DEC-07 | touches 9 | — | gate-evidence-capture, gate-preset-catalog, lease-check-coverage |
+| gate-preset-catalog | One pure gate-preset catalog serves every preset reader | task | One pure preset catalog over bytes keyed by the gate-presets path serves every reader; PresetManager is gone. | read-session-driver | REQ-11, REQ-21, DEC-22 | touches 11 | — | lock-free-read-consumers |
+| gate-evidence-capture | One gate evidence capture resolves its inputs once and enforces the prompt limit | task | One evidence capture enforces the prompt limit once and resolves issue, registry and gate once per captured image. | — | REQ-12, DEC-07 | touches 2 | — | bulk-apply-one-session |
+| configuration | Configuration and gate declarations come from captured images | story | Configuration is assembled once from bytes, read paths use captured declarations, and gate presets and evidence each have one path. | — | REQ-09, REQ-10, REQ-11, REQ-12, REQ-20 | — | — | declarations-on-mutation-base, executor-config-caches-removal |
 | image-identity-token | Sessions share the captured image and recognise it by token | task | Capture rounds and materialization plans share the image without copying, and sessions recognise it by a token. | — | REQ-13 | touches 5 | — | — |
-| capability-fs-module | No-follow primitives move into one storage module | task | The no-follow capability primitives move into storage/capability_fs.rs behind a re-export bridge in the session module. | — | REQ-16 | creates 1, touches 2 | — | — |
-| capability-fs-importers | Storage code imports the no-follow primitives from their module | task | Importers name storage::capability_fs directly and the session-module re-export bridge is removed. | capability-fs, capability-fs-bridge | REQ-16 | touches 10 | — | capability-fs-module |
-| capability-fs-error | No-follow primitives report their own error type | task | The capability module returns its own error type, and redo apply no longer imports from the session module. | capability-fs | REQ-16 | touches 7 | — | capability-fs-importers, root-relative-path-parse-error |
-| leaf-open-once | The no-follow leaf open exists once | task | One non-blocking no-follow leaf open serves the repository file readers in storage. | capability-fs | REQ-16, REQ-20 | touches 1 | — | capability-fs-error |
-| profile-reads-through-storage | Profile package reads use the storage leaf open | task | Profile package file reads go through the storage leaf-open primitive instead of profile/nofollow.rs. | leaf-open | REQ-16, DEC-19 | touches 6 | — | leaf-open-once |
-| record-commit-through-capabilities | Redo record commit goes through capability handles | task | Record commit writes through the data-root handle, and redo_record.rs only defines the record format. | capability-fs | REQ-16 | touches 11 | — | capability-fs-error |
-| redo-parent-handles-once | Redo apply opens each distinct parent once | task | Redo apply opens each distinct parent directory once per record through a per-record handle map. | capability-fs | REQ-14 | touches 2 | — | record-commit-through-capabilities |
-| redo-subset-crash-proof | Property test proves replay from any persisted subset | task | A conformance test records whether replay from any persisted subset of a record converges on both backends. | redo-crash-model | REQ-15, DEC-18 | touches 3 | — | redo-parent-handles-once |
-| redo-directory-sync-coalescing | Redo apply syncs each distinct parent once per record | task | Given the subset proof, redo apply fsyncs each touched parent once before record removal; otherwise rustdoc states why not. | redo-subset-proof, redo-crash-model | REQ-15, DEC-18 | touches 4 | — | redo-subset-crash-proof |
-| atomic-publication-core | One atomic file publication with a durability argument | task | One publish core with a durability argument and unique stage names serves the redo put. | capability-fs | REQ-17 | touches 3 | — | redo-directory-sync-coalescing |
-| export-and-user-config-publication | External export and user config publish through the core | task | External export and user-config writes go through the publish core, ending the duplicate counters and atomic writers. | atomic-publication | REQ-17 | touches 3 | — | atomic-publication-core |
-| control-files-publish-through-core | Worktree identity and the server PID file publish atomically | task | Worktree identity and the server PID file publish through the one function, and the PID file is synced. | atomic-publication | REQ-17 | touches 5 | — | lease-records-publish-through-core, export-and-user-config-publication, process-liveness-primitive |
-| lease-records-publish-through-core | Lease records and the claims sequence publish atomically | task | Lease records and the claims sequence counter publish through the one function with unique stage names. | atomic-publication | REQ-17, DEC-07, DEC-21 | touches 1, uncertain | — | atomic-publication-core |
-| layout-violation-domain-type | Artifact classifier reports layout violations through a domain type | task | The artifact classifier reports layout violations through a domain enum it matches exhaustively. | — | REQ-18 | touches 3 | — | — |
-| classifier-evidence-helper | The artifact classifier resolves missing evidence through one helper | task | classify_entry resolves missing evidence through the one generic evidence helper. | — | REQ-18 | touches 1 | — | layout-violation-domain-type |
-| root-relative-path-parse-error | RootRelativePath parsing has its own error type | task | RootRelativePath::parse returns its own error type with a conversion into the repository layout error. | — | REQ-18 | touches 8 | — | — |
-| root-relative-path-in-domain | RootRelativePath moves into the domain behind a bridge | task | RootRelativePath and its parse error live in a pure domain module, re-exported from repository_state::path as a bridge. | — | REQ-18, DEC-13 | creates 1, touches 3 | — | root-relative-path-parse-error |
-| root-relative-path-repository-state-importers | Repository-state code imports RootRelativePath from the domain | task | The repository_state modules name the domain RootRelativePath instead of the path re-export. | domain-root-relative-path, root-relative-path-bridge | REQ-18 | touches 8 | — | root-relative-path-in-domain |
-| root-relative-path-storage-importers | Storage code imports RootRelativePath from the domain | task | The storage modules name the domain RootRelativePath instead of the path re-export. | domain-root-relative-path, root-relative-path-bridge | REQ-18 | touches 6 | — | root-relative-path-in-domain, capability-fs-error |
-| root-relative-path-command-importers | Commands, profile and gate execution import RootRelativePath from the domain | task | commands, profile application and gate execution name the domain RootRelativePath instead of the path re-export. | domain-root-relative-path, root-relative-path-bridge | REQ-18 | touches 6 | — | root-relative-path-in-domain, capability-fs-importers |
-| root-relative-path-bridge-removal | The RootRelativePath re-export bridge is removed | task | The repository_state::path re-export of RootRelativePath is deleted, and no domain file names repository_state. | root-relative-path-bridge, domain-root-relative-path | REQ-18 | touches 3 | — | root-relative-path-repository-state-importers, root-relative-path-storage-importers, root-relative-path-command-importers, layout-violation-domain-type |
-| domain-typed-errors | Domain parsing returns typed errors | task | Domain parsers return thiserror types: no anyhow and no String error results remain under domain/. | — | REQ-18 | touches 6 | — | safe-path-validator-domain-inputs |
-| safe-path-validator-domain-inputs | Repository inputs validate paths through RootRelativePath | task | Repository inputs and profile packages validate relative paths with RootRelativePath::parse, ending is_safe_relative_path (REQ-20 safe relative paths). | domain-root-relative-path | REQ-20, DEC-13 | touches 3 | — | root-relative-path-bridge-removal |
-| safe-path-validator-storage | Storage path checks use RootRelativePath | task | Storage path checks use RootRelativePath::parse and validate_repo_relative_path is gone (REQ-20 safe relative paths). | domain-root-relative-path | REQ-20, DEC-13 | touches 8 | — | root-relative-path-bridge-removal, archive-storage-planners-removal |
-| issue-scope-type | One domain issue scope type | task | A domain IssueScope with one parser carrying an id prefix and one pure selection over issues (REQ-20 scope type). | — | REQ-20 | creates 1, touches 1 | — | — |
-| check-links-through-issue-scope | Link checks select issues through IssueScope | task | doc check-links parses and selects through IssueScope, gains label scopes, and DocumentScope is gone (REQ-20 scope type). | issue-scope | REQ-20 | touches 8 | — | issue-scope-type, command-reads-captured-declarations |
-| snapshot-scope-to-issue-scope | Snapshot export selects issues through IssueScope | task | Snapshot export parses and selects through IssueScope, and SnapshotScope is gone (REQ-20 scope type). | issue-scope | REQ-20 | touches 5 | — | snapshot-from-one-image, check-links-through-issue-scope |
-| archive-destination-no-legacy-fallback | Archive destinations drop the short-id fallback | task | Container destination resolution has no legacy short-id fallback (REQ-20 archive destination). | — | REQ-20 | touches 4 | — | container-destination-evidence-once |
-| status-summary-beside-queries | Status summary sits beside the query commands | task | StatusSummary and get_status move into the query command module (REQ-20 status summary). | — | REQ-20, DEC-17 | touches 4 | — | — |
+| capability-fs-module | No-follow primitives live in one storage module with their own error type | task | The no-follow capability primitives live in storage/capability_fs.rs, return their own error type, and redo apply no longer imports from the session module. | — | REQ-16 | creates 1, touches 12 | — | root-relative-path-in-domain |
+| leaf-open-once | The no-follow leaf open exists once and serves storage, profile and exact-store reads | task | One non-blocking no-follow leaf open serves the storage repository file readers, the profile package reader and the JSON backend's exact-store read. | capability-fs | REQ-16, REQ-20, DEC-19 | touches 7 | — | capability-fs-module |
+| record-commit-through-capabilities | Redo record commit goes through capability handles | task | Record commit writes through the data-root handle, and redo_record.rs only defines the record format. | capability-fs | REQ-16 | touches 13 | — | capability-fs-module |
+| redo-apply-parents-once | Redo apply opens and syncs each parent once per record | task | Redo apply opens each parent once per record, and a subset-replay proof decides whether it also syncs each once. | capability-fs, redo-crash-model | DEC-18, REQ-14, REQ-15 | touches 6 | — | record-commit-through-capabilities |
+| atomic-publication-core | One atomic file publication with a durability argument serves the redo put and external exports | task | One publish core with a durability argument and unique stage names serves the redo put and the external export writers. | capability-fs | REQ-17 | touches 5 | — | redo-apply-parents-once |
+| control-files-publication | Lease records, worktree identity and the server PID file publish through the one function | task | Lease records, the claims sequence counter, worktree identity and the server PID file publish through the one function, and the PID file is synced. | atomic-publication | REQ-17, DEC-07, DEC-21 | touches 6, uncertain | — | atomic-publication-core, process-liveness-primitive |
+| storage-primitives | Storage primitives exist once and redo apply touches each parent once | story | Images are shared by token, redo apply opens and syncs parents once per record, and no-follow and publication primitives exist once. | — | REQ-13, REQ-14, REQ-15, REQ-16, REQ-17, REQ-20 | — | — | control-files-publication, image-identity-token, leaf-open-once |
+| archive-reference-resolution-once | Archive discovery resolves each reference once | task | Archive planning resolves each artifact reference once per plan and walks reachability once per distinct root. | — | REQ-08 | touches 1 | — | — |
+| archive-preview-through-execute-planner | Archive preview runs the execute planner read-only | task | Archive preview runs capture_archive_plan through the read driver; the storage-only planners are deleted. | read-session-driver, capability-fs | REQ-06, DEC-09, DEC-12, REQ-21, REQ-16 | creates 1, touches 15 | — | archive-reference-resolution-once, read-session |
+| archive-candidates-one-session | Archive candidates plan in one read-only session | task | Candidate listing derives its base once, plans each candidate on the one growing image, and the adopter reference states the shared budget. | archive-planner-session, image-identity, read-session-driver | REQ-06, DEC-09, DEC-12, DEC-22, REQ-21 | touches 4 | — | archive-preview-through-execute-planner, lock-free-read-consumers |
+| container-destination-once | Container marker and destination evidence are declared once | task | One domain constant and path constructor name the container marker, and one function requests container-destination evidence for archive planning. | — | REQ-07 | touches 3 | — | archive-candidates-one-session |
+| snapshot-from-one-image | Snapshot export copies stored bytes from one image | task | The layout names its declaration files once and snapshot export writes each issue's stored bytes and the declaration files from one captured image. | — | REQ-19, DEC-14, DEC-24 | touches 5 | — | read-session |
+| archive-destination-no-legacy-fallback | Archive destinations drop the short-id fallback | task | Container destination resolution has no legacy short-id fallback (REQ-20 archive destination) and the adopter reference states the rule. | — | REQ-20 | touches 6 | — | container-destination-once |
+| archive-and-snapshot | Archive planning and snapshot export read through the execute session | story | Archive preview, candidates and snapshot export read one captured image through the execute planner and stored bytes. | — | REQ-06, REQ-07, REQ-08, REQ-16, REQ-19 | — | — | archive-destination-no-legacy-fallback, snapshot-from-one-image |
+| domain-typed-errors | Domain code reports typed errors and imports nothing from repository_state | task | Domain code returns typed errors, matches layout violations exhaustively and names nothing from repository_state. | — | REQ-18 | touches 9 | — | — |
+| root-relative-path-in-domain | RootRelativePath lives in the domain with its own parse error | task | RootRelativePath and its own parse error live in a pure domain module that every importer names, with no re-export and no domain import of repository_state. | — | REQ-18, DEC-13 | creates 1, touches 21 | — | domain-typed-errors |
+| one-safe-path-validator | Relative path inputs validate through RootRelativePath::parse | task | Every relative-path input validates with RootRelativePath::parse, and the other two validators are gone (REQ-20). | domain-root-relative-path | REQ-20, DEC-13 | touches 11 | — | archive-preview-through-execute-planner |
+| issue-scope-type | Link checks and snapshot export select issues through one IssueScope | task | One domain IssueScope serves link checks and snapshot export, adding label scopes to link checks (REQ-20). | — | REQ-20 | creates 1, touches 13 | — | captured-declaration-reads |
+| process-liveness-primitive | Process liveness and signalling go through one PID guard | task | One guarded liveness probe, EPERM and non-unix alive, serves every liveness check and signal site (REQ-20). | — | REQ-20, DEC-20 | creates 1, touches 4 | — | — |
 | type-extraction-exact-values | Type labels have one exact extraction | task | Type checks read the exact type label value through type_value_of, and extract_type is gone (REQ-20 type extraction). | — | REQ-20, DEC-16 | touches 1 | — | — |
-| edit-distance-in-domain | Edit distance lives in the domain | task | The validation engine's edit distance moves to a pure domain module that the engine calls (REQ-20 edit distance). | — | REQ-20 | creates 1, touches 2 | — | — |
-| edit-distance-once | Type suggestions use the shared edit distance | task | suggest_type_fix uses the shared edit-distance function and the taxonomy's copy is deleted (REQ-20 edit distance). | — | REQ-20 | touches 1 | — | type-extraction-exact-values, edit-distance-in-domain |
-| write-if-changed-constructor | One write-if-changed materialization constructor | task | RepositoryAction::write_if_changed decides unchanged files once, first for the materializer sites (REQ-20 write-if-changed). | — | REQ-20 | touches 2 | — | — |
-| write-if-changed-adoption | Remaining materializers use the write-if-changed constructor | task | Profile repair, the finalize gate-registry edit, package trees and profile apply decide unchanged files through the constructor (REQ-20 write-if-changed). | — | REQ-20 | touches 4 | — | write-if-changed-constructor |
-| creation-stamping-one-derivation | Creation finalizer stamps drafts through one function | task | Both creation finalizer passes stamp drafts and build the created event through one function (REQ-20 creation stamping). | — | REQ-20 | touches 1 | — | write-if-changed-adoption |
-| creation-initial-readiness | Created issues get their initial readiness from the readiness derivation | task | Drafts are born Backlog and the readiness derivation promotes them, ending the four initial-Ready writers (REQ-20 creation stamping). | readiness-corrections | REQ-20, REQ-01 | touches 5 | — | creation-stamping-one-derivation, derivations-use-base-declarations |
-| claim-coordinator-opening | Claim commands open the claims coordinator through one helper | task | The claim commands open the claims coordinator through one helper (REQ-20 claims-coordinator opening). | — | REQ-20 | touches 1 | — | — |
-| issue-lookup-one-path | Issue loading has one lookup | task | Both storage backends load issues through one lookup with one not-found mapping (REQ-20 issue loading). | — | REQ-20 | touches 7 | — | — |
-| process-liveness-primitive | Process liveness is one guarded primitive | task | One guarded liveness probe treats EPERM and non-unix as alive and replaces both liveness primitives (REQ-20 process liveness). | — | REQ-20, DEC-20 | creates 1, touches 4 | — | — |
-| pid-guard-signal-sites | Signal sites go through the PID guard | task | Server stop and process-group kill convert PIDs through the one guard and refuse sentinel PIDs (REQ-20 process liveness). | — | REQ-20, DEC-20 | touches 3 | — | process-liveness-primitive |
-| nofollow-store-reads | Store reads use the shared no-follow reader | task | The JSON backend's exact-store read uses the shared no-follow read primitive (REQ-20 no-follow repository reads). | leaf-open | REQ-20 | touches 1 | — | leaf-open-once |
-| ancestor-walker-once | Repository paths have one ancestor walker | task | Ancestor walks over repository paths use VirtualPath::ancestor_directories (REQ-20 ancestor walking). | — | REQ-20 | touches 3 | — | container-destination-evidence-once, initialization-errors-typed, creation-initial-readiness, root-relative-path-repository-state-importers |
-| present-or-create-helper | Missing directories are created through one helper | task | One helper decides present-or-create for repository directories at initialization, archive and mutation (REQ-20 ancestor walking). | — | REQ-20 | touches 4 | — | ancestor-walker-once |
-| initialization-errors-typed | Initialization errors keep their source types | task | Initialization reports rule-materialization and config failures with typed sources (REQ-20 initialization errors). | — | REQ-20 | touches 1 | — | configuration-assembly-callers |
-| declaration-loaders-removal | Template and invariant registries stop reading files | task | TemplateRegistry::load and InvariantRegistry::load are deleted, leaving declaration modules parse-only (REQ-20 declaration modules). | — | REQ-20, DEC-15 | touches 3 | — | configuration-assembler-adoption |
-| configuration-store | Storage reads configuration files for the assembler | task | A storage configuration loader reads config, template and invariant files and calls the assembler (REQ-20 declaration modules). | configuration-assembler | REQ-20, DEC-15 | creates 1, touches 1 | — | configuration-assembler-adoption |
-| configuration-store-callers | Configuration callers load through the storage loader | task | Command, claim and CLI configuration loads go through the storage configuration loader (REQ-20 declaration modules). | configuration-store | REQ-20, DEC-15 | touches 6 | — | configuration-store, claim-coordinator-opening |
-| configuration-load-tests-to-store | Configuration loading tests use the storage loader | task | The integration tests that call JitConfig::load use the storage configuration loader (REQ-20 declaration modules). | configuration-store | REQ-20 | touches 5 | — | configuration-store, declaration-loaders-removal |
-| config-load-function-removal | JitConfig::load is gone | task | JitConfig::load and its file I/O are removed, so config.rs only parses and merges (REQ-20 declaration modules). | — | REQ-20 | touches 1 | — | configuration-load-tests-to-store, config-manager-disk-readers-removal |
-| one-form-docs | Adopter docs for archive destinations, issue scopes and snapshot contents | task | User docs state the archive destination rule without the short-id fallback and the label scope for link checks. | — | REQ-20, DEC-16, DEC-22, REQ-19 | touches 2 | — | archive-destination-no-legacy-fallback, snapshot-scope-to-issue-scope |
-| session-coherence | Mutations derive their coupled readiness, field, lease and bulk state in one session | story | Readiness, field derivations, lease checks and bulk apply run inside the publishing mutation session. | — | REQ-01, REQ-02, REQ-03, REQ-04, REQ-05 | — | — | session-coherence-docs |
-| archive-and-snapshot | Archive planning and snapshot export read through the execute session | story | Archive preview, candidates and snapshot export read one captured image through the execute planner and stored bytes. | — | REQ-06, REQ-07, REQ-08, REQ-16, REQ-19 | — | — | container-destination-evidence-once, snapshot-from-one-image |
-| configuration | Configuration and gate declarations come from captured images | story | Configuration is assembled once from bytes, read paths use captured declarations, and gate presets and evidence each have one path. | — | REQ-09, REQ-10, REQ-11, REQ-12 | — | — | config-manager-disk-readers-removal, derivations-use-base-declarations, gate-preset-manager-removal, gate-evaluation-resolves-once |
-| storage-primitives | Storage primitives exist once and redo apply touches each parent once | story | Images are shared by token, redo apply opens and syncs parents once per record, and no-follow and publication primitives exist once. | — | REQ-13, REQ-14, REQ-15, REQ-16, REQ-17, REQ-20 | — | — | image-identity-token, profile-reads-through-storage, control-files-publish-through-core |
-| one-form-convergence | Layering and duplicated primitives converge on one form | story | The domain stops importing repository_state, and each REQ-20 duplicated primitive has one form. | — | REQ-01, REQ-18, REQ-19, REQ-20 | — | — | classifier-evidence-helper, domain-typed-errors, safe-path-validator-storage, status-summary-beside-queries, edit-distance-once, issue-lookup-one-path, pid-guard-signal-sites, nofollow-store-reads, present-or-create-helper, config-load-function-removal, one-form-docs |
+| one-form-convergence | Layering and duplicated primitives converge on one form | story | The domain stops importing repository_state, and process liveness, safe relative paths, issue scopes and type extraction each have one form. | — | REQ-18, REQ-20 | — | — | issue-scope-type, one-safe-path-validator, process-liveness-primitive, type-extraction-exact-values |
 
 ```mermaid
 flowchart LR
-    N0["readiness-derivation: One pure readiness derivation over a projected issue set"]
-    N1["readiness-correction-intents: Graph edits carry readiness corrections through one helper"]
-    N2["readiness-in-update-plans: Field and lifecycle updates carry their readiness corrections"]
-    N3["readiness-in-auto-done-plan: Automatic Done carries its readiness corrections"]
-    N4["validate-fix-readiness-convergence: Validate fix derives readiness through the shared helper"]
-    N5["readiness-follow-up-removal: Post-commit readiness publishers are gone"]
-    N6["lease-required-error: Missing-lease refusal is one typed error"]
-    N7["lease-check-in-session: Claims-first lease checks inside the publishing session"]
-    N8["template-lease-in-session: Template application checks leases in its publishing session"]
-    N9["state-derivation-convergence: One state derivation for update and lifecycle transitions"]
-    N10["bulk-field-events-converge: Bulk field changes write the single-update events"]
-    N11["dedicated-field-commands-through-update: Dedicated field commands share the general field derivation"]
-    N12["bulk-preview-removal: The uncalled bulk-update preview is gone"]
-    N13["bulk-apply-one-session: Bulk edits apply their matches in one session"]
-    N14["lease-check-coverage: Bulk and dependency edits check leases in session"]
-    N15["session-coherence-docs: Adopter docs for readiness, lease and bulk semantics"]
-    N16["archive-reference-resolution-once: Archive discovery resolves each reference once"]
-    N17["archive-preview-through-execute-planner: Archive preview runs the execute planner read-only"]
-    N18["archive-candidates-one-session: Archive candidates plan in one read-only session"]
-    N19["citation-scan-module: Citation scanning lives in its own storage module"]
-    N20["archive-discovery-tests-to-domain: Archive discovery tests run against the domain discovery"]
-    N21["archive-storage-planners-removal: Storage-only archive planning helpers are gone"]
-    N22["container-marker-constant: The container marker name is declared once"]
-    N23["container-destination-evidence-once: One request for container-destination evidence"]
-    N24["declaration-file-set: The repository layout names its declaration files"]
-    N25["snapshot-from-one-image: Snapshot export copies stored bytes from one image"]
-    N26["configuration-assembler: One pure assembler builds JitConfig from source bytes"]
-    N27["configuration-assembler-adoption: Disk loading and image capture assemble configuration through the assembler"]
-    N28["configuration-assembly-callers: Remaining configuration assemblies call the assembler"]
-    N29["configuration-declarations-mirror-removal: Configuration declarations stop mirroring JitConfig fields"]
-    N30["declaration-capture-helper: Read paths capture declarations through one helper"]
-    N31["command-reads-captured-declarations: Graph, item, document and query commands read captured declarations"]
-    N32["frontend-reads-captured-declarations: CLI and server read paths use captured declarations"]
-    N33["config-manager-disk-readers-removal: ConfigManager disk readers and get_hierarchy_config are gone"]
-    N34["effective-rules-tests-onto-declarations: Rule-registry tests read captured declarations"]
-    N35["executor-config-caches-removal: The executor holds no disk-backed configuration caches"]
-    N36["mutation-base-carries-declarations: Mutation bases carry their parsed declarations"]
-    N37["derivations-use-base-declarations: Command derivations reuse the base's declarations"]
-    N38["gate-preset-catalog: One pure gate-preset catalog over captured bytes"]
-    N39["gate-preset-catalog-adoption: Preset apply and template apply use the preset catalog"]
-    N40["gate-preset-reads-captured: Gate preset list and show read the captured catalog"]
-    N41["gate-preset-manager-removal: PresetManager and the storage preset methods are gone"]
-    N42["gate-evidence-capture: One gate evidence capture with the prompt limit"]
-    N43["gate-evaluation-resolves-once: Gate evaluation resolves its inputs once per image"]
-    N44["image-identity-token: Sessions share the captured image and recognise it by token"]
-    N45["capability-fs-module: No-follow primitives move into one storage module"]
-    N46["capability-fs-importers: Storage code imports the no-follow primitives from their module"]
-    N47["capability-fs-error: No-follow primitives report their own error type"]
-    N48["leaf-open-once: The no-follow leaf open exists once"]
-    N49["profile-reads-through-storage: Profile package reads use the storage leaf open"]
-    N50["record-commit-through-capabilities: Redo record commit goes through capability handles"]
-    N51["redo-parent-handles-once: Redo apply opens each distinct parent once"]
-    N52["redo-subset-crash-proof: Property test proves replay from any persisted subset"]
-    N53["redo-directory-sync-coalescing: Redo apply syncs each distinct parent once per record"]
-    N54["atomic-publication-core: One atomic file publication with a durability argument"]
-    N55["export-and-user-config-publication: External export and user config publish through the core"]
-    N56["control-files-publish-through-core: Worktree identity and the server PID file publish atomically"]
-    N57["lease-records-publish-through-core: Lease records and the claims sequence publish atomically"]
-    N58["layout-violation-domain-type: Artifact classifier reports layout violations through a domain type"]
-    N59["classifier-evidence-helper: The artifact classifier resolves missing evidence through one helper"]
-    N60["root-relative-path-parse-error: RootRelativePath parsing has its own error type"]
-    N61["root-relative-path-in-domain: RootRelativePath moves into the domain behind a bridge"]
-    N62["root-relative-path-repository-state-importers: Repository-state code imports RootRelativePath from the domain"]
-    N63["root-relative-path-storage-importers: Storage code imports RootRelativePath from the domain"]
-    N64["root-relative-path-command-importers: Commands, profile and gate execution import RootRelativePath from the domain"]
-    N65["root-relative-path-bridge-removal: The RootRelativePath re-export bridge is removed"]
-    N66["domain-typed-errors: Domain parsing returns typed errors"]
-    N67["safe-path-validator-domain-inputs: Repository inputs validate paths through RootRelativePath"]
-    N68["safe-path-validator-storage: Storage path checks use RootRelativePath"]
-    N69["issue-scope-type: One domain issue scope type"]
-    N70["check-links-through-issue-scope: Link checks select issues through IssueScope"]
-    N71["snapshot-scope-to-issue-scope: Snapshot export selects issues through IssueScope"]
-    N72["archive-destination-no-legacy-fallback: Archive destinations drop the short-id fallback"]
-    N73["status-summary-beside-queries: Status summary sits beside the query commands"]
-    N74["type-extraction-exact-values: Type labels have one exact extraction"]
-    N75["edit-distance-in-domain: Edit distance lives in the domain"]
-    N76["edit-distance-once: Type suggestions use the shared edit distance"]
-    N77["write-if-changed-constructor: One write-if-changed materialization constructor"]
-    N78["write-if-changed-adoption: Remaining materializers use the write-if-changed constructor"]
-    N79["creation-stamping-one-derivation: Creation finalizer stamps drafts through one function"]
-    N80["creation-initial-readiness: Created issues get their initial readiness from the readiness derivation"]
-    N81["claim-coordinator-opening: Claim commands open the claims coordinator through one helper"]
-    N82["issue-lookup-one-path: Issue loading has one lookup"]
-    N83["process-liveness-primitive: Process liveness is one guarded primitive"]
-    N84["pid-guard-signal-sites: Signal sites go through the PID guard"]
-    N85["nofollow-store-reads: Store reads use the shared no-follow reader"]
-    N86["ancestor-walker-once: Repository paths have one ancestor walker"]
-    N87["present-or-create-helper: Missing directories are created through one helper"]
-    N88["initialization-errors-typed: Initialization errors keep their source types"]
-    N89["declaration-loaders-removal: Template and invariant registries stop reading files"]
-    N90["configuration-store: Storage reads configuration files for the assembler"]
-    N91["configuration-store-callers: Configuration callers load through the storage loader"]
-    N92["configuration-load-tests-to-store: Configuration loading tests use the storage loader"]
-    N93["config-load-function-removal: JitConfig::load is gone"]
-    N94["one-form-docs: Adopter docs for archive destinations, issue scopes and snapshot contents"]
-    N95["session-coherence: Mutations derive their coupled readiness, field, lease and bulk state in one session"]
-    N96["archive-and-snapshot: Archive planning and snapshot export read through the execute session"]
-    N97["configuration: Configuration and gate declarations come from captured images"]
-    N98["storage-primitives: Storage primitives exist once and redo apply touches each parent once"]
-    N99["one-form-convergence: Layering and duplicated primitives converge on one form"]
-    N0 --> N1
-    N1 --> N2
-    N2 --> N3
-    N1 --> N4
-    N4 --> N5
-    N10 --> N5
+    N0["readiness-derivation: One readiness derivation carried into graph-editing commands"]
+    N1["readiness-in-mutation-plans: Every state-changing plan carries its readiness corrections and creation takes initial readiness from the derivation"]
+    N2["validate-fix-readiness-convergence: Validate fix derives readiness through the shared helper"]
+    N3["state-derivation-convergence: One state derivation for update and lifecycle transitions"]
+    N4["field-derivation-convergence: One field derivation for bulk, dedicated and single-issue changes"]
+    N5["lease-check-in-session: Dedicated, gate and template writes check their leases in their publishing session"]
+    N6["bulk-apply-one-session: Bulk update applies its matches in one session with no preview"]
+    N7["lease-check-coverage: Bulk and dependency edits check leases in their publishing session"]
+    N8["session-coherence: Mutations derive their coupled readiness, field, lease and bulk state in one session"]
+    N9["event-per-commit: Every redo record appends an event, enforced by plan construction and storage"]
+    N10["read-session: Lock-free read session with commit admission and one read driver"]
+    N11["lock-free-read-consumers: Validate, link checks and profile previews read through the read driver"]
+    N12["read-concurrency-benchmark: Benchmark: concurrent readers beside a continuous writer"]
+    N13["cost-evidence: Cost evidence: the epic's four cost reductions against the base binary"]
+    N14["read-concurrency: Reads run beside writers, every commit appends an event, and the cost reductions are evidenced"]
+    N15["configuration-assembly: One pure assembler builds every JitConfig from source bytes"]
+    N16["configuration-store: Storage reads configuration files and the registry file loaders are gone"]
+    N17["captured-declaration-reads: Read paths take declarations from one captured-declaration helper"]
+    N18["executor-config-caches-removal: The executor holds no disk-backed configuration; ConfigManager and JitConfig::load are gone"]
+    N19["declarations-on-mutation-base: Mutation bases carry their parsed declarations and derivations reuse them"]
+    N20["gate-preset-catalog: One pure gate-preset catalog serves every preset reader"]
+    N21["gate-evidence-capture: One gate evidence capture resolves its inputs once and enforces the prompt limit"]
+    N22["configuration: Configuration and gate declarations come from captured images"]
+    N23["image-identity-token: Sessions share the captured image and recognise it by token"]
+    N24["capability-fs-module: No-follow primitives live in one storage module with their own error type"]
+    N25["leaf-open-once: The no-follow leaf open exists once and serves storage, profile and exact-store reads"]
+    N26["record-commit-through-capabilities: Redo record commit goes through capability handles"]
+    N27["redo-apply-parents-once: Redo apply opens and syncs each parent once per record"]
+    N28["atomic-publication-core: One atomic file publication with a durability argument serves the redo put and external exports"]
+    N29["control-files-publication: Lease records, worktree identity and the server PID file publish through the one function"]
+    N30["storage-primitives: Storage primitives exist once and redo apply touches each parent once"]
+    N31["archive-reference-resolution-once: Archive discovery resolves each reference once"]
+    N32["archive-preview-through-execute-planner: Archive preview runs the execute planner read-only"]
+    N33["archive-candidates-one-session: Archive candidates plan in one read-only session"]
+    N34["container-destination-once: Container marker and destination evidence are declared once"]
+    N35["snapshot-from-one-image: Snapshot export copies stored bytes from one image"]
+    N36["archive-destination-no-legacy-fallback: Archive destinations drop the short-id fallback"]
+    N37["archive-and-snapshot: Archive planning and snapshot export read through the execute session"]
+    N38["domain-typed-errors: Domain code reports typed errors and imports nothing from repository_state"]
+    N39["root-relative-path-in-domain: RootRelativePath lives in the domain with its own parse error"]
+    N40["one-safe-path-validator: Relative path inputs validate through RootRelativePath::parse"]
+    N41["issue-scope-type: Link checks and snapshot export select issues through one IssueScope"]
+    N42["process-liveness-primitive: Process liveness and signalling go through one PID guard"]
+    N43["type-extraction-exact-values: Type labels have one exact extraction"]
+    N44["one-form-convergence: Layering and duplicated primitives converge on one form"]
+    N2 --> N1
+    N0 --> N2
+    N5 --> N3
+    N3 --> N4
+    N1 --> N5
+    N4 --> N6
     N6 --> N7
-    N3 --> N7
     N7 --> N8
-    N7 --> N9
+    N15 --> N9
+    N23 --> N9
+    N26 --> N9
     N9 --> N10
     N10 --> N11
-    N11 --> N13
-    N5 --> N13
-    N12 --> N13
+    N11 --> N12
+    N33 --> N13
+    N19 --> N13
+    N27 --> N13
     N13 --> N14
-    N8 --> N14
-    N14 --> N15
-    N64 --> N17
+    N12 --> N14
+    N17 --> N14
+    N15 --> N16
+    N16 --> N17
+    N35 --> N17
+    N11 --> N17
+    N33 --> N18
+    N6 --> N18
     N17 --> N18
-    N44 --> N18
-    N18 --> N19
-    N63 --> N19
-    N16 --> N20
-    N19 --> N21
-    N20 --> N21
-    N21 --> N22
-    N58 --> N22
-    N22 --> N23
+    N21 --> N19
+    N20 --> N19
+    N7 --> N19
+    N11 --> N20
+    N6 --> N21
+    N19 --> N22
+    N18 --> N22
+    N39 --> N24
     N24 --> N25
-    N64 --> N25
+    N24 --> N26
     N26 --> N27
     N27 --> N28
     N28 --> N29
+    N42 --> N29
     N29 --> N30
-    N24 --> N30
-    N32 --> N31
-    N30 --> N32
-    N91 --> N32
-    N18 --> N33
-    N4 --> N33
-    N35 --> N33
-    N30 --> N34
-    N34 --> N35
-    N12 --> N35
-    N7 --> N35
-    N31 --> N35
-    N29 --> N36
-    N14 --> N36
-    N42 --> N36
+    N23 --> N30
+    N25 --> N30
+    N31 --> N32
+    N10 --> N32
+    N32 --> N33
+    N11 --> N33
+    N33 --> N34
+    N10 --> N35
+    N34 --> N36
     N36 --> N37
-    N39 --> N37
+    N35 --> N37
     N38 --> N39
-    N39 --> N40
-    N40 --> N41
-    N9 --> N42
-    N42 --> N43
-    N45 --> N46
-    N46 --> N47
-    N60 --> N47
-    N47 --> N48
-    N48 --> N49
-    N47 --> N50
-    N50 --> N51
-    N51 --> N52
-    N52 --> N53
-    N53 --> N54
-    N54 --> N55
-    N57 --> N56
-    N55 --> N56
-    N83 --> N56
-    N54 --> N57
-    N58 --> N59
-    N60 --> N61
-    N61 --> N62
-    N61 --> N63
-    N47 --> N63
-    N61 --> N64
-    N46 --> N64
-    N62 --> N65
-    N63 --> N65
-    N64 --> N65
-    N58 --> N65
-    N67 --> N66
-    N65 --> N67
-    N65 --> N68
-    N21 --> N68
-    N69 --> N70
-    N31 --> N70
-    N25 --> N71
-    N70 --> N71
-    N23 --> N72
-    N74 --> N76
-    N75 --> N76
-    N77 --> N78
-    N78 --> N79
-    N79 --> N80
-    N37 --> N80
-    N83 --> N84
-    N48 --> N85
-    N23 --> N86
-    N88 --> N86
-    N80 --> N86
-    N62 --> N86
-    N86 --> N87
-    N28 --> N88
-    N27 --> N89
-    N27 --> N90
-    N90 --> N91
-    N81 --> N91
-    N90 --> N92
-    N89 --> N92
-    N92 --> N93
-    N33 --> N93
-    N72 --> N94
-    N71 --> N94
-    N15 --> N95
-    N23 --> N96
-    N25 --> N96
-    N33 --> N97
-    N37 --> N97
-    N41 --> N97
-    N43 --> N97
-    N44 --> N98
-    N49 --> N98
-    N56 --> N98
-    N59 --> N99
-    N66 --> N99
-    N68 --> N99
-    N73 --> N99
-    N76 --> N99
-    N82 --> N99
-    N84 --> N99
-    N85 --> N99
-    N87 --> N99
-    N93 --> N99
-    N94 --> N99
+    N32 --> N40
+    N17 --> N41
+    N41 --> N44
+    N40 --> N44
+    N42 --> N44
+    N43 --> N44
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -476,37 +296,41 @@ flowchart LR
 
 | Risk / decision | Resolution and rationale |
 |---|---|
-| DEC-01 Upstream 2195c98f | Chosen: the epic-level b697a3f7 → 2195c98f edge stays. Each root waits on the specific 2195c98f tasks whose code it consumes, reduced so that no edge is implied by another (all 2195c98f roots already reach 842b0ac6). External dependency 7abcc22d → `readiness-derivation`. External dependency 3ee3a4d1 → `archive-reference-resolution-once`. External dependency 945f65f3 → `declaration-file-set`. External dependency 42bcaa6e → `configuration-assembler`, `domain-typed-errors`. External dependency bc1955a8 → `configuration-assembler`. External dependency e1a6c8c2 → `configuration-assembler`, `gate-preset-catalog`; it reaches 945f65f3, which `configuration-assembly-callers` also needs. External dependency f8f80eea → `declaration-capture-helper`. External dependency 5491edd0 → `control-files-publish-through-core`. External dependency 1f6d3754 → `layout-violation-domain-type`. External dependency 5c232305, 18dc6e3e, 855d027d → `root-relative-path-in-domain`. External dependency 182350ce → `domain-typed-errors`. External dependency c1c86312 → `issue-scope-type`. External dependency 179dcef9 → `write-if-changed-constructor`. External dependency 5fac48b8 → `creation-stamping-one-derivation`. These are reached transitively, so a direct edge would be rejected as redundant: 417be079 and e98ae5a4 (`bulk-field-events-converge` reaches them through `lease-check-in-session`'s external 6c0f8739), d72bf093, 804a8605, 75951558, cd8adfc1, 8e82fa49, c400730c, 62a0085a, 96bb0941, 2ac50581, 3f026bb1, 3e353abd, 488eb3c1, 79aa3aa7, a50e9be9, 8cfbf19d and 89e7a273. Rejected: one edge per root onto the whole epic, which would hold every entry until 2195c98f closes. |
-| DEC-02 Same-function neighbours | Chosen: our entries wait wherever they edit a function that another epic's open task edits. 842b0ac6: fbb661f2, 2492ab29 and 459bb995 are done, so they get no edge; 34361448 and 86d3625d are reached transitively. f8a6b298: external dependency c3e3e2ff → `lease-required-error`. External dependency d0d73bef → `archive-preview-through-execute-planner`, which also covers 5e1ba005 (the steward's archive-preview-reads-evidence). External dependency 6c0f8739 → `lease-check-in-session`, covering 0bd2c797: both edit `check_gate_with`, where that entry adds the preliminary lease check. `gate-evidence-capture` reaches 6c0f8739 through `lease-check-in-session`. External dependency 7244ecb2 → `lease-records-publish-through-core`, covering 2f563673 and 53d19851. External dependency 0851fae4 → `capability-fs-module`: 0851fae4 rewrites the gate-run readers that `capability-fs-error` edits, and both the importers and error leaves follow `capability-fs-module`. 0851fae4 also precedes `nofollow-store-reads` through `leaf-open-once`. External dependency 63de0883 → `claim-coordinator-opening`; 614a6f97 is reached through an ancestor's externals. f4d9502a: external dependency d9ba0029 → `archive-preview-through-execute-planner`. External dependency 7cd27db8 → `snapshot-from-one-image`. External dependency e6ec58f3 → `safe-path-validator-storage`. External dependency d7cce445 → `issue-lookup-one-path`. External dependency ea4b7363 → `claim-coordinator-opening`, covering f6eaba42. 9876a23a: external dependency 1f24e3e9 → `validate-fix-readiness-convergence`. External dependency 6ac41880 → `command-reads-captured-declarations`, covering 145b4d57 there; `config-manager-disk-readers-removal` follows it. External dependency 145b4d57 → `mutation-base-carries-declarations`. External dependency f22147ec → `executor-config-caches-removal`, covering 2c8c13b2, 208edf4c and 03bf6983. External dependency a106d1be → `gate-evaluation-resolves-once`. External dependency 5d5a1794 → `creation-initial-readiness`. b3a768b3 and 2b5f452c are reached transitively. Lead-friction: external dependency d5966ba2 → `archive-reference-resolution-once`, `archive-preview-through-execute-planner`. External dependency 39710b3b → `gate-evidence-capture`. 8673dc5e is done, so it gets no edge. v1-release: external dependency 4575a03d → `layout-violation-domain-type`. No edge onto 15009590, whose change leaves the `claims_mutation_guard` call shape alone. No edge onto 2f12d920 or b32a720e, which touch different structs. Rejected: the reverse edges, which would delay other epics. The steward may still choose c3e3e2ff after `lease-check-in-session`, 0bd2c797 after `gate-evidence-capture`, or 2f563673 after `atomic-publication-core`. |
-| DEC-03 df129d9e facades | Chosen: no edge either way with df129d9e (a015dcbb, fd2073b7, a24b11aa, 0bc448fb, 1ac651c7, 24a982b7, 27f0a575, f79d2510, 2e0f276b, 083c9a91, d4373d07, 8c46fc85, 3cf69ecf, 182f4c03). Rejected: ordering edges, which serialize two epics for mechanical moves. |
-| Integration notes (DEC-03) | Whichever task lands second adapts. Where a facade or library handler exists when one of our entries lands, the entry edits the method in its facade location with the facade's bounds, and edits the handler module instead of the `main.rs` arm. That covers the archive and snapshot entries under a015dcbb, 3cf69ecf and 182f4c03; the preset and gate entries under fd2073b7, 1ac651c7 and a24b11aa; the status entry under 24a982b7; the issue, bulk and claims entries under 27f0a575, f79d2510, 2e0f276b and 083c9a91; and liveness under d4373d07 and 8c46fc85. If 0bc448fb lands first and exposes `rules`, `effective_rules` or `config_manager` publicly, `executor-config-caches-removal` and `config-manager-disk-readers-removal` delete those exposures. If they land first, 0bc448fb no longer has them to expose. |
+| DEC-01 Upstream 2195c98f | Chosen: the epic-level b697a3f7 → 2195c98f edge stays. Each task waits on the specific 2195c98f tasks whose code it consumes, reduced so that no edge is implied by another. External dependency 7abcc22d → `readiness-derivation`. External dependency 3ee3a4d1 → `archive-reference-resolution-once`. External dependency 42bcaa6e → `configuration-assembly`, `domain-typed-errors`. External dependency bc1955a8, e1a6c8c2 → `configuration-assembly`; e1a6c8c2 reaches 945f65f3, and `gate-preset-catalog` and `snapshot-from-one-image` reach `configuration-assembly`. External dependency f8f80eea → `captured-declaration-reads`. External dependency 5491edd0 → `control-files-publication`. External dependency 1f6d3754, 182350ce → `domain-typed-errors`. External dependency 5c232305, 18dc6e3e, 855d027d → `root-relative-path-in-domain`. External dependency c1c86312 → `issue-scope-type`. External dependency 5fac48b8 → `readiness-in-mutation-plans`, whose creation step edits the drafts 5fac48b8 changes. These are reached transitively: 417be079 and e98ae5a4 (through `lease-check-in-session`'s external 6c0f8739), d72bf093, 804a8605, 75951558, cd8adfc1, 8e82fa49, c400730c, 62a0085a, 96bb0941, 2ac50581, 3f026bb1, 3e353abd, 488eb3c1, 79aa3aa7, a50e9be9, 8cfbf19d and 89e7a273. 179dcef9 gets no edge: the write-if-changed work it bordered is dropped. Rejected: one edge per root onto the whole epic, which would hold every task until 2195c98f closes. |
+| DEC-02 Same-function neighbours | Chosen: our tasks wait wherever they edit a function that another epic's open task edits. 842b0ac6 (archived): fbb661f2, 2492ab29, 459bb995, 34361448 and 86d3625d are done, so they get no edge. f8a6b298: external dependency c3e3e2ff → `lease-check-in-session`. External dependency d0d73bef → `archive-preview-through-execute-planner`, which also covers 5e1ba005 (archive preview reads the per-target evidence record). External dependency 6c0f8739 → `lease-check-in-session`, covering 0bd2c797: both edit `check_gate_with`; `gate-evidence-capture` reaches 6c0f8739 through `lease-check-in-session`. External dependency 7244ecb2 → `control-files-publication`, covering 2f563673 and 53d19851. External dependency 0851fae4 → `capability-fs-module`: 0851fae4 rewrites the gate-run readers that `capability-fs-module` edits and owns their lstat-then-open sequence; `leaf-open-once` follows it. f4d9502a: external dependency d9ba0029 → `archive-preview-through-execute-planner`. External dependency 7cd27db8 → `snapshot-from-one-image`. External dependency e6ec58f3 → `one-safe-path-validator`. 63de0883, ea4b7363, f6eaba42 and d7cce445 get no edge: the claims-opening and issue-loading work they bordered is dropped. 9876a23a: external dependency 1f24e3e9 → `validate-fix-readiness-convergence`, `lock-free-read-consumers`; the latter moves the `--fix --dry-run` derivation 1f24e3e9 introduces onto the read driver. External dependency 6ac41880 → `captured-declaration-reads`, covering 145b4d57 there; `executor-config-caches-removal` follows it. External dependency 145b4d57 → `declarations-on-mutation-base`. External dependency f22147ec → `executor-config-caches-removal`, covering 2c8c13b2, 208edf4c and 03bf6983. External dependency a106d1be → `gate-evidence-capture`. External dependency 5d5a1794 → `readiness-in-mutation-plans`. b3a768b3 and 2b5f452c are reached transitively. Lead-friction: external dependency d5966ba2 → `archive-reference-resolution-once`, which `archive-preview-through-execute-planner` follows. 39710b3b and 8673dc5e are done. v1-release: external dependency 4575a03d → `domain-typed-errors`. No edge onto 15009590, whose change leaves the `claims_mutation_guard` call shape alone, or onto 2f12d920 or b32a720e, which touch different structs. Rejected: the reverse edges, which would delay other epics. The steward may still choose c3e3e2ff after `lease-check-in-session`, 0bd2c797 after `gate-evidence-capture`, or 2f563673 after `atomic-publication-core`. |
+| DEC-03 df129d9e facades | Chosen: no edge either way with df129d9e (a015dcbb, fd2073b7, a24b11aa, 0bc448fb, 1ac651c7, 24a982b7, f79d2510, 2e0f276b, 083c9a91, 8c46fc85, 3cf69ecf, 182f4c03). 27f0a575 is done: the issue lifecycle entries edit `IssueOps` methods in `commands/issue.rs`. d4373d07 is done: the liveness entry cites the rewritten `commands/serve.rs`. Rejected: ordering edges, which serialize two epics for mechanical moves. |
+| Integration notes (DEC-03) | Whichever task lands second adapts. Where a facade or library handler exists when one of our entries lands, the entry edits the method in its facade location with the facade's bounds, and edits the handler module instead of the `main.rs` arm. That covers the archive and snapshot entries under a015dcbb, 3cf69ecf and 182f4c03; the preset and gate entries under fd2073b7, 1ac651c7 and a24b11aa; the status entry under 24a982b7; the issue, bulk and claims entries under f79d2510, 2e0f276b and 083c9a91; and liveness under 8c46fc85. If 0bc448fb lands first and exposes `rules`, `effective_rules` or `config_manager` publicly, `executor-config-caches-removal` deletes those exposures. If `executor-config-caches-removal` lands first, 0bc448fb no longer has them to expose. |
 | DEC-04 Lease ownership | Chosen: this epic decides only where the check runs (`lease-checked-writes`). bedf0962 (done) owns mode resolution, and f8a6b298 owns lease storage and the LeaseLock sequence. Rejected: changing the mode or storage here. |
 | DEC-05 One readiness derivation | Chosen: 1f24e3e9 ships with whatever readiness derivation exists when it lands. `validate-fix-readiness-convergence` waits for 1f24e3e9 and converges its loop onto `readiness-correction-intents` with scope `All`. Rejected: a second readiness derivation inside `--fix`. |
 | DEC-06 REQ-05 amended | Chosen: delete the uncalled `preview_bulk_update`, and make bulk apply one session and one redo record. Rejected: a new `--dry-run` feature, a capability nobody requested. |
 | DEC-07 REQ-10, REQ-12, REQ-17 amended | Chosen: "once per captured image", because preflight and record sessions capture separate images. For REQ-17, lease records and the claims sequence counter replace the deleted claims index. Rejected: once per attempt across images, which would need a cross-image parse cache. |
-| DEC-08 Lease scope | Chosen: `lease-checked-writes`. Assign, unassign, gate add, remove, evaluate, evaluate-many, evaluate-all, pass and fail, template apply, `dep add` and `dep rm` are classified claims-first. The lifecycle's preliminary refusal before prechecks stays. A strict unleased automated pass is refused through a preliminary captured check before its checker runs. The behaviour change is stated in `lease-check-in-session`, `lease-check-coverage` and `session-coherence-docs`. Rejected: today's checked set, which fails "every issue mutation". |
-| DEC-09 Read-only session | Chosen: `read-only-session` for archive preview and candidates, snapshot export, declaration reads and the bulk derivation. Rejected: a lock-free read-session type, a second mechanism that would need its own leftover-record rule. |
-| DEC-10 Readiness semantics | Chosen: promotion through graph rules, direct demotion, `Affected` scope, corrections in the primary record. The fixes for rejection promoting dependents and for leaving Done demoting Ready dependents are stated in `readiness-in-update-plans`. Rejected: direct promotion, which drops `transition_blocked` events, and scope `All` everywhere, which repairs unrelated drift silently. |
+| DEC-08 Lease scope | Chosen: `lease-checked-writes`. Assign, unassign, gate add, remove, evaluate, evaluate-many, evaluate-all, pass and fail, template apply, `dep add` and `dep rm` are classified claims-first. The lifecycle's preliminary refusal before prechecks stays. A strict unleased automated pass is refused through a preliminary captured check before its checker runs. The behaviour change is stated and documented in `lease-check-in-session` and `lease-check-coverage`. Rejected: today's checked set, which fails "every issue mutation". |
+| DEC-09 Read discipline | Chosen: reads capture lock-free behind `optimistic-read-admission`, through `read-session-driver`, falling back to the operation's mutation session after four refused attempts (`@/charter/D-22`). The preview and the operation share one capture-and-derive function over `read-session`, so D-20 holds without a shared lock. Rejected: reading through the mutation session, which serializes every reader behind every writer and every other reader; a shared/exclusive flock, which still blocks readers on writers and lets readers starve writers; and re-reading the read set, which inode reuse makes unsound. `bulk-apply-one-session` is a writer and keeps no read contract. |
+| DEC-10 Readiness semantics | Chosen: promotion through graph rules, direct demotion, `Affected` scope, corrections in the primary record. The fixes for rejection promoting dependents and for leaving Done demoting Ready dependents are stated in `readiness-in-mutation-plans`. Rejected: direct promotion, which drops `transition_blocked` events, and scope `All` everywhere, which repairs unrelated drift silently. |
 | DEC-11 One state derivation | Chosen: prechecks become a captured precondition of any transition into InProgress in the shared derivation, so `issue update --state in_progress` stops skipping them (`state-derivation-convergence`). Rejected: routing update through the lifecycle request, which keeps two derivations. |
 | DEC-12 Candidates after image sharing | Chosen: `archive-candidates-one-session` follows `image-identity-token`. Risk: every candidate now shares one session's capture budget, so a repository whose candidates exceed it fails the listing. The worker records this repository's budget use as evidence. Rejected: one session per candidate, which contradicts REQ-06. |
-| DEC-13 Paths in the domain | Chosen: `RootRelativePath` moves into the domain behind a re-export bridge with one remover, and one validator replaces three. Path rule after the change: `classify_repository_relative` keeps stripping one leading `./` for every caller, so gate prompt files such as this repository's `prompt_file = "./contrib/gates/..."`, materialization and profile targets resolve as today. Both backends' `read_repo_file` parse their argument with `RootRelativePath::parse` before classification, so only that entry point refuses `./a` (it already refuses `a//b` and `a:b`). Pinned git reads apply the full grammar: `./`, `a//b`, `a:b`, `.`, `\` and control characters are refused. A configured item-kind source or registry spelled `./x` is refused through `read_repo_file`; this repository declares none. Stated in `safe-path-validator-storage`. Rejected: changing `classify_repository_relative`, which would break `./`-prefixed gate prompts; and a domain copy of the validator. |
+| DEC-13 Paths in the domain | Chosen: `RootRelativePath` moves into the domain in one task (`root-relative-path-in-domain`) that repoints every importer and leaves no re-export, and one validator replaces three. Path rule after the change: `classify_repository_relative` keeps stripping one leading `./` for every caller, so gate prompt files such as this repository's `prompt_file = "./contrib/gates/..."`, materialization and profile targets resolve as today. Both backends' `read_repo_file` parse their argument with `RootRelativePath::parse` before classification, so only that entry point refuses `./a` (it already refuses `a//b` and `a:b`). Pinned git reads apply the full grammar: `./`, `a//b`, `a:b`, `.`, `\` and control characters are refused. A configured item-kind source or registry spelled `./x` is refused through `read_repo_file`; this repository declares none. Stated in `one-safe-path-validator`. Rejected: changing `classify_repository_relative`, which would break `./`-prefixed gate prompts; and a domain copy of the validator. |
 | DEC-14 Snapshot declarations | Chosen: the declaration set derives from the layout, so the gate-presets directory is included because the layout declares it. Rejected: a hand list in snapshot. |
-| DEC-15 Configuration assembly | Chosen: one strict assembler. A malformed `[item_kinds]` is a structural load failure, and an image with an absent `config.toml` assembles the empty config (stated in `configuration-assembler`). Configuration file I/O lives in storage (`configuration-store` and its four sibling leaves), which supersedes 459bb995's note. The assembler builds on 459bb995's defaults and accessors. Rejected: keeping two pipelines, or keeping I/O in `config.rs`. |
+| DEC-15 Configuration assembly | Chosen: one strict assembler. A malformed `[item_kinds]` is a structural load failure, and an image with an absent `config.toml` assembles the empty config (stated in `configuration-assembler`). Configuration file I/O lives in storage (`configuration-store`), which supersedes 459bb995's note. The assembler builds on 459bb995's defaults and accessors. Rejected: keeping two pipelines, or keeping I/O in `config.rs`. |
 | DEC-16 Type extraction | Chosen: exact label values. `extract_type` is deleted, and `type:Epic` stops passing the taxonomy check (stated in `type-extraction-exact-values`). No adopter doc claims case-insensitive types. Rejected: lowercasing everywhere. |
-| DEC-17 Status summary | Chosen: only the location moves, because `backlog` already shipped in f7340f63f. Rejected: renaming again. |
-| DEC-18 REQ-15 proof | Chosen: `redo-subset-crash-proof` lands first as its own entry. `redo-directory-sync-coalescing` coalesces syncs only if the proof passes, and otherwise documents the crash case in rustdoc. Rejected: coalescing on the existing interruption tests, which cannot observe a lost directory entry. |
-| DEC-19 Profile opener | Chosen: profile imports the storage leaf open. No layer rule forbids profile from importing storage, so no bytes handoff is needed (`profile-reads-through-storage`). Rejected: a cited exception. |
-| DEC-20 Process liveness | Chosen: one guarded primitive in a crate-level process module (`process-liveness-primitive`), whose PID guard the signaling sites then use (`pid-guard-signal-sites`). EPERM counts as alive, and the non-unix policy is "alive". Rejected: a tri-state result with a policy per caller. |
-| DEC-21 Recover's claims-index write | Chosen: f8a6b298 53d19851 deletes `write_index_atomic`, including recover's unlocked `claims.index.tmp` write. `lease-records-publish-through-core` then routes the lease writes that replace it through `atomic-publication`. Rejected: fixing a function that is about to be deleted. |
+| DEC-17 Status summary | Chosen: no change. `backlog` already shipped in f7340f63f, and the relocation is dropped (DEC-26). |
+| DEC-18 REQ-15 proof | Chosen: `redo-apply-parents-once` lands the subset-replay proof before any sync moves, and coalesces only if the proof passes; otherwise it documents the crash case in rustdoc. Rejected: coalescing on the existing interruption tests, which cannot observe a lost directory entry. |
+| DEC-19 Profile opener | Chosen: profile imports the storage leaf open. No layer rule forbids profile from importing storage, so no bytes handoff is needed (`leaf-open-once`). Rejected: a cited exception. |
+| DEC-20 Process liveness | Chosen: one guarded primitive in a crate-level process module, whose PID guard the signaling sites use (`process-liveness-primitive`). EPERM counts as alive, and the non-unix policy is "alive". Rejected: a tri-state result with a policy per caller. |
+| DEC-21 Recover's claims-index write | Chosen: f8a6b298 53d19851 deletes `write_index_atomic`, including recover's unlocked `claims.index.tmp` write. `control-files-publication` then routes the lease writes that replace it through `atomic-publication`. Rejected: fixing a function that is about to be deleted. |
 | DEC-22 Shared candidate budget | Chosen: accept that every archive candidate shares one session's capture budget (DEC-12), so an oversized repository fails the whole listing instead of degrading per candidate. `archive-candidates-one-session` states this behaviour and records this repository's budget use as evidence. Rejected: one session per candidate, which brings back the quadratic captures this epic removes. |
-| Investigation corrections | The background's bulk "runs no cascade" is stale: bulk runs one post-batch cascade, which is still a follow-up publisher. Label edits already check the lease. There are three safe-path validators, not two. `StatusSummary` already reports `backlog`. A malformed `[item_kinds]` fails today's validation run rather than reporting a finding. The creation-stamping divergence is structural and cannot be observed today, so its test is an equality owner, not a regression. |
-| Behaviour changes | Each change is stated with its asserting test in the owning entry. Rejection promotes dependents, and leaving Done demotes them. Template edge promotion passes graph rules. `issue update --state in_progress` runs prechecks. Dedicated field commands run rules. Bulk is batch-atomic, and its prechecks run in one preflight before the publishing session. Bulk, `dep add`, `dep rm` and template apply check leases in session, and the reclassified commands, `gate evaluate-all` included, lock claims first. A strict unleased automated pass is refused before the checker runs. `--fix` promotions pass graph rules. An oversized precheck prompt fails at capture. A malformed `[item_kinds]` fails load, and an image without `config.toml` assembles the empty config. The linked-checkout refusal still takes no lock: it reads the stance through the storage loader. `read_repo_file` refuses `./a` while every other path input keeps stripping one leading `./`, and pinned reads apply the full path grammar (DEC-13). User-config writes become durable. The server PID file is synced, and a stale `server.pid.pid.tmp` no longer blocks a start. EPERM and non-unix count as alive, so `cleanup_stale_locks` keeps a lock held by another user's live process. A template node blocked by an in-template edge is created Backlog, with no Ready→Backlog demotion event and no `first_ready_at`. `type:Epic` is unknown. Check-links accepts `label:` scopes. An unmarked short-id archive directory is no longer adopted. Snapshot exports stored bytes and every declaration file. Archive preview, candidates, snapshot export and declaration reads hold the repository write lock through an unpublished mutation session, and candidates fail as a whole over the shared budget (DEC-22); `one-form-docs` documents both. Materialization rewrites an executable `rules.toml` whose text is current, to normalise its mode. The memory backend reports ancestor parse failures instead of skipping them. A cross-session plan over a byte-identical image is refused. Redo commit lands in the verified data root. |
-| Terminal sizing | Each terminal delivers one class with at most four criteria and about eight production files. No entry is kept whole for a build reason. The two type moves use named bridges, each with one remover. `capability-fs-bridge` is a re-export in the session module: `capability-fs-module` produces it and `capability-fs-importers` removes it. `root-relative-path-bridge` is a re-export in `repository_state::path`: `root-relative-path-in-domain` produces it and `root-relative-path-bridge-removal` removes it. The configuration loaders are public, so the storage loader coexists with them while callers move, and five leaves replace the former single entry. Deletions of public items are separate entries, because the build does not flag uncalled public items. Test relocations (`archive-discovery-tests-to-domain`, `effective-rules-tests-onto-declarations`, `configuration-load-tests-to-store`) precede the deletions that need them. |
-| REQ-10 literal reading | `derivations-use-base-declarations` keeps the configuration parse inside discovery rounds (`capture_discovering`). Each round parses a different, extended image, so "once per captured image" holds. Removing that parse would change `capture_discovering`'s 13 callers. |
-| Shared-file contention | `commands/mod.rs`, `issue.rs`, `gate.rs`, `gate_check.rs`, `bulk_update.rs`, `template.rs`, `commands/archive.rs`, `cli.rs`, `repository_state/mutation.rs` and the storage session module are edited by several entries. Edits to the same function are ordered by edges. The chains are: readiness, lease, state and then field (`bulk-field-events-converge` after `state-derivation-convergence`); the `CLAIM_FIRST_LEAF_COMMANDS` list through `lease-check-in-session`, `template-lease-in-session` and `lease-check-coverage`; the `finalize` arms through `write-if-changed-adoption`, `creation-stamping-one-derivation`, `creation-initial-readiness`, `ancestor-walker-once` and `present-or-create-helper`; `capture_archive_plan` through the archive preview, candidates and `citation-scan-module`; the server handler bounds through `frontend-reads-captured-declarations` and then `command-reads-captured-declarations`; the executor cache loaders, removed before `ConfigManager`; `mutation-base-carries-declarations` after `lease-check-coverage` and `gate-evidence-capture`; the control files after the lease records; the configuration-loading tests after `declaration-loaders-removal`; the claims opening before `configuration-store-callers`; and the RootRelativePath importer families after the capability error type and before the bridge removal, which follows `layout-violation-domain-type`. Round 2 adds: `readiness-follow-up-removal` after `bulk-field-events-converge`; `snapshot-from-one-image` and `root-relative-path-command-importers` after `capability-fs-importers` (`copy_jit_state`, `SnapshotExporter`); `ancestor-walker-once` after `root-relative-path-repository-state-importers` (`create_ancestors`, `ancestor_dirs`); `container-marker-constant` after `layout-violation-domain-type` (`finalize_archive_execution`); `check-links-through-issue-scope` after `command-reads-captured-declarations` (`check_document_links`); `capability-fs-error` after `root-relative-path-parse-error` (memory backend `resolve`); `control-files-publish-through-core` after `process-liveness-primitive` (the orphan-kill test) and after `export-and-user-config-publication`; and the gate-preset entries after `gate-preset-catalog-adoption`. `executor-config-caches-removal` is the last remover of the cached config and namespace accessors. Entries that edit distinct functions in one file run in parallel, and their workers rebase. |
-| Pre-executor write-policy read | `frontend-reads-captured-declarations` reads the linked-checkout write stance through the storage configuration loader, with no session and no lock. This is the stated exception to `read-only-session`: the refusal must precede every lock and redo replay (`main.rs` linked-checkout contract). The existing refusal tests keep passing. |
+| DEC-23 REQ-23 amended | Chosen: every redo record over a present data root appends an event, so the log's length counts commits (`@/charter/D-22`, `@/inv/event-log`). An event-less plan's publication adds one generic `files_published` event naming the paths it writes; `delta()` stays the derived delta, so drift reports, repair messages and previews are unchanged. Storage refuses a record without an append over a present root. The absent-root publication is exempt, because a reader sees the root appear. Rejected: a generation counter in the lock file, which is a second version source; and composing the event in storage, which would publish an event that no plan or preview shows. |
+| DEC-24 Read scope | Chosen, by user decision: archive preview and candidates, declaration reads, gate-preset reads, `jit validate` without `--fix` and with `--fix --dry-run`, `doc check-links`, and profile plans, difference reports and dry runs read through `read-session-driver`. `snapshot export` stays recovery-dispatched and keeps reading through the session dispatch retains (`snapshot-from-one-image`). `image_plan_content` and `validate_rule` move with the validation capture they share. Rejected: moving snapshot export, whose dispatch-level lock is out of scope. |
+| DEC-25 Benchmarks | Chosen: both harnesses build base `369d35a42` (the commit that added REQ-21–REQ-23, before any entry lands) and the tip in one run, and judge medians of in-run ratios, so host speed cancels. REQ-21: tip R(8)/R(1) ≥ 4 and W(8)/W(0) ≥ 0.8 with `doc check-links` readers beside a back-to-back `issue update` writer, on a host with at least 16 logical CPUs. REQ-22: bulk per-match slope at 2000 over 500 issues ≤ 1.5; per-candidate slope ≤ 0.5 × base with constant `config.toml` opens; declaration-attributable `dep add` time ≤ 0.7 × base; redo directory opens ≤ 0.6 × base. Directory and file counts come from `strace`, which the harness requires. Risk: a long read (validation on a large repository) under a back-to-back writer mostly takes the locked fallback, because any commit inside its capture refuses it; REQ-21 measures short reads only. Rejected: absolute timings, which depend on the host. |
+| DEC-26 Manifest size and task shape | Chosen, by user decision: the manifest has at most 50 issues, stories included. One coherent change within a module is one task: adding a form, moving its callers and deleting the old form land together, with their docs and tests. A task is split only when one worker genuinely cannot deliver and review it in one focused cycle. Merged tasks cite this decision under their sizing `warning_overrides`. Dropped REQ-20 sub-items, removed from the epic's criteria: status summary (relocation only, no behaviour or duplication risk); edit distance (two private copies of a small function with identical behaviour); claims-coordinator opening (call-site repetition in one module); issue loading (changes one not-found message); ancestor walking and present-or-create (internal duplication with no adopter-visible effect); write-if-changed (its only behaviour change is a file-mode nit on an executable `rules.toml`); creation stamping (the divergence is structural and cannot be observed); initialization errors (changes only an error source chain). Any of them can become a standalone issue. Rejected: one terminal per deliverable class, which produced 114 issues. |
+| Investigation corrections | The background's bulk "runs no cascade" is stale: bulk runs one post-batch cascade, which is still a follow-up publisher. Label edits already check the lease. There are three safe-path validators, not two. A malformed `[item_kinds]` fails today's validation run rather than reporting a finding. |
+| Behaviour changes | Each change is stated with its asserting test in the owning entry. Rejection promotes dependents, and leaving Done demotes them. Template edge promotion passes graph rules. `issue update --state in_progress` runs prechecks. Dedicated field commands run rules. Bulk is batch-atomic, and its prechecks run in one preflight before the publishing session. Bulk, `dep add`, `dep rm` and template apply check leases in session, and the reclassified commands, `gate evaluate-all` included, lock claims first. A strict unleased automated pass is refused before the checker runs. `--fix` promotions pass graph rules. An oversized precheck prompt fails at capture. A malformed `[item_kinds]` fails load, and an image without `config.toml` assembles the empty config. The linked-checkout refusal still takes no lock: it reads the stance through the storage loader. `read_repo_file` refuses `./a` while every other path input keeps stripping one leading `./`, and pinned reads apply the full path grammar (DEC-13). The server PID file is synced, and a stale `server.pid.pid.tmp` no longer blocks a start. EPERM and non-unix count as alive, so `cleanup_stale_locks` keeps a lock held by another user's live process. A template node blocked by an in-template edge is created Backlog, with no Ready→Backlog demotion event and no `first_ready_at`. `type:Epic` is unknown. Check-links accepts `label:` scopes. An unmarked short-id archive directory is no longer adopted. Snapshot exports stored bytes and every declaration file. The REQ-21 reads take no repository lock while uncontended. They complete a leftover redo record only through the locked fallback, and a leftover record that fallback cannot apply, as on a read-only filesystem, fails the read with the recovery-failed error. Candidates fail as a whole over the shared budget (DEC-22). Every event-less write appends one `files_published` event, and such a write over an uncertified torn tail is refused like any event-bearing write (DEC-23). Each owning task documents its read behaviour, and `event-per-commit` documents the event rule. A cross-session plan over a byte-identical image is refused. Redo commit lands in the verified data root. |
+| REQ-10 literal reading | `declarations-on-mutation-base` keeps the configuration parse inside discovery rounds (`capture_discovering`). Each round parses a different, extended image, so "once per captured image" holds. Removing that parse would change `capture_discovering`'s 13 callers. |
+| Shared-file contention | `commands/mod.rs`, `issue.rs`, `gate.rs`, `gate_check.rs`, `bulk_update.rs`, `template.rs`, `commands/archive.rs`, `repository_state/mutation.rs` and the storage session module are edited by several tasks. Edits to the same function are ordered by edges; tasks that edit distinct functions in one file run in parallel and rebase. Where two former neighbours now sit in different tasks, the later task is written against the earlier one's result: the readiness follow-up removal precedes the field derivation (`derive_field_update`); configuration assembly precedes the read-session interface; typed domain errors precede the safe-path validator (`repository_inputs.rs`); the `RootRelativePath` move precedes capability-fs (memory backend `resolve`, `copy_jit_state`); `leaf-open-once` and `redo-apply-parents-once` both edit `storage/capability_fs.rs` (the leaf open behind the parent walks, and the parent-handle map) with no edge, so whichever lands second rebases; `validate-fix-readiness-convergence` (its readiness step) and `lock-free-read-consumers` (its session parameter) both edit the one-capture `--fix` derivation 1f24e3e9 introduces, with no edge, so whichever lands second rebases; the archive preview, with the citation scan, precedes candidates, whose base and per-target split of `capture_archive_plan` precedes the container destination extraction and the legacy-fallback removal; the read-discipline statement in `storage-format.md` precedes each command list addition to it; and the ConfigManager disk readers go before `JitConfig::load`. |
+| Pre-executor write-policy read | `captured-declaration-reads` reads the linked-checkout write stance through the storage configuration loader, with no session and no lock. This is the stated exception to `read-session-driver`: the refusal must precede every lock and redo replay (`open_repository`'s contract in `commands/bootstrap.rs`). The existing refusal tests keep passing. |
 
 ## Investigation sources
 
 - [Investigation](investigation.md): claim classification, consumer sweeps, primitive verification and option analyses for four parts: session coherence and bulk; archive and snapshot; configuration, caches, presets, evidence and images; and storage primitives, redo apply and publication.
-- [Vision charter](../../vision/9db27a3a-charter.md): decisions D-17, D-18 and D-20.
+- [Vision charter](../../vision/9db27a3a-charter.md): decisions D-17, D-18, D-20 and D-22.
+- [Read concurrency](investigation-read-concurrency.md): option analysis, admission soundness, liveness, interface and benchmark design for D-22.

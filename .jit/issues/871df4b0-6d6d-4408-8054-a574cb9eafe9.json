@@ -9,21 +9,11 @@
   "description": "Bring the doctest substep under the per-test bound by keeping only rustdoc examples that clarify non-obvious behaviour.\n\n## Background\n\nThe `cargo-ci` doctest substep runs 61 doctests in 4.4 s, 21% of the warm suite clock. The workspace is on edition 2021, so rustdoc compiles and links each doctest against the `jit` library separately. Most examples sit in `validation/engine.rs`, `output.rs`, `domain/item.rs`, `config.rs`, `graph/hierarchy.rs`, `domain/queries.rs`, `visualization.rs` and `repository_state/default_rules.rs` under `crates/jit/src`. `@/inv/essential-code-prose` admits an example only where it clarifies non-obvious behaviour, and `cargo-ci` fails when a doctest is ignored.\n\n## Success Criteria\n\n- [hard] REQ-01: The doctest substep of `cargo-ci` takes under 5 s on a warm target at load ≤ 10, measured under the build turnstile.\n- [hard] REQ-02: Each rustdoc example that is removed either restated a property a unit test owns, or its property gains a unit test.\n- [hard] REQ-03: Each remaining example clarifies non-obvious behaviour, and none is ignored.\n\n## Notes\n\nExamples in feature-gated parser modules stay as they are.\n",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "b2bc900087b9bd24adb8eae71f57b3144246015ff2f77c2b1b9821768be2820f",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "../../active/c780514e-test-topology/plan.md",
-          "resolved_path": "dev/active/c780514e-test-topology/plan.md"
-        }
-      ],
       "commit": null,
       "doc_type": "implementation",
       "format": "markdown",
       "label": "Doctest timing evidence",
-      "path": "dev/benchmarks/test-topology-c780514e/README.md"
+      "path": "dev/archive/c780514e-test-topology/benchmarks/test-topology-c780514e/README.md"
     }
   ],
   "done_at": "2026-10-22T20:47:24.186764724Z",
@@ -62,5 +52,5 @@
   "priority": "high",
   "state": "done",
   "title": "Doctest substep fits within the per-test bound",
-  "updated_at": "2026-10-22T20:47:24.186764724Z"
+  "updated_at": "2026-11-01T11:26:47.305861750Z"
 }

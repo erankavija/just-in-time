@@ -1,0 +1,42 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T05:32:14.413124121Z",
+  "context": {},
+  "created_at": "2026-11-01T05:32:13.190937551Z",
+  "dependencies": [],
+  "description": "Stop the crate-source digest self-check going stale after a merge from main.\n\n## Background\n\n`test_crate_source_sha256_of_this_crate_is_the_digest_compiled_in` (`crates/jit/src/crate_source_digest.rs`) fails after merging main, and leads clear it with `cargo clean -p jit`. `build.rs` emits `rerun-if-changed` for `Cargo.toml`, `build.rs` and `src` and compiles the digest in through `rustc-env`. Whether the build script is skipped or the digest covers different source than the test later reads is undiagnosed. Removing the self-check or the digest is preferred if a simpler key would serve.\n\n## Success Criteria\n\n- [hard] REQ-01: A reproduction states the cause, recorded in the fixing commit.\n- [hard] REQ-02: Merging a change to `crates/jit/src` and rerunning the suite passes without `cargo clean`.\n",
+  "documents": [],
+  "done_at": "2026-11-01T08:01:25.997470347Z",
+  "first_ready_at": "2026-11-01T05:32:13.190937551Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "bc97c18f-78ac-4a7d-b783-0a1ebf67ef7e",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:57:32.977448856Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2c04bfb7-c933-4c15-a4d0-ec4e97975914",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:00:29.701045800Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "28a7bde1-84c4-4984-94c2-91728612f2d5",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:testing",
+    "per:@/charter/D-18",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Crate-source digest self-check does not go stale after a merge",
+  "updated_at": "2026-11-01T08:01:25.997470347Z"
+}

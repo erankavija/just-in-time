@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-12a0a694",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0e1342f03ae4ab800f7bd68f66384ffc527e9450",
+  "completed_at": "2026-11-01T07:24:03.947767854Z",
+  "duration_ms": 184519,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/gate_check.rs",
+        "id": "F1",
+        "line": 3169,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/12a0a694/requirement/REQ-02",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "No checker-level test verifies that an ambiguous target prefix produces an error run naming the offending label."
+      }
+    ],
+    "summary": "One issue-impact blocking test gap leaves REQ-02's ambiguous-target fault contract unproven.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "12a0a694-5dca-441d-8a3f-9e9fcf72364c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "981b3b20-87e0-491a-9095-033e7f2d79f1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:20:59.427889080Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3392 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-12a0a694\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a195fb-a8aa-7540-95c4-2384f1c5b8f4\n--------\nuser\n--- 3379 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0e1342f03, bbcf19b7d (jit:12a0a694)\nPolicy sources: AGENTS.md\nResolved items: @/issue/12a0a694/requirement/REQ-01..03 (.jit issue description); @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci, @/gate/docs-mechanical, @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 75); docs-mechanical passed (exit 0); code-review pending\nTruncation recovery: narrowed resolver/test and gate-preset projection reads after broad search output truncated\n\n1. **Blocking, issue-impact** — `crates/jit/src/commands/gate_check.rs:3169` has coverage for an unknown target and the new unique-short-id success path, but no checker-level test creates an ambiguous prefix and verifies an error run containing the offending label. This leaves the explicit ambiguous-target portion of REQ-02 unproven. References: `@/issue/12a0a694/requirement/REQ-02`, `@/invariant/orthogonal-tests`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact blocking test gap leaves REQ-02's ambiguous-target fault contract unproven.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No checker-level test verifies that an ambiguous target prefix produces an error run naming the offending label.\",\"file\":\"crates/jit/src/commands/gate_check.rs\",\"line\":3169,\"references\":[\"@/issue/12a0a694/requirement/REQ-02\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

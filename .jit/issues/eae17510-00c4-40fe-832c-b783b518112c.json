@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T01:43:26.206626138Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Aggregate the work that delivers this outcome: finalization is proven in repository state and every IssueStore backend runs one conformance suite.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Mutation finalization is proven once, in the repository-state layer, and storage tests cover only the behaviour a backend adds.\n- [hard] REQ-02: Both `IssueStore` backends run one shared reader and writer conformance suite, including path reads, decoding and commit-pinned reads, and backend tests cover only backend-specific behaviour.\n",
   "documents": [],
+  "done_at": "2026-11-01T04:37:51.894999666Z",
+  "first_ready_at": "2026-11-01T01:42:11.373019282Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "26e89572-254d-4c26-bbb6-cd76c16ca0b5",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:34:22.704808672Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "3c862a43-9d93-44dd-8071-c06ce33da252",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:36:00.904187930Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "eae17510-00c4-40fe-832c-b783b518112c",
   "labels": [
     "type:story",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Storage behaviour is proven once per contract",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T04:37:51.894999666Z"
 }

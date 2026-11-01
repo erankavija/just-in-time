@@ -34,7 +34,10 @@ default_type = "task"
     );
 
     let validation = config.validation.unwrap();
-    assert_eq!(validation.strictness, Some("loose".to_string()));
+    assert_eq!(
+        validation.strictness,
+        Some(jit::validation::Strictness::Loose)
+    );
     assert_eq!(validation.default_type, Some("task".to_string()));
 }
 
@@ -44,7 +47,10 @@ fn test_handle_missing_config_file() {
     let storage = JsonFileStorage::new(temp_dir.path());
 
     // Config file doesn't exist - should fall back to defaults
-    let config = JitConfig::load(storage.root()).unwrap();
+    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        storage.root(),
+    ))
+    .unwrap();
 
     // Should be None (uses defaults)
     assert!(config.type_hierarchy.is_none());
@@ -68,7 +74,10 @@ feature = "epic"
     std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
 
     // Load config
-    let config = JitConfig::load(storage.root()).unwrap();
+    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        storage.root(),
+    ))
+    .unwrap();
     let hierarchy = config.type_hierarchy.unwrap();
 
     assert_eq!(hierarchy.types.get("theme"), Some(&1));
@@ -109,7 +118,7 @@ fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
         .evaluate_graph_rules(&issues)
         .unwrap()
         .into_iter()
-        .filter(|gf| gf.issue_id.as_deref() == Some(issue_id.as_str()))
+        .filter(|gf| gf.issue_id.as_ref() == Some(&issue_id))
         .collect();
     assert!(
         warnings.is_empty(),
@@ -130,6 +139,8 @@ types = { broken syntax
     std::fs::write(storage.root().join("config.toml"), bad_toml).unwrap();
 
     // Should return error
-    let result = JitConfig::load(storage.root());
+    let result = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        storage.root(),
+    ));
     assert!(result.is_err());
 }

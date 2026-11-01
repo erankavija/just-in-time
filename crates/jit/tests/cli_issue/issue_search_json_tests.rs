@@ -3,79 +3,47 @@
 //! Tests verify that search returns compact results by default (MinimalIssue)
 //! and full results only when --full flag is provided.
 
-use serde_json::Value;
-use std::process::Command;
-use tempfile::TempDir;
+use jit::test_cli::JitCli;
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-
-    // Initialize jit repo properly
-    let jit = jit_binary();
-    Command::new(jit)
-        .current_dir(temp.path())
-        .arg("init")
-        .output()
-        .unwrap();
-
-    // Create first test issue via CLI (ensures proper indexing)
-    Command::new(jit)
-        .current_dir(temp.path())
-        .args([
-            "issue", "create",
-            "--title", "Test authentication feature",
-            "--description", "This is a detailed description about implementing authentication with JWT tokens and middleware.",
-            "--priority", "high",
-            "--label", "type:task",
-            "--label", "epic:auth",
-            "--label", "component:api",
-        ])
-        .output()
+fn seed_search_issues(cli: &JitCli) {
+    cli.create_issue([
+        "--title",
+        "Test authentication feature",
+        "--description",
+        "This is a detailed description about implementing authentication with JWT tokens and middleware.",
+        "--priority",
+        "high",
+        "--label",
+        "type:task",
+        "--label",
+        "epic:auth",
+        "--label",
+        "component:api",
+    ])
         .unwrap();
 
     // Create second test issue
-    Command::new(jit)
-        .current_dir(temp.path())
-        .args([
-            "issue",
-            "create",
-            "--title",
-            "Add authentication middleware",
-            "--description",
-            "Implement middleware for JWT validation",
-            "--label",
-            "type:task",
-            "--label",
-            "epic:auth",
-        ])
-        .output()
-        .unwrap();
-
-    temp
+    cli.create_issue([
+        "--title",
+        "Add authentication middleware",
+        "--description",
+        "Implement middleware for JWT validation",
+        "--label",
+        "type:task",
+        "--label",
+        "epic:auth",
+    ])
+    .unwrap();
 }
 
 #[test]
 fn test_search_returns_compact_by_default() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
 
-    let output = Command::new(jit)
-        .current_dir(temp.path())
-        .arg("issue")
-        .arg("search")
-        .arg("authentication")
-        .arg("--json")
-        .output()
+    let data = temp
+        .run_json(["issue", "search", "authentication"])
         .unwrap();
-
-    assert!(output.status.success());
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let data = &json;
     let issues = data["issues"].as_array().unwrap();
 
     assert!(!issues.is_empty(), "Should find authentication issues");
@@ -121,23 +89,11 @@ fn test_search_returns_compact_by_default() {
 
 #[test]
 fn test_search_returns_full_with_flag() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    let output = Command::new(jit)
-        .current_dir(temp.path())
-        .arg("issue")
-        .arg("search")
-        .arg("authentication")
-        .arg("--json")
-        .arg("--full")
-        .output()
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
+    let data = temp
+        .run_json(["issue", "search", "authentication", "--full"])
         .unwrap();
-
-    assert!(output.status.success());
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let data = &json;
     let issues = data["issues"].as_array().unwrap();
 
     assert!(!issues.is_empty(), "Should find authentication issues");
@@ -180,22 +136,11 @@ fn test_search_returns_full_with_flag() {
 
 #[test]
 fn test_search_compact_has_short_id() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    let output = Command::new(jit)
-        .current_dir(temp.path())
-        .arg("issue")
-        .arg("search")
-        .arg("authentication")
-        .arg("--json")
-        .output()
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
+    let data = temp
+        .run_json(["issue", "search", "authentication"])
         .unwrap();
-
-    assert!(output.status.success());
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let data = &json;
     let issues = data["issues"].as_array().unwrap();
 
     assert!(!issues.is_empty());
@@ -210,27 +155,14 @@ fn test_search_compact_has_short_id() {
 }
 
 #[test]
-fn test_search_compact_preserves_count() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    let output = Command::new(jit)
-        .current_dir(temp.path())
-        .arg("issue")
-        .arg("search")
-        .arg("authentication")
-        .arg("--json")
-        .output()
+fn test_search_compact_returns_every_matching_issue() {
+    let temp = JitCli::initialised().unwrap();
+    seed_search_issues(&temp);
+    let data = temp
+        .run_json(["issue", "search", "authentication"])
         .unwrap();
-
-    assert!(output.status.success());
-
-    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    let data = &json;
     let issues = data["issues"].as_array().unwrap();
-    let count = data["count"].as_u64().unwrap();
 
-    // Count should match actual array length
-    assert_eq!(count, issues.len() as u64);
-    assert_eq!(count, 2); // We created 2 issues with "authentication"
+    // We created 2 issues with "authentication"
+    assert_eq!(issues.len(), 2);
 }

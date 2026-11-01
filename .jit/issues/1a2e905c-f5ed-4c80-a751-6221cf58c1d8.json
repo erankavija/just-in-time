@@ -27,7 +27,7 @@
     "satisfies:f8a6b298/REQ-05"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Lease status reports staleness computed at read time",
-  "updated_at": "2026-10-21T10:40:06.516719713Z"
+  "updated_at": "2026-10-25T03:53:50.397824323Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dc3d63f6f172cd4916504b23ba61defaad4624f7",
+  "completed_at": "2026-10-27T00:13:57.784260322Z",
+  "duration_ms": 191162,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The fast_rules suite now uses the shared issue fixture with no assertion changes or attributable defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b90b1660-6ea6-48b3-9866-df8709838ebb",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f7911df3-697a-4b3d-b49e-9ac0f734627e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:10:46.621491509Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b2c7dd052; a0b4733ee (relevant merged `fast_rules` hunk)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-06 (issue description)\nGate evidence: cargo-ci passed (2026-10-27T00:10:22Z; exit code unavailable); code-review pending\nTruncation recovery: none\n\n1. No findings. The local fixture was removed, all existing suite calls resolve to the shared `jit::test_utils::fixture_issue`, and its behavior is identical to the removed implementation.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The fast_rules suite now uses the shared issue fixture with no assertion changes or attributable defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

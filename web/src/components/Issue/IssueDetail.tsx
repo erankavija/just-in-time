@@ -292,7 +292,7 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
           justifyContent: 'space-between',
           alignItems: 'center',
         }}>
-          <span>$ issue #{issue.id.substring(0, 8)}</span>
+          <span>$ issue #{issue.short_id}</span>
           {onFocusInGraph && (
             <button
               onClick={() => onFocusInGraph(issue.id)}
@@ -422,7 +422,7 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
             → Dependencies ({issue.dependencies.length})
           </h2>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {issue.dependencies.map((depId) => {
+            {issue.dependencies.map(({ id: depId, short_id: depShortId }) => {
               const depIssue = allIssues.find(i => i.id === depId);
               const depTitle = depIssue?.title || 'Unknown issue';
               
@@ -457,7 +457,7 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
                     {depTitle}
                   </span>
                   <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
-                    #{depId.substring(0, 8)}
+                    #{depShortId}
                   </span>
                 </li>
               );

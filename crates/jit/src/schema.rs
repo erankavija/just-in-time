@@ -580,8 +580,28 @@ impl CommandSchema {
                 Some(schema_to_value::<IssueChildrenResponse>()),
                 "IssueChildrenResponse",
             ),
+            "issue_progress" => (
+                Some(schema_to_value::<ContainerProgressResponse>()),
+                "ContainerProgressResponse",
+            ),
 
             // Gate commands
+            "gate_status" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<GateRunSummary>(),
+                        schema_to_value::<GateRunHistoryResponse>(),
+                        schema_to_value::<GateFlatReportResponse>(),
+                        schema_to_value::<GateFindingsResponse>(),
+                        { "type": "null" },
+                    ],
+                    "description": "Default shape: the gate's latest run. With --all or \
+                        --limit: the count-wrapped run history. With --stdout, --stderr or \
+                        --tail: the stored report text. With --findings: the structured \
+                        findings and verdict. null when the selected gate has not run."
+                });
+                (Some(union), "GateRunSummary")
+            }
             "gate_status-all" => (
                 Some(schema_to_value::<GateCheckAllResponse>()),
                 "GateCheckAllResponse",
@@ -630,6 +650,11 @@ impl CommandSchema {
             // `query blocked` is the one query whose --full variant is NOT a
             // record dump: both shapes build on MinimalIssue and carry no
             // gate-list fields; a blocking gate appears only as a reason.
+            "query_count" => (Some(schema_to_value::<StateRollup>()), "StateRollup"),
+            "query_divergence" => (
+                Some(schema_to_value::<DivergenceResponse>()),
+                "DivergenceResponse",
+            ),
             "query_blocked" => {
                 let union = json!({
                     "oneOf": [
@@ -658,7 +683,7 @@ impl CommandSchema {
                 Some(schema_to_value::<GraphDepsTreeResponse>()),
                 "GraphDepsTreeResponse",
             ),
-            "graph_downstream" => (
+            "graph_rdeps" => (
                 Some(schema_to_value::<GraphDownstreamResponse>()),
                 "GraphDownstreamResponse",
             ),
@@ -710,6 +735,22 @@ impl CommandSchema {
                 "NamespacesResponse",
             ),
             "search" => (Some(schema_to_value::<SearchResponse>()), "SearchResponse"),
+            "gate_preset_list" => (
+                Some(schema_to_value::<GatePresetListResponse>()),
+                "GatePresetListResponse",
+            ),
+            "events_tail" | "events_query" => (
+                Some(schema_to_value::<EventListResponse>()),
+                "EventListResponse",
+            ),
+            "label_values" => (
+                Some(schema_to_value::<LabelValuesResponse>()),
+                "LabelValuesResponse",
+            ),
+            "claim_status" | "claim_list" => (
+                Some(schema_to_value::<LeaseListResponse>()),
+                "LeaseListResponse",
+            ),
             "worktree_list" => (
                 Some(schema_to_value::<WorktreeListResponse>()),
                 "WorktreeListResponse",
@@ -718,6 +759,44 @@ impl CommandSchema {
                 Some(schema_to_value::<WorktreeStoreDivergenceResponse>()),
                 "WorktreeStoreDivergenceResponse",
             ),
+            "doc_list" => (
+                Some(schema_to_value::<crate::commands::DocumentListResult>()),
+                "DocumentListResult",
+            ),
+            "doc_assets_list" => (
+                Some(schema_to_value::<crate::commands::AssetListResult>()),
+                "AssetListResult",
+            ),
+            "item_list" | "item_search" => (
+                Some(schema_to_value::<crate::commands::ItemListResult>()),
+                "ItemListResult",
+            ),
+            "invariant_check" => (
+                Some(schema_to_value::<crate::commands::InvariantCheckResult>()),
+                "InvariantCheckResult",
+            ),
+            "project_render" => (
+                Some(schema_to_value::<crate::commands::ProjectRenderResult>()),
+                "ProjectRenderResult",
+            ),
+            "archive_candidates" => (
+                Some(schema_to_value::<
+                    crate::domain::artifact_plan::ArchiveCandidates,
+                >()),
+                "ArchiveCandidates",
+            ),
+            // Without `--execute` the command previews the plan it would run.
+            "archive_document" | "archive_container" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<crate::domain::artifact_plan::ArtifactPlan>(),
+                        schema_to_value::<crate::domain::artifact_execution::ArchiveExecutionResult>(),
+                    ],
+                    "description": "Default: the ArtifactPlan preview. With --execute: \
+                        the ArchiveExecutionResult of the run."
+                });
+                (Some(union), "ArtifactPlan")
+            }
 
             // Default: no specific schema
             _ => (None, "CommandResponse"),
@@ -732,14 +811,14 @@ impl CommandSchema {
 
     fn generate_types() -> HashMap<String, Value> {
         use crate::declarations::GateChecker;
-        use crate::domain::State;
+        use crate::domain::{Priority, State};
 
         let mut types = HashMap::new();
 
         // Derive the enum from the authoritative `State` enumeration so every
         // real variant (including `rejected`) surfaces and future variants
         // cannot silently drift out of the contract (@/inv/single-source-prose).
-        let state_values: Vec<Value> = State::all()
+        let state_values: Vec<Value> = State::ALL
             .iter()
             .map(|state| Value::String(state.as_str().to_string()))
             .collect();
@@ -752,11 +831,15 @@ impl CommandSchema {
             }),
         );
 
+        let priority_values: Vec<Value> = Priority::ALL
+            .iter()
+            .map(|priority| Value::String(priority.as_str().to_string()))
+            .collect();
         types.insert(
             "Priority".to_string(),
             json!({
                 "type": "enum",
-                "enum": ["low", "normal", "high", "critical"],
+                "enum": priority_values,
                 "description": "Issue priority level"
             }),
         );
@@ -1273,23 +1356,29 @@ mod tests {
         assert!(props.get("count").is_some(), "list envelope count");
         assert!(props.get("root").is_some(), "scoping root id");
 
-        // The node shape carries the four resolved-hierarchy fields.
-        let node_schema = serde_json::to_string(
-            schema_val
-                .pointer("/definitions/HierarchyNodeView")
-                .expect("HierarchyNodeView definition"),
-        )
-        .unwrap();
-        for field in ["parent", "children", "cluster", "rank"] {
-            assert!(
-                node_schema.contains(&format!("\"{field}\"")),
-                "node schema should describe the {field} field"
-            );
+        let export_schema = published_output_schema(&["graph", "export"]);
+        let full_schema = &export_schema["oneOf"][1];
+        for (root, node) in [
+            (schema_val, "HierarchyNodeView"),
+            (full_schema, "GraphExportFullNode"),
+        ] {
+            let properties = &root["definitions"][node]["properties"];
+            for field in ["parent", "cluster"] {
+                assert_eq!(
+                    properties[field]["type"],
+                    json!(["string", "null"]),
+                    "{node}.{field} remains a nullable string: {}",
+                    properties[field],
+                );
+            }
+            assert_eq!(properties["children"]["type"], "array");
+            assert_eq!(properties["children"]["items"]["type"], "string");
+            assert_eq!(properties["rank"]["type"], "integer");
         }
     }
 
     /// REQ-01: the schema's `State` enum must list every real `State` variant,
-    /// derived from the authoritative `State::all()` enumeration. A hand-copied
+    /// derived from the authoritative `State::ALL` enumeration. A hand-copied
     /// list that drops `rejected` (or any future variant) must fail this test.
     #[test]
     fn test_schema_state_enum_covers_every_state() {
@@ -1312,14 +1401,11 @@ mod tests {
         );
 
         // Guard against drift in either direction: the schema enum must equal
-        // the authoritative `State::all()` enumeration exactly.
-        let expected: Vec<String> = State::all()
-            .iter()
-            .map(|s| s.as_str().to_string())
-            .collect();
+        // the authoritative `State::ALL` enumeration exactly.
+        let expected: Vec<String> = State::ALL.iter().map(|s| s.as_str().to_string()).collect();
         assert_eq!(
             enum_vals, expected,
-            "schema State enum must match State::all() exactly (single source of truth)"
+            "schema State enum must match State::ALL exactly (single source of truth)"
         );
     }
 
@@ -1896,6 +1982,27 @@ mod tests {
                      the storage names); got {props:?}"
                 ),
             }
+        }
+    }
+
+    #[test]
+    fn test_schema_list_results_declare_count_beside_their_collection() {
+        for (path, collection) in [
+            (&["doc", "list"][..], "documents"),
+            (&["doc", "assets", "list"], "assets"),
+            (&["item", "list"], "items"),
+            (&["item", "search"], "items"),
+            (&["invariant", "check"], "findings"),
+            (&["project", "render"], "projections"),
+            (&["archive", "candidates"], "candidates"),
+            (&["archive", "document"], "artifacts"),
+            (&["archive", "container"], "artifacts"),
+        ] {
+            let props = declared_property_names(&published_output_schema(path));
+            assert!(
+                props.contains("count") && props.contains(collection),
+                "{path:?} must declare `count` beside `{collection}`; got {props:?}"
+            );
         }
     }
 

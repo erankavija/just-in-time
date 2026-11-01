@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:17:57.329703830Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,12 +9,26 @@
   ],
   "description": "Introduce the validated issue-id type and the temporary bridge that lets each layer adopt the `IssueId` name while the workspace stays green.\n\n## Background\n\nIssue ids are `String` throughout: `Issue.id` and `Issue.dependencies` (`crates/jit/src/domain/types.rs:414,427`), `MinimalIssue.id` (`:670`) and `MinimalBlockedIssue.id` (`:758`). No `IssueId`, short-id or prefix type exists. Flipping `Issue.id` directly to a newtype produces 293 type errors in 32 library files before the binary, the server and the tests are reached, so adoption happens layer by layer behind an alias. About 79 `format!` sites and 136 `#[error]` attributes interpolate ids, so the newtype's `Display` must print exactly the id.\n\nEvery stored id in this repository (issue records, dependency lists, the index, events and gate runs) is a canonical lowercase hyphenated UUID produced by `IdAuthority::uuid_at` (`repository_state/mutation.rs:149-162`). `uuid` parsing also accepts simple, braced, URN and uppercase forms, so canonical decoding needs an explicit check. `InputsDigest` (`domain/repository_inputs.rs:345-403`) is the crate's newtype precedent. The short id is the first `SHORT_ID_LENGTH` (`domain/types.rs:24`) characters of the id.\n\n## Success Criteria\n\n- [hard] REQ-01: A new `domain::identity` module defines the validated issue-id newtype, which accepts only the canonical lowercase hyphenated UUID form and rejects simple, braced, URN, uppercase and empty input with an error naming the input.\n- [hard] REQ-02: The newtype serializes and deserializes as a plain JSON string, and its published JSON schema is `{\"type\":\"string\"}`.\n- [hard] REQ-03: The newtype implements exactly `Display` (printing the same text as `as_str()`), `Debug`, `Clone`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`, `Serialize`, `Deserialize` and `JsonSchema`, plus the methods `as_str()` and `short_id() -> &str`; `short_id()` returns the first `SHORT_ID_LENGTH` characters. It implements no `Deref`, `Borrow<str>` or comparison with strings.\n- [hard] REQ-04: `crate::domain::identity::IssueId` is a temporary alias for `String`, and a temporary `IssueIdStaging` trait implemented for `String` provides `short_id()` with the same result as the newtype.\n- [hard] REQ-05: Property tests show that canonical ids round-trip through parsing and serde unchanged, and that each non-canonical spelling of the same UUID is rejected.\n\n## Notes\n\nThe alias and trait are a named temporary bridge (`@/inv/canonical-cutover`, `@/inv/convention-convergence`). A later change in this epic gives the newtype the `IssueId` name and deletes both, so until then the newtype carries a staging name. Imports use the module path `crate::domain::identity::IssueId`, which stays the same across that change.\n",
   "documents": [],
+  "done_at": "2026-10-24T23:27:42.020406896Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "06a5e83d-a51a-42a9-81b6-362fc30918db",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:22:25.895227061Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8db608ca-7c2d-4daa-aef4-8da41e553d90",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:23:33.611189757Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3e353abd-9b73-4da2-a8e7-ea07512f3e3e",
   "labels": [
     "type:task",
@@ -27,7 +42,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Validated issue identity type with an alias staging bridge",
-  "updated_at": "2026-10-22T19:43:19.936822108Z"
+  "updated_at": "2026-10-24T23:27:42.020406896Z"
 }

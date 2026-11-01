@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T23:10:44.955833702Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
     "f265e748-e350-4ba6-949f-575acf122bd9"
   ],
-  "description": "Aggregate the work that delivers this outcome: events hold id and timestamp once around a tagged body, with a typed optional issue accessor.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: `Event` holds `id` and `timestamp` once around a flattened `EventBody`, and the body-view bridge no longer exists.\n- [hard] REQ-02: The event issue accessor returns an optional typed id.\n- [hard] REQ-03: This repository's event log round-trips byte-identically.\n",
+  "description": "Aggregate the work that delivers this outcome: events hold id and timestamp once around a tagged body, with a typed optional issue accessor.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: `Event` holds `id` and `timestamp` once around a flattened `EventBody`, and the body-view bridge no longer exists.\n- [hard] REQ-02: The event issue accessor returns an optional typed id.\n- [hard] REQ-03: Each line of this repository's event log whose tag is a current event type round-trips byte-identically, and the lines skipped by event parsing are exactly the lines carrying the retired tags `document_archived` and `lifecycle_timestamps_backfilled`.",
   "documents": [],
+  "done_at": "2026-10-27T20:25:58.817174500Z",
+  "first_ready_at": "2026-10-26T23:10:20.884158339Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "44143ebd-682b-4020-b600-518e6a424642",
+      "status": "passed",
+      "updated_at": "2026-10-27T20:25:45.035457346Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "ea0c1058-1e13-493b-8652-c535f4fc0d71",
+      "status": "passed",
+      "updated_at": "2026-10-27T19:54:23.971040198Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8c40d01b-145e-4974-8f22-41676a158aa0",
   "labels": [
     "type:story",
@@ -23,7 +39,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Events are an envelope around a tagged body",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-27T20:25:58.817174500Z"
 }

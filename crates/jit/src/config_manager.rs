@@ -7,10 +7,10 @@
 
 use crate::config::{JitConfig, NamespaceConfig};
 use crate::domain::{LabelNamespace, LabelNamespaces};
+use crate::repository_state::RepositoryLayout;
 use crate::type_icons::{resolve_icons_for_hierarchy, IconConfig};
 use anyhow::Result;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 
 /// Environment variable carrying one invocation's linked-checkout write stance.
 ///
@@ -26,19 +26,23 @@ pub const LINKED_CHECKOUT_WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
 /// backends (JSON, SQL, etc.) without coupling to TOML parsing.
 #[derive(Clone)]
 pub struct ConfigManager {
-    root: PathBuf,
+    layout: Option<RepositoryLayout>,
 }
 
 impl ConfigManager {
-    /// Create a new ConfigManager for the given JIT repository root.
-    ///
-    /// # Arguments
-    ///
-    /// * `root` - Path to the .jit directory
-    pub fn new<P: AsRef<Path>>(root: P) -> Self {
+    /// Create a new ConfigManager for the selected repository layout.
+    pub fn new(layout: RepositoryLayout) -> Self {
         Self {
-            root: root.as_ref().to_path_buf(),
+            layout: Some(layout),
         }
+    }
+
+    pub(crate) fn unbound() -> Self {
+        Self { layout: None }
+    }
+
+    pub(crate) fn bind_layout(&mut self, layout: RepositoryLayout) {
+        self.layout = Some(layout);
     }
 
     /// Load the JIT configuration from config.toml.
@@ -46,7 +50,10 @@ impl ConfigManager {
     /// Returns an empty config (all fields None) if the file doesn't exist.
     /// Returns an error if the file exists but is malformed.
     pub fn load(&self) -> Result<JitConfig> {
-        JitConfig::load(&self.root)
+        let layout = self.layout.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("no repository layout configured for configuration loading")
+        })?;
+        JitConfig::load(layout)
     }
 
     /// Get the namespace registry from configuration.
@@ -251,7 +258,7 @@ fn build_namespaces_from_config(
 /// Load the type taxonomy from the repository's `config.toml`.
 ///
 /// Reads `[type_hierarchy]` and its label associations through a
-/// [`ConfigManager`] rooted at the store, and returns them as a
+/// [`ConfigManager`] over the store's selected layout, and returns them as a
 /// [`HierarchyConfig`](crate::domain::type_taxonomy::HierarchyConfig). A
 /// repository that declares no `[type_hierarchy]` yields a hierarchy with no
 /// types, so every query that resolves tiers resolves none.
@@ -263,22 +270,28 @@ fn build_namespaces_from_config(
 pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
     storage: &S,
 ) -> Result<crate::domain::type_taxonomy::HierarchyConfig> {
-    let namespaces = ConfigManager::new(storage.root()).get_namespaces()?;
+    let namespaces = ConfigManager::new(storage.repository_layout()?).get_namespaces()?;
 
-    crate::domain::type_taxonomy::HierarchyConfig::new(
-        namespaces.declared_type_hierarchy(),
-        namespaces.label_associations.unwrap_or_default(),
-    )
-    .map_err(|e| {
-        crate::errors::InvalidArgumentError::new(format!("Invalid hierarchy config: {e}")).into()
-    })
+    Ok(crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository_state::RepositoryRootEvidence;
+    use crate::storage::IssueStore;
     use std::fs;
+    use std::path::Path;
     use tempfile::TempDir;
+
+    fn test_layout(data_root: &Path) -> RepositoryLayout {
+        let worktree_root = data_root.parent().unwrap_or(data_root);
+        RepositoryLayout::new(
+            RepositoryRootEvidence::new(worktree_root, "test-worktree", true),
+            RepositoryRootEvidence::new(data_root, "test-data", true),
+        )
+        .unwrap()
+    }
 
     fn test_config(extra: &str) -> String {
         format!(
@@ -297,7 +310,7 @@ mod tests {
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         let config = config_mgr.load().unwrap();
 
         // Missing config should return empty config, not error
@@ -325,7 +338,7 @@ unique = false
 "#;
         fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         let config = config_mgr.load().unwrap();
 
         assert_eq!(config.version.unwrap().schema, 2);
@@ -343,7 +356,7 @@ unique = false
         let config_toml = taxonomy.config_fragment();
         fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         let namespaces = config_mgr.get_namespaces().unwrap();
 
         assert_eq!(namespaces.schema_version, 2);
@@ -369,7 +382,7 @@ unique = false
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         let namespaces = config_mgr.get_namespaces().unwrap();
 
         // A repository declaring nothing receives nothing.
@@ -385,6 +398,8 @@ unique = false
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
         let storage = crate::storage::JsonFileStorage::new(&jit_dir);
+        let layout = test_layout(&jit_dir);
+        storage.configure_repository_layout(&layout);
 
         let hierarchy = get_hierarchy_config(&storage).unwrap();
 
@@ -396,13 +411,30 @@ unique = false
     }
 
     #[test]
+    fn test_get_hierarchy_config_preserves_constructor_error() {
+        let (_repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        fs::write(storage.root().join("config.toml"), config).unwrap();
+
+        let error =
+            get_hierarchy_config(&storage).expect_err("invalid hierarchy must fail construction");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
+
+    #[test]
     fn test_get_hierarchy_icons_uses_level_defaults_without_icons() {
         let temp_dir = setup_test_dir();
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
         fs::write(jit_dir.join("config.toml"), test_config("")).unwrap();
 
-        let icons = ConfigManager::new(&jit_dir).get_hierarchy_icons().unwrap();
+        let icons = ConfigManager::new(test_layout(&jit_dir))
+            .get_hierarchy_icons()
+            .unwrap();
 
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         assert_eq!(
@@ -436,7 +468,9 @@ unique = false
         ));
         fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
 
-        let icons = ConfigManager::new(&jit_dir).get_hierarchy_icons().unwrap();
+        let icons = ConfigManager::new(test_layout(&jit_dir))
+            .get_hierarchy_icons()
+            .unwrap();
 
         assert_eq!(
             icons.get(taxonomy.type_at_level(1)),
@@ -465,7 +499,7 @@ unique = false
 "#;
         fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         let namespaces = config_mgr.get_namespaces().unwrap();
 
         assert!(namespaces.namespaces.get("type").unwrap().unique);
@@ -481,7 +515,7 @@ unique = false
         let invalid_toml = "this is not valid toml [[[";
         fs::write(jit_dir.join("config.toml"), invalid_toml).unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         let result = config_mgr.load();
 
         assert!(result.is_err());
@@ -493,7 +527,7 @@ unique = false
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         assert_eq!(
             config_mgr.get_write_policy().unwrap(),
             crate::domain::LinkedCheckoutWriteStance::Refuse
@@ -511,7 +545,7 @@ unique = false
         )
         .unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         assert_eq!(
             config_mgr.get_write_policy().unwrap(),
             crate::domain::LinkedCheckoutWriteStance::Refuse
@@ -529,7 +563,7 @@ unique = false
         )
         .unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         // This is the same default as an absent [worktree] section; write policy
         // has no section-presence asymmetry like enforce_leases does.
         assert_eq!(
@@ -549,7 +583,7 @@ unique = false
         )
         .unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         assert_eq!(
             config_mgr.get_write_policy().unwrap(),
             crate::domain::LinkedCheckoutWriteStance::Allow
@@ -567,7 +601,7 @@ unique = false
         )
         .unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         let result = config_mgr.get_write_policy();
 
         assert!(result.is_err());
@@ -584,7 +618,7 @@ unique = false
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         assert_eq!(config_mgr.get_project_name().unwrap(), None);
     }
 
@@ -597,7 +631,7 @@ unique = false
         let config_toml = "[project]\nname = \"just-in-time\"\n";
         fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         assert_eq!(
             config_mgr.get_project_name().unwrap(),
             Some("just-in-time".to_string())
@@ -614,7 +648,7 @@ unique = false
 
         fs::write(jit_dir.join("config.toml"), "[project]\n").unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         assert_eq!(config_mgr.get_project_name().unwrap(), None);
     }
 
@@ -627,7 +661,7 @@ unique = false
         let config_toml = "[project]\nname = \"Bad_Name\"\n";
         fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
 
-        let config_mgr = ConfigManager::new(&jit_dir);
+        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
         let result = config_mgr.get_project_name();
 
         // Invalid tokens are rejected at TOML parse time (via the typed

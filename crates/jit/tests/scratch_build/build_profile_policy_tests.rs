@@ -198,73 +198,20 @@ fn test_cargo_ci_enforces_the_measured_suite_clock_through_the_budget_checker() 
     );
 }
 
-/// jit:0708d692: nothing the measured suite runs may compile, because the suite
-/// clock the `budget` step judges is defined over an already-built target.
-/// cargo-nextest runs its setup scripts inside that clock, and Cargo unifies
-/// features over the packages one invocation selects — so a setup script
-/// selecting a single package resolves a second variant of the whole dependency
-/// graph and builds it mid-suite. Measured on a target freshly built by
-/// `cargo test --workspace --no-run`, the one setup script that invokes Cargo
-/// compiled 60 crates in 24,677 ms under `-p jit --test cli_issue` and was
-/// fresh in 131 ms under `--workspace --test cli_issue`.
+/// A setup script runs inside the measured suite clock, where a nested Cargo
+/// invocation can compile (jit:0708d692); fixtures are built in the suite instead.
 #[test]
-fn test_nextest_setup_scripts_reuse_the_workspace_build_resolution() {
-    const BUILDING_SUBCOMMANDS: [&str; 5] = ["test", "build", "check", "run", "nextest"];
-
-    let root = workspace_root();
-    let config: toml::Value = fs::read_to_string(root.join(".config/nextest.toml"))
+fn test_nextest_configuration_declares_no_setup_script() {
+    let config: toml::Value = fs::read_to_string(workspace_root().join(".config/nextest.toml"))
         .expect("read .config/nextest.toml")
         .parse()
         .expect("nextest configuration must be valid TOML");
-    let declared = config
-        .get("scripts")
-        .and_then(|scripts| scripts.get("setup"))
-        .and_then(toml::Value::as_table)
-        .expect(".config/nextest.toml must declare its setup scripts under [scripts.setup]");
 
-    let repository_scripts = declared.iter().filter_map(|(name, declaration)| {
-        let command = declaration.get("command")?;
-        // Only a script stored in the repository can be read here; a
-        // target-relative command names a built binary, not a source file.
-        if command.get("relative-to").and_then(toml::Value::as_str) != Some("workspace-root") {
-            return None;
-        }
-        Some((name, command.get("command-line")?.as_str()?.to_string()))
-    });
-
-    let mut checked = 0usize;
-    for (name, command_line) in repository_scripts {
-        let path = root.join(command_line.split_whitespace().next().expect("script path"));
-        let text = fs::read_to_string(&path)
-            .unwrap_or_else(|error| panic!("read setup script {}: {error}", path.display()));
-
-        for line in text.lines() {
-            let tokens: Vec<&str> = line.split_whitespace().collect();
-            let Some(cargo) = tokens.iter().position(|token| token.contains("cargo")) else {
-                continue;
-            };
-            if !tokens[cargo + 1..]
-                .iter()
-                .any(|token| BUILDING_SUBCOMMANDS.contains(token))
-            {
-                continue;
-            }
-            checked += 1;
-            assert!(
-                line.contains("--workspace"),
-                "setup script `{name}` invokes Cargo with a package selection \
-                 that is not the workspace, so its unit graph is resolved \
-                 independently of the build the gate already paid for and it \
-                 compiles inside the measured suite clock: {line}"
-            );
-        }
-    }
-
-    assert!(
-        checked > 0,
-        "no Cargo invocation was found in the repository setup scripts \
-         `.config/nextest.toml` declares, so this policy checked nothing"
-    );
+    assert!(config.get("scripts").is_none());
+    assert!(config
+        .get("profile")
+        .and_then(|profile| profile.get("default"))
+        .is_some_and(|default| default.get("scripts").is_none()));
 }
 
 #[test]

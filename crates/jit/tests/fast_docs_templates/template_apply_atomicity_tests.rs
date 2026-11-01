@@ -12,7 +12,9 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use jit::commands::test_helpers::{memory_executor_wrapping, MemoryDeclarations};
 use jit::declarations::{GateChecker, GateMode, GateRegistry, GateStage};
+use jit::domain::identity::IssueId;
 use jit::domain::{Event, Issue, Priority};
 use jit::gate_presets::{GatePresetDefinition, PresetInfo};
 use jit::repository_state::{CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath};
@@ -130,13 +132,19 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn acquire_repo_write_lock(&self) -> Result<jit::storage::RepoWriteGuard> {
         self.inner.acquire_repo_write_lock()
     }
-    fn load_issue(&self, id: &str) -> Result<Issue> {
+    fn load_issue(&self, id: &jit::domain::identity::IssueId) -> Result<Issue> {
         self.inner.load_issue(id)
     }
-    fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, PathReadError> {
+    fn load_issue_or_not_found(
+        &self,
+        id: &jit::domain::identity::IssueId,
+    ) -> Result<Issue, PathReadError> {
         self.inner.load_issue_or_not_found(id)
     }
-    fn resolve_issue_id(&self, prefix: &jit::domain::issue_id::IssueIdPrefix) -> Result<String> {
+    fn resolve_issue_id(
+        &self,
+        prefix: &jit::domain::identity::IssueIdPrefix,
+    ) -> Result<jit::domain::identity::IssueId> {
         assert_eq!(
             self.active_sessions.load(Ordering::SeqCst),
             0,
@@ -154,15 +162,21 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn read_events(&self) -> Result<Vec<Event>> {
         self.inner.read_events()
     }
-    fn load_gate_run_result(&self, run_id: &str) -> Result<jit::domain::GateRunResult> {
+    fn load_gate_run_result(
+        &self,
+        run_id: &jit::domain::identity::GateRunId,
+    ) -> Result<jit::domain::GateRunResult> {
         self.inner.load_gate_run_result(run_id)
     }
-    fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<jit::domain::GateRunResult>> {
+    fn list_gate_runs_for_issue(
+        &self,
+        issue_id: &jit::domain::identity::IssueId,
+    ) -> Result<Vec<jit::domain::GateRunResult>> {
         self.inner.list_gate_runs_for_issue(issue_id)
     }
     fn find_reusable_gate_run(
         &self,
-        gate_key: &str,
+        gate_key: &jit::domain::identity::GateKey,
         digest: &jit::domain::repository_inputs::InputsDigest,
     ) -> Result<Option<jit::domain::GateRunResult>> {
         self.inner.find_reusable_gate_run(gate_key, digest)
@@ -373,31 +387,22 @@ applies_to = ["{container_type}"]
         .clone()
 }
 
-fn bindings(container: &str) -> BTreeMap<String, String> {
-    BTreeMap::from([("container".to_string(), container.to_string())])
-}
-
-fn memory_storage() -> (InMemoryStorage, TestTaxonomy) {
-    let taxonomy = test_taxonomy();
-    let storage = InMemoryStorage::new();
-    let config = taxonomy.config_fragment();
-    storage.add_data_file("config.toml", &config);
-    (storage, taxonomy)
+fn bindings(container: &IssueId) -> BTreeMap<String, IssueId> {
+    BTreeMap::from([("container".to_string(), container.clone())])
 }
 
 fn fixture<S: IssueStore + RepositoryStateStore>(
-    store: PublicationProbeStore<S>,
+    executor: CommandExecutor<PublicationProbeStore<S>>,
     taxonomy: &TestTaxonomy,
-) -> (CommandExecutor<PublicationProbeStore<S>>, String, String) {
-    jit::test_mode::enable();
-    assert!(store.read_repo_file(".jit/config.toml").unwrap().is_some());
-    let layout =
-        jit::storage::discover_repository_layout(store.root().parent().unwrap(), store.root())
-            .unwrap();
-    let executor = CommandExecutor::new(store.clone()).with_layout(layout);
+) -> (CommandExecutor<PublicationProbeStore<S>>, IssueId, IssueId) {
+    assert!(executor
+        .storage()
+        .read_repo_file(".jit/config.toml")
+        .unwrap()
+        .is_some());
     executor
         .define_gate(
-            "repo-validate".to_string(),
+            &"repo-validate".parse().unwrap(),
             "Repo Validate".to_string(),
             "Whole-repository validation must pass".to_string(),
             GateStage::Postcheck,
@@ -470,10 +475,11 @@ fn repository_image<S: IssueStore + RepositoryStateStore>(store: &S) -> Reposito
 }
 
 fn assert_publication_failure_is_atomic<S: IssueStore + RepositoryStateStore>(
-    store: PublicationProbeStore<S>,
+    executor: CommandExecutor<PublicationProbeStore<S>>,
     taxonomy: &TestTaxonomy,
 ) {
-    let (executor, container, _) = fixture(store.clone(), taxonomy);
+    let store = executor.storage().clone();
+    let (executor, container, _) = fixture(executor, taxonomy);
     let before = repository_image(&store);
     store.arm();
     let error = executor
@@ -504,21 +510,39 @@ fn assert_publication_failure_is_atomic<S: IssueStore + RepositoryStateStore>(
 
 #[test]
 fn test_failed_publication_preserves_memory_preimage_and_retry_succeeds() {
-    let (storage, taxonomy) = memory_storage();
-    assert_publication_failure_is_atomic(PublicationProbeStore::new(storage), &taxonomy);
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_wrapping(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&taxonomy.config_fragment()),
+            ..MemoryDeclarations::default()
+        },
+        PublicationProbeStore::new,
+    );
+    assert_publication_failure_is_atomic(executor, &taxonomy);
 }
 
 #[test]
 fn test_failed_publication_preserves_file_preimage_and_retry_succeeds() {
-    let (_temp, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
-    assert_publication_failure_is_atomic(PublicationProbeStore::new(storage), &taxonomy);
+    let (temp, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
+    let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
+    let executor = CommandExecutor::new(PublicationProbeStore::new(storage)).with_layout(layout);
+    assert_publication_failure_is_atomic(executor, &taxonomy);
 }
 
 #[test]
 fn test_retryable_conflict_reuses_created_ids_and_timestamp() {
-    let (storage, taxonomy) = memory_storage();
-    let store = PublicationProbeStore::retry_once(storage);
-    let (executor, container, _) = fixture(store.clone(), &taxonomy);
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_wrapping(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&taxonomy.config_fragment()),
+            ..MemoryDeclarations::default()
+        },
+        PublicationProbeStore::retry_once,
+    );
+    let store = executor.storage().clone();
+    let (executor, container, _) = fixture(executor, &taxonomy);
     store.arm();
     let result = executor
         .apply_template_with(
@@ -566,7 +590,9 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
     let (temp, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
     let jit_root = temp.path().join(".jit");
     let store = PublicationProbeStore::with_stall(storage, stall);
-    let (executor, container, upstream) = fixture(store.clone(), &taxonomy);
+    let layout = jit::storage::discover_repository_layout(temp.path(), store.root()).unwrap();
+    let executor = CommandExecutor::new(store.clone()).with_layout(layout);
+    let (executor, container, upstream) = fixture(executor, &taxonomy);
     let original_container = executor.storage().load_issue(&container).unwrap();
     store.arm();
 
@@ -653,9 +679,17 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
 
 #[test]
 fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
-    let (storage, taxonomy) = memory_storage();
-    let store = PublicationProbeStore::new(storage);
-    let (executor, container, _) = fixture(store.clone(), &taxonomy);
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_wrapping(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&taxonomy.config_fragment()),
+            ..MemoryDeclarations::default()
+        },
+        PublicationProbeStore::new,
+    );
+    let store = executor.storage().clone();
+    let (executor, container, _) = fixture(executor, &taxonomy);
     store.inner.add_data_file(
         "config.toml",
         &format!(
@@ -709,7 +743,9 @@ target = "docs/closure.md"
         jit_root.join("config.toml"),
         changed_config.to_string(),
     );
-    let (executor, container, _) = fixture(store.clone(), &taxonomy);
+    let layout = jit::storage::discover_repository_layout(temp.path(), store.root()).unwrap();
+    let executor = CommandExecutor::new(store.clone()).with_layout(layout);
+    let (executor, container, _) = fixture(executor, &taxonomy);
     let calls_before = store.apply_calls();
     store.arm();
 
@@ -734,10 +770,13 @@ target = "docs/closure.md"
     assert_eq!(store.apply_calls(), calls_before + 1);
 }
 
-fn assert_planning_document_capture(existing: bool) {
-    let (storage, taxonomy) = memory_storage();
-    let store = PublicationProbeStore::new(storage);
-    let (executor, container, _) = fixture(store.clone(), &taxonomy);
+fn assert_planning_document_capture(
+    executor: CommandExecutor<PublicationProbeStore<InMemoryStorage>>,
+    taxonomy: &TestTaxonomy,
+    existing: bool,
+) {
+    let store = executor.storage().clone();
+    let (executor, container, _) = fixture(executor, taxonomy);
     let target = format!("dev/active/{container}-plan.md");
     if existing {
         store.inner.add_worktree_file(&target, "existing plan\n");
@@ -745,7 +784,7 @@ fn assert_planning_document_capture(existing: bool) {
 
     executor
         .apply_template_with(
-            &plan_template(&taxonomy),
+            &plan_template(taxonomy),
             &container,
             &bindings(&container),
             false,
@@ -773,19 +812,45 @@ fn assert_planning_document_capture(existing: bool) {
 
 #[test]
 fn test_planning_document_absence_and_parents_are_captured_without_borrowing() {
-    assert_planning_document_capture(false);
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_wrapping(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&taxonomy.config_fragment()),
+            ..MemoryDeclarations::default()
+        },
+        PublicationProbeStore::new,
+    );
+    assert_planning_document_capture(executor, &taxonomy, false);
 }
 
 #[test]
 fn test_existing_planning_document_and_parents_are_captured_without_borrowing() {
-    assert_planning_document_capture(true);
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_wrapping(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&taxonomy.config_fragment()),
+            ..MemoryDeclarations::default()
+        },
+        PublicationProbeStore::new,
+    );
+    assert_planning_document_capture(executor, &taxonomy, true);
 }
 
 #[test]
 fn test_unchanged_force_is_exact_noop_without_publication_or_created_id_paths() {
-    let (storage, taxonomy) = memory_storage();
-    let store = PublicationProbeStore::new(storage);
-    let (executor, container, _) = fixture(store.clone(), &taxonomy);
+    let taxonomy = test_taxonomy();
+    let executor = memory_executor_wrapping(
+        InMemoryStorage::new(),
+        MemoryDeclarations {
+            config: Some(&taxonomy.config_fragment()),
+            ..MemoryDeclarations::default()
+        },
+        PublicationProbeStore::new,
+    );
+    let store = executor.storage().clone();
+    let (executor, container, _) = fixture(executor, &taxonomy);
     let template = plan_template(&taxonomy);
     let applied = executor
         .apply_template_with(&template, &container, &bindings(&container), false)

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ccec7c26ea328746edda1af29bc23aba275525ae",
+  "completed_at": "2026-10-22T21:57:51.085085685Z",
+  "duration_ms": 185116,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The finalizer cases now have repository-state unit-test owners; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5d7020b9-dc3c-42c0-b7b4-afee483d809d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "613c2939-feff-4388-ba39-ee82c7659057",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-22T21:54:45.968356495Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3b149041b, 1299a02fb, ccec7c26e (the merge reproduces 1299a02fb’s mutation-test patch)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md, markdown-first); @/invariant/orthogonal-tests (.jit/invariants.toml, registry-first); @/issue/c780514e/requirement/REQ-03 (parent issue description, markdown-first)\nGate evidence: cargo-ci: passed (exit 0, 2026-10-22T21:53:25Z)\nTruncation recovery: reread bounded mutation patch segments and storage finalization sections, including lines 1855-2225 and 2384-2589\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The finalizer cases now have repository-state unit-test owners; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -24,8 +24,9 @@ use crate::domain::artifact_plan::{
 };
 #[cfg(test)]
 use crate::domain::artifact_plan::{ArtifactAction, WarningCode};
+use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
-use crate::domain::{Event, Issue};
+use crate::domain::{Event, EventBody, Issue};
 use crate::storage::{
     collect_artifact_classification_facts, discover_archive_artifacts,
     resolve_container_destination, validate_repo_relative_path, GitRevisionResolver, IssueStore,
@@ -37,7 +38,7 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Clone, Copy)]
 enum ArchiveTarget<'a> {
     Document(&'a str),
-    Container(&'a crate::domain::issue_id::IssueIdPrefix),
+    Container(&'a IssueId),
 }
 
 /// Ids of configured non-leaf containers that are archive candidates: those that
@@ -49,7 +50,7 @@ enum ArchiveTarget<'a> {
 fn effectively_terminal_container_ids(
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
-) -> Vec<String> {
+) -> Vec<IssueId> {
     let leaf_level = hierarchy.types().map(|(_, level)| *level).max();
     let mut ids = issues
         .iter()
@@ -112,8 +113,8 @@ fn apply_recorded_residue_identities(
 ) {
     let covered = events
         .iter()
-        .filter_map(|event| match event {
-            Event::ArtifactArchiveExecuted {
+        .filter_map(|event| match event.body() {
+            EventBody::ArtifactArchiveExecuted {
                 target: event_target,
                 destination_root: event_root,
                 publications,
@@ -160,11 +161,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issues = self.storage.list_issues()?;
         let plans = effectively_terminal_container_ids(&issues, &hierarchy)
             .into_iter()
-            .map(|id| {
-                self.plan_archive_target(ArchiveTarget::Container(
-                    &crate::domain::issue_id::IssueIdPrefix::of_stored(&id),
-                ))
-            })
+            .map(|id| self.plan_archive_target(ArchiveTarget::Container(&id)))
             .collect::<Result<Vec<_>>>()?;
         Ok(ArchiveCandidates::new(plans))
     }
@@ -175,10 +172,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Build a complete non-mutating plan for one resolved container subtree.
-    pub fn preview_archive_container(&self, id: &str) -> Result<ArtifactPlan> {
-        self.plan_archive_target(ArchiveTarget::Container(
-            &crate::domain::issue_id::IssueIdPrefix::parse(id)?,
-        ))
+    pub fn preview_archive_container(&self, id: &IssueId) -> Result<ArtifactPlan> {
+        self.plan_archive_target(ArchiveTarget::Container(id))
     }
 
     fn plan_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArtifactPlan> {
@@ -191,7 +186,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let root_container_id = match target {
             ArchiveTarget::Document(_) => None,
-            ArchiveTarget::Container(id) => Some(self.storage.resolve_issue_id(id)?),
+            ArchiveTarget::Container(id) => Some(id.clone()),
         };
         let policy =
             ArtifactClassificationPolicy::from_documentation(config.documentation.as_ref());
@@ -201,17 +196,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             },
             ArchiveTarget::Container(_) => PlanTarget::Container {
                 id: root_container_id
-                    .as_deref()
+                    .as_ref()
                     .context("container id was not resolved")?
-                    .into(),
+                    .clone(),
             },
         };
         let legacy_root = artifact_destination_root(&target_for_layout, &policy.archive_root);
-        let (destination_root, destination_conflicts) = match root_container_id.as_deref() {
+        let (destination_root, destination_conflicts) = match root_container_id.as_ref() {
             Some(container_id) => {
                 let issue = issues
                     .iter()
-                    .find(|issue| issue.id == container_id)
+                    .find(|issue| &issue.id == container_id)
                     .context("resolved archive container is missing from issue inventory")?;
                 let preferred_root =
                     preferred_container_destination_root(issue, &hierarchy, &policy.archive_root);
@@ -241,7 +236,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             ArchiveTarget::Document(path) => ExplicitRootTarget::Document(path),
             ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
                 root_container_id
-                    .as_deref()
+                    .as_ref()
                     .context("container id was not resolved")?,
             ),
         };
@@ -268,14 +263,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .map(|root| PlanBlocker::new(BlockerCode::DestinationConflict, Some(root))),
         );
 
-        if let Some(container_id) = root_container_id.as_deref() {
+        if let Some(container_id) = root_container_id.as_ref() {
             // Coupled retirement (`jit:45a140ae`): artifact archival requires an
             // effectively terminal container (Done/Rejected, or already Archived
             // from one of those for an idempotent rerun). An Archived container
             // retired from a non-terminal state, or any active state, is blocked.
             if issues
                 .iter()
-                .find(|issue| issue.id == container_id)
+                .find(|issue| &issue.id == container_id)
                 .is_some_and(|issue| !issue.is_effectively_terminal())
             {
                 blockers.push(PlanBlocker::new(
@@ -358,6 +353,9 @@ fn image_evidence(
         RepositoryEntry::File { content, .. } => ArtifactEvidence::File(content.bytes().to_vec()),
         RepositoryEntry::FileTail { .. } => {
             return Err(crate::repository_state::CaptureError::TailOnlyCapture(vpath).into())
+        }
+        RepositoryEntry::FileKind { .. } => {
+            return Err(crate::repository_state::CaptureError::KindOnlyCapture(vpath).into())
         }
         RepositoryEntry::Symlink { .. } => ArtifactEvidence::Symlink,
         RepositoryEntry::Unsupported { .. } => ArtifactEvidence::Unsupported,
@@ -518,11 +516,12 @@ impl CommandExecutor<JsonFileStorage> {
         };
         let config = crate::repository_state::assemble_config(&image)?;
         let namespaces = crate::config_manager::namespaces_from_config(&config);
-        let hierarchy = crate::repository_state::hierarchy_config(&namespaces);
+        let hierarchy =
+            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
         let issues = super::captured_active_issues(&image)?;
         let root_id = match target {
             ArchiveTarget::Document(_) => None,
-            ArchiveTarget::Container(id) => Some(super::resolve_issue_from_capture(&issues, id)?),
+            ArchiveTarget::Container(id) => Some(super::require_issue_in_capture(&issues, id)?),
         };
         let policy =
             ArtifactClassificationPolicy::from_documentation(config.documentation.as_ref());
@@ -532,17 +531,17 @@ impl CommandExecutor<JsonFileStorage> {
             },
             ArchiveTarget::Container(_) => PlanTarget::Container {
                 id: root_id
-                    .as_deref()
+                    .as_ref()
                     .context("container id was not resolved")?
-                    .into(),
+                    .clone(),
             },
         };
         let legacy = artifact_destination_root(&plan_target, &policy.archive_root);
         let mut conflicts = Vec::new();
-        let destination = if let Some(id) = root_id.as_deref() {
+        let destination = if let Some(id) = root_id.as_ref() {
             let issue = issues
                 .iter()
-                .find(|issue| issue.id == id)
+                .find(|issue| &issue.id == id)
                 .context("captured container missing")?;
             let preferred =
                 preferred_container_destination_root(issue, &hierarchy, &policy.archive_root);
@@ -662,9 +661,7 @@ impl CommandExecutor<JsonFileStorage> {
         let explicit = match target {
             ArchiveTarget::Document(path) => ExplicitRootTarget::Document(path),
             ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
-                root_id
-                    .as_deref()
-                    .context("container id was not resolved")?,
+                root_id.as_ref().context("container id was not resolved")?,
             ),
         };
         let pinned_requests = pinned_root_requests(&inventory_issues, &hierarchy, explicit)?;
@@ -746,10 +743,10 @@ impl CommandExecutor<JsonFileStorage> {
                 .into_iter()
                 .map(|root| PlanBlocker::new(BlockerCode::DestinationConflict, Some(root))),
         );
-        if let Some(id) = root_id.as_deref() {
+        if let Some(id) = root_id.as_ref() {
             if issues
                 .iter()
-                .find(|issue| issue.id == id)
+                .find(|issue| &issue.id == id)
                 .is_some_and(|issue| !issue.is_effectively_terminal())
             {
                 blockers.push(PlanBlocker::new(
@@ -838,10 +835,8 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Execute a freshly recomputed container archive plan under one write guard.
-    pub fn execute_archive_container(&self, id: &str) -> Result<ArchiveExecutionResult> {
-        self.execute_archive_target(ArchiveTarget::Container(
-            &crate::domain::issue_id::IssueIdPrefix::parse(id)?,
-        ))
+    pub fn execute_archive_container(&self, id: &IssueId) -> Result<ArchiveExecutionResult> {
+        self.execute_archive_target(ArchiveTarget::Container(id))
     }
 
     fn execute_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArchiveExecutionResult> {
@@ -882,18 +877,86 @@ impl CommandExecutor<JsonFileStorage> {
 mod tests {
     use super::*;
     use crate::domain::artifact_plan::EvidenceCode;
+    use crate::domain::identity::IssueId;
     use crate::domain::State;
     use crate::storage::JsonFileStorage;
     use crate::test_taxonomy::test_taxonomy;
     use crate::test_utils::{document_reference, document_reference_at};
     use std::collections::HashMap;
     use std::fs;
-    use tempfile::TempDir;
 
-    fn executor(repo: &TempDir, storage: JsonFileStorage) -> CommandExecutor<JsonFileStorage> {
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        CommandExecutor::new(storage).with_layout(layout)
+    #[test]
+    fn test_archive_candidates_propagates_invalid_hierarchy_error() {
+        let (repo, executor) =
+            crate::test_utils::setup_test_repo_with_config(&test_taxonomy().config_fragment())
+                .unwrap();
+        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
+        std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
+
+        let error = executor
+            .archive_candidates()
+            .expect_err("invalid hierarchy must fail archive candidate planning");
+
+        assert_eq!(
+            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
+            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+        );
+    }
+
+    /// Candidates are every effectively terminal non-leaf container, each fully
+    /// evaluated, and reporting them leaves issues and events intact.
+    #[test]
+    fn test_archive_candidates_are_complete_and_non_mutating() {
+        let storage = crate::storage::InMemoryStorage::new();
+        let archive_root = format!(
+            "{}/archive",
+            storage.root().file_name().unwrap().to_string_lossy()
+        );
+        let seed = |title: &str, state: State, kind: &str| {
+            let mut issue = crate::test_utils::fixture_issue(title.to_string(), String::new());
+            issue.state = state;
+            issue.archived_from = (state == State::Archived).then_some(State::InProgress);
+            issue.labels = vec![format!("type:{kind}")];
+            let id = issue.id.clone();
+            crate::commands::test_helpers::seed_issue(&storage, issue);
+            id
+        };
+        let rejected = seed("Rejected portfolio", State::Rejected, "portfolio");
+        let done = seed("Done portfolio", State::Done, "portfolio");
+        seed("Done leaf", State::Done, "unit");
+        seed("Archived portfolio", State::Archived, "portfolio");
+        let config = format!(
+            "[documentation]\nmanaged_paths = []\npermanent_paths = []\narchive_root = \"{archive_root}\"\n\n[type_hierarchy]\ntypes = {{ portfolio = 2, unit = 7 }}\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"
+        );
+        let executor = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
+        let issues_before = executor.storage.list_issues().unwrap();
+        let events_before = executor.storage.read_events().unwrap();
+
+        let report = executor.archive_candidates().unwrap();
+
+        let target_ids = report
+            .candidates()
+            .iter()
+            .map(|plan| match plan.target() {
+                PlanTarget::Container { id } => id.clone(),
+                _ => panic!("candidate target must be a container"),
+            })
+            .collect::<Vec<_>>();
+        let mut expected = vec![done, rejected];
+        expected.sort();
+        assert_eq!(target_ids, expected);
+        assert!(report.candidates().iter().all(|plan| {
+            plan.count() == 0
+                && plan.policy_status() == crate::domain::artifact_plan::PolicyStatus::Configured
+        }));
+        assert_eq!(executor.storage.list_issues().unwrap(), issues_before);
+        assert_eq!(executor.storage.read_events().unwrap(), events_before);
     }
 
     /// Seed an exact file-backed issue precondition without exercising command mutation behavior.
@@ -907,11 +970,15 @@ mod tests {
         index.all_ids.sort();
         index.all_ids.dedup();
         index.deleted_ids.retain(|id| id != &issue.id);
+        let issue_path = storage
+            .repository_layout()
+            .unwrap()
+            .resolve(&crate::repository_state::VirtualPath::issue_record(
+                &issue.id,
+            ))
+            .unwrap();
         fs::write(
-            storage
-                .root()
-                .join("issues")
-                .join(format!("{}.json", issue.id)),
+            issue_path,
             crate::repository_state::serialize_issue(&issue).expect("serialize fixture issue"),
         )
         .unwrap();
@@ -931,9 +998,9 @@ mod tests {
         )
         .unwrap();
         let issue =
-            |id: &str, state: State, archived_from: Option<State>, issue_type: Option<&str>| {
+            |id: &IssueId, state: State, archived_from: Option<State>, issue_type: Option<&str>| {
                 let mut issue = crate::test_utils::fixture_issue(id.to_string(), String::new());
-                issue.id = id.to_string();
+                issue.id = id.clone();
                 issue.state = state;
                 issue.archived_from = archived_from;
                 issue.labels = issue_type
@@ -942,15 +1009,20 @@ mod tests {
                 issue
             };
         let issues = vec![
-            issue("done-container", State::Done, None, Some("portfolio")),
             issue(
-                "rejected-container",
+                &crate::test_utils::issue_id(0x481e_5d93_bcbd_8d3a_8296_04ea_3073_ec9d),
+                State::Done,
+                None,
+                Some("portfolio"),
+            ),
+            issue(
+                &crate::test_utils::issue_id(0x8274_5bc5_ab45_4bcd_c906_31e7_c81c_a1b2),
                 State::Rejected,
                 None,
                 Some("portfolio"),
             ),
             issue(
-                "active-container",
+                &crate::test_utils::issue_id(0x2115_5819_bd02_0be9_e12b_79b2_58a2_e44c),
                 State::InProgress,
                 None,
                 Some("portfolio"),
@@ -958,7 +1030,7 @@ mod tests {
             // Archived from a terminal state is effectively terminal, so it is a
             // reconcilable candidate — same as the direct archive path accepts.
             issue(
-                "archived-from-done",
+                &crate::test_utils::issue_id(0x4078_5d9c_b05c_90bf_43cf_08c2_8f2e_6a1f),
                 State::Archived,
                 Some(State::Done),
                 Some("portfolio"),
@@ -966,79 +1038,66 @@ mod tests {
             // Archived from a non-terminal state is not effectively terminal, so
             // it is excluded.
             issue(
-                "archived-from-active",
+                &crate::test_utils::issue_id(0xb561_527e_9bdf_3a3c_1258_a630_ef24_90cc),
                 State::Archived,
                 Some(State::InProgress),
                 Some("portfolio"),
             ),
-            issue("done-leaf", State::Done, None, Some("unit")),
-            issue("done-unknown", State::Done, None, Some("epic")),
-            issue("done-untyped", State::Done, None, None),
+            issue(
+                &crate::test_utils::issue_id(0x3f8_54fa_b8d7_66a8_b066_27fe_907a_9f01),
+                State::Done,
+                None,
+                Some("unit"),
+            ),
+            issue(
+                &crate::test_utils::issue_id(0x1cd3_507f_a34c_9168_6888_506d_6493_8dc3),
+                State::Done,
+                None,
+                Some("epic"),
+            ),
+            issue(
+                &crate::test_utils::issue_id(0xc7e4_5c20_9543_1654_446a_06ac_748f_d8b6),
+                State::Done,
+                None,
+                None,
+            ),
         ];
 
+        let mut expected = vec![
+            issues[0].id.clone(),
+            issues[1].id.clone(),
+            issues[3].id.clone(),
+        ];
+        expected.sort();
         assert_eq!(
             effectively_terminal_container_ids(&issues, &hierarchy),
-            vec!["archived-from-done", "done-container", "rejected-container"]
+            expected
         );
-    }
-
-    /// A repository whose configuration declares no development-root boundary,
-    /// so its areas classify by the managed/permanent split alone.
-    ///
-    /// The empty `development_root` is deliberate and is what the omitted key
-    /// would not give: an absent key falls back to the shipped `dev` root,
-    /// which would place this fixture's whole `fixtures` area outside the
-    /// boundary and retain everything, leaving nothing to archive. Tests whose
-    /// subject *is* that boundary declare a real root of their own —
-    /// `development_root_repo` below, and the classifier's own suite.
-    fn executable_document_repo(
-        owner_count: usize,
-        content: &str,
-    ) -> (TempDir, CommandExecutor<JsonFileStorage>, Vec<String>) {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!(
-                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
-                taxonomy.config_fragment()
-            ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
-        fs::create_dir(repo.path().join("fixtures")).unwrap();
-        fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
-        let ids = (0..owner_count)
-            .map(|index| {
-                let mut issue =
-                    crate::test_utils::fixture_issue(format!("Owner {index}"), String::new());
-                issue.state = State::Done;
-                let mut document = document_reference("fixtures/root.md");
-                document.assets.push(crate::document::Asset {
-                    original_path: "asset.png".into(),
-                    resolved_path: Some("fixtures/asset.png".into()),
-                    asset_type: crate::document::AssetType::Missing,
-                    mime_type: None,
-                    content_hash: None,
-                    is_shared: false,
-                });
-                issue.documents = vec![document];
-                let id = issue.id.clone();
-                seed_archive_issue_precondition(&storage, issue);
-                id
-            })
-            .collect();
-        let executor = executor(&repo, storage);
-        (repo, executor, ids)
     }
 
     #[test]
     fn test_execute_document_commits_event_before_delete_and_noop_rerun_is_stable() {
-        let (repo, executor, ids) = executable_document_repo(1, "# Root\n");
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "# Root\n").unwrap();
+        let mut owner = crate::test_utils::fixture_issue("Owner 0".into(), String::new());
+        owner.state = State::Done;
+        let mut document = document_reference("fixtures/root.md");
+        document.assets.push(crate::document::Asset {
+            original_path: "asset.png".into(),
+            resolved_path: Some("fixtures/asset.png".into()),
+            asset_type: crate::document::AssetType::Missing,
+            mime_type: None,
+            content_hash: None,
+            is_shared: false,
+        });
+        owner.documents = vec![document];
+        let id = owner.id.clone();
+        seed_archive_issue_precondition(&executor.storage, owner);
         let first = executor
             .execute_archive_document("fixtures/root.md")
             .unwrap();
@@ -1049,7 +1108,7 @@ mod tests {
             fs::read(repo.path().join("archive/fixtures/root.md")).unwrap(),
             b"# Root\n"
         );
-        let issue = executor.storage.load_issue(&ids[0]).unwrap();
+        let issue = executor.storage.load_issue(&id).unwrap();
         assert_eq!(issue.documents[0].path, "archive/fixtures/root.md");
         assert!(issue.documents[0].assets.is_empty());
         assert_eq!(
@@ -1079,20 +1138,11 @@ mod tests {
     #[test]
     fn test_execute_reports_preview_citations_without_capturing_the_scanned_files() {
         use crate::storage::RepositoryStateStore as _;
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!(
-                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\ncitation_scan_roots = [\"notes\"]\n",
-                test_taxonomy().config_fragment()
-            ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\ncitation_scan_roots = [\"notes\"]\n",
+            test_taxonomy().config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         fs::create_dir_all(repo.path().join("fixtures")).unwrap();
         fs::create_dir_all(repo.path().join("notes")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), "# Root\n").unwrap();
@@ -1104,8 +1154,7 @@ mod tests {
         let mut issue = crate::test_utils::fixture_issue("Owner".into(), String::new());
         issue.state = State::Done;
         issue.documents = vec![document_reference("fixtures/root.md")];
-        seed_archive_issue_precondition(&storage, issue);
-        let executor = executor(&repo, storage);
+        seed_archive_issue_precondition(&executor.storage, issue);
         let citations = |warnings: Vec<crate::domain::artifact_plan::PlanWarning>| {
             warnings
                 .into_iter()
@@ -1151,7 +1200,27 @@ mod tests {
 
     #[test]
     fn test_execute_non_directory_archive_root_is_blocked_without_descending() {
-        let (repo, executor, _) = executable_document_repo(1, "source");
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "source").unwrap();
+        let mut owner = crate::test_utils::fixture_issue("Owner 0".into(), String::new());
+        owner.state = State::Done;
+        let mut document = document_reference("fixtures/root.md");
+        document.assets.push(crate::document::Asset {
+            original_path: "asset.png".into(),
+            resolved_path: Some("fixtures/asset.png".into()),
+            asset_type: crate::document::AssetType::Missing,
+            mime_type: None,
+            content_hash: None,
+            is_shared: false,
+        });
+        owner.documents = vec![document];
+
+        seed_archive_issue_precondition(&executor.storage, owner);
         fs::write(repo.path().join("archive"), b"occupied").unwrap();
 
         assert!(executor
@@ -1163,7 +1232,27 @@ mod tests {
 
     #[test]
     fn test_execute_archive_root_nested_under_data_uses_data_paths() {
-        let (repo, executor, _) = executable_document_repo(1, "source");
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "source").unwrap();
+        let mut owner = crate::test_utils::fixture_issue("Owner 0".into(), String::new());
+        owner.state = State::Done;
+        let mut document = document_reference("fixtures/root.md");
+        document.assets.push(crate::document::Asset {
+            original_path: "asset.png".into(),
+            resolved_path: Some("fixtures/asset.png".into()),
+            asset_type: crate::document::AssetType::Missing,
+            mime_type: None,
+            content_hash: None,
+            is_shared: false,
+        });
+        owner.documents = vec![document];
+
+        seed_archive_issue_precondition(&executor.storage, owner);
         fs::write(
             repo.path().join(".jit/config.toml"),
             "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \".jit/archive\"\n",
@@ -1184,7 +1273,27 @@ mod tests {
     fn test_execute_symlink_source_is_blocked_without_following_it() {
         use std::os::unix::fs::symlink;
 
-        let (repo, executor, _) = executable_document_repo(1, "source");
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "source").unwrap();
+        let mut owner = crate::test_utils::fixture_issue("Owner 0".into(), String::new());
+        owner.state = State::Done;
+        let mut document = document_reference("fixtures/root.md");
+        document.assets.push(crate::document::Asset {
+            original_path: "asset.png".into(),
+            resolved_path: Some("fixtures/asset.png".into()),
+            asset_type: crate::document::AssetType::Missing,
+            mime_type: None,
+            content_hash: None,
+            is_shared: false,
+        });
+        owner.documents = vec![document];
+
+        seed_archive_issue_precondition(&executor.storage, owner);
         fs::remove_file(repo.path().join("fixtures/root.md")).unwrap();
         fs::write(repo.path().join("outside.md"), b"outside").unwrap();
         symlink("../outside.md", repo.path().join("fixtures/root.md")).unwrap();
@@ -1204,7 +1313,57 @@ mod tests {
     fn test_execute_nested_archive_root_symlink_is_blocked_without_descending() {
         use std::os::unix::fs::symlink;
 
-        let (repo, executor, id) = configured_repo();
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir_all(repo.path().join("fixtures/bundle/theme")).unwrap();
+        fs::write(
+            repo.path().join("fixtures/readme.md"),
+            "[page](bundle/index.html) [external](https://example.com)",
+        )
+        .unwrap();
+        fs::write(
+            repo.path().join("fixtures/bundle/index.html"),
+            r#"<link href="theme/base.css"><img src="image.svg">"#,
+        )
+        .unwrap();
+        fs::write(
+            repo.path().join("fixtures/bundle/theme/base.css"),
+            r#"@import "nested.css"; body { background: url("../../image.png"); }"#,
+        )
+        .unwrap();
+        fs::write(repo.path().join("fixtures/bundle/theme/nested.css"), "a{}").unwrap();
+        fs::write(repo.path().join("fixtures/bundle/image.svg"), "<svg/>").unwrap();
+        fs::write(repo.path().join("fixtures/bundle/image.png"), b"png").unwrap();
+        fs::write(repo.path().join("fixtures/data.csv"), "a,b\n1,2\n").unwrap();
+
+        let mut epic = crate::test_utils::fixture_issue("Archive fixture".into(), String::new());
+        epic.state = State::Done;
+        let epic_type = taxonomy.type_at_level(1);
+        let epic_namespace = taxonomy
+            .label_associations
+            .get(epic_type)
+            .expect("taxonomy declares a membership namespace for level one");
+        epic.labels = vec![
+            format!("type:{epic_type}"),
+            format!("{epic_namespace}:archive-fixture"),
+        ];
+        epic.documents = [
+            "fixtures/readme.md",
+            "fixtures/bundle/index.html",
+            "fixtures/bundle/theme/base.css",
+            "fixtures/data.csv",
+            "fixtures/bundle/image.png",
+            "fixtures/bundle/image.svg",
+        ]
+        .into_iter()
+        .map(document_reference)
+        .collect();
+        let id = epic.id.clone();
+        seed_archive_issue_precondition(&executor.storage, epic);
         let config_path = repo.path().join(".jit/config.toml");
         let config = fs::read_to_string(&config_path).unwrap().replace(
             "archive_root = \"archive\"",
@@ -1226,7 +1385,27 @@ mod tests {
     fn test_execute_preserves_executable_source_mode() {
         use std::os::unix::fs::PermissionsExt;
 
-        let (repo, executor, _) = executable_document_repo(1, "source");
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "source").unwrap();
+        let mut owner = crate::test_utils::fixture_issue("Owner 0".into(), String::new());
+        owner.state = State::Done;
+        let mut document = document_reference("fixtures/root.md");
+        document.assets.push(crate::document::Asset {
+            original_path: "asset.png".into(),
+            resolved_path: Some("fixtures/asset.png".into()),
+            asset_type: crate::document::AssetType::Missing,
+            mime_type: None,
+            content_hash: None,
+            is_shared: false,
+        });
+        owner.documents = vec![document];
+
+        seed_archive_issue_precondition(&executor.storage, owner);
         fs::set_permissions(
             repo.path().join("fixtures/root.md"),
             fs::Permissions::from_mode(0o755),
@@ -1248,7 +1427,13 @@ mod tests {
 
     #[test]
     fn test_execute_waits_for_competing_repository_write_guard() {
-        let (_repo, executor, _) = executable_document_repo(0, "guard contention");
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(_repo.path().join("fixtures")).unwrap();
+        fs::write(_repo.path().join("fixtures/root.md"), "guard contention").unwrap();
         let holder_storage = executor.storage.clone();
         let (held_sender, held_receiver) = std::sync::mpsc::channel();
         let (release_sender, release_receiver) = std::sync::mpsc::channel();
@@ -1281,7 +1466,13 @@ mod tests {
 
     #[test]
     fn test_execute_document_allows_managed_zero_owner_and_refuses_active_owner() {
-        let (repo, executor, _) = executable_document_repo(0, "zero owner");
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "zero owner").unwrap();
         let result = executor
             .execute_archive_document("fixtures/root.md")
             .unwrap();
@@ -1291,8 +1482,28 @@ mod tests {
             .any(|warning| warning.code == WarningCode::NoOwner));
         assert!(repo.path().join("archive/fixtures/root.md").exists());
 
-        let (active_repo, active_executor, ids) = executable_document_repo(1, "active");
-        let mut issue = active_executor.storage.load_issue(&ids[0]).unwrap();
+        let (active_repo, active_executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(active_repo.path().join("fixtures")).unwrap();
+        fs::write(active_repo.path().join("fixtures/root.md"), "active").unwrap();
+        let mut owner = crate::test_utils::fixture_issue("Owner 0".into(), String::new());
+        owner.state = State::Done;
+        let mut document = document_reference("fixtures/root.md");
+        document.assets.push(crate::document::Asset {
+            original_path: "asset.png".into(),
+            resolved_path: Some("fixtures/asset.png".into()),
+            asset_type: crate::document::AssetType::Missing,
+            mime_type: None,
+            content_hash: None,
+            is_shared: false,
+        });
+        owner.documents = vec![document];
+        let active_id = owner.id.clone();
+        seed_archive_issue_precondition(&active_executor.storage, owner);
+        let mut issue = active_executor.storage.load_issue(&active_id).unwrap();
         issue.state = State::InProgress;
         seed_archive_issue_precondition(&active_executor.storage, issue);
         assert!(active_executor
@@ -1304,7 +1515,13 @@ mod tests {
 
     #[test]
     fn test_archive_event_reader_accepts_final_and_multiple_nested_brace_torn_prefixes() {
-        let (repo, executor, _) = executable_document_repo(0, "event tails");
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "event tails").unwrap();
         let events_path = repo.path().join(".jit/events.jsonl");
         let nested_torn = concat!(
             "{\"type\":\"artifact_archive_executed\",",
@@ -1317,15 +1534,19 @@ mod tests {
             .unwrap()
             .is_empty());
 
-        let valid = Event::draft_artifact_archive_executed(
-            PlanTarget::Document {
-                path: "fixtures/root.md".into(),
-            },
-            "archive".into(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            true,
+        let valid = crate::test_utils::stamped_event(
+            EventBody::draft_artifact_archive_executed(
+                PlanTarget::Document {
+                    path: "fixtures/root.md".into(),
+                },
+                "archive".into(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                true,
+            ),
+            "valid-archive",
+            chrono::DateTime::UNIX_EPOCH,
         );
         let valid_json = serde_json::to_string(&valid).unwrap();
         fs::write(&events_path, format!("{nested_torn}\n{valid_json}\n")).unwrap();
@@ -1388,21 +1609,11 @@ mod tests {
 
     #[test]
     fn test_execution_preserves_positive_relative_and_root_relative_multi_edge_layout() {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!(
-                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"shared\"]\narchive_root = \"archive\"\n",
-                taxonomy.config_fragment()
-            ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::create_dir(repo.path().join("shared")).unwrap();
         fs::write(
@@ -1412,8 +1623,6 @@ mod tests {
         .unwrap();
         fs::write(repo.path().join("fixtures/child.md"), "child").unwrap();
         fs::write(repo.path().join("shared/global.md"), "shared").unwrap();
-        let executor = executor(&repo, storage);
-
         let result = executor
             .execute_archive_document("fixtures/root.md")
             .unwrap();
@@ -1426,7 +1635,27 @@ mod tests {
 
     #[test]
     fn test_identical_destination_is_adopted_but_differing_destination_is_never_overwritten() {
-        let (repo, executor, ids) = executable_document_repo(1, "identical");
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "identical").unwrap();
+        let mut owner = crate::test_utils::fixture_issue("Owner 0".into(), String::new());
+        owner.state = State::Done;
+        let mut document = document_reference("fixtures/root.md");
+        document.assets.push(crate::document::Asset {
+            original_path: "asset.png".into(),
+            resolved_path: Some("fixtures/asset.png".into()),
+            asset_type: crate::document::AssetType::Missing,
+            mime_type: None,
+            content_hash: None,
+            is_shared: false,
+        });
+        owner.documents = vec![document];
+        let id = owner.id.clone();
+        seed_archive_issue_precondition(&executor.storage, owner);
         fs::create_dir(repo.path().join("archive")).unwrap();
         fs::create_dir(repo.path().join("archive/fixtures")).unwrap();
         fs::write(repo.path().join("archive/fixtures/root.md"), b"identical").unwrap();
@@ -1437,11 +1666,35 @@ mod tests {
             publication.destination == "archive/fixtures/root.md" && publication.adopted
         }));
         assert_eq!(
-            executor.storage.load_issue(&ids[0]).unwrap().documents[0].path,
+            executor.storage.load_issue(&id).unwrap().documents[0].path,
             "archive/fixtures/root.md"
         );
 
-        let (conflict_repo, conflict_executor, _) = executable_document_repo(1, "source bytes");
+        let (conflict_repo, conflict_executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(conflict_repo.path().join("fixtures")).unwrap();
+        fs::write(
+            conflict_repo.path().join("fixtures/root.md"),
+            "source bytes",
+        )
+        .unwrap();
+        let mut owner = crate::test_utils::fixture_issue("Owner 0".into(), String::new());
+        owner.state = State::Done;
+        let mut document = document_reference("fixtures/root.md");
+        document.assets.push(crate::document::Asset {
+            original_path: "asset.png".into(),
+            resolved_path: Some("fixtures/asset.png".into()),
+            asset_type: crate::document::AssetType::Missing,
+            mime_type: None,
+            content_hash: None,
+            is_shared: false,
+        });
+        owner.documents = vec![document];
+
+        seed_archive_issue_precondition(&conflict_executor.storage, owner);
         fs::create_dir_all(conflict_repo.path().join("archive/fixtures")).unwrap();
         fs::write(
             conflict_repo.path().join("archive/fixtures/root.md"),
@@ -1463,28 +1716,13 @@ mod tests {
 
     #[test]
     fn test_publication_only_execution_records_one_event() {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!("{}\n", taxonomy.config_fragment())
-                + concat!(
-                    "[documentation]\n",
-                    "development_root = \"dev\"\n",
-                    "managed_paths = [\"fixtures\"]\n",
-                    "permanent_paths = [\"dev/guides\"]\n",
-                    "archive_root = \"archive\"\n"
-                ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"dev\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"dev/guides\"]\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
         fs::write(repo.path().join("dev/guides/permanent.md"), b"permanent").unwrap();
-        let executor = executor(&repo, storage);
         let result = executor
             .execute_archive_document("dev/guides/permanent.md")
             .unwrap();
@@ -1506,25 +1744,11 @@ mod tests {
 
     #[test]
     fn test_preexisting_identical_permanent_copy_is_adopted_once_without_deletion() {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!("{}\n", taxonomy.config_fragment())
-                + concat!(
-                    "[documentation]\n",
-                    "development_root = \"dev\"\n",
-                    "managed_paths = [\"fixtures\"]\n",
-                    "permanent_paths = [\"dev/guides\"]\n",
-                    "archive_root = \"archive\"\n"
-                ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"dev\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"dev/guides\"]\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         fs::create_dir_all(repo.path().join("archive/guides")).unwrap();
         fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
         fs::write(repo.path().join("dev/guides/permanent.md"), b"permanent").unwrap();
@@ -1533,8 +1757,6 @@ mod tests {
             b"permanent",
         )
         .unwrap();
-        let executor = executor(&repo, storage);
-
         let first = executor
             .execute_archive_document("dev/guides/permanent.md")
             .unwrap();
@@ -1562,9 +1784,59 @@ mod tests {
 
     #[test]
     fn test_container_execution_creates_marker_and_inverse_mirror_rerun_is_noop() {
-        let (repo, executor, id) = configured_repo();
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir_all(repo.path().join("fixtures/bundle/theme")).unwrap();
+        fs::write(
+            repo.path().join("fixtures/readme.md"),
+            "[page](bundle/index.html) [external](https://example.com)",
+        )
+        .unwrap();
+        fs::write(
+            repo.path().join("fixtures/bundle/index.html"),
+            r#"<link href="theme/base.css"><img src="image.svg">"#,
+        )
+        .unwrap();
+        fs::write(
+            repo.path().join("fixtures/bundle/theme/base.css"),
+            r#"@import "nested.css"; body { background: url("../../image.png"); }"#,
+        )
+        .unwrap();
+        fs::write(repo.path().join("fixtures/bundle/theme/nested.css"), "a{}").unwrap();
+        fs::write(repo.path().join("fixtures/bundle/image.svg"), "<svg/>").unwrap();
+        fs::write(repo.path().join("fixtures/bundle/image.png"), b"png").unwrap();
+        fs::write(repo.path().join("fixtures/data.csv"), "a,b\n1,2\n").unwrap();
+
+        let mut epic = crate::test_utils::fixture_issue("Archive fixture".into(), String::new());
+        epic.state = State::Done;
+        let epic_type = taxonomy.type_at_level(1);
+        let epic_namespace = taxonomy
+            .label_associations
+            .get(epic_type)
+            .expect("taxonomy declares a membership namespace for level one");
+        epic.labels = vec![
+            format!("type:{epic_type}"),
+            format!("{epic_namespace}:archive-fixture"),
+        ];
+        epic.documents = [
+            "fixtures/readme.md",
+            "fixtures/bundle/index.html",
+            "fixtures/bundle/theme/base.css",
+            "fixtures/data.csv",
+            "fixtures/bundle/image.png",
+            "fixtures/bundle/image.svg",
+        ]
+        .into_iter()
+        .map(document_reference)
+        .collect();
+        let id = epic.id.clone();
+        seed_archive_issue_precondition(&executor.storage, epic);
         let first = executor.execute_archive_container(&id).unwrap();
-        let destination_root = format!("archive/{}-archive-fixture", &id[..8]);
+        let destination_root = format!("archive/{}-archive-fixture", id.short_id());
         assert_eq!(
             fs::read_to_string(repo.path().join(&destination_root).join(".jit-container")).unwrap(),
             format!("{id}\n")
@@ -1600,26 +1872,12 @@ mod tests {
 
     #[test]
     fn test_container_preview_and_execution_share_owner_relative_destinations_across_areas() {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!("{}\n", taxonomy.config_fragment())
-                + concat!(
-                    "[documentation]\n",
-                    "development_root = \"workspace\"\n",
-                    "managed_paths = [\"workspace/active\", \"workspace/presentations\"]\n",
-                    "issue_scoped_areas = [\"workspace/active\", \"workspace/presentations\"]\n",
-                    "permanent_paths = []\n",
-                    "archive_root = \"workspace/archive\"\n",
-                ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"workspace\"\nmanaged_paths = [\"workspace/active\", \"workspace/presentations\"]\nissue_scoped_areas = [\"workspace/active\", \"workspace/presentations\"]\npermanent_paths = []\narchive_root = \"workspace/archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
 
         let mut container =
             crate::test_utils::fixture_issue("Owned archive layout".into(), String::new());
@@ -1646,8 +1904,7 @@ mod tests {
         });
         container.documents = sources.iter().map(document_reference).collect();
         let id = container.id.clone();
-        seed_archive_issue_precondition(&storage, container);
-        let executor = executor(&repo, storage);
+        seed_archive_issue_precondition(&executor.storage, container);
         let destination_root = format!("workspace/archive/{owner}");
         let expected = [
             (
@@ -1702,26 +1959,15 @@ mod tests {
             String::from_utf8(output.stdout).unwrap().trim().to_string()
         }
 
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!(
-                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
-                taxonomy.config_fragment()
-            ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), b"shared").unwrap();
-        git(repo.path(), &["init", "-q"]);
-        git(repo.path(), &["config", "user.email", "test@example.com"]);
-        git(repo.path(), &["config", "user.name", "Test"]);
+        crate::test_cli::init_git_repository(repo.path()).unwrap();
         git(repo.path(), &["add", "fixtures/root.md"]);
         git(repo.path(), &["commit", "-qm", "fixture"]);
         let commit = git(repo.path(), &["rev-parse", "HEAD"]);
@@ -1734,17 +1980,16 @@ mod tests {
             document_reference_at("fixtures/root.md", commit),
         ];
         let container_id = container.id.clone();
-        seed_archive_issue_precondition(&storage, container);
+        seed_archive_issue_precondition(&executor.storage, container);
         let mut outside = crate::test_utils::fixture_issue("Outside active".into(), String::new());
         outside.state = State::InProgress;
         outside.labels = vec![format!("type:{}", taxonomy.type_at_level(4))];
         outside.documents = vec![document_reference("fixtures/root.md")];
         let outside_id = outside.id.clone();
-        seed_archive_issue_precondition(&storage, outside);
+        seed_archive_issue_precondition(&executor.storage, outside);
 
-        let executor = executor(&repo, storage);
         let result = executor.execute_archive_container(&container_id).unwrap();
-        let destination = format!("archive/{}/fixtures/root.md", &container_id[..8]);
+        let destination = format!("archive/{}/fixtures/root.md", container_id.short_id());
         let container = executor.storage.load_issue(&container_id).unwrap();
         let outside = executor.storage.load_issue(&outside_id).unwrap();
         assert_eq!(container.documents[0].path, destination);
@@ -1757,27 +2002,14 @@ mod tests {
         assert!(result.planned_deletions.is_empty());
     }
 
-    /// A container-bearing repository that, like [`executable_document_repo`],
-    /// declares no development-root boundary so its managed and permanent areas
-    /// are the whole classification.
-    fn configured_repo() -> (TempDir, CommandExecutor<JsonFileStorage>, String) {
-        let repo = TempDir::new().unwrap();
-        let jit = repo.path().join(".jit");
-        let storage = JsonFileStorage::new(&jit);
+    #[test]
+    fn test_preview_container_is_deterministic_complete_and_non_mutating() {
         let taxonomy = test_taxonomy();
-        fs::create_dir_all(&jit).unwrap();
-        fs::write(
-            jit.join("config.toml"),
-            format!(
-                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
-                taxonomy.config_fragment()
-            ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
-
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         fs::create_dir_all(repo.path().join("fixtures/bundle/theme")).unwrap();
         fs::write(
             repo.path().join("fixtures/readme.md"),
@@ -1822,14 +2054,7 @@ mod tests {
         .map(document_reference)
         .collect();
         let id = epic.id.clone();
-        seed_archive_issue_precondition(&storage, epic);
-        let executor = executor(&repo, storage);
-        (repo, executor, id)
-    }
-
-    #[test]
-    fn test_preview_container_is_deterministic_complete_and_non_mutating() {
-        let (repo, executor, id) = configured_repo();
+        seed_archive_issue_precondition(&executor.storage, epic);
         let events_before = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
         let issues_before = executor.storage.list_issues().unwrap();
 
@@ -1878,20 +2103,10 @@ mod tests {
 
     #[test]
     fn test_preview_policy_statuses_remain_distinct_and_ineligible() {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        fs::create_dir_all(storage.root().join("issues")).unwrap();
-        fs::write(
-            storage.root().join("index.json"),
-            crate::repository_state::RepositoryIndex::default()
-                .to_pretty_bytes()
-                .unwrap(),
-        )
-        .unwrap();
+        let (repo, executor) =
+            crate::test_utils::setup_test_repo_with_config(&test_taxonomy().config_fragment())
+                .unwrap();
         fs::write(repo.path().join("root.csv"), "a,b").unwrap();
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
         let unconfigured = executor.preview_archive_document("root.csv").unwrap();
         assert_eq!(
             unconfigured.policy_status(),
@@ -1904,14 +2119,11 @@ mod tests {
             .any(|b| b.code == BlockerCode::PolicyUnconfigured));
 
         fs::write(
-            storage.root().join("config.toml"),
+            repo.path().join(".jit/config.toml"),
             "[documentation]\nmanaged_paths = [\".\"]\n",
         )
         .unwrap();
-        let incomplete = CommandExecutor::new(storage)
-            .with_layout(layout)
-            .preview_archive_document("root.csv")
-            .unwrap();
+        let incomplete = executor.preview_archive_document("root.csv").unwrap();
         assert_eq!(
             incomplete.policy_status(),
             crate::domain::artifact_plan::PolicyStatus::Incomplete
@@ -1925,19 +2137,10 @@ mod tests {
 
     #[test]
     fn test_preview_every_partial_policy_is_incomplete_and_explicit_empty_is_configured() {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        fs::create_dir_all(storage.root().join("issues")).unwrap();
-        fs::write(
-            storage.root().join("index.json"),
-            crate::repository_state::RepositoryIndex::default()
-                .to_pretty_bytes()
-                .unwrap(),
-        )
-        .unwrap();
+        let (repo, executor) =
+            crate::test_utils::setup_test_repo_with_config(&test_taxonomy().config_fragment())
+                .unwrap();
         fs::write(repo.path().join("root.csv"), "a,b").unwrap();
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let fields = [
             "managed_paths = []",
             "permanent_paths = []",
@@ -1953,14 +2156,11 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join("\n");
             fs::write(
-                storage.root().join("config.toml"),
+                repo.path().join(".jit/config.toml"),
                 format!("[documentation]\n{authored}\n"),
             )
             .unwrap();
-            let plan = CommandExecutor::new(storage.clone())
-                .with_layout(layout.clone())
-                .preview_archive_document("root.csv")
-                .unwrap();
+            let plan = executor.preview_archive_document("root.csv").unwrap();
             assert_eq!(
                 plan.policy_status(),
                 crate::domain::artifact_plan::PolicyStatus::Incomplete,
@@ -1970,14 +2170,11 @@ mod tests {
         }
 
         fs::write(
-            storage.root().join("config.toml"),
+            repo.path().join(".jit/config.toml"),
             "[documentation]\nmanaged_paths = []\npermanent_paths = []\narchive_root = \"\"\n",
         )
         .unwrap();
-        let configured = CommandExecutor::new(storage)
-            .with_layout(layout)
-            .preview_archive_document("root.csv")
-            .unwrap();
+        let configured = executor.preview_archive_document("root.csv").unwrap();
         assert_eq!(
             configured.policy_status(),
             crate::domain::artifact_plan::PolicyStatus::Configured
@@ -1986,50 +2183,6 @@ mod tests {
             blocker.code,
             BlockerCode::PolicyIncomplete | BlockerCode::PolicyUnconfigured
         )));
-    }
-
-    /// A repository whose development root is authored explicitly, holding one
-    /// terminal-owned artifact outside that root and one inside it that matches
-    /// no configured area.
-    fn development_root_repo() -> (TempDir, CommandExecutor<JsonFileStorage>) {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!("{}\n", taxonomy.config_fragment())
-                + concat!(
-                    "[documentation]\n",
-                    "development_root = \"workspace\"\n",
-                    "managed_paths = [\"workspace/active\"]\n",
-                    "permanent_paths = []\n",
-                    "archive_root = \"workspace/archive\"\n"
-                ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
-        fs::create_dir_all(repo.path().join("scripts")).unwrap();
-        fs::create_dir_all(repo.path().join("workspace/active")).unwrap();
-        fs::create_dir_all(repo.path().join("workspace/scratch")).unwrap();
-        fs::write(repo.path().join("scripts/install.sh"), "#!/bin/sh\n").unwrap();
-        fs::write(repo.path().join("workspace/active/target.md"), "# Target\n").unwrap();
-        fs::write(repo.path().join("workspace/scratch/notes.md"), "# Notes\n").unwrap();
-        for path in [
-            "scripts/install.sh",
-            "workspace/active/target.md",
-            "workspace/scratch/notes.md",
-        ] {
-            let mut issue =
-                crate::test_utils::fixture_issue(format!("Owner of {path}"), String::new());
-            issue.state = State::Done;
-            issue.documents = vec![document_reference(path)];
-            seed_archive_issue_precondition(&storage, issue);
-        }
-        let executor = executor(&repo, storage);
-        (repo, executor)
     }
 
     /// Guards the deliberately unbounded closure expansion in
@@ -2050,25 +2203,12 @@ mod tests {
     #[test]
     fn test_document_preview_copies_an_artifact_whose_only_outside_owner_arrives_through_an_out_of_root_hub(
     ) {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!("{}\n", taxonomy.config_fragment())
-                + concat!(
-                    "[documentation]\n",
-                    "development_root = \"workspace\"\n",
-                    "managed_paths = [\"workspace/active\"]\n",
-                    "permanent_paths = []\n",
-                    "archive_root = \"workspace/archive\"\n"
-                ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"workspace\"\nmanaged_paths = [\"workspace/active\"]\npermanent_paths = []\narchive_root = \"workspace/archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         for (path, content) in [
             ("workspace/active/target.md", "# Target\n"),
             ("workspace/notes/other.md", "[hub](../../HUB.md)\n"),
@@ -2084,9 +2224,8 @@ mod tests {
                 crate::test_utils::fixture_issue(format!("Owner of {path}"), String::new());
             issue.state = State::Done;
             issue.documents = vec![document_reference(path)];
-            seed_archive_issue_precondition(&storage, issue);
+            seed_archive_issue_precondition(&executor.storage, issue);
         }
-        let executor = executor(&repo, storage);
 
         let plan = executor
             .preview_archive_document("workspace/active/target.md")
@@ -2116,7 +2255,29 @@ mod tests {
 
     #[test]
     fn test_preview_document_classifies_selected_roots_by_the_configured_development_root() {
-        let (_repo, executor) = development_root_repo();
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"workspace\"\nmanaged_paths = [\"workspace/active\"]\npermanent_paths = []\narchive_root = \"workspace/archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir_all(repo.path().join("scripts")).unwrap();
+        fs::create_dir_all(repo.path().join("workspace/active")).unwrap();
+        fs::create_dir_all(repo.path().join("workspace/scratch")).unwrap();
+        fs::write(repo.path().join("scripts/install.sh"), "#!/bin/sh\n").unwrap();
+        fs::write(repo.path().join("workspace/active/target.md"), "# Target\n").unwrap();
+        fs::write(repo.path().join("workspace/scratch/notes.md"), "# Notes\n").unwrap();
+        for path in [
+            "scripts/install.sh",
+            "workspace/active/target.md",
+            "workspace/scratch/notes.md",
+        ] {
+            let mut issue =
+                crate::test_utils::fixture_issue(format!("Owner of {path}"), String::new());
+            issue.state = State::Done;
+            issue.documents = vec![document_reference(path)];
+            seed_archive_issue_precondition(&executor.storage, issue);
+        }
 
         let outside = executor
             .preview_archive_document("scripts/install.sh")
@@ -2147,7 +2308,29 @@ mod tests {
 
     #[test]
     fn test_execute_document_uses_path_relative_to_a_non_default_development_root_and_relinks() {
-        let (repo, executor) = development_root_repo();
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"workspace\"\nmanaged_paths = [\"workspace/active\"]\npermanent_paths = []\narchive_root = \"workspace/archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir_all(repo.path().join("scripts")).unwrap();
+        fs::create_dir_all(repo.path().join("workspace/active")).unwrap();
+        fs::create_dir_all(repo.path().join("workspace/scratch")).unwrap();
+        fs::write(repo.path().join("scripts/install.sh"), "#!/bin/sh\n").unwrap();
+        fs::write(repo.path().join("workspace/active/target.md"), "# Target\n").unwrap();
+        fs::write(repo.path().join("workspace/scratch/notes.md"), "# Notes\n").unwrap();
+        for path in [
+            "scripts/install.sh",
+            "workspace/active/target.md",
+            "workspace/scratch/notes.md",
+        ] {
+            let mut issue =
+                crate::test_utils::fixture_issue(format!("Owner of {path}"), String::new());
+            issue.state = State::Done;
+            issue.documents = vec![document_reference(path)];
+            seed_archive_issue_precondition(&executor.storage, issue);
+        }
 
         let result = executor
             .execute_archive_document("workspace/active/target.md")
@@ -2168,7 +2351,29 @@ mod tests {
 
     #[test]
     fn test_execute_document_reconciles_edited_residue_from_pre_cutover_event_destination() {
-        let (repo, executor) = development_root_repo();
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"workspace\"\nmanaged_paths = [\"workspace/active\"]\npermanent_paths = []\narchive_root = \"workspace/archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir_all(repo.path().join("scripts")).unwrap();
+        fs::create_dir_all(repo.path().join("workspace/active")).unwrap();
+        fs::create_dir_all(repo.path().join("workspace/scratch")).unwrap();
+        fs::write(repo.path().join("scripts/install.sh"), "#!/bin/sh\n").unwrap();
+        fs::write(repo.path().join("workspace/active/target.md"), "# Target\n").unwrap();
+        fs::write(repo.path().join("workspace/scratch/notes.md"), "# Notes\n").unwrap();
+        for path in [
+            "scripts/install.sh",
+            "workspace/active/target.md",
+            "workspace/scratch/notes.md",
+        ] {
+            let mut issue =
+                crate::test_utils::fixture_issue(format!("Owner of {path}"), String::new());
+            issue.state = State::Done;
+            issue.documents = vec![document_reference(path)];
+            seed_archive_issue_precondition(&executor.storage, issue);
+        }
         let source = "workspace/active/target.md";
         let canonical_destination = "workspace/archive/active/target.md";
         let historical_destination = "workspace/archive/workspace/active/target.md";
@@ -2176,22 +2381,26 @@ mod tests {
         fs::write(repo.path().join(canonical_destination), b"# Target\n").unwrap();
         fs::write(repo.path().join(source), b"# Edited residue\n").unwrap();
 
-        let historical_event = Event::draft_artifact_archive_executed(
-            PlanTarget::Document {
-                path: source.into(),
-            },
-            "workspace/archive".into(),
-            vec![crate::domain::artifact_execution::ArchivePublication {
-                source: Some(source.into()),
-                destination: historical_destination.into(),
-                content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
-                    b"# Target\n",
-                ),
-                adopted: false,
-            }],
-            Vec::new(),
-            Vec::new(),
-            false,
+        let historical_event = crate::test_utils::stamped_event(
+            EventBody::draft_artifact_archive_executed(
+                PlanTarget::Document {
+                    path: source.into(),
+                },
+                "workspace/archive".into(),
+                vec![crate::domain::artifact_execution::ArchivePublication {
+                    source: Some(source.into()),
+                    destination: historical_destination.into(),
+                    content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
+                        b"# Target\n",
+                    ),
+                    adopted: false,
+                }],
+                Vec::new(),
+                Vec::new(),
+                false,
+            ),
+            "historical-archive",
+            chrono::DateTime::UNIX_EPOCH,
         );
         let events_path = repo.path().join(".jit/events.jsonl");
         let mut event_bytes = fs::read(&events_path).unwrap_or_default();
@@ -2235,15 +2444,65 @@ mod tests {
 
     #[test]
     fn test_preview_non_terminal_container_and_foreign_destination_are_blocked() {
-        let (repo, executor, id) = configured_repo();
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir_all(repo.path().join("fixtures/bundle/theme")).unwrap();
+        fs::write(
+            repo.path().join("fixtures/readme.md"),
+            "[page](bundle/index.html) [external](https://example.com)",
+        )
+        .unwrap();
+        fs::write(
+            repo.path().join("fixtures/bundle/index.html"),
+            r#"<link href="theme/base.css"><img src="image.svg">"#,
+        )
+        .unwrap();
+        fs::write(
+            repo.path().join("fixtures/bundle/theme/base.css"),
+            r#"@import "nested.css"; body { background: url("../../image.png"); }"#,
+        )
+        .unwrap();
+        fs::write(repo.path().join("fixtures/bundle/theme/nested.css"), "a{}").unwrap();
+        fs::write(repo.path().join("fixtures/bundle/image.svg"), "<svg/>").unwrap();
+        fs::write(repo.path().join("fixtures/bundle/image.png"), b"png").unwrap();
+        fs::write(repo.path().join("fixtures/data.csv"), "a,b\n1,2\n").unwrap();
+
+        let mut epic = crate::test_utils::fixture_issue("Archive fixture".into(), String::new());
+        epic.state = State::Done;
+        let epic_type = taxonomy.type_at_level(1);
+        let epic_namespace = taxonomy
+            .label_associations
+            .get(epic_type)
+            .expect("taxonomy declares a membership namespace for level one");
+        epic.labels = vec![
+            format!("type:{epic_type}"),
+            format!("{epic_namespace}:archive-fixture"),
+        ];
+        epic.documents = [
+            "fixtures/readme.md",
+            "fixtures/bundle/index.html",
+            "fixtures/bundle/theme/base.css",
+            "fixtures/data.csv",
+            "fixtures/bundle/image.png",
+            "fixtures/bundle/image.svg",
+        ]
+        .into_iter()
+        .map(document_reference)
+        .collect();
+        let id = epic.id.clone();
+        seed_archive_issue_precondition(&executor.storage, epic);
         let mut issue = executor.storage.load_issue(&id).unwrap();
         issue.state = State::InProgress;
         seed_archive_issue_precondition(&executor.storage, issue);
-        let destination = repo.path().join("archive").join(&id[..8]);
+        let destination = repo.path().join("archive").join(id.short_id());
         fs::create_dir_all(&destination).unwrap();
         fs::write(destination.join(".jit-container"), "foreign-container-id\n").unwrap();
 
-        let plan = executor.preview_archive_container(&id[..8]).unwrap();
+        let plan = executor.preview_archive_container(&id).unwrap();
         assert!(!plan.eligible());
         assert!(plan
             .blockers()
@@ -2268,21 +2527,11 @@ mod tests {
     fn test_preview_blocks_symlink_artifact_without_following_it() {
         use std::os::unix::fs::symlink;
 
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!(
-                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
-                taxonomy.config_fragment()
-            ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("real.md"), "[referent](secret.html)").unwrap();
         fs::write(repo.path().join("fixtures/secret.html"), "referent-only").unwrap();
@@ -2292,7 +2541,7 @@ mod tests {
         )
         .unwrap();
 
-        let plan = executor(&repo, storage)
+        let plan = executor
             .preview_archive_document("fixtures/link.md")
             .unwrap();
         let artifact = plan
@@ -2311,21 +2560,8 @@ mod tests {
             .iter()
             .any(|blocker| blocker.code == BlockerCode::SymlinkArtifact));
 
-        let regular_repo = TempDir::new().unwrap();
-        let regular_storage = JsonFileStorage::new(regular_repo.path().join(".jit"));
-        let regular_taxonomy = test_taxonomy();
-        fs::create_dir_all(regular_storage.root()).unwrap();
-        fs::write(
-            regular_storage.root().join("config.toml"),
-            format!(
-                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
-                regular_taxonomy.config_fragment()
-            ),
-        )
-        .unwrap();
-        executor(&regular_repo, regular_storage.clone())
-            .initialize_fresh_repository(regular_repo.path(), None)
-            .unwrap();
+        let (regular_repo, regular_executor) =
+            crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         fs::create_dir(regular_repo.path().join("fixtures")).unwrap();
         fs::create_dir(regular_repo.path().join("real-archive")).unwrap();
         fs::write(regular_repo.path().join("fixtures/root.md"), "root").unwrap();
@@ -2334,7 +2570,7 @@ mod tests {
             regular_repo.path().join("archive"),
         )
         .unwrap();
-        let destination_symlink = executor(&regular_repo, regular_storage)
+        let destination_symlink = regular_executor
             .preview_archive_document("fixtures/root.md")
             .unwrap();
         assert!(destination_symlink.artifacts()[0]
@@ -2342,21 +2578,8 @@ mod tests {
             .iter()
             .any(|blocker| blocker.code == BlockerCode::SymlinkArtifact));
 
-        let owner_repo = TempDir::new().unwrap();
-        let owner_storage = JsonFileStorage::new(owner_repo.path().join(".jit"));
-        let owner_taxonomy = test_taxonomy();
-        fs::create_dir_all(owner_storage.root()).unwrap();
-        fs::write(
-            owner_storage.root().join("config.toml"),
-            format!(
-                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
-                owner_taxonomy.config_fragment()
-            ),
-        )
-        .unwrap();
-        executor(&owner_repo, owner_storage.clone())
-            .initialize_fresh_repository(owner_repo.path(), None)
-            .unwrap();
+        let (owner_repo, owner_executor) =
+            crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         fs::create_dir_all(owner_repo.path().join("docs")).unwrap();
         fs::create_dir_all(owner_repo.path().join("fixtures")).unwrap();
         fs::create_dir_all(owner_repo.path().join("referents")).unwrap();
@@ -2375,9 +2598,9 @@ mod tests {
             crate::test_utils::fixture_issue("Active outside owner".into(), String::new());
         outside.state = State::InProgress;
         outside.documents = vec![document_reference("docs/outside.md")];
-        seed_archive_issue_precondition(&owner_storage, outside);
+        seed_archive_issue_precondition(&owner_executor.storage, outside);
 
-        let owner_plan = executor(&owner_repo, owner_storage)
+        let owner_plan = owner_executor
             .preview_archive_document("fixtures/selected.md")
             .unwrap();
         let selected = &owner_plan.artifacts()[0];
@@ -2392,28 +2615,16 @@ mod tests {
         )));
     }
 
-    /// A configured repository whose one terminal container owns a document
-    /// linking the sibling path `fixtures/section`. The caller decides what that
-    /// path is on disk.
-    fn directory_link_repo() -> (TempDir, JsonFileStorage, String) {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!(
-                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
-                taxonomy.config_fragment()
-            ),
-        )
+    #[test]
+    fn test_preview_container_directory_link_target_contributes_no_artifact_and_stays_eligible() {
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
         .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
         fs::create_dir_all(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/index.md"), "[section](section/)").unwrap();
-
+        let taxonomy = test_taxonomy();
         let mut epic =
             crate::test_utils::fixture_issue("Directory link container".into(), String::new());
         epic.state = State::Done;
@@ -2428,19 +2639,11 @@ mod tests {
         ];
         epic.documents = vec![document_reference("fixtures/index.md")];
         let id = epic.id.clone();
-        seed_archive_issue_precondition(&storage, epic);
-        (repo, storage, id)
-    }
-
-    #[test]
-    fn test_preview_container_directory_link_target_contributes_no_artifact_and_stays_eligible() {
-        let (repo, storage, id) = directory_link_repo();
+        seed_archive_issue_precondition(&executor.storage, epic);
         fs::create_dir_all(repo.path().join("fixtures/section")).unwrap();
         fs::write(repo.path().join("fixtures/section/child.md"), "child").unwrap();
 
-        let plan = executor(&repo, storage)
-            .preview_archive_container(&id)
-            .unwrap();
+        let plan = executor.preview_archive_container(&id).unwrap();
 
         assert!(plan
             .artifacts()
@@ -2463,7 +2666,29 @@ mod tests {
     fn test_preview_container_symlinked_directory_link_target_still_blocks_as_symlink_artifact() {
         use std::os::unix::fs::symlink;
 
-        let (repo, storage, id) = directory_link_repo();
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir_all(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/index.md"), "[section](section/)").unwrap();
+        let taxonomy = test_taxonomy();
+        let mut epic =
+            crate::test_utils::fixture_issue("Directory link container".into(), String::new());
+        epic.state = State::Done;
+        let epic_type = taxonomy.type_at_level(1);
+        let epic_namespace = taxonomy
+            .label_associations
+            .get(epic_type)
+            .expect("taxonomy declares a membership namespace for level one");
+        epic.labels = vec![
+            format!("type:{epic_type}"),
+            format!("{epic_namespace}:directory-link"),
+        ];
+        epic.documents = vec![document_reference("fixtures/index.md")];
+        let id = epic.id.clone();
+        seed_archive_issue_precondition(&executor.storage, epic);
         fs::create_dir_all(repo.path().join("referents/section")).unwrap();
         symlink(
             repo.path().join("referents/section"),
@@ -2471,9 +2696,7 @@ mod tests {
         )
         .unwrap();
 
-        let plan = executor(&repo, storage)
-            .preview_archive_container(&id)
-            .unwrap();
+        let plan = executor.preview_archive_container(&id).unwrap();
 
         assert!(plan
             .artifacts()
@@ -2488,52 +2711,32 @@ mod tests {
 
     // === Coupled retirement workflow (jit:45a140ae) ===
 
-    /// A repo with one container issue in `state` owning `fixtures/root.md`.
-    /// Returns the repo, executor, and the container's full id.
-    fn executable_container_repo(
-        state: State,
-        content: &str,
-    ) -> (TempDir, CommandExecutor<JsonFileStorage>, String) {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let taxonomy = test_taxonomy();
-        fs::create_dir_all(storage.root()).unwrap();
-        fs::write(
-            storage.root().join("config.toml"),
-            format!(
-                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
-                taxonomy.config_fragment()
-            ),
-        )
-        .unwrap();
-        executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
-        fs::create_dir(repo.path().join("fixtures")).unwrap();
-        fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
-        let mut container = crate::test_utils::fixture_issue("Container".into(), String::new());
-        container.state = state;
-        container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
-        container.documents = vec![document_reference("fixtures/root.md")];
-        let id = container.id.clone();
-        seed_archive_issue_precondition(&storage, container);
-        let executor = executor(&repo, storage);
-        (repo, executor, id)
-    }
-
-    fn state_change_count(executor: &CommandExecutor<JsonFileStorage>, id: &str) -> usize {
+    fn state_change_count(executor: &CommandExecutor<JsonFileStorage>, id: &IssueId) -> usize {
         executor
             .storage
             .read_events()
             .unwrap()
             .iter()
-            .filter(|event| matches!(event, Event::IssueStateChanged { issue_id, to: State::Archived, .. } if issue_id == id))
+            .filter(|event| matches!(event.body(), EventBody::IssueStateChanged { issue_id, to: State::Archived, .. } if issue_id == id))
             .count()
     }
 
     #[test]
     fn test_container_archival_retires_container_to_archived() {
-        let (repo, executor, id) = executable_container_repo(State::Done, "# Root\n");
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "# Root\n").unwrap();
+        let mut container = crate::test_utils::fixture_issue("Container".into(), String::new());
+        container.state = State::Done;
+        container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
+        container.documents = vec![document_reference("fixtures/root.md")];
+        let id = container.id.clone();
+        seed_archive_issue_precondition(&executor.storage, container);
         let result = executor.execute_archive_container(&id).unwrap();
         assert!(result.event_appended);
         // The document was relocated out of its source into the archive mirror
@@ -2550,7 +2753,20 @@ mod tests {
 
     #[test]
     fn test_rejected_container_archival_retires_from_rejected() {
-        let (_repo, executor, id) = executable_container_repo(State::Rejected, "# Root\n");
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "# Root\n").unwrap();
+        let mut container = crate::test_utils::fixture_issue("Container".into(), String::new());
+        container.state = State::Rejected;
+        container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
+        container.documents = vec![document_reference("fixtures/root.md")];
+        let id = container.id.clone();
+        seed_archive_issue_precondition(&executor.storage, container);
         executor.execute_archive_container(&id).unwrap();
         let container = executor.storage.load_issue(&id).unwrap();
         assert_eq!(container.state, State::Archived);
@@ -2559,7 +2775,20 @@ mod tests {
 
     #[test]
     fn test_non_terminal_container_archival_refused_with_guidance() {
-        let (repo, executor, id) = executable_container_repo(State::InProgress, "# Root\n");
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "# Root\n").unwrap();
+        let mut container = crate::test_utils::fixture_issue("Container".into(), String::new());
+        container.state = State::InProgress;
+        container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
+        container.documents = vec![document_reference("fixtures/root.md")];
+        let id = container.id.clone();
+        seed_archive_issue_precondition(&executor.storage, container);
         let error = executor
             .execute_archive_container(&id)
             .expect_err("archiving a non-terminal container must be refused");
@@ -2578,7 +2807,20 @@ mod tests {
 
     #[test]
     fn test_container_archival_rerun_is_idempotent_noop() {
-        let (_repo, executor, id) = executable_container_repo(State::Done, "# Root\n");
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "# Root\n").unwrap();
+        let mut container = crate::test_utils::fixture_issue("Container".into(), String::new());
+        container.state = State::Done;
+        container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
+        container.documents = vec![document_reference("fixtures/root.md")];
+        let id = container.id.clone();
+        seed_archive_issue_precondition(&executor.storage, container);
         executor.execute_archive_container(&id).unwrap();
         // The container is now Archived-from-Done, still effectively terminal, so a
         // rerun is eligible and reconciles to a no-op rather than erroring.
@@ -2593,8 +2835,24 @@ mod tests {
 
     #[test]
     fn test_container_archival_rerun_keeps_a_copy_an_archived_document_still_cites() {
-        let (repo, executor, id) =
-            executable_container_repo(State::Done, "See [b](/fixtures/b.md).\n");
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(
+            repo.path().join("fixtures/root.md"),
+            "See [b](/fixtures/b.md).\n",
+        )
+        .unwrap();
+        let mut container = crate::test_utils::fixture_issue("Container".into(), String::new());
+        container.state = State::Done;
+        container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
+        container.documents = vec![document_reference("fixtures/root.md")];
+        let id = container.id.clone();
+        seed_archive_issue_precondition(&executor.storage, container);
         fs::write(repo.path().join("fixtures/b.md"), "# B\n").unwrap();
         let mut container = executor.storage.load_issue(&id).unwrap();
         container
@@ -2613,8 +2871,24 @@ mod tests {
 
     #[test]
     fn test_archive_reports_a_link_target_the_layout_cannot_represent_as_a_blocker() {
-        let (_repo, executor, id) =
-            executable_container_repo(State::Done, "See [item](my_module::item).\n");
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(
+            repo.path().join("fixtures/root.md"),
+            "See [item](my_module::item).\n",
+        )
+        .unwrap();
+        let mut container = crate::test_utils::fixture_issue("Container".into(), String::new());
+        container.state = State::Done;
+        container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
+        container.documents = vec![document_reference("fixtures/root.md")];
+        let id = container.id.clone();
+        seed_archive_issue_precondition(&executor.storage, container);
 
         let preview = executor.preview_archive_container(&id).unwrap();
         assert!(preview
@@ -2632,7 +2906,27 @@ mod tests {
         // A document shared by a Done owner and a descendant independently
         // archived FROM a terminal state: the archived owner is effectively
         // terminal, so it is not an active owner and the document still moves.
-        let (_repo, executor, _) = executable_document_repo(1, "shared doc");
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(&format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        ))
+        .unwrap();
+        fs::create_dir(_repo.path().join("fixtures")).unwrap();
+        fs::write(_repo.path().join("fixtures/root.md"), "shared doc").unwrap();
+        let mut owner = crate::test_utils::fixture_issue("Owner 0".into(), String::new());
+        owner.state = State::Done;
+        let mut document = document_reference("fixtures/root.md");
+        document.assets.push(crate::document::Asset {
+            original_path: "asset.png".into(),
+            resolved_path: Some("fixtures/asset.png".into()),
+            asset_type: crate::document::AssetType::Missing,
+            mime_type: None,
+            content_hash: None,
+            is_shared: false,
+        });
+        owner.documents = vec![document];
+
+        seed_archive_issue_precondition(&executor.storage, owner);
         let mut archived_owner =
             crate::test_utils::fixture_issue("Independently archived".into(), String::new());
         archived_owner.state = State::Archived;

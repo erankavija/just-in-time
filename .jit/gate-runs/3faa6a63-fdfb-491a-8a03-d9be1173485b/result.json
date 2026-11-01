@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "823834d3415c0a7d6b796178eb38cbf32a42b5d5",
+  "completed_at": "2026-10-28T23:30:08.070034815Z",
+  "duration_ms": 206606,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped requirements are satisfied; prior review findings are addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f1c1acc8-4440-409d-9a8b-e2fa070befc2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3faa6a63-fdfb-491a-8a03-d9be1173485b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:26:41.463284502Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:f1c1acc8 commits 38c745cd0, 63ae9e050, f5f49e6c3, 823834d34\nPolicy sources: AGENTS.md\nResolved items: @/issue/f1c1acc8/requirement/REQ-01, @/issue/f1c1acc8/requirement/REQ-02, @/issue/f1c1acc8/requirement/REQ-03, @/charter/D-18, @/invariant/orthogonal-tests, @/invariant/single-source-prose, @/invariant/shared-test-contracts\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T23:25:50Z); prior code-review failed (exit 1, c93f8ccd) and its findings were addressed\nTruncation recovery: re-read the attributed projection-test patch in bounded chunks, plus current projection rows and test bindings\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped requirements are satisfied; prior review findings are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

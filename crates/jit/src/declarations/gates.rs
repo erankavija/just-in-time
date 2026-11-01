@@ -1,104 +1,35 @@
 //! Neutral authored quality-gate declarations and pure TOML preservation.
 
+use crate::domain::identity::GateKey;
 use crate::domain::repository_inputs::RepositoryInputs;
+use crate::domain::vocabulary::wire_vocabulary;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::str::FromStr;
 
-/// Error returned for an unknown gate stage.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum GateStageParseError {
-    /// The input was not a canonical stage token.
-    #[error("Invalid gate stage: '{0}' (expected 'precheck' or 'postcheck')")]
-    UnknownStage(String),
-}
-
-/// Gate execution stage.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum GateStage {
-    /// Runs before work starts.
-    Precheck,
-    /// Runs after work completes.
-    Postcheck,
-}
-
-impl GateStage {
-    /// Canonical serialized token.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Precheck => "precheck",
-            Self::Postcheck => "postcheck",
-        }
+wire_vocabulary! {
+    /// Gate execution stage.
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
+    )]
+    pub enum GateStage {
+        /// Runs before work starts.
+        Precheck = "precheck",
+        /// Runs after work completes.
+        Postcheck = "postcheck",
     }
 }
 
-impl FromStr for GateStage {
-    type Err = GateStageParseError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            "precheck" => Ok(Self::Precheck),
-            "postcheck" => Ok(Self::Postcheck),
-            _ => Err(GateStageParseError::UnknownStage(value.to_string())),
-        }
-    }
-}
-
-impl std::fmt::Display for GateStage {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
-/// Error returned for an unknown gate mode.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum GateModeParseError {
-    /// The input was not a canonical mode token.
-    #[error("Invalid gate mode: '{0}' (expected 'manual' or 'auto')")]
-    UnknownMode(String),
-}
-
-/// Gate execution mode.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum GateMode {
-    /// Requires an explicit pass/fail.
-    Manual,
-    /// Has an automated checker.
-    Auto,
-}
-
-impl GateMode {
-    /// Canonical serialized token.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Manual => "manual",
-            Self::Auto => "auto",
-        }
-    }
-}
-
-impl FromStr for GateMode {
-    type Err = GateModeParseError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            "manual" => Ok(Self::Manual),
-            "auto" => Ok(Self::Auto),
-            _ => Err(GateModeParseError::UnknownMode(value.to_string())),
-        }
-    }
-}
-
-impl std::fmt::Display for GateMode {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
+wire_vocabulary! {
+    /// Gate execution mode.
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
+    )]
+    pub enum GateMode {
+        /// Requires an explicit pass/fail.
+        Manual = "manual",
+        /// Has an automated checker.
+        Auto = "auto",
     }
 }
 
@@ -157,7 +88,7 @@ pub struct GateDefinition {
     #[serde(default = "default_gate_version")]
     pub version: u32,
     /// Unique registry key.
-    pub key: String,
+    pub key: GateKey,
     /// Human-readable name.
     pub title: String,
     /// Explanation of the check.
@@ -226,7 +157,7 @@ fn default_gate_priority() -> u32 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct GateRegistry {
     /// Gate key to definition.
-    pub gates: HashMap<String, GateDefinition>,
+    pub gates: HashMap<GateKey, GateDefinition>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -275,7 +206,7 @@ pub enum GateDeclarationError {
     #[error("gate registry cannot be serialized: {0}")]
     Serialize(#[from] toml::ser::Error),
     #[error("duplicate gate key '{0}'")]
-    DuplicateKey(String),
+    DuplicateKey(GateKey),
 }
 
 #[cfg(test)]
@@ -301,8 +232,28 @@ mode = "manual"
 "#;
         assert!(matches!(
             parse_gate_registry(bytes),
-            Err(GateDeclarationError::DuplicateKey(key)) if key == "review"
+            Err(GateDeclarationError::DuplicateKey(key)) if key.as_str() == "review"
         ));
+    }
+
+    #[test]
+    fn test_gate_registry_parser_rejects_malformed_gate_key_with_its_error() {
+        let key = "Not_Kebab";
+        let error = parse_gate_registry(
+            format!(
+                "[[gates]]\n\
+                 key = \"{key}\"\n\
+                 title = \"Review\"\n\
+                 description = \"Review\"\n\
+                 stage = \"postcheck\"\n\
+                 mode = \"manual\"\n"
+            )
+            .as_bytes(),
+        )
+        .expect_err("a malformed gate key must fail the load");
+        let refusal = GateKey::try_from(key).unwrap_err().to_string();
+
+        assert!(error.to_string().contains(&refusal), "{error}");
     }
 
     /// REQ-01: a key outside the declaration schema, including the removed
@@ -357,7 +308,7 @@ mode = "manual"
         let accepted =
             registry_with_inputs("roots = [\"crates\"]\nexclude = [\"crates/**/target/**\"]\n")
                 .expect("a declarable input set parses");
-        let inputs = accepted.gates["workspace"]
+        let inputs = accepted.gates[&"workspace".parse().unwrap()]
             .inputs
             .as_ref()
             .expect("the parsed gate carries its declared inputs");
@@ -402,7 +353,7 @@ mode = "manual"
     fn test_gate_registry_serialization_is_sorted_and_round_trips() {
         let gate = |key: &str| GateDefinition {
             version: 1,
-            key: key.to_string(),
+            key: key.parse().unwrap(),
             title: key.to_string(),
             description: key.to_string(),
             stage: GateStage::Postcheck,
@@ -414,8 +365,8 @@ mode = "manual"
         };
         let registry = GateRegistry {
             gates: HashMap::from([
-                ("zeta".to_string(), gate("zeta")),
-                ("alpha".to_string(), gate("alpha")),
+                ("zeta".parse().unwrap(), gate("zeta")),
+                ("alpha".parse().unwrap(), gate("alpha")),
             ]),
         };
         let bytes = serialize_gate_registry(&registry).unwrap();
@@ -428,5 +379,57 @@ mode = "manual"
                     .position(|window| window == b"key = \"zeta\"")
         );
         assert_eq!(parse_gate_registry(&bytes).unwrap(), registry);
+    }
+
+    /// An authored registry re-serializes to a fixed point holding the same
+    /// declarations, and the stage and mode tokens it carries are the
+    /// vocabulary's own. Authored comments and ordering are not preserved.
+    #[test]
+    fn test_serialize_gate_registry_reaches_a_fixed_point_over_authored_declarations() {
+        let authored = br#"
+# An authored comment the rewrite drops.
+[[gates]]
+version = 1
+key = "workspace"
+title = "Workspace"
+description = "Runs a command over declared inputs."
+stage = "postcheck"
+mode = "auto"
+priority = 50
+
+[gates.checker]
+type = "exec"
+command = "./ci.sh"
+timeout_seconds = 60
+pass_context = true
+prompt_file = "./prompt.md"
+
+[gates.checker.env]
+REVIEWER = "agent"
+
+[gates.inputs]
+roots = ["crates"]
+exclude = ["crates/target/**"]
+
+[[gates]]
+key = "attested"
+title = "Attested"
+description = ""
+stage = "precheck"
+mode = "manual"
+"#;
+        let registry = parse_gate_registry(authored).unwrap();
+        let bytes = serialize_gate_registry(&registry).unwrap();
+        let text = String::from_utf8(bytes.clone()).unwrap();
+
+        assert_eq!(
+            serialize_gate_registry(&parse_gate_registry(&bytes).unwrap()).unwrap(),
+            bytes
+        );
+        assert_eq!(parse_gate_registry(&bytes).unwrap(), registry);
+        registry.gates.values().for_each(|gate| {
+            assert!(text.contains(&format!("stage = \"{}\"", gate.stage)));
+            assert!(text.contains(&format!("mode = \"{}\"", gate.mode)));
+        });
     }
 }

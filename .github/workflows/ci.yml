@@ -154,13 +154,8 @@ jobs:
       - name: Build all crates
         run: cargo build --workspace --verbose
       
-      - name: Run tests
-        run: cargo test --workspace --verbose
-      
-      - name: Run integration tests
-        run: |
-          cd crates/jit
-          cargo test --test '*' --verbose
+      - name: Run the test suite
+        run: ./scripts/cargo-ci.sh --suite
 
   # Enforce the declared MSRV and its recency window. The authoritative policy
   # is the single `rust-version` under `[workspace.package]` in Cargo.toml,

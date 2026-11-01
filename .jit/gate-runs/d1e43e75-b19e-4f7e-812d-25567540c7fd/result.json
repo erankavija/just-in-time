@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-13190465",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f1308174844a6f40866ea66190ae5f1367fb4b28",
+  "completed_at": "2026-10-28T23:50:49.448735119Z",
+  "duration_ms": 81965,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The current fast_issue suite uses canonical typed issue IDs, and the prior direct-slice finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "13190465-174b-4fd2-be58-308b7a3d7e2e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d1e43e75-b19e-4f7e-812d-25567540c7fd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T23:49:27.483265484Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ac9e953a9, a3b26f895, 03186ac8b, 8619ab626, 2ab0a95d0, f13081748\nPolicy sources: AGENTS.md\nResolved items: @/issue/13190465/requirement/REQ-01–REQ-05 and @/issue/2195c98f/requirement/REQ-01 (issue descriptions, markdown-first); @/charter/D-18 (dev/vision/9db27a3a-charter.md, markdown-first); @/invariant/semantic-types, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-10-28T23:49:26Z); code-review failed (exit 1, prior finding addressed by 8619ab626)\nTruncation recovery: narrowed fast_issue-only ID-operation and construction scans; bounded reads verified the prior direct-slice locations and modified helpers\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current fast_issue suite uses canonical typed issue IDs, and the prior direct-slice finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -7,6 +7,7 @@
 //! (REQ-04), and over arbitrary dependency edits (REQ-06).
 
 use jit::commands::BatchIssueDef;
+use jit::domain::identity::IssueId;
 use jit::domain::{queries::build_issue_map, Issue, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
@@ -84,8 +85,8 @@ fn test_add_dependency_demotes_a_ready_dependent_and_records_the_state_change() 
     let events = h.storage.read_events().unwrap();
     assert!(
         events.iter().any(|event| matches!(
-            event,
-            jit::domain::Event::IssueStateChanged { issue_id, from, to, .. }
+            event.body(),
+            jit::domain::EventBody::IssueStateChanged { issue_id, from, to, .. }
                 if *issue_id == dependent && *from == State::Ready && *to == State::Backlog
         )),
         "the demotion must append its own state-change event"
@@ -165,8 +166,8 @@ fn test_validate_fix_records_the_repair_demotion_in_the_event_log() {
     assert!(events.len() > events_before);
     assert!(
         events.iter().skip(events_before).any(|event| matches!(
-            event,
-            jit::domain::Event::IssueStateChanged { issue_id, from, to, .. }
+            event.body(),
+            jit::domain::EventBody::IssueStateChanged { issue_id, from, to, .. }
                 if *issue_id == dependent && *from == State::Ready && *to == State::Backlog
         )),
         "the repair must append its own Ready → Backlog event"
@@ -236,7 +237,7 @@ proptest! {
         edits in dependency_edits(5)
     ) {
         let h = TestHarness::new();
-        let ids: Vec<String> = (0..5)
+        let ids: Vec<IssueId> = (0..5)
             .map(|index| h.create_issue(&format!("Issue {index}")))
             .collect();
 

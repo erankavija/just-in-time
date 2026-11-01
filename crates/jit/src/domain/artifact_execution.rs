@@ -20,7 +20,7 @@ pub struct ArchivePublication {
 }
 
 /// Structured result returned by `jit archive ... --execute`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ArchiveExecutionResult {
     /// Result wire version.
     pub schema_version: u32,

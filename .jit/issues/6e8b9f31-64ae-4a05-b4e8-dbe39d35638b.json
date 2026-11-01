@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:55:22.369090175Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,12 +9,26 @@
   ],
   "description": "Name each engine-owned actor once as an `Assignee` constant.\n\n## Background\n\nSystem actors are string literals: `system:list` (`crates/jit/src/commands/claim.rs:530`), `system:check` (`:578`), `system:admin` (`:630`), `system:recovery` (`:700`) and `system:lease-check` (`commands/mod.rs:729`). The automated gate executor is `AUTO_EXECUTOR: &str = \"auto:executor\"` (`gate_execution.rs:24`). `Assignee` (`domain/types.rs:281`) holds two private `String` fields, so it cannot be a `const`. `VirtualPath` shows the crate's way to build constants with `Cow<'static, str>` fields and a `const fn` (`repository_state/path.rs:249-254`).\n\n## Success Criteria\n\n- [hard] REQ-01: `Assignee` can be built in a const context, and its public API, parsing and serialized form are unchanged.\n- [hard] REQ-02: Associated `Assignee` constants name the list, check, admin, recovery and lease-check system actors and the automated gate executor.\n- [hard] REQ-03: No production code spells a `system:` actor or `auto:executor` literal outside those constants.\n- [hard] REQ-04: A unit test shows that each constant equals the result of parsing its spelling.\n",
   "documents": [],
+  "done_at": "2026-10-25T01:43:29.585970447Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "30f566e0-01c7-4be1-b7ee-a75f4462a07b",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:43:27.800808853Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b5a6f59f-1acd-4797-b270-17c35c0ab743",
+      "status": "passed",
+      "updated_at": "2026-10-25T01:14:49.504813570Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6e8b9f31-64ae-4a05-b4e8-dbe39d35638b",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "System actors are named Assignee constants",
-  "updated_at": "2026-10-22T19:43:28.615746836Z"
+  "updated_at": "2026-10-25T01:43:29.585970447Z"
 }

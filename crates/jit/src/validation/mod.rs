@@ -26,6 +26,8 @@
 //! - [`drift`] — the enforcement-drift check (declaration consistency between
 //!   invariants and loadable rules/gates), reporting the sole
 //!   declared-but-unenforced direction;
+//! - [`record_fidelity`] — whether stored records decode and reproduce what the
+//!   writer would publish, a verdict of whole-repository validation only;
 //! - [`report`] — structured rule reports for `jit validate [--explain]`.
 //!
 //! Rendering a [`RuleSet`](crate::declarations::rules::RuleSet) to `rules.toml` +
@@ -38,6 +40,7 @@ pub mod drift;
 pub mod engine;
 pub mod graph;
 pub mod local;
+pub(crate) mod record_fidelity;
 pub mod report;
 pub mod repository;
 pub mod strictness;

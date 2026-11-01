@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-417be079",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1bc5c0f808a9189a0613222046b99f4a0e9e1d62",
+  "completed_at": "2026-11-01T03:54:04.659511424Z",
+  "duration_ms": 286333,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard success criteria are met in the attributable current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "417be079-1de3-43e3-816a-03f4a70e2f63",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c42dee3a-510b-4cd6-bd30-aed7b3fd42e1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T03:49:18.325881159Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5cff8e0a6, d2ca96e48, 1bc5c0f80\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types (.jit/invariants.toml); @/issue/2195c98f/requirement/REQ-01 and REQ-17 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T03:47:56Z)\nTruncation recovery: Recovered truncated combined diffs through focused per-file/hunk reads across domain, CLI, server, commands, templates, output, storage serialization, validation, and tests.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard success criteria are met in the attributable current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

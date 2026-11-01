@@ -19,17 +19,36 @@ use crate::domain::artifact_plan::{
     ArtifactAction, ArtifactEdge, ArtifactPlanEntry, ArtifactProvenance, ArtifactVersion,
     BlockerCode, EdgeKind, EdgeResolutionMode, PlanBlocker, PlanError, PlanWarning, WarningCode,
 };
+use crate::domain::identity::IssueId;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::Issue;
 use pulldown_cmark::{Event, Parser, Tag};
 use regex::Regex;
+use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::LazyLock;
 
+wire_vocabulary! {
+    /// Artifact format recognized by extension; its token is the format
+    /// identifier archive-plan entries carry.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+    pub enum ArtifactFormat {
+        /// Markdown source.
+        Markdown = "markdown",
+        /// HTML markup.
+        Html = "html",
+        /// CSS stylesheet.
+        Css = "css",
+        /// JavaScript module or script.
+        JavaScript = "javascript",
+    }
+}
+
 /// Parsed, side-effect-free facts about one already-read artifact.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedArtifact {
-    format: Option<&'static str>,
+    format: Option<ArtifactFormat>,
     references: Vec<String>,
     dynamic_loading_suspected: bool,
 }
@@ -37,7 +56,7 @@ pub struct ParsedArtifact {
 impl ParsedArtifact {
     /// Stable format identifier used in archive-plan entries.
     pub fn format(&self) -> Option<&'static str> {
-        self.format
+        self.format.map(ArtifactFormat::as_str)
     }
 
     /// Canonically ordered textual references extracted from supported syntax.
@@ -168,8 +187,8 @@ pub fn recorded_archived_copies(
 ) -> BTreeMap<String, String> {
     events
         .iter()
-        .filter_map(|event| match event {
-            crate::domain::Event::ArtifactArchiveExecuted {
+        .filter_map(|event| match event.body() {
+            crate::domain::EventBody::ArtifactArchiveExecuted {
                 target: recorded,
                 publications,
                 ..
@@ -500,7 +519,7 @@ fn is_navigation_target(target: &str, evidence: &ArtifactEvidenceMap) -> bool {
 /// an archive delete a file another issue's document still reaches.
 fn discover_embedded_owners(
     issues: &[Issue],
-    selected_member_ids: &BTreeSet<String>,
+    selected_member_ids: &BTreeSet<IssueId>,
     parsed_by_path: &BTreeMap<String, ParsedArtifact>,
 ) -> Vec<EmbeddedArtifactOwner> {
     let mut owners = Vec::new();
@@ -613,14 +632,12 @@ pub fn parse_artifact(path: &str, bytes: &[u8]) -> ParsedArtifact {
     let text = String::from_utf8_lossy(bytes);
     let format = format_for_path(path);
     let references = match format {
-        Some("markdown") => markdown_references(&text),
-        Some("html") => html_references(&text),
-        Some("css") => css_references(&text),
-        _ => Vec::new(),
+        Some(ArtifactFormat::Markdown) => markdown_references(&text),
+        Some(ArtifactFormat::Html) => html_references(&text),
+        Some(ArtifactFormat::Css) => css_references(&text),
+        Some(ArtifactFormat::JavaScript) | None => Vec::new(),
     };
-    let dynamic_loading_suspected =
-        matches!(format, Some("markdown" | "html" | "css" | "javascript"))
-            && suspects_dynamic_loading(&text);
+    let dynamic_loading_suspected = format.is_some() && suspects_dynamic_loading(&text);
 
     ParsedArtifact {
         format,
@@ -708,17 +725,17 @@ pub fn resolve_reference(parent: &str, reference: &str) -> ReferenceResolution {
     }
 }
 
-fn format_for_path(path: &str) -> Option<&'static str> {
+fn format_for_path(path: &str) -> Option<ArtifactFormat> {
     match Path::new(path)
         .extension()
         .and_then(|extension| extension.to_str())
         .map(str::to_ascii_lowercase)
         .as_deref()
     {
-        Some("md" | "markdown") => Some("markdown"),
-        Some("html" | "htm") => Some("html"),
-        Some("css") => Some("css"),
-        Some("js" | "mjs" | "cjs") => Some("javascript"),
+        Some("md" | "markdown") => Some(ArtifactFormat::Markdown),
+        Some("html" | "htm") => Some(ArtifactFormat::Html),
+        Some("css") => Some(ArtifactFormat::Css),
+        Some("js" | "mjs" | "cjs") => Some(ArtifactFormat::JavaScript),
         _ => None,
     }
 }

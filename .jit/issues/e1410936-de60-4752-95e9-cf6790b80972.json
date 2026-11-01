@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:50:14.873092180Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -9,11 +10,26 @@
   ],
   "description": "Remove the per-command checks of `count` against collection length from the `cli_issue` suite.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test that covers each list-emitting command. Per-command re-assertions remain at `cli_issue/container_rollup_tests.rs:211,348`, `cli_issue/issue_search_json_tests.rs:234`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
   "documents": [],
+  "done_at": "2026-11-01T01:01:25.488792841Z",
+  "first_ready_at": "2026-10-31T23:46:36.088682154Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "23f00238-2a78-4a44-8b03-28a112439c17",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:52:14.080162020Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "978b0aa6-3a1c-409a-9a2d-12591be8788c",
+      "status": "passed",
+      "updated_at": "2026-11-01T00:55:01.562591155Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e1410936-de60-4752-95e9-cf6790b80972",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "cli_issue tests stop re-asserting the list-envelope count",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-11-01T01:01:25.488792841Z"
 }

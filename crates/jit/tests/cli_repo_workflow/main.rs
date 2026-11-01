@@ -55,3 +55,48 @@ pub(crate) fn repository_package_at(repo: &std::path::Path, id: &str) -> String 
         .to_string_lossy()
         .into_owned()
 }
+
+/// Create an `epic` container, returning its full id.
+pub(crate) fn create_epic(cli: &jit::test_cli::JitCli, title: &str) -> String {
+    cli.create_issue([
+        "--title",
+        title,
+        "--description",
+        "## Success Criteria\n\n- [hard] REQ-01: it works\n",
+        "--label",
+        "type:epic",
+    ])
+    .unwrap()
+}
+
+/// Install `templates_toml` as `.jit/templates.toml` and define every gate key
+/// its templates name; a template's gate entries resolve against the
+/// repository's own gate registry.
+pub(crate) fn install_templates(cli: &jit::test_cli::JitCli, templates_toml: &str) {
+    std::fs::write(cli.root().join(".jit/templates.toml"), templates_toml).unwrap();
+    let no_hierarchy_check: [&str; 0] = [];
+    jit::templates::TemplateRegistry::from_toml_str(templates_toml, &no_hierarchy_check)
+        .expect("the fixture template registry parses")
+        .templates
+        .iter()
+        .flat_map(jit::test_harness::template_gate_keys)
+        .collect::<std::collections::BTreeSet<_>>()
+        .iter()
+        .for_each(|key| {
+            cli.run([
+                "gate",
+                "define",
+                key.as_str(),
+                "--title",
+                &format!("{key} gate"),
+                "--description",
+                &format!("Repository-declared {key} gate"),
+            ])
+            .unwrap();
+        });
+}
+
+pub(crate) const ALLOW_LINKED_WRITES: (&str, &str) = (
+    jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV,
+    jit::domain::LinkedCheckoutWriteStance::Allow.as_token(),
+);

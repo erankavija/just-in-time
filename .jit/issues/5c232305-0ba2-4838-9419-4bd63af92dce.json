@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:31:15.794185433Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Move the validated profile identity and its lowercase-kebab predicate into the domain layer.\n\n## Background\n\n`ProfileId` (`crates/jit/src/profile/manifest.rs:23-49`) validates through `is_lowercase_kebab` (`manifest.rs:397`) in `TryFrom` and deserialization, and lives in `profile/`. `domain/types.rs:1183` names `crate::profile::ProfileId`, a dependency from the domain outward. `RegionId` (`manifest.rs:74`) uses the same predicate. `ProfileId` is referenced in 13 files under `crates/jit/src`.\n\n## Success Criteria\n\n- [hard] REQ-01: `ProfileId` and the lowercase-kebab predicate are defined in `domain::identity`, and `ProfileId` is constructed only through validation.\n- [hard] REQ-02: Each reference imports `crate::domain::identity::ProfileId`, and the domain imports nothing from `profile` for it.\n- [hard] REQ-03: `RegionId` validates through the domain predicate, and no second copy of the predicate exists.\n",
   "documents": [],
+  "done_at": "2026-10-25T00:16:14.939449465Z",
+  "first_ready_at": "2026-10-24T23:27:44.226086350Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c77ab653-0ad7-43b2-a2dc-335cd3ba0872",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:07:35.555200252Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a6ecc540-8ecc-455c-a686-926a87e5704f",
+      "status": "passed",
+      "updated_at": "2026-10-25T00:08:33.270860713Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5c232305-0ba2-4838-9419-4bd63af92dce",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/architecture-dependency-direction"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "ProfileId is defined in the domain layer",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-25T00:16:14.939449465Z"
 }

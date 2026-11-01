@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T23:31:48.093263090Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -9,11 +10,26 @@
   ],
   "description": "Remove numeric exit-code assertions that re-prove projected rows from the `cli_gate` suite, keeping each test's own property and its error-class evidence.\n\n## Background\n\nThe exit-code projection suite (`cli_issue/command_exit_code_projection_tests.rs`) binds each command-to-exit-code row in both invocation forms, and its wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command. Outside it, a subprocess test asserts success or failure and the property it adds, such as a JSON verdict, an error envelope code, remediation text or empty stdout. It names a numeric exit code only for a command and code pair the projection has no row for. The sweep counts numeric `.code(N)`, single- and multi-line `status.code()` comparisons with `Some(...)` (literal, `ExitCode::X` or derived), symbolic `ExitCode::X.code()`, and helpers that take an expected code.\n\nExit-code assertion sites in `crates/jit/tests/cli_gate`: `gate_evaluate_exit_code_test.rs` (13), `gate_evaluate_all_test.rs` (9), `gate_cli_integration_test.rs` (7), `gate_status_all_strict_test.rs` (5), `gate_evaluate_rerun_test.rs` (5), `gate_preset_apply_json_failure_test.rs` (2), `gate_findings_test.rs` (1), `bracket_coverage_gate_run_test.rs` (1), `gate_status_all_lean_response_test.rs` (1). `gate_evaluate_exit_code_test.rs` has 13 tests of gate evaluate exits 0, 4, 10, 3 and 2; its added property is the JSON verdict each run reports.\n\nThis entry covers `gate_cli_integration_test.rs`, `gate_status_all_strict_test.rs`, `gate_preset_apply_json_failure_test.rs`, `gate_findings_test.rs`, `gate_status_all_lean_response_test.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts a numeric exit code for a command and code pair the projection binds; each asserts success or failure instead.\n- [hard] REQ-02: Where a numeric exit code was a test's only evidence of which error class its path takes, the test asserts that class another way, such as the `error.code` of the `--json` envelope, instead of bare failure.\n- [hard] REQ-03: Each edited test keeps the other properties it asserted, and a test whose only assertion was a projected exit code with no class to preserve no longer exists.\n",
   "documents": [],
+  "done_at": "2026-10-28T23:56:38.127953609Z",
+  "first_ready_at": "2026-10-28T23:30:31.267798849Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "97c2fe45-be72-4331-b7a2-bfc2316cb292",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:51:49.299625944Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ab13c186-5b34-4c32-a2a2-2659faead3a6",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:56:01.330177533Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8f87e366-0470-42de-a24a-9262b637bd13",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate status and definition tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T23:56:38.127953609Z"
 }

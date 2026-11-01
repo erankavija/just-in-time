@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T22:57:21.637598895Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Retire the private git setup in the server's route tests in favour of the shared helper.\n\n## Background\n\nShared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration. `crates/server/src/routes.rs` tests hand-roll `git init`; the server crate's tests enable `jit`'s `test-support` feature.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/server/src/routes.rs` tests initialise git only through the shared function.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:20:12.446282257Z",
   "first_ready_at": "2026-10-22T15:46:59.538338780Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5128e3f3-4410-493e-8485-34a2b918fa18",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:10:23.453885492Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "df29f320-0f9e-4ad6-86df-ba8c27c6f2e4",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:15:36.074575214Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2f717d93-f1ea-49cf-8769-4d244a4a3bec",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Server unit tests initialise git through the shared helper",
-  "updated_at": "2026-10-22T15:46:59.538338780Z"
+  "updated_at": "2026-10-27T00:20:12.446282257Z"
 }

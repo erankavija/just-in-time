@@ -1,7 +1,7 @@
 //! CLI integration tests for config-declared template role and anchor bindings
 //! (jit:136268f8, REQ-2).
 //!
-//! These spawn the real `jit` binary against a `TempDir`-backed repository whose
+//! These spawn the real `jit` binary against an isolated repository whose
 //! `.jit/templates.toml` renames all three bracket bindings: the planning role is
 //! `spec`, the breakdown role is `split`, and the container anchor is `target`.
 //! No engine-known name appears as a role or anchor anywhere in the fixture.
@@ -16,16 +16,8 @@
 //! reported `anchor_bindings` carry exactly `target`.
 
 use assert_cmd::prelude::*;
+use jit::test_cli::JitCli;
 use serde_json::Value;
-use std::process::Command;
-use tempfile::TempDir;
-
-/// Declares the bracket node types. Role and anchor names live in
-/// `templates.toml`, not here.
-const CONFIG_TOML: &str = r#"
-[type_hierarchy]
-types = { epic = 1, planning = 2, breakdown = 2, task = 3 }
-"#;
 
 /// The `plan` bracket under renamed bindings: `[roles]` names the planning role
 /// `spec` and the breakdown role `split`, `[anchors]` names the container anchor
@@ -105,80 +97,6 @@ applies_to  = ["epic"]
   to   = "split"
 "#;
 
-fn jit(temp: &TempDir) -> Command {
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
-    cmd.current_dir(temp.path());
-    cmd
-}
-
-/// Run a jit command, asserting success, and parse its JSON stdout.
-fn jit_json(temp: &TempDir, args: &[&str]) -> Value {
-    let out = jit(temp)
-        .args(args)
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    serde_json::from_slice(&out).unwrap_or_else(|e| {
-        panic!(
-            "expected JSON from `jit {}`: {e}\n{}",
-            args.join(" "),
-            String::from_utf8_lossy(&out)
-        )
-    })
-}
-
-/// Initialize an isolated temp repo carrying `templates_toml`.
-///
-/// The configuration is written before initialization, which preserves it and
-/// derives the coupled rules and schemas from the registry it declares.
-fn setup_repo(templates_toml: &str) -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let jit_dir = temp.path().join(".jit");
-    std::fs::create_dir_all(&jit_dir).unwrap();
-    std::fs::write(jit_dir.join("config.toml"), CONFIG_TOML).unwrap();
-    jit(&temp).arg("init").assert().success();
-    std::fs::write(jit_dir.join("templates.toml"), templates_toml).unwrap();
-    // A template's gate entries resolve against the repository's own presets
-    // and its own gate registry, so the repository declares every key the
-    // registry it just received names.
-    for key in crate::apply_cli_tests::template_gate_keys(templates_toml) {
-        jit(&temp)
-            .args([
-                "gate",
-                "define",
-                &key,
-                "--title",
-                &format!("{key} gate"),
-                "--description",
-                &format!("Repository-declared {key} gate"),
-            ])
-            .assert()
-            .success();
-    }
-    temp
-}
-
-/// Create an `epic` container, returning its full id.
-fn create_epic(temp: &TempDir, title: &str) -> String {
-    let json = jit_json(
-        temp,
-        &[
-            "issue",
-            "create",
-            "--title",
-            title,
-            "--description",
-            "## Success Criteria\n\n- [hard] REQ-01: it works\n",
-            "--label",
-            "type:epic",
-            "--json",
-        ],
-    );
-    json["id"].as_str().expect("created epic id").to_string()
-}
-
 /// The `data` payload of a command's JSON envelope.
 fn data(out: &Value) -> &Value {
     out.get("data").unwrap_or(out)
@@ -186,8 +104,8 @@ fn data(out: &Value) -> &Value {
 
 /// The dependency ids of an issue (`issue show --json` expands each into an
 /// object; read its `id`).
-fn dep_ids(temp: &TempDir, id: &str) -> Vec<String> {
-    let issue = jit_json(temp, &["issue", "show", id, "--json"]);
+fn dep_ids(cli: &JitCli, id: &str) -> Vec<String> {
+    let issue = cli.run_json(["issue", "show", id]).unwrap();
     data(&issue)
         .get("dependencies")
         .and_then(|d| d.as_array())
@@ -200,14 +118,14 @@ fn dep_ids(temp: &TempDir, id: &str) -> Vec<String> {
 }
 
 /// How many issues carry `type:planning`.
-fn planning_node_count(temp: &TempDir) -> u64 {
-    let listed = jit_json(
-        temp,
-        &["query", "all", "--label", "type:planning", "--json"],
-    );
-    listed["count"]
-        .as_u64()
-        .unwrap_or_else(|| panic!("query all must report a count, got: {listed}"))
+fn planning_node_count(cli: &JitCli) -> u64 {
+    let listed = cli
+        .run_json(["query", "all", "--label", "type:planning"])
+        .unwrap();
+    listed["issues"]
+        .as_array()
+        .unwrap_or_else(|| panic!("query all must report issues, got: {listed}"))
+        .len() as u64
 }
 
 /// Assert the reported anchor bindings are exactly `{target: <epic>}`: the CLI
@@ -235,10 +153,15 @@ fn assert_bound_to_configured_anchor(out: &Value, epic: &str) {
 /// the renamed roles.
 #[test]
 fn test_apply_auto_binds_the_configured_container_anchor() {
-    let temp = setup_repo(RENAMED_BINDINGS_TEMPLATE);
-    let epic = create_epic(&temp, "Auth epic");
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
+    crate::install_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
+    let epic = crate::create_epic(&cli, "Auth epic");
 
-    let out = jit_json(&temp, &["apply", "plan", &epic, "--json"]);
+    let out = cli.run_json(["apply", "plan", &epic]).unwrap();
     assert_bound_to_configured_anchor(&out, &epic);
 
     // The created nodes answer to the renamed roles, and to no others.
@@ -251,11 +174,11 @@ fn test_apply_auto_binds_the_configured_container_anchor() {
 
     // The bracket is wired C → B → P through the renamed anchor edge.
     assert!(
-        dep_ids(&temp, &epic).iter().any(|d| d == split_id),
+        dep_ids(&cli, &epic).iter().any(|d| d == split_id),
         "the container must depend on the breakdown node (C → B)"
     );
     assert!(
-        dep_ids(&temp, split_id).iter().any(|d| d == spec_id),
+        dep_ids(&cli, split_id).iter().any(|d| d == spec_id),
         "the breakdown node must depend on the planning node (B → P)"
     );
 }
@@ -267,17 +190,21 @@ fn test_apply_auto_binds_the_configured_container_anchor() {
 /// `RENAMED_BINDINGS_TEMPLATE`.
 #[test]
 fn test_apply_aborts_when_the_bound_anchor_names_no_declared_anchor() {
-    let temp = setup_repo(UNBOUND_ANCHOR_TEMPLATE);
-    let epic = create_epic(&temp, "Auth epic");
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
+    crate::install_templates(&cli, UNBOUND_ANCHOR_TEMPLATE);
+    let epic = crate::create_epic(&cli, "Auth epic");
 
-    jit(&temp)
-        .args(["apply", "plan", &epic])
+    cli.command(["apply", "plan", &epic])
         .assert()
         .failure()
         .stderr(predicates::str::contains("target"));
 
     assert_eq!(
-        planning_node_count(&temp),
+        planning_node_count(&cli),
         0,
         "a rejected apply must create no bracket node"
     );
@@ -290,20 +217,24 @@ fn test_apply_aborts_when_the_bound_anchor_names_no_declared_anchor() {
 /// container's new title.
 #[test]
 fn test_apply_force_refreshes_the_bracket_through_the_configured_bindings() {
-    let temp = setup_repo(RENAMED_BINDINGS_TEMPLATE);
-    let epic = create_epic(&temp, "Auth epic");
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
+    crate::install_templates(&cli, RENAMED_BINDINGS_TEMPLATE);
+    let epic = crate::create_epic(&cli, "Auth epic");
 
-    let applied = jit_json(&temp, &["apply", "plan", &epic, "--json"]);
+    let applied = cli.run_json(["apply", "plan", &epic]).unwrap();
     let roles = &data(&applied)["created_node_ids_by_role"];
     let spec_id = roles["spec"].as_str().expect("spec id").to_string();
     let split_id = roles["split"].as_str().expect("split id").to_string();
 
-    jit(&temp)
-        .args(["issue", "update", &epic, "--title", "Auth epic (revised)"])
+    cli.command(["issue", "update", &epic, "--title", "Auth epic (revised)"])
         .assert()
         .success();
 
-    let refreshed = jit_json(&temp, &["apply", "plan", &epic, "--force", "--json"]);
+    let refreshed = cli.run_json(["apply", "plan", &epic, "--force"]).unwrap();
     assert_bound_to_configured_anchor(&refreshed, &epic);
 
     let roles = &data(&refreshed)["created_node_ids_by_role"];
@@ -318,7 +249,7 @@ fn test_apply_force_refreshes_the_bracket_through_the_configured_bindings() {
         "--force must re-seed the existing breakdown node, got: {refreshed}"
     );
 
-    let spec = jit_json(&temp, &["issue", "show", &spec_id, "--json"]);
+    let spec = cli.run_json(["issue", "show", &spec_id]).unwrap();
     assert_eq!(
         data(&spec)["description"].as_str(),
         Some("Planning node for Auth epic (revised)."),
@@ -326,7 +257,7 @@ fn test_apply_force_refreshes_the_bracket_through_the_configured_bindings() {
     );
 
     assert_eq!(
-        planning_node_count(&temp),
+        planning_node_count(&cli),
         1,
         "--force must not duplicate the planning node"
     );
@@ -339,16 +270,20 @@ fn test_explicit_bindings_override_captured_default_and_bind_secondary_anchor() 
         "  [[template.anchors]]\n  name = \"reviewer\"\n\n  [[template.nodes]]",
         1,
     );
-    let temp = setup_repo(&templates);
-    let positional = create_epic(&temp, "Positional epic");
-    let target = create_epic(&temp, "Target epic");
-    let reviewer = create_epic(&temp, "Reviewer epic");
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(crate::apply_cli_tests::CONFIG_TOML)
+            .unwrap()
+            .0,
+    );
+    crate::install_templates(&cli, &templates);
+    let positional = crate::create_epic(&cli, "Positional epic");
+    let target = crate::create_epic(&cli, "Target epic");
+    let reviewer = crate::create_epic(&cli, "Reviewer epic");
     let target_binding = format!("target={target}");
     let reviewer_binding = format!("reviewer={reviewer}");
 
-    let out = jit_json(
-        &temp,
-        &[
+    let out = cli
+        .run_json([
             "apply",
             "plan",
             &positional,
@@ -356,9 +291,8 @@ fn test_explicit_bindings_override_captured_default_and_bind_secondary_anchor() 
             &target_binding,
             "--anchor",
             &reviewer_binding,
-            "--json",
-        ],
-    );
+        ])
+        .unwrap();
     let bindings = data(&out)["anchor_bindings"].as_object().unwrap();
     assert_eq!(bindings["target"].as_str(), Some(target.as_str()));
     assert_eq!(bindings["reviewer"].as_str(), Some(reviewer.as_str()));
@@ -366,6 +300,6 @@ fn test_explicit_bindings_override_captured_default_and_bind_secondary_anchor() 
     let split = data(&out)["created_node_ids_by_role"]["split"]
         .as_str()
         .unwrap();
-    assert!(dep_ids(&temp, &target).iter().any(|id| id == split));
-    assert!(!dep_ids(&temp, &positional).iter().any(|id| id == split));
+    assert!(dep_ids(&cli, &target).iter().any(|id| id == split));
+    assert!(!dep_ids(&cli, &positional).iter().any(|id| id == split));
 }

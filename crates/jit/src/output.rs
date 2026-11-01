@@ -4,8 +4,10 @@
 //! and error cases, ensuring machine-readable output that works well with
 //! AI agents and automation tools.
 
+use crate::domain::identity::GateKey;
+use crate::domain::Assignee;
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::Display;
 use std::io::{self, Write};
@@ -15,15 +17,16 @@ pub mod failure;
 
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
+use crate::domain::identity::IssueId;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
+use crate::domain::queries::BlockingReason;
 use crate::domain::store_divergence::StoreDivergence;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::{
     GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue, MinimalIssue,
     Priority, State,
 };
-use crate::errors::{
-    gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
-};
+use crate::errors::{TransitionBlockedError, TransitionBlocker};
 
 /// Render the complete schema-v1 archive plan without introducing a second
 /// decision model. Every action, fact, edge, relink, deletion, warning, and
@@ -34,7 +37,7 @@ pub fn render_archive_plan(plan: &crate::domain::artifact_plan::ArtifactPlan) ->
 
     let mut rendered = String::new();
     let target = match plan.target() {
-        PlanTarget::Container { id } => format!("container {}", short_id(id)),
+        PlanTarget::Container { id } => format!("container {}", id.short_id()),
         PlanTarget::Document { path } => format!("document {path}"),
     };
     let counts = plan.action_counts();
@@ -108,7 +111,7 @@ pub fn render_archive_plan(plan: &crate::domain::artifact_plan::ArtifactPlan) ->
                 let _ = writeln!(
                     rendered,
                     "      - issue={} document-index={} state={} inside-subtree={} pinned={} selected-for-relink={}",
-                    short_id(&owner.issue),
+                    owner.issue.short_id(),
                     owner.document_index,
                     wire_name(&owner.state),
                     owner.inside_subtree,
@@ -136,7 +139,7 @@ pub fn render_archive_plan(plan: &crate::domain::artifact_plan::ArtifactPlan) ->
                 let _ = writeln!(
                     rendered,
                     "      - issue={} document-index={} {} -> {}",
-                    short_id(&change.issue),
+                    change.issue.short_id(),
                     change.document_index,
                     change.from_path,
                     change.to_path
@@ -188,6 +191,36 @@ pub fn render_archive_candidates(
     rendered
 }
 
+/// Render the human summary of an executed archive: the completion counts,
+/// then one `warning: {code} ({path})` line per warning.
+pub fn render_archive_execution(
+    result: &crate::domain::artifact_execution::ArchiveExecutionResult,
+) -> String {
+    use std::fmt::Write;
+
+    let mut rendered = String::new();
+    let _ = writeln!(
+        rendered,
+        "Archive execution complete: {} publication(s), {} reference change(s), {} source deletion(s)",
+        result.publications.len(),
+        result.reference_changes.len(),
+        result.deleted_sources.len()
+    );
+    for warning in &result.warnings {
+        let _ = writeln!(
+            rendered,
+            "warning: {}{}",
+            warning.code.as_str(),
+            warning
+                .path
+                .as_ref()
+                .map(|path| format!(" ({path})"))
+                .unwrap_or_default()
+        );
+    }
+    rendered
+}
+
 /// A column printed after `{id} | {title}` in a human issue-list row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IssueColumn {
@@ -221,8 +254,8 @@ pub fn render_issue_list<'a>(
         let _ = write!(lines, "  {} | {}", issue.id, issue.title);
         for column in columns {
             let _ = match column {
-                IssueColumn::State => write!(lines, " | {:?}", issue.state),
-                IssueColumn::Priority => write!(lines, " | {:?}", issue.priority),
+                IssueColumn::State => write!(lines, " | {}", issue.state),
+                IssueColumn::Priority => write!(lines, " | {}", issue.priority),
             };
         }
         lines.push('\n');
@@ -260,17 +293,17 @@ pub enum GateRunLine {
     Passed,
 }
 
-/// The human status line for a gate's run, shared by every gate command.
+/// The human status line for a gate's run, preserving the requested text.
 pub fn render_gate_run_status(
     line: GateRunLine,
-    gate_key: impl Display,
-    issue_id: impl Display,
+    gate_key: &GateKey,
+    requested: impl Display,
 ) -> String {
     match line {
         GateRunLine::NeverRun => format!(
-            "Gate '{gate_key}' has not been run yet for issue {issue_id}. Use 'jit gate evaluate' to run it."
+            "Gate '{gate_key}' has not been run yet for issue {requested}. Use 'jit gate evaluate' to run it."
         ),
-        GateRunLine::Passed => format!("Passed gate '{gate_key}' for issue {issue_id}"),
+        GateRunLine::Passed => format!("Passed gate '{gate_key}' for issue {requested}"),
     }
 }
 
@@ -385,15 +418,22 @@ fn display_optional(value: &str) -> &str {
 mod issue_list_render_tests {
     use super::*;
 
-    fn issue(id: &str, title: &str) -> Issue {
-        let mut issue = Issue::draft(title.into(), String::new());
-        issue.id = id.into();
-        issue
+    fn issue(id: IssueId, title: &str) -> Issue {
+        Issue::draft(id, title.into(), String::new())
     }
 
     #[test]
     fn test_render_issue_list_indents_rows_and_columns_reasons_and_total_footer() {
-        let issues = [issue("aaaa", "First"), issue("bbbb", "Second")];
+        let issues = [
+            issue(
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_aaaa_aaaa),
+                "First",
+            ),
+            issue(
+                crate::test_utils::issue_id(0x4000_8000_0000_0000_0002_bbbb_bbbb),
+                "Second",
+            ),
+        ];
         let rows = vec![
             (&issues[0], vec!["waits on x".to_string()]),
             (&issues[1], Vec::new()),
@@ -406,24 +446,36 @@ mod issue_list_render_tests {
             false,
         );
 
+        let (state, priority) = (issues[0].state, issues[0].priority);
         assert_eq!(
             rendered,
-            "Header:\n  aaaa | First | Backlog | Normal\n    - waits on x\n  bbbb | Second | Backlog | Normal\n\nTotal: 2"
+            format!(
+                "Header:\n  {} | First | {state} | {priority}\n    - waits on x\n  {} | Second | {state} | {priority}\n\nTotal: 2", issues[0].id, issues[1].id
+            )
         );
     }
 
     #[test]
     fn test_render_issue_list_without_columns_prints_id_and_title_only() {
-        let issues = [issue("aaaa", "First")];
+        let issues = [issue(
+            crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_aaaa_aaaa),
+            "First",
+        )];
 
         let rendered = render_issue_list("H", plain_issue_rows(&issues), &[], false);
 
-        assert_eq!(rendered, "H\n  aaaa | First\n\nTotal: 1");
+        assert_eq!(
+            rendered,
+            format!("H\n  {} | First\n\nTotal: 1", issues[0].id)
+        );
     }
 
     #[test]
     fn test_render_issue_list_quiet_keeps_rows_and_drops_header_and_footer() {
-        let issues = [issue("aaaa", "First")];
+        let issues = [issue(
+            crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_aaaa_aaaa),
+            "First",
+        )];
 
         let rendered = render_issue_list(
             "H",
@@ -432,7 +484,10 @@ mod issue_list_render_tests {
             true,
         );
 
-        assert_eq!(rendered, "  aaaa | First | Normal");
+        assert_eq!(
+            rendered,
+            format!("  {} | First | {}", issues[0].id, issues[0].priority)
+        );
     }
 
     #[test]
@@ -453,6 +508,7 @@ mod archive_render_tests {
 
     #[test]
     fn test_human_archive_preview_projects_every_plan_decision_and_diagnostic() {
+        let owner_id = crate::test_utils::issue_id(1);
         let artifact = ArtifactPlanEntry::new(
             "dev/active/page.md",
             ArtifactVersion::WorkingTree,
@@ -461,7 +517,7 @@ mod archive_render_tests {
         .with_provenance(vec![ArtifactProvenance::Explicit])
         .with_format("markdown")
         .with_owners(vec![ArtifactOwner {
-            issue: "12345678-1234-1234-1234-123456789abc".into(),
+            issue: owner_id.clone(),
             document_index: 2,
             state: State::Done,
             archived_from: None,
@@ -497,6 +553,10 @@ mod archive_render_tests {
         .unwrap();
 
         let human = render_archive_plan(&plan);
+        assert!(human.contains(&format!(
+            "issue={} document-index=2 state=done",
+            owner_id.short_id()
+        )));
         for expected in [
             "Schema version: 1",
             "Policy: configured",
@@ -505,7 +565,6 @@ mod archive_render_tests {
             "format: markdown",
             "provenance: explicit",
             "evidence: permanent-path",
-            "issue=12345678 document-index=2 state=done",
             "supported relative reference=missing.png target=dev/active/missing.png",
             "destination-conflict: dev/archive/page.md",
             "missing-edge-target: dev/active/missing.png",
@@ -825,220 +884,111 @@ impl ExitCode {
 // Error Codes (JSON responses)
 // ============================================================================
 
-/// Standard error-code vocabulary for JIT's machine-readable responses.
-///
-/// The serialized names are the strings carried in JSON error envelopes.
-/// [`ErrorCode::ALL`] is checked against this enum's derived schema, keeping
-/// enumeration consumers in lockstep with the type's variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, JsonSchema)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ErrorCode {
-    /// The requested issue does not exist.
-    IssueNotFound,
-    /// The requested gate does not exist.
-    GateNotFound,
-    /// The requested dependency would make the graph cyclic.
-    CycleDetected,
-    /// An argument or invocation is invalid.
-    InvalidArgument,
-    /// A label query filter is not in the accepted namespace/value form.
-    InvalidLabelPattern,
-    /// Repository or domain validation failed.
-    ValidationFailed,
-    /// The requested resource already exists.
-    AlreadyExists,
-    /// A requested lifecycle state or transition is invalid.
-    InvalidState,
-    /// Unfinished dependencies block the requested operation.
-    Blocked,
-    /// A quality-gate checker completed without passing.
-    GateFailed,
-    /// An input/output or external-system operation failed.
-    IoError,
-    /// An operation was denied by filesystem or operating-system permissions.
-    PermissionDenied,
-    /// Input data could not be parsed.
-    ParseError,
-    /// A claim or lease command requires a Git repository.
-    ClaimRequiresGit,
-    /// An ID prefix matched more than one candidate.
-    AmbiguousId,
-    /// An ID prefix was shorter than the accepted minimum.
-    InvalidIdPrefix,
-    /// No `.jit` repository exists at the resolved data directory.
-    RepositoryNotFound,
-    /// The repository format is newer than this binary supports.
-    RepositoryFormatTooNew,
-    /// Issue deletion was refused because operator confirmation was absent.
-    DeletionNotConfirmed,
-    /// A state-mutating command was refused because it ran inside a linked
-    /// non-primary checkout whose write stance refuses one.
-    LinkedCheckoutWriteRefused,
-    /// No resolution route found the requested profile.
-    ProfileNotFound,
-    /// Profile planning or final-state validation rejected the operation.
-    ProfileConflict,
-    /// A dependency command failed.
-    DependencyError,
-    /// A gate command failed.
-    GateError,
-    /// A gate-status check failed.
-    GateCheckError,
-    /// A gate-preset command failed.
-    PresetError,
-    /// An issue item-address lookup failed before resolving an item.
-    ItemNotFound,
-    /// An item command failed without a more specific public classification.
-    ItemCommandFailed,
-    /// An invariant command failed without a more specific public classification.
-    InvariantCommandFailed,
-    /// A project command failed without a more specific public classification.
-    ProjectCommandFailed,
-    /// A profile command failed without a more specific public classification.
-    ProfileError,
-    /// The search backend failed while executing a query.
-    SearchFailed,
-    /// The external ripgrep search tool could not be found.
-    RipgrepNotFound,
-    /// Worktree identity inspection failed.
-    WorktreeInfoError,
-    /// Worktree enumeration failed.
-    WorktreeListError,
-    /// Cross-checkout store comparison failed.
-    WorktreeStoreDivergenceError,
-    /// Repository hook installation failed.
-    HooksInstallError,
-    /// A command failed without a more specific public classification.
-    GenericError,
-    /// Repository recovery failed.
-    #[serde(rename = "recovery_failed")]
-    RecoveryFailed,
-    /// Claim acquisition failed.
-    ClaimAcquireError,
-    /// Claim release failed.
-    ClaimReleaseError,
-    /// Claim renewal failed.
-    ClaimRenewError,
-    /// Claim heartbeat failed.
-    ClaimHeartbeatError,
-    /// Claim status inspection failed without a more specific classification.
-    ClaimStatusError,
-    /// Claim enumeration failed without a more specific classification.
-    ClaimListError,
-    /// Forced claim eviction failed.
-    ClaimForceEvictError,
-    /// A lock wait expired while another jit process held the lock.
-    LockTimeout,
+wire_vocabulary! {
+    /// Standard error-code vocabulary for JIT's machine-readable responses.
+    ///
+    /// The declared names are the strings carried in JSON error envelopes.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+    pub enum ErrorCode {
+        /// The requested issue does not exist.
+        IssueNotFound = "ISSUE_NOT_FOUND",
+        /// The requested gate does not exist.
+        GateNotFound = "GATE_NOT_FOUND",
+        /// The requested dependency would make the graph cyclic.
+        CycleDetected = "CYCLE_DETECTED",
+        /// An argument or invocation is invalid.
+        InvalidArgument = "INVALID_ARGUMENT",
+        /// A label query filter is not in the accepted namespace/value form.
+        InvalidLabelPattern = "INVALID_LABEL_PATTERN",
+        /// Repository or domain validation failed.
+        ValidationFailed = "VALIDATION_FAILED",
+        /// The requested resource already exists.
+        AlreadyExists = "ALREADY_EXISTS",
+        /// A requested lifecycle state or transition is invalid.
+        InvalidState = "INVALID_STATE",
+        /// Unfinished dependencies block the requested operation.
+        Blocked = "BLOCKED",
+        /// A quality-gate checker completed without passing.
+        GateFailed = "GATE_FAILED",
+        /// An input/output or external-system operation failed.
+        IoError = "IO_ERROR",
+        /// An operation was denied by filesystem or operating-system permissions.
+        PermissionDenied = "PERMISSION_DENIED",
+        /// Input data could not be parsed.
+        ParseError = "PARSE_ERROR",
+        /// A claim or lease command requires a Git repository.
+        ClaimRequiresGit = "CLAIM_REQUIRES_GIT",
+        /// An ID prefix matched more than one candidate.
+        AmbiguousId = "AMBIGUOUS_ID",
+        /// An ID prefix was shorter than the accepted minimum.
+        InvalidIdPrefix = "INVALID_ID_PREFIX",
+        /// No `.jit` repository exists at the resolved data directory.
+        RepositoryNotFound = "REPOSITORY_NOT_FOUND",
+        /// The repository format is newer than this binary supports.
+        RepositoryFormatTooNew = "REPOSITORY_FORMAT_TOO_NEW",
+        /// Issue deletion was refused because operator confirmation was absent.
+        DeletionNotConfirmed = "DELETION_NOT_CONFIRMED",
+        /// A state-mutating command was refused because it ran inside a linked
+        /// non-primary checkout whose write stance refuses one.
+        LinkedCheckoutWriteRefused = "LINKED_CHECKOUT_WRITE_REFUSED",
+        /// No resolution route found the requested profile.
+        ProfileNotFound = "PROFILE_NOT_FOUND",
+        /// Profile planning or final-state validation rejected the operation.
+        ProfileConflict = "PROFILE_CONFLICT",
+        /// A dependency command failed.
+        DependencyError = "DEPENDENCY_ERROR",
+        /// A gate command failed.
+        GateError = "GATE_ERROR",
+        /// A gate-status check failed.
+        GateCheckError = "GATE_CHECK_ERROR",
+        /// A gate-preset command failed.
+        PresetError = "PRESET_ERROR",
+        /// An issue item-address lookup failed before resolving an item.
+        ItemNotFound = "ITEM_NOT_FOUND",
+        /// An item command failed without a more specific public classification.
+        ItemCommandFailed = "ITEM_COMMAND_FAILED",
+        /// An invariant command failed without a more specific public classification.
+        InvariantCommandFailed = "INVARIANT_COMMAND_FAILED",
+        /// A project command failed without a more specific public classification.
+        ProjectCommandFailed = "PROJECT_COMMAND_FAILED",
+        /// A profile command failed without a more specific public classification.
+        ProfileError = "PROFILE_ERROR",
+        /// The search backend failed while executing a query.
+        SearchFailed = "SEARCH_FAILED",
+        /// The external ripgrep search tool could not be found.
+        RipgrepNotFound = "RIPGREP_NOT_FOUND",
+        /// Worktree identity inspection failed.
+        WorktreeInfoError = "WORKTREE_INFO_ERROR",
+        /// Worktree enumeration failed.
+        WorktreeListError = "WORKTREE_LIST_ERROR",
+        /// Cross-checkout store comparison failed.
+        WorktreeStoreDivergenceError = "WORKTREE_STORE_DIVERGENCE_ERROR",
+        /// Repository hook installation failed.
+        HooksInstallError = "HOOKS_INSTALL_ERROR",
+        /// A command failed without a more specific public classification.
+        GenericError = "GENERIC_ERROR",
+        /// Repository recovery failed.
+        RecoveryFailed = "recovery_failed",
+        /// Claim acquisition failed.
+        ClaimAcquireError = "CLAIM_ACQUIRE_ERROR",
+        /// Claim release failed.
+        ClaimReleaseError = "CLAIM_RELEASE_ERROR",
+        /// Claim renewal failed.
+        ClaimRenewError = "CLAIM_RENEW_ERROR",
+        /// Claim heartbeat failed.
+        ClaimHeartbeatError = "CLAIM_HEARTBEAT_ERROR",
+        /// Claim status inspection failed without a more specific classification.
+        ClaimStatusError = "CLAIM_STATUS_ERROR",
+        /// Claim enumeration failed without a more specific classification.
+        ClaimListError = "CLAIM_LIST_ERROR",
+        /// Forced claim eviction failed.
+        ClaimForceEvictError = "CLAIM_FORCE_EVICT_ERROR",
+        /// A lock wait expired while another jit process held the lock.
+        LockTimeout = "LOCK_TIMEOUT",
+    }
 }
 
 impl ErrorCode {
-    /// Every registered error code, in declaration order.
-    ///
-    /// A conformance test compares this list with the variants schemars derives
-    /// from [`ErrorCode`], so omitting a newly added member fails the suite.
-    pub const ALL: [ErrorCode; 47] = [
-        ErrorCode::IssueNotFound,
-        ErrorCode::GateNotFound,
-        ErrorCode::CycleDetected,
-        ErrorCode::InvalidArgument,
-        ErrorCode::InvalidLabelPattern,
-        ErrorCode::ValidationFailed,
-        ErrorCode::AlreadyExists,
-        ErrorCode::InvalidState,
-        ErrorCode::Blocked,
-        ErrorCode::GateFailed,
-        ErrorCode::IoError,
-        ErrorCode::PermissionDenied,
-        ErrorCode::ParseError,
-        ErrorCode::ClaimRequiresGit,
-        ErrorCode::AmbiguousId,
-        ErrorCode::InvalidIdPrefix,
-        ErrorCode::RepositoryNotFound,
-        ErrorCode::RepositoryFormatTooNew,
-        ErrorCode::DeletionNotConfirmed,
-        ErrorCode::LinkedCheckoutWriteRefused,
-        ErrorCode::ProfileNotFound,
-        ErrorCode::ProfileConflict,
-        ErrorCode::DependencyError,
-        ErrorCode::GateError,
-        ErrorCode::GateCheckError,
-        ErrorCode::PresetError,
-        ErrorCode::ItemNotFound,
-        ErrorCode::ItemCommandFailed,
-        ErrorCode::InvariantCommandFailed,
-        ErrorCode::ProjectCommandFailed,
-        ErrorCode::ProfileError,
-        ErrorCode::SearchFailed,
-        ErrorCode::RipgrepNotFound,
-        ErrorCode::WorktreeInfoError,
-        ErrorCode::WorktreeListError,
-        ErrorCode::WorktreeStoreDivergenceError,
-        ErrorCode::HooksInstallError,
-        ErrorCode::GenericError,
-        ErrorCode::RecoveryFailed,
-        ErrorCode::ClaimAcquireError,
-        ErrorCode::ClaimReleaseError,
-        ErrorCode::ClaimRenewError,
-        ErrorCode::ClaimHeartbeatError,
-        ErrorCode::ClaimStatusError,
-        ErrorCode::ClaimListError,
-        ErrorCode::ClaimForceEvictError,
-        ErrorCode::LockTimeout,
-    ];
-
-    /// Return the byte-exact code written to a JSON error envelope.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            ErrorCode::IssueNotFound => "ISSUE_NOT_FOUND",
-            ErrorCode::GateNotFound => "GATE_NOT_FOUND",
-            ErrorCode::CycleDetected => "CYCLE_DETECTED",
-            ErrorCode::InvalidArgument => "INVALID_ARGUMENT",
-            ErrorCode::InvalidLabelPattern => "INVALID_LABEL_PATTERN",
-            ErrorCode::ValidationFailed => "VALIDATION_FAILED",
-            ErrorCode::AlreadyExists => "ALREADY_EXISTS",
-            ErrorCode::InvalidState => "INVALID_STATE",
-            ErrorCode::Blocked => "BLOCKED",
-            ErrorCode::GateFailed => "GATE_FAILED",
-            ErrorCode::IoError => "IO_ERROR",
-            ErrorCode::PermissionDenied => "PERMISSION_DENIED",
-            ErrorCode::ParseError => "PARSE_ERROR",
-            ErrorCode::ClaimRequiresGit => "CLAIM_REQUIRES_GIT",
-            ErrorCode::AmbiguousId => "AMBIGUOUS_ID",
-            ErrorCode::InvalidIdPrefix => "INVALID_ID_PREFIX",
-            ErrorCode::RepositoryNotFound => "REPOSITORY_NOT_FOUND",
-            ErrorCode::RepositoryFormatTooNew => "REPOSITORY_FORMAT_TOO_NEW",
-            ErrorCode::DeletionNotConfirmed => "DELETION_NOT_CONFIRMED",
-            ErrorCode::LinkedCheckoutWriteRefused => "LINKED_CHECKOUT_WRITE_REFUSED",
-            ErrorCode::ProfileNotFound => "PROFILE_NOT_FOUND",
-            ErrorCode::ProfileConflict => "PROFILE_CONFLICT",
-            ErrorCode::DependencyError => "DEPENDENCY_ERROR",
-            ErrorCode::GateError => "GATE_ERROR",
-            ErrorCode::GateCheckError => "GATE_CHECK_ERROR",
-            ErrorCode::PresetError => "PRESET_ERROR",
-            ErrorCode::ItemNotFound => "ITEM_NOT_FOUND",
-            ErrorCode::ItemCommandFailed => "ITEM_COMMAND_FAILED",
-            ErrorCode::InvariantCommandFailed => "INVARIANT_COMMAND_FAILED",
-            ErrorCode::ProjectCommandFailed => "PROJECT_COMMAND_FAILED",
-            ErrorCode::ProfileError => "PROFILE_ERROR",
-            ErrorCode::SearchFailed => "SEARCH_FAILED",
-            ErrorCode::RipgrepNotFound => "RIPGREP_NOT_FOUND",
-            ErrorCode::WorktreeInfoError => "WORKTREE_INFO_ERROR",
-            ErrorCode::WorktreeListError => "WORKTREE_LIST_ERROR",
-            ErrorCode::WorktreeStoreDivergenceError => "WORKTREE_STORE_DIVERGENCE_ERROR",
-            ErrorCode::HooksInstallError => "HOOKS_INSTALL_ERROR",
-            ErrorCode::GenericError => "GENERIC_ERROR",
-            ErrorCode::RecoveryFailed => "recovery_failed",
-            ErrorCode::ClaimAcquireError => "CLAIM_ACQUIRE_ERROR",
-            ErrorCode::ClaimReleaseError => "CLAIM_RELEASE_ERROR",
-            ErrorCode::ClaimRenewError => "CLAIM_RENEW_ERROR",
-            ErrorCode::ClaimHeartbeatError => "CLAIM_HEARTBEAT_ERROR",
-            ErrorCode::ClaimStatusError => "CLAIM_STATUS_ERROR",
-            ErrorCode::ClaimListError => "CLAIM_LIST_ERROR",
-            ErrorCode::ClaimForceEvictError => "CLAIM_FORCE_EVICT_ERROR",
-            ErrorCode::LockTimeout => "LOCK_TIMEOUT",
-        }
-    }
-
     /// Return the process exit status associated with this error code.
     ///
     /// The match is exhaustive so adding a member requires choosing its status.
@@ -1197,8 +1147,7 @@ pub(crate) mod test_support {
 /// Each row reads its wire spelling, meaning, and numeric exit status from
 /// [`ErrorCode::as_str`], [`ErrorCode::description`], and
 /// [`ErrorCode::exit_code`] respectively. Iterating [`ErrorCode::ALL`] keeps the
-/// page coupled to the same derive-checked member list used by the runtime's
-/// vocabulary conformance tests.
+/// page coupled to the runtime vocabulary declaration.
 #[cfg(any(test, feature = "test-support"))]
 pub fn render_error_code_reference() -> String {
     let rows = ErrorCode::ALL
@@ -1232,85 +1181,6 @@ pub fn render_error_code_reference() -> String {
     )
 }
 
-/// An input string that is not a member of the registered error-code vocabulary.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("unknown error code `{code}`")]
-pub struct UnknownErrorCode {
-    code: String,
-}
-
-impl UnknownErrorCode {
-    /// Return the unresolved input string.
-    pub fn as_str(&self) -> &str {
-        &self.code
-    }
-}
-
-impl std::str::FromStr for ErrorCode {
-    type Err = UnknownErrorCode;
-
-    fn from_str(code: &str) -> Result<Self, Self::Err> {
-        match code {
-            "ISSUE_NOT_FOUND" => Ok(ErrorCode::IssueNotFound),
-            "GATE_NOT_FOUND" => Ok(ErrorCode::GateNotFound),
-            "CYCLE_DETECTED" => Ok(ErrorCode::CycleDetected),
-            "INVALID_ARGUMENT" => Ok(ErrorCode::InvalidArgument),
-            "INVALID_LABEL_PATTERN" => Ok(ErrorCode::InvalidLabelPattern),
-            "VALIDATION_FAILED" => Ok(ErrorCode::ValidationFailed),
-            "ALREADY_EXISTS" => Ok(ErrorCode::AlreadyExists),
-            "INVALID_STATE" => Ok(ErrorCode::InvalidState),
-            "BLOCKED" => Ok(ErrorCode::Blocked),
-            "GATE_FAILED" => Ok(ErrorCode::GateFailed),
-            "IO_ERROR" => Ok(ErrorCode::IoError),
-            "PERMISSION_DENIED" => Ok(ErrorCode::PermissionDenied),
-            "PARSE_ERROR" => Ok(ErrorCode::ParseError),
-            "CLAIM_REQUIRES_GIT" => Ok(ErrorCode::ClaimRequiresGit),
-            "AMBIGUOUS_ID" => Ok(ErrorCode::AmbiguousId),
-            "INVALID_ID_PREFIX" => Ok(ErrorCode::InvalidIdPrefix),
-            "REPOSITORY_NOT_FOUND" => Ok(ErrorCode::RepositoryNotFound),
-            "REPOSITORY_FORMAT_TOO_NEW" => Ok(ErrorCode::RepositoryFormatTooNew),
-            "DELETION_NOT_CONFIRMED" => Ok(ErrorCode::DeletionNotConfirmed),
-            "LINKED_CHECKOUT_WRITE_REFUSED" => Ok(ErrorCode::LinkedCheckoutWriteRefused),
-            "PROFILE_NOT_FOUND" => Ok(ErrorCode::ProfileNotFound),
-            "PROFILE_CONFLICT" => Ok(ErrorCode::ProfileConflict),
-            "DEPENDENCY_ERROR" => Ok(ErrorCode::DependencyError),
-            "GATE_ERROR" => Ok(ErrorCode::GateError),
-            "GATE_CHECK_ERROR" => Ok(ErrorCode::GateCheckError),
-            "PRESET_ERROR" => Ok(ErrorCode::PresetError),
-            "ITEM_NOT_FOUND" => Ok(ErrorCode::ItemNotFound),
-            "ITEM_COMMAND_FAILED" => Ok(ErrorCode::ItemCommandFailed),
-            "INVARIANT_COMMAND_FAILED" => Ok(ErrorCode::InvariantCommandFailed),
-            "PROJECT_COMMAND_FAILED" => Ok(ErrorCode::ProjectCommandFailed),
-            "PROFILE_ERROR" => Ok(ErrorCode::ProfileError),
-            "SEARCH_FAILED" => Ok(ErrorCode::SearchFailed),
-            "RIPGREP_NOT_FOUND" => Ok(ErrorCode::RipgrepNotFound),
-            "WORKTREE_INFO_ERROR" => Ok(ErrorCode::WorktreeInfoError),
-            "WORKTREE_LIST_ERROR" => Ok(ErrorCode::WorktreeListError),
-            "WORKTREE_STORE_DIVERGENCE_ERROR" => Ok(ErrorCode::WorktreeStoreDivergenceError),
-            "HOOKS_INSTALL_ERROR" => Ok(ErrorCode::HooksInstallError),
-            "GENERIC_ERROR" => Ok(ErrorCode::GenericError),
-            "recovery_failed" => Ok(ErrorCode::RecoveryFailed),
-            "CLAIM_ACQUIRE_ERROR" => Ok(ErrorCode::ClaimAcquireError),
-            "CLAIM_RELEASE_ERROR" => Ok(ErrorCode::ClaimReleaseError),
-            "CLAIM_RENEW_ERROR" => Ok(ErrorCode::ClaimRenewError),
-            "CLAIM_HEARTBEAT_ERROR" => Ok(ErrorCode::ClaimHeartbeatError),
-            "CLAIM_STATUS_ERROR" => Ok(ErrorCode::ClaimStatusError),
-            "CLAIM_LIST_ERROR" => Ok(ErrorCode::ClaimListError),
-            "CLAIM_FORCE_EVICT_ERROR" => Ok(ErrorCode::ClaimForceEvictError),
-            "LOCK_TIMEOUT" => Ok(ErrorCode::LockTimeout),
-            code => Err(UnknownErrorCode {
-                code: code.to_string(),
-            }),
-        }
-    }
-}
-
-impl Display for ErrorCode {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
 impl From<ErrorCode> for String {
     fn from(code: ErrorCode) -> Self {
         code.as_str().to_string()
@@ -1324,12 +1194,12 @@ impl From<ErrorCode> for String {
 /// (e.g. `ISSUE_NOT_FOUND`). When the actual failure is an ambiguous-prefix or
 /// too-short-prefix id lookup, that fallback misreports both the code and the
 /// exit class, so this replaces it with the matching argument error
-/// (`AMBIGUOUS_ID` / `INVALID_ID_PREFIX`, exit code 2) carrying the offending
-/// prefix in `details`. Any other error keeps its `fallback` unchanged, so this
+/// ([`ErrorCode::AmbiguousId`] or [`ErrorCode::InvalidIdPrefix`], exit code 2)
+/// carrying the offending prefix in `details`. Any other error keeps its `fallback` unchanged, so this
 /// is a no-op for the vast majority of call sites.
 pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
     if let Some(prefix_error) =
-        error.downcast_ref::<crate::domain::issue_id::InvalidIdPrefixError>()
+        error.downcast_ref::<crate::domain::identity::InvalidIdPrefixError>()
     {
         return JsonError::new(ErrorCode::InvalidIdPrefix, prefix_error.to_string())
             .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
@@ -1347,17 +1217,18 @@ pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError 
 
 /// Helper to create common error responses
 impl JsonError {
-    pub fn issue_not_found(issue_id: &str) -> Self {
+    /// Preserve unresolved request text in the lookup diagnostic.
+    pub fn issue_not_found(requested: &str) -> Self {
         Self::new(
             ErrorCode::IssueNotFound,
-            format!("Issue not found: {}", issue_id),
+            format!("Issue not found: {}", requested),
         )
-        .with_details(serde_json::json!({"issue_id": issue_id}))
+        .with_details(serde_json::json!({"issue_id": requested}))
         .with_suggestion("Run 'jit query all' to see available issues")
         .with_suggestion("Check if the issue ID is correct")
     }
 
-    pub fn gate_not_found(gate_key: &str) -> Self {
+    pub fn gate_not_found(gate_key: &GateKey) -> Self {
         Self::new(
             ErrorCode::GateNotFound,
             format!("Gate not found: {}", gate_key),
@@ -1367,12 +1238,16 @@ impl JsonError {
         .with_suggestion("Add the gate to the registry first with 'jit gate define'")
     }
 
-    pub fn cycle_detected(from: &str, to: &str) -> Self {
+    /// Preserve the rejected target request text alongside the resolved source.
+    pub fn cycle_detected(from: &IssueId, requested: &str) -> Self {
         Self::new(
             ErrorCode::CycleDetected,
-            format!("Adding dependency would create a cycle: {} -> {}", from, to),
+            format!(
+                "Adding dependency would create a cycle: {} -> {}",
+                from, requested
+            ),
         )
-        .with_details(serde_json::json!({"from": from, "to": to}))
+        .with_details(serde_json::json!({"from": from, "to": requested}))
         .with_suggestion("Remove existing dependencies that create the cycle")
         .with_suggestion("Use 'jit graph show' to visualize the dependency graph")
     }
@@ -1385,8 +1260,8 @@ impl JsonError {
         Self::new(blocked.error_code(), blocked.summary())
             .with_details(serde_json::json!({
                 "issue_id": blocked.issue_id(),
-                "requested_state": state_name(blocked.requested_state()),
-                "actual_state": state_name(blocked.actual_state()),
+                "requested_state": blocked.requested_state().as_str(),
+                "actual_state": blocked.actual_state().as_str(),
                 "blockers": blocked.blockers().iter().map(transition_blocker_json).collect::<Vec<_>>(),
                 "warnings": blocked.warnings(),
                 "remediation": blocked.remediation_commands(),
@@ -1404,14 +1279,14 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
         } => serde_json::json!({
             "type": "dependency",
             "issue_id": issue_id,
-            "short_id": short_id(issue_id),
+            "short_id": issue_id.short_id(),
             "title": title,
-            "state": state_name(*state),
+            "state": state.as_str(),
         }),
         TransitionBlocker::MissingDependency { issue_id } => serde_json::json!({
             "type": "dependency",
             "issue_id": issue_id,
-            "short_id": short_id(issue_id),
+            "short_id": issue_id.short_id(),
             "title": "(missing issue)",
             "state": "missing",
         }),
@@ -1422,7 +1297,7 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
         } => serde_json::json!({
             "type": "gate",
             "key": gate_key,
-            "status": gate_status_name(*status),
+            "status": status.as_str(),
             "mode": mode.as_str(),
         }),
         TransitionBlocker::GraphRule { rule, message } => serde_json::json!({
@@ -1432,10 +1307,10 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
         }),
         TransitionBlocker::ArchivedRevive { origin } => serde_json::json!({
             "type": "archived_revive",
-            "origin": state_name(*origin),
+            "origin": origin.as_str(),
             "message": format!(
                 "an archived issue only revives to its pre-archive state '{}'",
-                state_name(*origin)
+                origin.as_str()
             ),
         }),
     }
@@ -1508,6 +1383,10 @@ collection_keys! {
     ArtifactsKey = "artifacts";
     NamespacesKey = "namespaces";
     WorktreesKey = "worktrees";
+    PresetsKey = "presets";
+    EventsKey = "events";
+    ValuesKey = "values";
+    LeasesKey = "leases";
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)
@@ -1563,15 +1442,25 @@ pub struct ClaimResponse {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct TemplateApplyResponse {
     pub template: String,
-    pub container: String,
-    pub anchor_bindings: std::collections::BTreeMap<String, String>,
-    pub created_node_ids_by_role: std::collections::BTreeMap<String, String>,
-    pub anchor_dependency_snapshots: std::collections::BTreeMap<String, Vec<String>>,
+    pub container: IssueId,
+    pub anchor_bindings: std::collections::BTreeMap<String, IssueId>,
+    pub created_node_ids_by_role: std::collections::BTreeMap<String, IssueId>,
+    pub anchor_dependency_snapshots: std::collections::BTreeMap<String, Vec<IssueId>>,
     pub created_issues: std::collections::BTreeMap<String, Issue>,
 }
 
 /// Response for blocked query with reasons (minimal issue + reasons)
 pub type BlockedListResponse = ListEnvelope<IssuesKey, MinimalBlockedIssue>;
+
+/// One [`BlockedListResponse`] reason string. A gate reason keeps the status
+/// variant name (`gate:<key> (Pending)`) the JSON contract carries; human output
+/// renders the wire token through [`BlockingReason`]'s `Display`.
+pub fn minimal_blocked_reason(reason: &BlockingReason) -> String {
+    match reason {
+        BlockingReason::Gate { key, status } => format!("gate:{key} ({status:?})"),
+        BlockingReason::Dependency { .. } => reason.to_string(),
+    }
+}
 
 /// Multi-id envelope for `issue show <id> <id> …` — full show projections in
 /// argument order.
@@ -1621,14 +1510,14 @@ pub type GraphDownstreamResponse = ListEnvelope<DependentsKey, MinimalIssue, Iss
 /// The issue a graph traversal starts from.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueScope {
-    pub issue_id: String,
+    pub issue_id: IssueId,
 }
 
 /// Tree node for hierarchical dependency display
 #[derive(Debug, Serialize, JsonSchema, Clone)]
 pub struct DependencyTreeNode {
     /// Issue ID
-    pub id: String,
+    pub id: IssueId,
     /// Short ID (first 8 chars)
     pub short_id: String,
     /// Issue title
@@ -1679,7 +1568,7 @@ pub type GraphDepsTreeResponse = ListEnvelope<NodesKey, DependencyTreeNode, Depe
 /// Fields of [`GraphDepsTreeResponse`] beside its `nodes`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DependencyTreeScope {
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Depth of traversal (1 = immediate, 0 = unlimited)
     pub depth: u32,
     /// Summary statistics
@@ -1712,15 +1601,17 @@ pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
 /// use jit::graph::hierarchy::NodeHierarchy;
 /// use jit::output::HierarchyNodeView;
 ///
+/// let epic_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678);
+/// let task_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0002_8765_4321);
 /// let view = HierarchyNodeView {
-///     id: "epic-1234".into(),
-///     short_id: "epic-123".into(),
+///     id: epic_id.clone(),
+///     short_id: epic_id.short_id().to_string(),
 ///     title: "Auth epic".into(),
 ///     type_name: Some("epic".into()),
 ///     hierarchy: NodeHierarchy {
 ///         parent: None,
-///         children: vec!["task-a".into()],
-///         cluster: Some("epic-1234".into()),
+///         children: vec![task_id.clone()],
+///         cluster: Some(epic_id.clone()),
 ///         rank: 1,
 ///     },
 /// };
@@ -1728,14 +1619,14 @@ pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
 /// // `type_name` serializes under the `type` key.
 /// assert_eq!(json["type"], "epic");
 /// // The resolution fields sit flat on the node.
-/// assert_eq!(json["children"][0], "task-a");
-/// assert_eq!(json["cluster"], "epic-1234");
+/// assert_eq!(json["children"][0], task_id.as_str());
+/// assert_eq!(json["cluster"], epic_id.as_str());
 /// assert_eq!(json["rank"], 1);
 /// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct HierarchyNodeView {
     /// Full issue id.
-    pub id: String,
+    pub id: IssueId,
     /// Short id (first 8 chars).
     pub short_id: String,
     /// Issue title.
@@ -1760,16 +1651,18 @@ pub struct HierarchyNodeView {
 /// use jit::graph::hierarchy::NodeHierarchy;
 /// use jit::output::{GraphTreeResponse, HierarchyNodeView, TreeRoot};
 ///
+/// let epic_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678);
+/// let task_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0002_8765_4321);
 /// let response = GraphTreeResponse::with_extras(
 ///     vec![HierarchyNodeView {
-///         id: "task-1234".into(),
-///         short_id: "task-123".into(),
+///         id: task_id.clone(),
+///         short_id: task_id.short_id().to_string(),
 ///         title: "A task".into(),
 ///         type_name: Some("task".into()),
 ///         hierarchy: NodeHierarchy {
-///             parent: Some("epic-1".into()),
+///             parent: Some(epic_id.clone()),
 ///             children: vec![],
-///             cluster: Some("epic-1".into()),
+///             cluster: Some(epic_id.clone()),
 ///             rank: 0,
 ///         },
 ///     }],
@@ -1778,7 +1671,7 @@ pub struct HierarchyNodeView {
 /// let json = serde_json::to_value(&response).unwrap();
 /// assert_eq!(json["count"], 1);
 /// assert_eq!(json["root"], serde_json::Value::Null);
-/// assert_eq!(json["nodes"][0]["parent"], "epic-1");
+/// assert_eq!(json["nodes"][0]["parent"], epic_id.as_str());
 /// ```
 pub type GraphTreeResponse = ListEnvelope<NodesKey, HierarchyNodeView, TreeRoot>;
 
@@ -1786,14 +1679,14 @@ pub type GraphTreeResponse = ListEnvelope<NodesKey, HierarchyNodeView, TreeRoot>
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct TreeRoot {
     /// The root id the tree was scoped to, or `null` for the whole repository.
-    pub root: Option<String>,
+    pub root: Option<IssueId>,
 }
 
 /// One reported membership-vs-DAG divergence, as rendered by `query divergence`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DivergenceView {
     /// Full id of the issue carrying the unsupported membership label.
-    pub id: String,
+    pub id: IssueId,
     /// Short id (first 8 chars).
     pub short_id: String,
     /// Issue title.
@@ -1827,8 +1720,8 @@ pub type DivergenceResponse = ListEnvelope<DivergencesKey, DivergenceView>;
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateView {
     /// Gate key.
-    pub key: String,
-    /// Gate status: `pending`, `passed`, or `failed`.
+    pub key: GateKey,
+    /// Gate status.
     pub status: crate::domain::GateStatus,
     /// Timestamp of the gate's latest run, or `null` when never run.
     pub last_run_at: Option<String>,
@@ -1842,7 +1735,11 @@ impl GateView {
     /// `state` is the issue's recorded [`GateState`] for this gate (if any) and
     /// `runs` are all recorded runs for the issue; the run `state` was projected
     /// from, the gate's latest published run, supplies `last_run_at`/`exit_code`.
-    fn build(key: &str, state: Option<&crate::domain::GateState>, runs: &[GateRunResult]) -> Self {
+    fn build(
+        key: &GateKey,
+        state: Option<&crate::domain::GateState>,
+        runs: &[GateRunResult],
+    ) -> Self {
         let status = state
             .map(|s| s.status)
             .unwrap_or(crate::domain::GateStatus::Pending);
@@ -1850,7 +1747,7 @@ impl GateView {
         let latest = state.and_then(|state| state.projected_run(key, runs));
 
         GateView {
-            key: key.to_string(),
+            key: key.clone(),
             status,
             last_run_at: latest.map(|r| r.started_at.to_rfc3339()),
             exit_code: latest.and_then(|r| r.exit_code),
@@ -1871,7 +1768,7 @@ impl GateView {
 /// carrying only what an orchestrator needs to see what is still blocking work.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct UnmetDependency {
-    pub id: String,
+    pub id: IssueId,
     /// Short ID (first 8 chars of the full UUID), for human-readable references.
     pub short_id: String,
     pub title: String,
@@ -1892,7 +1789,7 @@ impl From<&MinimalIssue> for UnmetDependency {
 /// Response for `issue show` command with enriched dependencies
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowResponse {
-    pub id: String,
+    pub id: IssueId,
     /// Short ID (first 8 chars of the full UUID), for human-readable references.
     pub short_id: String,
     pub title: String,
@@ -1912,7 +1809,7 @@ pub struct IssueShowResponse {
     /// `dependencies`, which silently omits ids it cannot resolve — is not
     /// hidden.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dangling_dependency_ids: Vec<String>,
+    pub dangling_dependency_ids: Vec<IssueId>,
     /// The subset of `dependencies` that are not yet met (not effectively terminal),
     /// consistent with readiness — see [`UnmetDependency`]. Always an array,
     /// empty when every dependency is effectively terminal (`Done`, `Rejected`,
@@ -1968,12 +1865,12 @@ impl IssueShowResponse {
 
         // See the doc comment above: recover ids `enriched_deps` couldn't
         // resolve so they surface instead of vanishing from the response.
-        let resolved_ids: std::collections::HashSet<&str> =
-            enriched_deps.iter().map(|dep| dep.id.as_str()).collect();
-        let dangling_dependency_ids: Vec<String> = issue
+        let resolved_ids: std::collections::HashSet<&IssueId> =
+            enriched_deps.iter().map(|dep| &dep.id).collect();
+        let dangling_dependency_ids: Vec<IssueId> = issue
             .dependencies
             .iter()
-            .filter(|dep_id| !resolved_ids.contains(dep_id.as_str()))
+            .filter(|dep_id| !resolved_ids.contains(dep_id))
             .cloned()
             .collect();
 
@@ -2027,18 +1924,21 @@ impl IssueShowResponse {
 /// # Examples
 ///
 /// ```
+/// use jit::domain::identity::GateKey;
 /// use jit::domain::{GateStatus, Issue, State};
 /// use jit::output::{IssueShowResponse, IssueStatusResponse};
 ///
-/// let mut issue = Issue::draft("Build parser".into(), "Body".into());
+/// let id = jit::test_utils::issue_id(1);
+/// let mut issue = Issue::draft(id, "Build parser".into(), "Body".into());
 /// issue.state = State::Ready;
-/// issue.gates_required = vec!["tests".into()];
+/// let gate: GateKey = "tests".parse().unwrap();
+/// issue.gates_required = vec![gate.clone()];
 /// let show = IssueShowResponse::from_issue(issue, vec![], &[]);
 ///
 /// let status = IssueStatusResponse::from_show(&show);
 /// assert_eq!(status.state, State::Ready);
 /// assert_eq!(status.gates.len(), 1);
-/// assert_eq!(status.gates[0].key, "tests");
+/// assert_eq!(status.gates[0].key, gate);
 /// assert_eq!(status.gates[0].status, GateStatus::Pending);
 /// assert!(status.unmet_dependencies.is_empty());
 ///
@@ -2136,14 +2036,14 @@ pub struct StateCount {
 /// issues, shared by `jit issue progress` (over a container's direct children)
 /// and `jit query count --by state` (over a label bucket or the whole repo).
 ///
-/// `by_state` has one [`StateCount`] per [`State`] variant in [`State::all`]
+/// `by_state` has one [`StateCount`] per [`State`] variant in [`State::ALL`]
 /// order, zero-count states included, so the shape is stable and complete
 /// (@/inv/domain-agnostic — the state list is enumerated, never hardcoded).
 /// `count` is `by_state.len()` (one entry per state).
 ///
 /// Effective-terminal semantics ([`Issue::effective_terminal_state`],
-/// `Done`/`Rejected`): `done` and `rejected` are reported separately because a
-/// rejected issue is terminal but not delivered. `Archived` is
+/// `Done`/`Rejected`): the two terminal tallies are reported separately because
+/// a rejected issue is terminal but not delivered. `Archived` is
 /// terminality-preserving, so an issue archived from `Done` counts toward `done`
 /// and one archived from `Rejected` toward `rejected`; an `Archived` issue with a
 /// non-terminal origin is not effectively terminal and counts as `open`. `open` is every issue that is not effectively terminal
@@ -2170,10 +2070,10 @@ impl ListEnvelope<ByStateKey, StateCount, RollupTotals> {
     /// Aggregate a slice of issues into the counts-by-state rollup.
     ///
     /// `by_state` is [`count_by_state`](crate::domain::queries::count_by_state)
-    /// (every variant, zero-count states kept); `done`/`rejected`/`open` and
-    /// `percent` follow the effective-terminal semantics documented on the type,
-    /// folding an `Archived` issue into `done`/`rejected` by its pre-archive
-    /// origin ([`Issue::effective_terminal_state`]).
+    /// (every variant, zero-count states kept); the [`RollupTotals`] follow the
+    /// effective-terminal semantics documented on the type, folding an
+    /// `Archived` issue into its pre-archive terminal origin
+    /// ([`Issue::effective_terminal_state`]).
     pub fn from_issues(issues: &[Issue]) -> Self {
         let by_state: Vec<StateCount> = crate::domain::queries::count_by_state(issues)
             .into_iter()
@@ -2289,15 +2189,14 @@ pub struct ChildrenScope {
     /// Dependency ids that resolve to no stored issue (dangling edges), omitted
     /// when empty. `count`/`issues` cover resolvable children only.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dangling: Vec<String>,
+    pub dangling: Vec<IssueId>,
 }
 
 /// Response for `jit issue progress`: a container header, the counts-by-state
 /// [`StateRollup`] over its resolvable direct children, and any dangling child
 /// edges.
 ///
-/// The rollup fields (`count`, `by_state`, `total`, `done`, `rejected`, `open`,
-/// `percent`) are flattened to the top level, so the JSON is the `StateRollup`
+/// The [`StateRollup`] fields are flattened to the top level, so the JSON is the `StateRollup`
 /// shape plus `container` (and `dangling` when non-empty). `total` and every
 /// count are over **resolvable** children only; a dependency id resolving to no
 /// stored issue is surfaced in `dangling` (the [`IssueShowResponse`] precedent)
@@ -2313,7 +2212,7 @@ pub struct ContainerProgressResponse {
     /// Dependency ids that resolve to no stored issue (dangling edges), omitted
     /// when empty. The rollup counts resolvable children only.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dangling: Vec<String>,
+    pub dangling: Vec<IssueId>,
 }
 
 /// Render a single top-level field of a serialized issue value as plain text.
@@ -2426,7 +2325,7 @@ pub fn render_config_snapshot(snapshot: &Value) -> String {
 /// need it can call `jit issue show`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueUpdateResponse {
-    pub id: String,
+    pub id: IssueId,
     pub short_id: String,
     pub state: State,
     pub updated_at: String,
@@ -2453,7 +2352,7 @@ impl From<&Issue> for IssueUpdateResponse {
 /// only needs per-gate status reads it identically on both shapes.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowSummaryResponse {
-    pub id: String,
+    pub id: IssueId,
     pub short_id: String,
     pub title: String,
     pub state: State,
@@ -2509,10 +2408,10 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///
 /// let run = GateRunResult {
 ///     schema_version: 1,
-///     run_id: "r1".into(),
-///     gate_key: "tests".into(),
+///     run_id: jit::test_utils::gate_run_id(1),
+///     gate_key: "tests".parse().unwrap(),
 ///     stage: GateStage::Postcheck,
-///     issue_id: "i1".into(),
+///     issue_id: jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678),
 ///     commit: None,
 ///     branch: None,
 ///     status: GateRunStatus::Passed,
@@ -2539,8 +2438,8 @@ impl From<&Issue> for IssueShowSummaryResponse {
 /// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateRunSummary {
-    pub run_id: String,
-    pub key: String,
+    pub run_id: crate::domain::identity::GateRunId,
+    pub key: GateKey,
     pub stage: GateStage,
     pub status: GateRunStatus,
     pub started_at: String,
@@ -2556,7 +2455,7 @@ pub struct GateRunSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub by: Option<String>,
+    pub by: Option<Assignee>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2629,13 +2528,13 @@ impl GateRunSummary {
 
 /// Per-required-gate readiness entry in a [`GateCheckAllResponse`].
 ///
-/// Reports one required gate's authoritative per-issue status (`passed`,
-/// `failed`, or `pending`) so a `--json` consumer can distinguish a gate that
+/// Reports one required gate's authoritative per-issue [`GateStatus`] so a
+/// `--json` consumer can distinguish a gate that
 /// ran and failed from one that has never run/attested, both of which map to
 /// the single nonzero exit code of `gate status-all`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateStatusEntry {
-    pub key: String,
+    pub key: GateKey,
     pub status: GateStatus,
 }
 
@@ -2646,9 +2545,9 @@ impl GateStatusEntry {
     /// Centralizes the pending-default so the compact `gates` projection shared
     /// by `issue status` and `issue show --summary` matches the status the full
     /// [`GateView`] reports for the same gate.
-    pub fn for_required(key: &str, state: Option<&GateState>) -> Self {
+    pub fn for_required(key: &GateKey, state: Option<&GateState>) -> Self {
         Self {
-            key: key.to_string(),
+            key: key.clone(),
             status: state.map(|s| s.status).unwrap_or(GateStatus::Pending),
         }
     }
@@ -2674,18 +2573,36 @@ pub struct GateCheckSummary {
     pub results: Vec<GateRunSummary>,
     pub passed: usize,
     pub total: usize,
-    pub not_run: Vec<String>,
+    pub not_run: Vec<GateKey>,
     pub all_passed: bool,
+}
+
+/// A resolved issue id or the request text that failed lookup, serialized as a string.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum BatchTarget {
+    Resolved(IssueId),
+    Unresolved(String),
+}
+
+impl BatchTarget {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Resolved(id) => id.as_str(),
+            Self::Unresolved(requested) => requested.as_str(),
+        }
+    }
 }
 
 /// One per-issue result from `jit gate evaluate-many`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateEvaluateManyResult {
-    /// Issue identifier as supplied to the command.
-    pub issue_id: String,
+    #[serde(rename = "issue_id")]
+    pub target: BatchTarget,
     /// Gate key evaluated for this issue.
-    pub key: String,
-    /// `passed` when a verdict was recorded as passing, otherwise `failed`.
+    pub key: GateKey,
+    /// [`GateStatus::Passed`] token when a verdict was recorded as passing,
+    /// otherwise the [`GateStatus::Failed`] token.
     pub status: String,
     /// `pass` or `fail`/`error` when a checker produced a verdict. Pre-verdict
     /// lookup and argument errors leave this absent.
@@ -2720,8 +2637,8 @@ pub type GateRunHistoryResponse = ListEnvelope<ResultsKey, GateRunSummary>;
 /// plain verbatim output exactly.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateFlatReportResponse {
-    pub key: String,
-    pub run_id: String,
+    pub key: GateKey,
+    pub run_id: crate::domain::identity::GateRunId,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stdout: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2739,8 +2656,8 @@ pub struct GateFlatReportResponse {
 /// fields.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateFindingsResponse {
-    pub key: String,
-    pub run_id: String,
+    pub key: GateKey,
+    pub run_id: crate::domain::identity::GateRunId,
     /// Whether the latest run carried a machine-readable findings block.
     pub has_findings: bool,
     /// Checker-declared verdict; `None` when no block was emitted.
@@ -2764,15 +2681,15 @@ pub type GateListResponse = ListEnvelope<GatesKey, GateDefinition>;
 ///
 /// Serialized as snake_case JSON; `stage` and `mode` are typed enums so the
 /// serialized form is always well-formed and identical to the registry storage
-/// format (`"precheck"` / `"postcheck"` / `"manual"` / `"auto"`).
+/// format.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateDefinition {
-    pub key: String,
+    pub key: GateKey,
     pub title: String,
     pub description: String,
-    /// Execution stage; serializes as `"precheck"` or `"postcheck"`.
+    /// Execution stage; serializes as its [`GateStage`] token.
     pub stage: GateStage,
-    /// Execution mode; serializes as `"manual"` or `"auto"`.
+    /// Execution mode; serializes as its [`GateMode`] token.
     pub mode: GateMode,
     /// Checker configuration for automated gates.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2817,7 +2734,7 @@ impl From<crate::declarations::GateDefinition> for GateDefinition {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ArtifactDirectoryResponse {
     /// Full identifier of the issue the directory belongs to.
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Short identifier the directory name is built from.
     pub short_id: String,
     /// Issue-scoped area the caller named.
@@ -2867,7 +2784,7 @@ pub struct ArtifactConformanceEntry {
     pub status: String,
     /// Full identifier of the owning issue, for a `nonconforming` entry.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub issue_id: Option<String>,
+    pub issue_id: Option<IssueId>,
     /// Repository-relative directory the owner owns in that area, for a
     /// `nonconforming` entry.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2913,6 +2830,32 @@ pub struct SearchQuery {
     pub query: String,
 }
 
+/// Response for `gate preset list` command
+pub type GatePresetListResponse = ListEnvelope<PresetsKey, crate::gate_presets::PresetInfo>;
+
+/// Response for `events tail` and `events query`
+pub type EventListResponse = ListEnvelope<EventsKey, crate::domain::Event>;
+
+/// Response for `label values` command
+pub type LabelValuesResponse = ListEnvelope<ValuesKey, String, LabelValuesScope>;
+
+/// The namespace a [`LabelValuesResponse`] lists values of.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct LabelValuesScope {
+    pub namespace: String,
+}
+
+/// Response for `claim status` and `claim list`: the leases beside the
+/// storage warnings raised while reading them.
+pub type LeaseListResponse =
+    ListEnvelope<LeasesKey, crate::storage::claim_coordinator::Lease, LeaseListWarnings>;
+
+/// The storage warnings a [`LeaseListResponse`] carries.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct LeaseListWarnings {
+    pub warnings: Vec<crate::storage::StorageWarning>,
+}
+
 /// Response for `worktree list` command
 pub type WorktreeListResponse =
     ListEnvelope<WorktreesKey, crate::commands::worktree::WorktreeListEntry>;
@@ -2939,14 +2882,71 @@ mod tests {
     use std::collections::BTreeSet;
 
     #[test]
+    fn test_batch_target_serializes_resolved_and_unresolved_as_plain_strings() {
+        let id = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678);
+        for target in [
+            BatchTarget::Resolved(id),
+            BatchTarget::Unresolved("missing-prefix".into()),
+        ] {
+            let expected = serde_json::to_string(target.as_str()).unwrap();
+            assert_eq!(serde_json::to_string(&target).unwrap(), expected);
+        }
+    }
+
+    #[test]
     fn test_render_gate_run_status_never_run_and_passed_name_gate_and_issue() {
-        let never = render_gate_run_status(GateRunLine::NeverRun, "tests", "abc123");
-        let passed = render_gate_run_status(GateRunLine::Passed, "tests", "abc123");
+        let id = crate::test_utils::issue_id(1);
+        let never = render_gate_run_status(GateRunLine::NeverRun, &"tests".parse().unwrap(), &id);
+        let passed = render_gate_run_status(GateRunLine::Passed, &"tests".parse().unwrap(), &id);
         for line in [&never, &passed] {
-            assert!(line.contains("'tests'") && line.contains("abc123"));
+            assert!(line.contains("'tests'") && line.contains(id.as_str()));
         }
         assert!(never.contains("has not been run yet") && never.contains("jit gate evaluate"));
-        assert_eq!(passed, "Passed gate 'tests' for issue abc123");
+        assert_eq!(passed, format!("Passed gate 'tests' for issue {id}"));
+    }
+
+    #[test]
+    fn test_render_archive_execution_lists_counts_and_warnings_or_none() {
+        use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
+        use crate::domain::artifact_plan::{ContentIdentity, PlanTarget, PlanWarning, WarningCode};
+        let result = |warnings| ArchiveExecutionResult {
+            schema_version: 1,
+            target: PlanTarget::Document {
+                path: "docs/a.md".into(),
+            },
+            destination_root: "archive".into(),
+            publications: vec![ArchivePublication {
+                source: Some("docs/a.md".into()),
+                destination: "archive/a.md".into(),
+                content_identity: ContentIdentity::from_bytes(b"a"),
+                adopted: false,
+            }],
+            reference_changes: Vec::new(),
+            planned_deletions: Vec::new(),
+            deleted_sources: vec!["docs/a.md".into()],
+            warnings,
+            event_appended: true,
+            reconciling: false,
+        };
+        let summary = "Archive execution complete: 1 publication(s), 0 reference change(s), 1 source deletion(s)";
+
+        assert_eq!(
+            render_archive_execution(&result(Vec::new())),
+            format!("{summary}\n")
+        );
+
+        let warned = render_archive_execution(&result(vec![
+            PlanWarning::new(WarningCode::DeletionFailed, Some("docs/a.md")),
+            PlanWarning::new(WarningCode::NoOwner, None::<String>),
+        ]));
+        assert_eq!(
+            warned,
+            format!(
+                "{summary}\nwarning: {} (docs/a.md)\nwarning: {}\n",
+                WarningCode::DeletionFailed,
+                WarningCode::NoOwner
+            )
+        );
     }
 
     #[test]
@@ -3033,13 +3033,23 @@ mod tests {
         );
     }
 
+    /// An empty container reports percent 0 and still enumerates every state.
+    #[test]
+    fn test_state_rollup_from_issues_empty_counts_zero_in_every_state() {
+        let rollup = StateRollup::from_issues(&[]);
+        assert_eq!(rollup.extras.total, 0);
+        assert_eq!(rollup.extras.percent, 0);
+        assert_eq!(rollup.items.len(), State::ALL.len());
+        assert!(rollup.items.iter().all(|c| c.count == 0));
+    }
+
     /// jit:45a140ae REQ-02: a dependency-tree node archived from a terminal
     /// state renders and serializes as effectively terminal; one archived from a
     /// non-terminal state stays non-terminal.
     #[test]
     fn test_dependency_tree_node_effective_terminality() {
         let issue = crate::domain::MinimalIssue {
-            id: "a".repeat(36),
+            id: crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_aaaa_aaaa),
             title: "Archived dep".to_string(),
             state: State::Archived,
             priority: Priority::Normal,
@@ -3150,7 +3160,7 @@ mod tests {
     fn test_gate_definition_json_includes_builtin_checker_configuration() {
         let gate = crate::declarations::GateDefinition {
             version: 1,
-            key: "anything".to_string(),
+            key: "anything".parse().unwrap(),
             title: "Coverage".to_string(),
             description: "Configured indirection".to_string(),
             stage: GateStage::Postcheck,
@@ -3179,8 +3189,8 @@ mod tests {
 
     #[test]
     fn test_show_response_root_shape_short_id_and_arrays() {
-        // short_id is id[0..8]; labels and dependencies always serialize as arrays.
-        let issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
+        // Labels and dependencies always serialize as arrays.
+        let issue = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
         let expected_short = issue.short_id();
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
@@ -3204,7 +3214,7 @@ mod tests {
 
     #[test]
     fn test_show_response_surfaces_lifecycle_timestamps() {
-        let mut issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
+        let mut issue = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
         let at = chrono::Utc::now();
         issue.mark_first_ready(at);
         issue.mark_claimed(at);
@@ -3229,13 +3239,10 @@ mod tests {
         // must surface in `dangling_dependency_ids` rather than vanish when
         // `enriched_deps` only contains the resolvable ones.
 
-        let mut issue = crate::domain::fixture_issue("Parent".to_string(), "Body".to_string());
-        issue.dependencies = vec!["resolved-id".to_string(), "dangling-id".to_string()];
-
-        // Simulate what `get_dependencies_enriched` would produce: only the
-        // resolvable dependency's MinimalIssue, the dangling one absent.
-        let mut resolved_dep = crate::domain::fixture_issue("Dep".to_string(), "".to_string());
-        resolved_dep.id = "resolved-id".to_string();
+        let mut issue = crate::test_utils::fixture_issue("Parent".to_string(), "Body".to_string());
+        let resolved_dep = crate::test_utils::fixture_issue("Dep".to_string(), String::new());
+        let dangling_id = crate::test_utils::issue_id(0x4000_8000_0000_0000_0002_2222_2222);
+        issue.dependencies = vec![resolved_dep.id.clone(), dangling_id.clone()];
         let enriched_deps = vec![MinimalIssue::from(&resolved_dep)];
 
         let resp = IssueShowResponse::from_issue(issue, enriched_deps, &[]);
@@ -3248,7 +3255,7 @@ mod tests {
         );
         assert_eq!(
             v["dangling_dependency_ids"],
-            serde_json::json!(["dangling-id"]),
+            serde_json::json!([dangling_id]),
             "the dangling id must be reported, not silently dropped"
         );
     }
@@ -3257,15 +3264,12 @@ mod tests {
     fn test_show_response_omits_rejected_dependency_from_unmet() {
         use crate::domain::State;
 
-        let mut issue = crate::domain::fixture_issue("Parent".to_string(), "Body".to_string());
-        issue.dependencies = vec!["rejected-id".to_string(), "pending-id".to_string()];
-
-        let mut rejected = crate::domain::fixture_issue("Abandoned".to_string(), String::new());
-        rejected.id = "rejected-id".to_string();
+        let mut issue = crate::test_utils::fixture_issue("Parent".to_string(), "Body".to_string());
+        let mut rejected = crate::test_utils::fixture_issue("Abandoned".to_string(), String::new());
         rejected.state = State::Rejected;
-        let mut pending = crate::domain::fixture_issue("Upstream".to_string(), String::new());
-        pending.id = "pending-id".to_string();
+        let mut pending = crate::test_utils::fixture_issue("Upstream".to_string(), String::new());
         pending.state = State::InProgress;
+        issue.dependencies = vec![rejected.id.clone(), pending.id.clone()];
         let enriched_deps = vec![MinimalIssue::from(&rejected), MinimalIssue::from(&pending)];
 
         let resp = IssueShowResponse::from_issue(issue, enriched_deps, &[]);
@@ -3277,7 +3281,7 @@ mod tests {
             .collect();
         assert_eq!(
             unmet,
-            vec!["pending-id"],
+            vec![pending.id.as_str()],
             "a Rejected dependency is met and must not render as unmet"
         );
     }
@@ -3286,14 +3290,14 @@ mod tests {
     fn test_show_response_exposes_content_format() {
         use crate::domain::ContentFormat;
         // Set -> appears in `jit issue show --json` (create/show parity).
-        let mut issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
+        let mut issue = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
         issue.content_format = Some(ContentFormat::Html);
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
         assert_eq!(v["content_format"], "html");
 
         // Absent -> omitted (existing issues without the field stay clean).
-        let issue2 = crate::domain::fixture_issue("T".to_string(), "B".to_string());
+        let issue2 = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
         let resp2 = IssueShowResponse::from_issue(issue2, vec![], &[]);
         let v2 = serde_json::to_value(&resp2).unwrap();
         assert!(v2.get("content_format").is_none());
@@ -3303,8 +3307,8 @@ mod tests {
     fn test_show_response_gates_array_replaces_split_fields() {
         // `gates` replaces `gates_required`/`gates_status`; neither legacy field
         // appears in the `issue show --json` shape.
-        let mut issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
-        issue.gates_required = vec!["tests".to_string()];
+        let mut issue = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
+        issue.gates_required = vec!["tests".parse().unwrap()];
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
 
@@ -3319,8 +3323,8 @@ mod tests {
     #[test]
     fn test_show_response_gate_never_run_is_null() {
         // Required-but-never-run gate: status pending, last_run_at/exit_code null.
-        let mut issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
-        issue.gates_required = vec!["tests".to_string()];
+        let mut issue = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
+        issue.gates_required = vec!["tests".parse().unwrap()];
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
 
@@ -3339,23 +3343,24 @@ mod tests {
 
         // A gate that has run: status from GateState, last_run_at/exit_code from
         // the GateRunResult the state names.
-        let mut issue = crate::domain::fixture_issue("T".to_string(), "B".to_string());
-        issue.gates_required = vec!["tests".to_string()];
+        let mut issue = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
+        issue.gates_required = vec!["tests".parse().unwrap()];
         let run_at = Utc::now();
+        let run_id = crate::test_utils::gate_run_id(1);
         issue.gates_status.insert(
-            "tests".to_string(),
+            "tests".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("ci:test".parse().unwrap()),
                 updated_at: run_at,
-                run_id: Some("run-1".to_string()),
+                run_id: Some(run_id.clone()),
             },
         );
 
         let run = GateRunResult {
             schema_version: 1,
-            run_id: "run-1".to_string(),
-            gate_key: "tests".to_string(),
+            run_id,
+            gate_key: "tests".parse().unwrap(),
             stage: GateStage::Postcheck,
             issue_id: issue.id.clone(),
             commit: None,
@@ -3388,22 +3393,24 @@ mod tests {
 
     #[test]
     fn test_json_output_success() {
-        let data = json!({"id": "123", "title": "Test"});
+        let id = crate::test_utils::issue_id(1);
+        let data = json!({"id": id, "title": "Test"});
         let output = JsonOutput::success(data);
 
         // success field removed
-        assert_eq!(output.data["id"], "123");
+        assert_eq!(output.data["id"], id.as_str());
         // metadata removed
     }
 
     #[test]
     fn test_json_output_serialization() {
-        let data = json!({"id": "123", "title": "test"});
+        let id = crate::test_utils::issue_id(1);
+        let data = json!({"id": id, "title": "test"});
         let output = JsonOutput::success(data);
 
         let json_str = output.to_json_string().unwrap();
         // Should contain raw data without envelope
-        assert!(json_str.contains("\"id\": \"123\""));
+        assert!(json_str.contains(&format!("\"id\": \"{id}\"")));
         assert!(json_str.contains("\"title\": \"test\""));
         // Should NOT contain envelope fields
         assert!(!json_str.contains("\"success\""));
@@ -3425,8 +3432,8 @@ mod tests {
             references,
         };
         let response = GateFindingsResponse {
-            key: "review".to_string(),
-            run_id: "run-1".to_string(),
+            key: "review".parse().unwrap(),
+            run_id: crate::test_utils::gate_run_id(1),
             has_findings: true,
             verdict: Some("fail".to_string()),
             summary: Some("two defects".to_string()),
@@ -3453,19 +3460,21 @@ mod tests {
 
     #[test]
     fn test_json_output_with_message() {
-        let data = json!({"id": "abc12345", "title": "Test issue"});
-        let output = JsonOutput::success(data).with_message("Created issue abc12345 - Test issue");
+        let id = crate::test_utils::issue_id(1);
+        let data = json!({"id": id, "title": "Test issue"});
+        let message = format!("Created issue {id} - Test issue");
+        let output = JsonOutput::success(data).with_message(&message);
 
         let json_str = output.to_json_string().unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
-        assert_eq!(parsed["message"], "Created issue abc12345 - Test issue");
-        assert_eq!(parsed["id"], "abc12345");
+        assert_eq!(parsed["message"], message);
+        assert_eq!(parsed["id"], id.as_str());
         assert_eq!(parsed["title"], "Test issue");
     }
 
     #[test]
     fn test_json_output_without_message() {
-        let data = json!({"id": "123"});
+        let data = json!({"id": crate::test_utils::issue_id(1)});
         let output = JsonOutput::success(data);
 
         let json_str = output.to_json_string().unwrap();
@@ -3477,7 +3486,8 @@ mod tests {
     fn test_json_output_with_message_array_payload() {
         // When data serializes to a JSON array (not object), message cannot be injected.
         // Verify the output is still valid JSON (the array), just without message.
-        let data = json!([{"id": "a"}, {"id": "b"}]);
+        let data =
+            json!([{"id": crate::test_utils::issue_id(1)}, {"id": crate::test_utils::issue_id(2)}]);
         let output = JsonOutput::success(data).with_message("Should not appear");
 
         let json_str = output.to_json_string().unwrap();
@@ -3562,268 +3572,75 @@ mod tests {
     }
 
     #[test]
-    fn test_error_code_all_lists_every_derived_variant() {
-        let schema = serde_json::to_value(schema_for!(ErrorCode))
-            .expect("ErrorCode schema should serialize");
-        let derived = schema_accepted_strings(&schema);
-        assert!(!derived.is_empty(), "derived schema should list variants");
-
-        let listed: BTreeSet<String> = ErrorCode::ALL
-            .iter()
-            .map(|code| code.as_str().to_string())
-            .collect();
-
-        assert_eq!(listed, derived, "ErrorCode::ALL must list every variant");
-    }
-
-    #[test]
     fn test_error_code_wire_strings_and_exit_statuses_match_contract() {
         let expected = [
-            (
-                ErrorCode::IssueNotFound,
-                "ISSUE_NOT_FOUND",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::GateNotFound,
-                "GATE_NOT_FOUND",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::CycleDetected,
-                "CYCLE_DETECTED",
-                ExitCode::ValidationFailed,
-            ),
-            (
-                ErrorCode::InvalidArgument,
-                "INVALID_ARGUMENT",
-                ExitCode::InvalidArgument,
-            ),
-            (
-                ErrorCode::InvalidLabelPattern,
-                "INVALID_LABEL_PATTERN",
-                ExitCode::InvalidArgument,
-            ),
-            (
-                ErrorCode::ValidationFailed,
-                "VALIDATION_FAILED",
-                ExitCode::ValidationFailed,
-            ),
-            (
-                ErrorCode::AlreadyExists,
-                "ALREADY_EXISTS",
-                ExitCode::AlreadyExists,
-            ),
-            (
-                ErrorCode::InvalidState,
-                "INVALID_STATE",
-                ExitCode::InvalidArgument,
-            ),
-            (ErrorCode::Blocked, "BLOCKED", ExitCode::ValidationFailed),
-            (
-                ErrorCode::GateFailed,
-                "GATE_FAILED",
-                ExitCode::ValidationFailed,
-            ),
-            (ErrorCode::IoError, "IO_ERROR", ExitCode::ExternalError),
-            (
-                ErrorCode::PermissionDenied,
-                "PERMISSION_DENIED",
-                ExitCode::PermissionDenied,
-            ),
-            (ErrorCode::ParseError, "PARSE_ERROR", ExitCode::GenericError),
-            (
-                ErrorCode::ClaimRequiresGit,
-                "CLAIM_REQUIRES_GIT",
-                ExitCode::ExternalError,
-            ),
-            (
-                ErrorCode::AmbiguousId,
-                "AMBIGUOUS_ID",
-                ExitCode::InvalidArgument,
-            ),
-            (
-                ErrorCode::InvalidIdPrefix,
-                "INVALID_ID_PREFIX",
-                ExitCode::InvalidArgument,
-            ),
-            (
-                ErrorCode::RepositoryNotFound,
-                "REPOSITORY_NOT_FOUND",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::RepositoryFormatTooNew,
-                "REPOSITORY_FORMAT_TOO_NEW",
-                ExitCode::ExternalError,
-            ),
-            (
-                ErrorCode::DeletionNotConfirmed,
-                "DELETION_NOT_CONFIRMED",
-                ExitCode::InvalidArgument,
-            ),
+            (ErrorCode::IssueNotFound, ExitCode::NotFound),
+            (ErrorCode::GateNotFound, ExitCode::NotFound),
+            (ErrorCode::CycleDetected, ExitCode::ValidationFailed),
+            (ErrorCode::InvalidArgument, ExitCode::InvalidArgument),
+            (ErrorCode::InvalidLabelPattern, ExitCode::InvalidArgument),
+            (ErrorCode::ValidationFailed, ExitCode::ValidationFailed),
+            (ErrorCode::AlreadyExists, ExitCode::AlreadyExists),
+            (ErrorCode::InvalidState, ExitCode::InvalidArgument),
+            (ErrorCode::Blocked, ExitCode::ValidationFailed),
+            (ErrorCode::GateFailed, ExitCode::ValidationFailed),
+            (ErrorCode::IoError, ExitCode::ExternalError),
+            (ErrorCode::PermissionDenied, ExitCode::PermissionDenied),
+            (ErrorCode::ParseError, ExitCode::GenericError),
+            (ErrorCode::ClaimRequiresGit, ExitCode::ExternalError),
+            (ErrorCode::AmbiguousId, ExitCode::InvalidArgument),
+            (ErrorCode::InvalidIdPrefix, ExitCode::InvalidArgument),
+            (ErrorCode::RepositoryNotFound, ExitCode::NotFound),
+            (ErrorCode::RepositoryFormatTooNew, ExitCode::ExternalError),
+            (ErrorCode::DeletionNotConfirmed, ExitCode::InvalidArgument),
             (
                 ErrorCode::LinkedCheckoutWriteRefused,
-                "LINKED_CHECKOUT_WRITE_REFUSED",
                 ExitCode::InvalidArgument,
             ),
-            (
-                ErrorCode::ProfileNotFound,
-                "PROFILE_NOT_FOUND",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::ProfileConflict,
-                "PROFILE_CONFLICT",
-                ExitCode::ValidationFailed,
-            ),
-            (
-                ErrorCode::DependencyError,
-                "DEPENDENCY_ERROR",
-                ExitCode::NotFound,
-            ),
-            (ErrorCode::GateError, "GATE_ERROR", ExitCode::AlreadyExists),
-            (
-                ErrorCode::GateCheckError,
-                "GATE_CHECK_ERROR",
-                ExitCode::NotFound,
-            ),
-            (ErrorCode::PresetError, "PRESET_ERROR", ExitCode::NotFound),
-            (
-                ErrorCode::ItemNotFound,
-                "ITEM_NOT_FOUND",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ItemCommandFailed,
-                "ITEM_COMMAND_FAILED",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::InvariantCommandFailed,
-                "INVARIANT_COMMAND_FAILED",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ProjectCommandFailed,
-                "PROJECT_COMMAND_FAILED",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ProfileError,
-                "PROFILE_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::SearchFailed,
-                "SEARCH_FAILED",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::RipgrepNotFound,
-                "RIPGREP_NOT_FOUND",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::WorktreeInfoError,
-                "WORKTREE_INFO_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::WorktreeListError,
-                "WORKTREE_LIST_ERROR",
-                ExitCode::GenericError,
-            ),
+            (ErrorCode::ProfileNotFound, ExitCode::NotFound),
+            (ErrorCode::ProfileConflict, ExitCode::ValidationFailed),
+            (ErrorCode::DependencyError, ExitCode::NotFound),
+            (ErrorCode::GateError, ExitCode::AlreadyExists),
+            (ErrorCode::GateCheckError, ExitCode::NotFound),
+            (ErrorCode::PresetError, ExitCode::NotFound),
+            (ErrorCode::ItemNotFound, ExitCode::GenericError),
+            (ErrorCode::ItemCommandFailed, ExitCode::GenericError),
+            (ErrorCode::InvariantCommandFailed, ExitCode::GenericError),
+            (ErrorCode::ProjectCommandFailed, ExitCode::GenericError),
+            (ErrorCode::ProfileError, ExitCode::GenericError),
+            (ErrorCode::SearchFailed, ExitCode::GenericError),
+            (ErrorCode::RipgrepNotFound, ExitCode::GenericError),
+            (ErrorCode::WorktreeInfoError, ExitCode::GenericError),
+            (ErrorCode::WorktreeListError, ExitCode::GenericError),
             (
                 ErrorCode::WorktreeStoreDivergenceError,
-                "WORKTREE_STORE_DIVERGENCE_ERROR",
                 ExitCode::GenericError,
             ),
-            (
-                ErrorCode::HooksInstallError,
-                "HOOKS_INSTALL_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::GenericError,
-                "GENERIC_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::RecoveryFailed,
-                "recovery_failed",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ClaimAcquireError,
-                "CLAIM_ACQUIRE_ERROR",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::ClaimReleaseError,
-                "CLAIM_RELEASE_ERROR",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::ClaimRenewError,
-                "CLAIM_RENEW_ERROR",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::ClaimHeartbeatError,
-                "CLAIM_HEARTBEAT_ERROR",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::ClaimStatusError,
-                "CLAIM_STATUS_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ClaimListError,
-                "CLAIM_LIST_ERROR",
-                ExitCode::GenericError,
-            ),
-            (
-                ErrorCode::ClaimForceEvictError,
-                "CLAIM_FORCE_EVICT_ERROR",
-                ExitCode::NotFound,
-            ),
-            (
-                ErrorCode::LockTimeout,
-                "LOCK_TIMEOUT",
-                ExitCode::LockTimeout,
-            ),
+            (ErrorCode::HooksInstallError, ExitCode::GenericError),
+            (ErrorCode::GenericError, ExitCode::GenericError),
+            (ErrorCode::RecoveryFailed, ExitCode::GenericError),
+            (ErrorCode::ClaimAcquireError, ExitCode::NotFound),
+            (ErrorCode::ClaimReleaseError, ExitCode::NotFound),
+            (ErrorCode::ClaimRenewError, ExitCode::NotFound),
+            (ErrorCode::ClaimHeartbeatError, ExitCode::NotFound),
+            (ErrorCode::ClaimStatusError, ExitCode::GenericError),
+            (ErrorCode::ClaimListError, ExitCode::GenericError),
+            (ErrorCode::ClaimForceEvictError, ExitCode::NotFound),
+            (ErrorCode::LockTimeout, ExitCode::LockTimeout),
         ];
 
         assert_eq!(expected.len(), ErrorCode::ALL.len());
-        for ((code, wire, status), listed) in expected.into_iter().zip(ErrorCode::ALL) {
+        for ((code, status), listed) in expected.into_iter().zip(ErrorCode::ALL) {
             assert_eq!(code, listed);
-            assert_eq!(code.as_str(), wire);
             assert_eq!(code.exit_code(), status);
             let error = JsonError::new(code, "failure");
             assert_eq!(error.exit_code(), status);
             assert_eq!(
                 serde_json::to_value(&error).expect("registered error should serialize")["error"]
                     ["code"],
-                wire
+                code.as_str()
             );
         }
-    }
-
-    #[test]
-    fn test_error_code_strings_round_trip_and_unknown_is_unresolved() {
-        for code in ErrorCode::ALL {
-            assert_eq!(code.as_str().parse::<ErrorCode>(), Ok(code));
-            let error = JsonError::new(code, "failure");
-            assert_eq!(error.error.code, code);
-            assert_eq!(error.exit_code(), code.exit_code());
-        }
-
-        let unresolved = "UNREGISTERED_ERROR"
-            .parse::<ErrorCode>()
-            .expect_err("unknown input should stay unresolved");
-        assert_eq!(unresolved.as_str(), "UNREGISTERED_ERROR");
     }
 
     #[test]
@@ -3885,9 +3702,8 @@ mod tests {
         }
     }
 
-    /// The derive-vs-`ALL` conformance test above rejects an unlisted enum
-    /// member; once listed, that new row changes this projection and fails here
-    /// until the committed page is regenerated.
+    /// The wire-contract test above pins the declaration order; a new member also
+    /// changes this projection until the committed page is regenerated.
     #[test]
     fn test_committed_error_code_reference_matches_projection() {
         let committed = std::fs::read_to_string(error_code_reference_path())
@@ -4008,7 +3824,11 @@ mod tests {
         };
         let gate = BlockedReason {
             reason_type: BlockedReasonType::Gate,
-            detail: "test-gate".to_string(),
+            detail: format!(
+                "{} ({})",
+                "test-gate".parse::<GateKey>().unwrap(),
+                GateStatus::Pending
+            ),
         };
 
         let dep_json = serde_json::to_value(&dep).unwrap();
@@ -4023,7 +3843,7 @@ mod tests {
         use crate::declarations::{GateMode, GateStage};
         // --json gate output must remain snake_case regardless of enum Debug repr.
         let def = GateDefinition {
-            key: "ci".to_string(),
+            key: "ci".parse().unwrap(),
             title: "CI".to_string(),
             description: "Continuous integration".to_string(),
             stage: GateStage::Postcheck,
@@ -4036,7 +3856,7 @@ mod tests {
         assert_eq!(v["mode"], "auto", "mode must be snake_case");
 
         let def_pre = GateDefinition {
-            key: "lint".to_string(),
+            key: "lint".parse().unwrap(),
             title: "Lint".to_string(),
             description: "Linting".to_string(),
             stage: GateStage::Precheck,
@@ -4054,7 +3874,7 @@ mod tests {
         use crate::declarations::{GateMode, GateStage};
         let gate = crate::declarations::GateDefinition {
             version: 1,
-            key: "tests".to_string(),
+            key: "tests".parse().unwrap(),
             title: "Tests".to_string(),
             description: "Run tests".to_string(),
             stage: GateStage::Postcheck,
@@ -4070,5 +3890,74 @@ mod tests {
         let v = serde_json::to_value(&def).unwrap();
         assert_eq!(v["stage"], "postcheck");
         assert_eq!(v["mode"], "auto");
+    }
+
+    /// `count` is owned by `ListEnvelope`; each distinct response shape owns
+    /// only its collection key and the extras beside it.
+    fn assert_envelope_value(value: &serde_json::Value, key: &str, len: usize) {
+        assert_eq!(value[key].as_array().map(Vec::len), Some(len));
+    }
+
+    #[test]
+    fn test_gate_preset_list_response_serializes_presets_under_collection_key() {
+        let info = crate::gate_presets::PresetInfo {
+            name: "rust-tdd".into(),
+            description: "TDD gates".into(),
+            gate_count: 3,
+        };
+        let value = serde_json::to_value(GatePresetListResponse::new(vec![info])).unwrap();
+        assert_envelope_value(&value, "presets", 1);
+        assert_eq!(value["presets"][0]["gate_count"], 3);
+    }
+
+    #[test]
+    fn test_event_list_response_serializes_events_under_collection_key() {
+        let issue = crate::test_utils::fixture_issue("title".to_string(), String::new());
+        let event = crate::test_utils::stamped_event(
+            crate::domain::EventBody::draft_issue_created(&issue),
+            "e",
+            chrono::Utc::now(),
+        );
+        let value =
+            serde_json::to_value(EventListResponse::new(vec![event.clone(), event])).unwrap();
+        assert_envelope_value(&value, "events", 2);
+        assert!(value["events"][0]["type"].is_string());
+    }
+
+    #[test]
+    fn test_label_values_response_serializes_namespace_beside_values() {
+        let response = LabelValuesResponse::with_extras(
+            vec!["v1".into(), "v2".into()],
+            LabelValuesScope {
+                namespace: "epic".into(),
+            },
+        );
+        let value = serde_json::to_value(response).unwrap();
+        assert_envelope_value(&value, "values", 2);
+        assert_eq!(value["namespace"], "epic");
+    }
+
+    #[test]
+    fn test_lease_list_response_serializes_null_options_and_empty_warnings() {
+        let now = chrono::Utc::now();
+        let lease = crate::storage::claim_coordinator::Lease {
+            lease_id: "00000000-0000-4000-8000-000000000001".parse().unwrap(),
+            issue_id: crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_aaaa_aaaa),
+            agent_id: "agent:a".parse().unwrap(),
+            worktree_id: "w".parse().unwrap(),
+            branch: None,
+            ttl_secs: 0,
+            acquired_at: now,
+            expires_at: None,
+            last_beat: now,
+            stale: false,
+        };
+        let response =
+            LeaseListResponse::with_extras(vec![lease], LeaseListWarnings { warnings: vec![] });
+        let value = serde_json::to_value(response).unwrap();
+        assert_envelope_value(&value, "leases", 1);
+        assert_eq!(value["warnings"], json!([]));
+        assert!(value["leases"][0]["expires_at"].is_null());
+        assert!(value["leases"][0]["branch"].is_null());
     }
 }

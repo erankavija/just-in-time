@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8e990134300c7bb5eb1b589b041676bc92619c7a",
+  "completed_at": "2026-11-01T10:39:29.169447229Z",
+  "duration_ms": 191328,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/benchmarks/test-topology-c780514e/README.md",
+        "id": "F1",
+        "line": 181,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/45e3e442/requirement/REQ-04",
+          "@/issue/c780514e/requirement/REQ-13"
+        ],
+        "severity": "high",
+        "summary": "The profile records timings and warm status but no host load; the README's ≤10-load claims are unsubstantiated, so REQ-04 is not verifiably met."
+      }
+    ],
+    "summary": "The required warm-target load condition has no recorded evidence.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "45e3e442-e157-4d73-918c-2fc7df04accc",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "97b2319d-3982-4fdd-8dbb-6fd7cde3a6b6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T10:36:17.840529611Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 42492 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a196ae-74d4-7dd0-8079-fd8568dabc7e\n--------\nuser\n--- 42479 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — high, blocking:** The clean per-test profile records warm status and timings but no host-load measurement. The ≤10-load claims in the benchmark README are self-attested; neither the profiler nor the recorded cargo-ci run captures load. REQ-04 is therefore not independently verifiable.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required warm-target load condition has no recorded evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The profile records timings and warm status but no host load; the README's ≤10-load claims are unsubstantiated, so REQ-04 is not verifiably met.\",\"file\":\"dev/benchmarks/test-topology-c780514e/README.md\",\"line\":181,\"references\":[\"@/issue/45e3e442/requirement/REQ-04\",\"@/issue/c780514e/requirement/REQ-13\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

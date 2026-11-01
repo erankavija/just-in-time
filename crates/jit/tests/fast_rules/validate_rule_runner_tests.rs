@@ -13,18 +13,9 @@
 //! rather than asserting on the total finding/outcome count, which now legitimately
 //! includes default-rule activity.
 
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::domain::Issue;
-use jit::storage::{InMemoryStorage, IssueStore};
-
-/// Build a fresh in-memory store whose on-disk root (used only for `rules.toml`)
-/// holds the supplied rules file contents.
-fn store_with_rules(rules_toml: &str) -> InMemoryStorage {
-    jit::test_mode::enable();
-    let storage = InMemoryStorage::new();
-    std::fs::create_dir_all(storage.root()).unwrap();
-    std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
-    storage
-}
+use jit::storage::InMemoryStorage;
 
 /// A local rule: every `type:epic` must carry a `req:*` label. Error severity.
 const EPIC_NEEDS_REQ: &str = r#"
@@ -55,12 +46,18 @@ fn epic(req: bool) -> Issue {
 
 #[test]
 fn test_per_issue_local_rule_fails() {
-    let storage = store_with_rules(EPIC_NEEDS_REQ);
+    let storage = InMemoryStorage::new();
     let bad = epic(false);
     let id = bad.id.clone();
     jit::test_harness::seed_memory_issue(&storage, &bad);
 
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(EPIC_NEEDS_REQ),
+            ..MemoryDeclarations::default()
+        },
+    );
     let report = executor.run_rules(Some(&id)).unwrap();
 
     assert!(report.has_errors(), "missing req:* label is an error");
@@ -69,17 +66,23 @@ fn test_per_issue_local_rule_fails() {
     assert!(report
         .findings
         .iter()
-        .all(|f| f.issue_id.as_deref() == Some(id.as_str())));
+        .all(|f| f.issue_id.as_ref() == Some(&id)));
 }
 
 #[test]
 fn test_per_issue_local_rule_passes() {
-    let storage = store_with_rules(EPIC_NEEDS_REQ);
+    let storage = InMemoryStorage::new();
     let good = epic(true);
     let id = good.id.clone();
     jit::test_harness::seed_memory_issue(&storage, &good);
 
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(EPIC_NEEDS_REQ),
+            ..MemoryDeclarations::default()
+        },
+    );
     let report = executor.run_rules(Some(&id)).unwrap();
 
     // The user rule is satisfied: no `epic-needs-req` finding. (Default rules may
@@ -92,12 +95,18 @@ fn test_per_issue_local_rule_passes() {
 
 #[test]
 fn test_whole_repo_collects_local_findings_for_all_issues() {
-    let storage = store_with_rules(EPIC_NEEDS_REQ);
+    let storage = InMemoryStorage::new();
     // Two bad epics; both must surface.
     jit::test_harness::seed_memory_issue(&storage, &epic(false));
     jit::test_harness::seed_memory_issue(&storage, &epic(false));
 
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(EPIC_NEEDS_REQ),
+            ..MemoryDeclarations::default()
+        },
+    );
     let report = executor.run_rules(None).unwrap();
 
     assert_eq!(report.error_count(), 2, "both epics fail: {report:?}");
@@ -114,7 +123,7 @@ when = { type = "task" }
 severity = "error"
 assert = { dependency-shape = { target = { type = "story" }, mode = "must" } }
 "#;
-    let storage = store_with_rules(rules);
+    let storage = InMemoryStorage::new();
     let mut story = crate::fixture_issue("a story".to_string(), String::new());
     story.labels = vec!["type:story".to_string()];
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
@@ -123,7 +132,13 @@ assert = { dependency-shape = { target = { type = "story" }, mode = "must" } }
     jit::test_harness::seed_memory_issue(&storage, &story);
     jit::test_harness::seed_memory_issue(&storage, &task);
 
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(rules),
+            ..MemoryDeclarations::default()
+        },
+    );
     let report = executor.run_rules(Some(&task_id)).unwrap();
 
     assert!(report.has_errors(), "graph rule fires for the task");
@@ -135,12 +150,18 @@ assert = { dependency-shape = { target = { type = "story" }, mode = "must" } }
 
 #[test]
 fn test_explain_lists_matched_rules_and_outcomes() {
-    let storage = store_with_rules(EPIC_NEEDS_REQ);
+    let storage = InMemoryStorage::new();
     let bad = epic(false);
     let id = bad.id.clone();
     jit::test_harness::seed_memory_issue(&storage, &bad);
 
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(EPIC_NEEDS_REQ),
+            ..MemoryDeclarations::default()
+        },
+    );
     let report = executor.explain_rules(&id).unwrap();
 
     assert_eq!(report.issue_id, id);
@@ -162,12 +183,18 @@ fn test_explain_lists_matched_rules_and_outcomes() {
 
 #[test]
 fn test_explain_passing_rule_marks_pass() {
-    let storage = store_with_rules(EPIC_NEEDS_REQ);
+    let storage = InMemoryStorage::new();
     let good = epic(true);
     let id = good.id.clone();
     jit::test_harness::seed_memory_issue(&storage, &good);
 
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(EPIC_NEEDS_REQ),
+            ..MemoryDeclarations::default()
+        },
+    );
     let report = executor.explain_rules(&id).unwrap();
 
     // The USER rule passes for a compliant epic; assert on it by name (default
@@ -183,14 +210,20 @@ fn test_explain_passing_rule_marks_pass() {
 
 #[test]
 fn test_explain_non_matching_rule_is_reported_as_skipped() {
-    let storage = store_with_rules(EPIC_NEEDS_REQ);
+    let storage = InMemoryStorage::new();
     // A task does not match the epic selector.
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     let id = task.id.clone();
     jit::test_harness::seed_memory_issue(&storage, &task);
 
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(EPIC_NEEDS_REQ),
+            ..MemoryDeclarations::default()
+        },
+    );
     let report = executor.explain_rules(&id).unwrap();
 
     // The epic-selected USER rule does not match a task, but is now STILL listed
@@ -226,13 +259,19 @@ when = { state = "in_progress" }
 severity = "error"
 assert = { require-section = { heading = "Plan" } }
 "#;
-    let storage = store_with_rules(rules);
+    let storage = InMemoryStorage::new();
     let mut issue = crate::fixture_issue("a task".to_string(), String::new());
     issue.state = jit::domain::State::InProgress;
     let id = issue.id.clone();
     jit::test_harness::seed_memory_issue(&storage, &issue);
 
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(rules),
+            ..MemoryDeclarations::default()
+        },
+    );
     let report = executor.explain_rules(&id).unwrap();
 
     let outcome = report
@@ -254,7 +293,7 @@ assert = { require-section = { heading = "Plan" } }
 #[test]
 fn test_explain_state_predicate_mismatch_names_state_and_tokens() {
     // The success criterion: `--explain` shows whether the state predicate
-    // matched. A rule wanting `done` against an `in_progress` issue is skipped
+    // matched. A rule wanting one state against an issue in another is skipped
     // with a reason naming BOTH the issue state and the predicate token.
     let rules = r#"
 [[rules]]
@@ -263,13 +302,19 @@ when = { state = "done" }
 severity = "error"
 assert = { require-section = { heading = "Summary" } }
 "#;
-    let storage = store_with_rules(rules);
+    let storage = InMemoryStorage::new();
     let mut issue = crate::fixture_issue("a task".to_string(), String::new());
     issue.state = jit::domain::State::InProgress;
     let id = issue.id.clone();
     jit::test_harness::seed_memory_issue(&storage, &issue);
 
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(rules),
+            ..MemoryDeclarations::default()
+        },
+    );
     let report = executor.explain_rules(&id).unwrap();
 
     let outcome = report
@@ -305,12 +350,18 @@ when = { type = "epic" }
 severity = "warn"
 assert = { require-label = { label = "req:*", min = 1 } }
 "#;
-    let storage = store_with_rules(rules);
+    let storage = InMemoryStorage::new();
     let bad = epic(false);
     let id = bad.id.clone();
     jit::test_harness::seed_memory_issue(&storage, &bad);
 
-    let executor = crate::memory_executor(storage);
+    let executor = memory_executor_declaring(
+        storage,
+        MemoryDeclarations {
+            rules: Some(rules),
+            ..MemoryDeclarations::default()
+        },
+    );
     let report = executor.run_rules(Some(&id)).unwrap();
 
     assert!(!report.has_errors(), "warn never fails validate");

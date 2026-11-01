@@ -1,7 +1,7 @@
 {
   "epic_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "epic_short_id": "df129d9e",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -126,7 +126,7 @@
           "short_id": "9cc3056a",
           "title": "One output renderer for validation findings",
           "classification": "implementation",
-          "status": "in_progress (sonnet worker w-9cc3056a, base c983c7d3c)"
+          "status": "done (merged 145091232; cargo-ci, code-review passed; closed after interrupted-session recovery ee3fcbc84)"
         },
         {
           "key": "serve-foreground-command",
@@ -134,7 +134,9 @@
           "short_id": "d4373d07",
           "title": "Foreground serve as a commands-layer operation",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 8cf19175a + rework 8c6d518bc; REQ-02 exit clause amended by user 9f201b611; code-review R1 failed on stale rustdoc, R2 passed; cargo-ci passed)",
+          "model_tier": "opus (rework 1)",
+          "tier_reason": "escalated one tier after a failed review attempt"
         },
         {
           "key": "archive-execution-renderer",
@@ -142,7 +144,9 @@
           "short_id": "2e7e1348",
           "title": "One output renderer for archive execution summaries",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 10fde232e; cargo-ci, code-review passed)",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: byte-identical renderer extraction following three established renderer tasks"
         },
         {
           "key": "repository-bootstrap-constructor",
@@ -150,7 +154,10 @@
           "short_id": "a807e699",
           "title": "Library repository bootstrap for the CLI",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 853d1cfc8 + rework b834fcbae; code-review R1 failed on recover mapping left in main.rs, R2 passed; cargo-ci passed)",
+          "model_tier": "opus",
+          "tier_reason": "storage-coupled: mutation-session retention, recovery ordering and linked-checkout write policy",
+          "vendor": "claude"
         },
         {
           "key": "json-silent-stderr",
@@ -158,7 +165,10 @@
           "short_id": "5d0a9a90",
           "title": "Keep stderr empty for --json failures",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 46a747fc2 + fix 1d998db27; first merge broke cli_gate test, gates failed; codex attempts 3-4 fixed; full cargo-ci on branch then cargo-ci, code-review passed)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-luna xhigh",
+          "tier_reason": "well-specified: five exact criteria, narrow footprint in main() and one test file"
         }
       ]
     },
@@ -714,7 +724,10 @@
     "719a5501": 0,
     "650e6a56": 1,
     "d8176fd3": 0,
-    "9fa12e75": 1
+    "9fa12e75": 1,
+    "d4373d07": 1,
+    "a807e699": 1,
+    "5d0a9a90": 2
   },
   "surfaced_pitfalls": [],
   "external_blockers": {
@@ -728,5 +741,22 @@
       "2195c98f error-code-vocabulary (steward edge, pending)"
     ]
   },
-  "started_at": "2026-10-21T05:00:00Z"
+  "started_at": "2026-10-21T05:00:00Z",
+  "line_target": {
+    "modules": "main.rs + dispatch/ + output",
+    "baseline_rev": "dc2ea8706",
+    "baseline": 9804,
+    "threshold_below": 8700,
+    "decision": "plan D-26",
+    "epic_merge_deltas": {
+      "through_9cc3056a": -115,
+      "d4373d07": -24,
+      "2e7e1348": -4,
+      "a807e699": -158,
+      "5d0a9a90": 8
+    },
+    "epic_total": -293,
+    "head_lines": 9031,
+    "head_rev": "1d998db27"
+  }
 }

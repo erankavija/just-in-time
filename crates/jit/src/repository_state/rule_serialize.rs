@@ -9,11 +9,11 @@
 //!
 //! # Why a custom renderer (no `Serialize` derive)
 //!
-//! [`Severity`] and [`Selector`] derive only `Deserialize`, and [`Assertion`]
-//! mixes shorthand scalars, raw schema values, and graph config tables. Rather
-//! than retrofit `Serialize` onto the model, each field is rendered by hand into
-//! inline TOML. Regex-bearing shorthands use [`toml_literal_string`] so
-//! backslashes survive verbatim (DR §8.1).
+//! [`Rule`], [`Selector`], and [`Assertion`] are not direct TOML serialization
+//! shapes: assertions mix shorthand scalars, raw schema values, and graph config
+//! tables. Each field is rendered by hand into inline TOML. Regex-bearing
+//! shorthands use [`toml_literal_string`] so backslashes survive verbatim
+//! (DR §8.1).
 //!
 //! # JSON Schema rules materialize to files
 //!
@@ -33,7 +33,11 @@
 //! which necessarily change from the in-code placeholder to the on-disk file
 //! reference. The round-trip test compares field-wise, excluding those two.
 
-use crate::declarations::rules::{Assertion, Rule, RuleSet, Selector, TypeHierarchyKind};
+use super::VirtualPath;
+use crate::declarations::rules::{
+    Assertion, LabelCoverageConfig, LabelUniquenessScope, Rule, RuleSet, Selector,
+    DEFAULT_CRITERION_ID_PATTERN,
+};
 use std::collections::HashSet;
 
 /// A `rules.toml` body together with the schema files it references.
@@ -59,7 +63,7 @@ pub struct SchemaFile {
 /// Pure: performs no I/O. The header documents that the file is the operative
 /// source. JSON Schema rules are materialized into [`SchemaFile`]s referenced by
 /// `schemas/<sanitized-name>.json`.
-pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
+pub fn serialize_ruleset(set: &RuleSet) -> Result<SerializedRuleSet, super::RepositoryLayoutError> {
     let mut rules_toml = String::new();
     rules_toml.push_str(FILE_HEADER);
 
@@ -71,14 +75,14 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
     let mut used_stems: HashSet<String> = HashSet::new();
 
     for rule in &set.rules {
-        render_rule(rule, &mut rules_toml, &mut schema_files, &mut used_stems);
+        render_rule(rule, &mut rules_toml, &mut schema_files, &mut used_stems)?;
         rules_toml.push('\n');
     }
 
-    SerializedRuleSet {
+    Ok(SerializedRuleSet {
         rules_toml,
         schema_files,
-    }
+    })
 }
 
 /// Render a single rule as a standalone, reloadable `[[rules]]` block (with
@@ -93,13 +97,13 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
 /// the same file the whole-set serialization does. Persisting that file is the
 /// caller's: the default-rule materialization writes every schema the current
 /// configuration derives in the same pass that splices the referencing row in.
-pub fn render_rule_block(rule: &Rule) -> String {
+pub fn render_rule_block(rule: &Rule) -> Result<String, super::RepositoryLayoutError> {
     let mut out = String::new();
     let mut schema_files: Vec<SchemaFile> = Vec::new();
     let mut used_stems: HashSet<String> = HashSet::new();
-    render_rule(rule, &mut out, &mut schema_files, &mut used_stems);
+    render_rule(rule, &mut out, &mut schema_files, &mut used_stems)?;
     out.push('\n');
-    out
+    Ok(out)
 }
 
 /// Pick a schema-file stem for `identity` (a rule's schema identity — see
@@ -148,7 +152,7 @@ fn render_rule(
     out: &mut String,
     schema_files: &mut Vec<SchemaFile>,
     used_stems: &mut HashSet<String>,
-) {
+) -> Result<(), super::RepositoryLayoutError> {
     out.push_str("[[rules]]\n");
     out.push_str(&format!("name = {}\n", toml_basic_string(&rule.name)));
     if let Some(origin) = &rule.origin {
@@ -167,7 +171,7 @@ fn render_rule(
 
     out.push_str(&format!(
         "severity = {}\n",
-        toml_basic_string(rule.severity.token())
+        toml_basic_string(rule.severity.as_str())
     ));
     out.push_str(&format!("enforce = {}\n", rule.enforce));
     // The schema-file stem is derived from the rule's ORIGIN-qualified identity
@@ -182,8 +186,9 @@ fn render_rule(
     };
     out.push_str(&format!(
         "assert = {}\n",
-        render_assertion(&schema_identity, &rule.assert, schema_files, used_stems)
+        render_assertion(&schema_identity, &rule.assert, schema_files, used_stems)?
     ));
+    Ok(())
 }
 
 /// Render a [`Selector`] as an inline table, or `None` when it is empty (so an
@@ -225,8 +230,8 @@ fn render_assertion(
     assertion: &Assertion,
     schema_files: &mut Vec<SchemaFile>,
     used_stems: &mut HashSet<String>,
-) -> String {
-    match assertion {
+) -> Result<String, super::RepositoryLayoutError> {
+    Ok(match assertion {
         Assertion::RequireLabel { label, min, max } => {
             let mut parts = vec![format!("label = {}", toml_basic_string(label))];
             if let Some(min) = min {
@@ -252,26 +257,47 @@ fn render_assertion(
         ),
         Assertion::JsonSchema(source) => {
             let file_name = format!("{}.json", unique_schema_stem(schema_identity, used_stems));
+            let schema_path = VirtualPath::schema(&file_name)?;
             schema_files.push(SchemaFile {
                 name: file_name.clone(),
                 content: pretty_schema(&source.schema),
             });
             format!(
                 "{{ json-schema = {} }}",
-                toml_basic_string(&format!("schemas/{file_name}"))
+                toml_basic_string(schema_path.relative().as_str())
             )
         }
         Assertion::CheckerCommand(cmd) => {
             format!("{{ checker-command = {} }}", toml_basic_string(cmd))
         }
         Assertion::LabelCoverage { config } => {
-            format!("{{ label-coverage = {} }}", render_config_table(config))
+            format!("{{ label-coverage = {} }}", render_label_coverage(config))
         }
         Assertion::LabelReference { config } => {
-            format!("{{ label-reference = {} }}", render_config_table(config))
+            // Emit `scope` only when authored, so the keys round-trip as written.
+            let mut parts = vec![
+                format!("from = {}", toml_basic_string(&config.from)),
+                format!("to = {}", toml_basic_string(&config.to)),
+            ];
+            if let Some(scope) = config.authored_scope {
+                parts.push(format!("scope = {}", toml_basic_string(scope.as_str())));
+            }
+            format!("{{ label-reference = {{ {} }} }}", parts.join(", "))
         }
         Assertion::DependencyShape { config } => {
-            format!("{{ dependency-shape = {} }}", render_config_table(config))
+            // Emit `mode` and `transitive` only when authored, so the keys
+            // round-trip as written.
+            let mut parts = vec![format!(
+                "target = {}",
+                render_selector(&config.target).unwrap_or_else(|| "{}".to_string())
+            )];
+            if let Some(mode) = config.authored_mode {
+                parts.push(format!("mode = {}", toml_basic_string(mode.as_str())));
+            }
+            if let Some(transitive) = config.authored_transitive {
+                parts.push(format!("transitive = {transitive}"));
+            }
+            format!("{{ dependency-shape = {{ {} }} }}", parts.join(", "))
         }
         Assertion::GateRecency {
             max_age_hours,
@@ -281,19 +307,18 @@ fn render_assertion(
             // present (an empty list means "all of the issue's gates_required").
             let mut parts = vec![format!("max-age-hours = {max_age_hours}")];
             if !gates.is_empty() {
-                let rendered: Vec<String> = gates.iter().map(|g| toml_basic_string(g)).collect();
+                let rendered: Vec<String> = gates
+                    .iter()
+                    .map(|g| toml_basic_string(g.as_str()))
+                    .collect();
                 parts.push(format!("gates = [{}]", rendered.join(", ")));
             }
             format!("{{ gate-recency = {{ {} }} }}", parts.join(", "))
         }
         Assertion::TypeHierarchy { kind } => {
-            let kind_token = match kind {
-                TypeHierarchyKind::OrphanLeaf => "orphan-leaf",
-                TypeHierarchyKind::StrategicConsistency => "strategic-consistency",
-            };
             format!(
                 "{{ type-hierarchy = {{ kind = {} }} }}",
-                toml_basic_string(kind_token)
+                toml_basic_string(kind.as_str())
             )
         }
         Assertion::CriteriaLabelMatch {
@@ -315,8 +340,11 @@ fn render_assertion(
             if let Some(m) = marker {
                 parts.push(format!("marker = {}", toml_basic_string(m)));
             }
-            if id_pattern != "[A-Z][A-Z0-9]*-[0-9]+" {
-                parts.push(format!("id-pattern = {}", toml_literal_string(id_pattern)));
+            if id_pattern.as_str() != DEFAULT_CRITERION_ID_PATTERN {
+                parts.push(format!(
+                    "id-pattern = {}",
+                    toml_literal_string(id_pattern.as_str())
+                ));
             }
             format!("{{ criteria-label-match = {{ {} }} }}", parts.join(", "))
         }
@@ -324,12 +352,14 @@ fn render_assertion(
             criteria_section,
             marker,
             id_pattern,
-            gate_prefix,
             check_namespace,
         } => {
-            // Emit only fields that differ from their defaults so the round-trip
-            // is stable (a reload with defaults applied produces the same output).
-            let mut parts: Vec<String> = Vec::new();
+            // Emit the required namespace and only non-default optional fields,
+            // keeping the serialized rule canonical after a reload.
+            let mut parts = vec![format!(
+                "check-namespace = {}",
+                toml_basic_string(check_namespace)
+            )];
             if criteria_section != "success_criteria" {
                 parts.push(format!(
                     "criteria-section = {}",
@@ -339,60 +369,71 @@ fn render_assertion(
             if let Some(m) = marker {
                 parts.push(format!("marker = {}", toml_basic_string(m)));
             }
-            if id_pattern != "[A-Z][A-Z0-9]*-[0-9]+" {
-                parts.push(format!("id-pattern = {}", toml_literal_string(id_pattern)));
-            }
-            if let Some(prefix) = gate_prefix {
-                parts.push(format!("gate-prefix = {}", toml_basic_string(prefix)));
-            }
-            if let Some(ns) = check_namespace {
-                parts.push(format!("check-namespace = {}", toml_basic_string(ns)));
+            if id_pattern.as_str() != DEFAULT_CRITERION_ID_PATTERN {
+                parts.push(format!(
+                    "id-pattern = {}",
+                    toml_literal_string(id_pattern.as_str())
+                ));
             }
             format!("{{ criteria-to-check = {{ {} }} }}", parts.join(", "))
         }
         Assertion::LabelUniqueness { namespace } => {
-            // scope = "all" is the only valid value; round-trip it explicitly
-            // so the reloaded rule is identical to the original.
+            // Round-trip the required scope explicitly so the reload is identical.
             format!(
-                "{{ label-uniqueness = {{ namespace = {}, scope = \"all\" }} }}",
-                toml_basic_string(namespace)
+                "{{ label-uniqueness = {{ namespace = {}, scope = {} }} }}",
+                toml_basic_string(namespace),
+                toml_basic_string(LabelUniquenessScope::All.as_str())
             )
         }
-    }
+    })
 }
 
-/// Render a graph rule's `toml::value::Table` as an inline TOML table, reusing
-/// `toml_edit` so nested tables/arrays/escaping are handled correctly.
-fn render_config_table(table: &toml::value::Table) -> String {
-    let value = toml::Value::Table(table.clone());
-    let edit = toml_value_to_edit(&value);
-    edit.to_string()
-}
-
-/// Convert a `toml::Value` into a `toml_edit::Value`, rendering tables as INLINE
-/// tables (so the result fits inside an `assert = { … }` line).
-fn toml_value_to_edit(value: &toml::Value) -> toml_edit::Value {
-    match value {
-        toml::Value::String(s) => toml_edit::Value::from(s.clone()),
-        toml::Value::Integer(i) => toml_edit::Value::from(*i),
-        toml::Value::Float(f) => toml_edit::Value::from(*f),
-        toml::Value::Boolean(b) => toml_edit::Value::from(*b),
-        toml::Value::Datetime(dt) => toml_edit::Value::from(dt.to_string()),
-        toml::Value::Array(items) => {
-            let mut arr = toml_edit::Array::new();
-            for item in items {
-                arr.push(toml_value_to_edit(item));
-            }
-            toml_edit::Value::Array(arr)
-        }
-        toml::Value::Table(map) => {
-            let mut inline = toml_edit::InlineTable::new();
-            for (k, v) in map {
-                inline.insert(k, toml_value_to_edit(v));
-            }
-            toml_edit::Value::InlineTable(inline)
-        }
-    }
+/// Preserve authored keys and their historical alphabetical ordering.
+fn render_label_coverage(config: &LabelCoverageConfig) -> String {
+    let string = |value: &Option<String>| value.as_deref().map(toml_edit::Value::from);
+    let fields = [
+        (
+            "child-link",
+            config
+                .authored_child_link
+                .map(|v| toml_edit::Value::from(v.as_str())),
+        ),
+        (
+            "child-state",
+            config
+                .child_state
+                .map(|v| toml_edit::Value::from(v.as_str())),
+        ),
+        (
+            "child-type-exclude",
+            config
+                .child_type_exclude
+                .as_ref()
+                .map(|values| toml_edit::Value::Array(values.iter().map(String::as_str).collect())),
+        ),
+        ("container-from-label", string(&config.container_from_label)),
+        (
+            "criteria-section",
+            string(&config.authored_criteria_section),
+        ),
+        (
+            "id-pattern",
+            config
+                .authored_id_pattern
+                .as_ref()
+                .map(|v| toml_edit::Value::from(v.as_str())),
+        ),
+        ("marker", string(&config.marker)),
+        (
+            "satisfies-namespace",
+            string(&config.authored_satisfies_namespace),
+        ),
+    ];
+    let table: toml_edit::InlineTable = fields
+        .into_iter()
+        .filter_map(|(key, value)| value.map(|value| (key, value)))
+        .collect();
+    table.to_string()
 }
 
 /// Sanitize a schema identity into a safe schema file stem: lowercase
@@ -451,9 +492,13 @@ pub(crate) fn toml_literal_string(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::declarations::rules::{RuleScope, RuleSet, Severity};
+    use crate::declarations::rules::{
+        ChildLink, DependencyShapeMode, LabelReferenceScope, RuleScope, RuleSet, Severity,
+    };
+    use crate::domain::State;
     use crate::domain::{LabelNamespace, LabelNamespaces};
     use crate::repository_state::default_rules::default_ruleset;
+    use crate::test_utils::toml_string_array;
     use std::collections::HashMap;
 
     fn test_type(level: u8) -> String {
@@ -484,7 +529,7 @@ mod tests {
 
     /// Write the serialized ruleset to a temp `.jit` and reload it.
     fn round_trip(set: &RuleSet) -> (tempfile::TempDir, RuleSet) {
-        let out = serialize_ruleset(set);
+        let out = serialize_ruleset(set).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let schemas = dir.path().join("schemas");
         std::fs::create_dir_all(&schemas).unwrap();
@@ -493,7 +538,7 @@ mod tests {
         }
         std::fs::write(dir.path().join("rules.toml"), &out.rules_toml).unwrap();
         let reloaded = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .expect("serialized rules.toml must reload");
@@ -596,7 +641,7 @@ mod tests {
         // The schema file is materialized under its ORIGIN-qualified stem, so a
         // fresh `jit init` reproduces the historical `default-label-format.json`
         // file name even though `name` itself is now colon-free.
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(out
             .schema_files
             .iter()
@@ -621,22 +666,26 @@ assert = { require-section = { heading = "Goals" } }
     fn test_round_trip_rule_origin_field() {
         // REQ-03: a rule's `origin` (built-in provenance) round-trips, and a
         // rule with none reloads with `None` (not an empty string).
-        let toml = r#"
+        let toml = format!(
+            r#"
 [[rules]]
 name = "with-origin"
 origin = "bracket"
-severity = "error"
-assert = { require-section = { heading = "Goals" } }
+severity = "{error}"
+assert = {{ require-section = {{ heading = "Goals" }} }}
 
 [[rules]]
 name = "without-origin"
-severity = "warn"
-assert = { require-section = { heading = "Goals" } }
-"#;
-        let set = RuleSet::parse(toml, None, []).unwrap();
+severity = "{warn}"
+assert = {{ require-section = {{ heading = "Goals" }} }}
+"#,
+            error = Severity::Error,
+            warn = Severity::Warn,
+        );
+        let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_eq!(set.rules[0].origin.as_deref(), Some("bracket"));
         assert_eq!(set.rules[1].origin, None);
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(out.rules_toml.contains("origin = \"bracket\""));
         assert_round_trips(&set);
     }
@@ -645,25 +694,29 @@ assert = { require-section = { heading = "Goals" } }
     fn test_round_trip_rule_description_field() {
         // REQ-01: a rule's optional `description` round-trips, and a rule with
         // none reloads with `None` (not an empty string).
-        let toml = r#"
+        let toml = format!(
+            r#"
 [[rules]]
 name = "with-description"
 description = "Every label must be namespace:value."
-severity = "error"
-assert = { require-section = { heading = "Goals" } }
+severity = "{error}"
+assert = {{ require-section = {{ heading = "Goals" }} }}
 
 [[rules]]
 name = "without-description"
-severity = "warn"
-assert = { require-section = { heading = "Goals" } }
-"#;
-        let set = RuleSet::parse(toml, None, []).unwrap();
+severity = "{warn}"
+assert = {{ require-section = {{ heading = "Goals" }} }}
+"#,
+            error = Severity::Error,
+            warn = Severity::Warn,
+        );
+        let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_eq!(
             set.rules[0].description.as_deref(),
             Some("Every label must be namespace:value.")
         );
         assert_eq!(set.rules[1].description, None);
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(out
             .rules_toml
             .contains("description = \"Every label must be namespace:value.\""));
@@ -694,67 +747,122 @@ assert = { require-section = { heading = "Goals" } }
             );
         }
         // The seeded descriptions survive serialization into rules.toml text.
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(out.rules_toml.contains("description = \""));
     }
 
     #[test]
     fn test_round_trip_criteria_to_check() {
-        // The criteria-to-check kind round-trips all its optional fields.
-        let toml = test_toml(
+        // The criteria-to-check kind round-trips its required label namespace
+        // and optional criterion selectors.
+        let toml = test_toml(&format!(
             r#"
 [[rules]]
-name = "ctc-both"
-when = { type = "__strategic_type__" }
-severity = "error"
+name = "ctc-marked"
+when = {{ type = "__strategic_type__" }}
+severity = "{error}"
 enforce = true
-assert = { criteria-to-check = { marker = "[hard]", gate-prefix = "verify:", check-namespace = "checks" } }
+assert = {{ criteria-to-check = {{ marker = "[hard]", check-namespace = "checks" }} }}
 
 [[rules]]
-name = "ctc-gate-only"
-severity = "warn"
-assert = { criteria-to-check = { gate-prefix = "verify:" } }
+name = "ctc-default-selectors"
+severity = "{warn}"
+assert = {{ criteria-to-check = {{ check-namespace = "checks" }} }}
 
 [[rules]]
-name = "ctc-label-only"
-severity = "warn"
-assert = { criteria-to-check = { check-namespace = "checks", id-pattern = "SC-[0-9]+" } }
+name = "ctc-custom-pattern"
+severity = "{warn}"
+assert = {{ criteria-to-check = {{ check-namespace = "checks", id-pattern = "SC-[0-9]+" }} }}
 
 [[rules]]
 name = "ctc-custom-section"
-severity = "warn"
-assert = { criteria-to-check = { criteria-section = "acceptance_criteria", gate-prefix = "gate:" } }
+severity = "{warn}"
+assert = {{ criteria-to-check = {{ criteria-section = "acceptance_criteria", check-namespace = "checks" }} }}
 "#,
-        );
+            error = Severity::Error,
+            warn = Severity::Warn,
+        ));
         let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_round_trips(&set);
     }
 
     #[test]
     fn test_round_trip_graph_config_kinds() {
-        // The three graph config-table kinds round-trip their config tables.
-        let toml = test_toml(
+        // Graph configs retain explicit defaults distinctly from absent keys.
+        let toml = test_toml(&format!(
             r#"
 [[rules]]
 name = "coverage"
-when = { type = "__strategic_type__" }
-severity = "error"
-assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", child-state = "done" } }
+when = {{ type = "__strategic_type__" }}
+severity = "{error}"
+assert = {{ label-coverage = {{ criteria-section = "success_criteria", marker = "[hard]", child-state = "{done}" }} }}
+
+[[rules]]
+name = "coverage-defaults"
+assert = {{ label-coverage = {{}} }}
+
+[[rules]]
+name = "coverage-all-options"
+assert = {{ label-coverage = {{ child-link = "{dependents}", child-state = "{rejected}", child-type-exclude = ["story", "task", "story"], container-from-label = "brackets", criteria-section = "success_criteria", id-pattern = '[A-Z][A-Z0-9]*-[0-9]+', marker = "[hard]", satisfies-namespace = "satisfies" }} }}
 
 [[rules]]
 name = "reference"
-severity = "warn"
-assert = { label-reference = { from = "satisfies", to = "req", scope = "linked" } }
+severity = "{warn}"
+assert = {{ label-reference = {{ from = "satisfies", to = "req", scope = "{linked}" }} }}
+
+[[rules]]
+name = "reference-explicit-global"
+severity = "{warn}"
+assert = {{ label-reference = {{ from = "satisfies", to = "req", scope = "{global}" }} }}
+
+[[rules]]
+name = "reference-default-scope"
+severity = "{warn}"
+assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
 
 [[rules]]
 name = "shape"
-when = { type = "__leaf_type__" }
-severity = "error"
-assert = { dependency-shape = { target = { type = "design" }, mode = "must", transitive = true } }
+when = {{ type = "__leaf_type__" }}
+severity = "{error}"
+assert = {{ dependency-shape = {{ target = {{ type = "design" }}, mode = "{must}", transitive = true }} }}
+
+[[rules]]
+name = "shape-default-keys"
+severity = "{warn}"
+assert = {{ dependency-shape = {{ target = {{ type = "design", state = {shape_states} }} }} }}
+
+[[rules]]
+name = "shape-should"
+severity = "{warn}"
+assert = {{ dependency-shape = {{ target = {{ label = "area:*" }}, mode = "{should}", transitive = false }} }}
 "#,
-        );
+            error = Severity::Error,
+            warn = Severity::Warn,
+            done = State::Done,
+            rejected = State::Rejected,
+            linked = LabelReferenceScope::Linked,
+            global = LabelReferenceScope::Global,
+            must = DependencyShapeMode::Must,
+            should = DependencyShapeMode::Should,
+            shape_states = toml_string_array(&[State::Ready, State::Done]),
+            dependents = ChildLink::Dependents,
+        ));
         let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_round_trips(&set);
+        let serialized = serialize_ruleset(&set).unwrap();
+        let source: toml::Table = toml::from_str(&toml).unwrap();
+        let rendered: toml::Table = toml::from_str(&serialized.rules_toml).unwrap();
+        for (source, rendered) in source["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(rendered["rules"].as_array().unwrap())
+        {
+            assert_eq!(
+                source["assert"], rendered["assert"],
+                "authored assertion keys and values"
+            );
+        }
     }
 
     #[test]
@@ -766,7 +874,7 @@ name = "marker"
 assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' } }
 "#;
         let set = RuleSet::parse(toml, None, []).unwrap();
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         // Rendered as a literal string (single quotes), backslashes intact.
         assert!(out.rules_toml.contains(r"regex = '^\[hard\]\s+\w+'"));
         assert_round_trips(&set);
@@ -783,25 +891,27 @@ assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' }
     fn test_round_trip_state_predicate_single_and_list() {
         // A single-state selector serializes as a string and a multi-state
         // selector as a TOML array; both must reload to the same predicate.
-        let toml = test_toml(
+        let listed = [State::Ready, State::InProgress, State::Gated];
+        let toml = test_toml(&format!(
             r#"
 [[rules]]
 name = "single-state"
-when = { type = "__strategic_type__", state = "in_progress" }
-assert = { require-section = { heading = "Plan" } }
+when = {{ type = "__strategic_type__", state = "in_progress" }}
+assert = {{ require-section = {{ heading = "Plan" }} }}
 
 [[rules]]
 name = "list-state"
-when = { state = ["ready", "in_progress", "gated"] }
-assert = { require-section = { heading = "Plan" } }
+when = {{ state = {listed} }}
+assert = {{ require-section = {{ heading = "Plan" }} }}
 "#,
-        );
+            listed = toml_string_array(&listed),
+        ));
         let set = RuleSet::parse(&toml, None, []).unwrap();
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(out.rules_toml.contains(r#"state = "in_progress""#));
         assert!(out
             .rules_toml
-            .contains(r#"state = ["ready", "in_progress", "gated"]"#));
+            .contains(&format!("state = {}", toml_string_array(&listed))));
         assert_round_trips(&set);
     }
 
@@ -809,21 +919,23 @@ assert = { require-section = { heading = "Plan" } }
     fn test_round_trip_criteria_label_match() {
         // The criteria-label-match kind must serialize and reload with all
         // fields preserved, matching the gate-recency pattern for round-trip tests.
-        let toml = test_toml(
+        let toml = test_toml(&format!(
             r#"
 [[rules]]
 name = "req-matches-criterion"
-when = { type = "__strategic_type__" }
-severity = "error"
-assert = { criteria-label-match = { namespace = "req", marker = "[hard]" } }
+when = {{ type = "__strategic_type__" }}
+severity = "{error}"
+assert = {{ criteria-label-match = {{ namespace = "req", marker = "[hard]" }} }}
 
 [[rules]]
 name = "req-custom-section"
-when = { type = "__strategic_type__" }
-severity = "warn"
-assert = { criteria-label-match = { namespace = "req", criteria-section = "hard_requirements", id-pattern = 'REQ-[0-9]+' } }
+when = {{ type = "__strategic_type__" }}
+severity = "{warn}"
+assert = {{ criteria-label-match = {{ namespace = "req", criteria-section = "hard_requirements", id-pattern = 'REQ-[0-9]+' }} }}
 "#,
-        );
+            error = Severity::Error,
+            warn = Severity::Warn,
+        ));
         let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_eq!(set.rules.len(), 2);
         assert_eq!(set.rules[0].scope, RuleScope::Graph);
@@ -835,7 +947,7 @@ assert = { criteria-label-match = { namespace = "req", criteria-section = "hard_
         // A rule with no selector must NOT emit `when = {}` (which the loader
         // accepts, but the canonical form omits it).
         let set = default_ruleset(&registry(vec![]));
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         assert!(!out.rules_toml.contains("when = {}"));
         assert!(!out.rules_toml.contains("when = { }"));
     }
@@ -865,12 +977,12 @@ assert = { json-schema = "schemas/second.json" }
         std::fs::write(schemas.join("second.json"), "{\"const\": 2}\n").unwrap();
         std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
         let set = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();
 
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         // Both rules carry a JsonSchema, so two schema files are emitted.
         assert_eq!(out.schema_files.len(), 2, "two json-schema rules");
         // The file names must be UNIQUE despite the sanitized-name collision.
@@ -900,8 +1012,8 @@ assert = { json-schema = "schemas/second.json" }
         // the reloaded set (whose JsonSchema references now point at files).
         let set = default_ruleset(&registry(vec![]));
         let (_dir, reloaded) = round_trip(&set);
-        let first = serialize_ruleset(&set).rules_toml;
-        let second = serialize_ruleset(&reloaded).rules_toml;
+        let first = serialize_ruleset(&set).unwrap().rules_toml;
+        let second = serialize_ruleset(&reloaded).unwrap().rules_toml;
         assert_eq!(first, second, "serialization must be canonical/stable");
     }
 
@@ -922,8 +1034,8 @@ assert = { json-schema = "schemas/second.json" }
             .find(|r| r.name == "namespace-unique-team")
             .unwrap();
 
-        let standalone = render_rule_block(rule);
-        let full = serialize_ruleset(&set).rules_toml;
+        let standalone = render_rule_block(rule).unwrap();
+        let full = serialize_ruleset(&set).unwrap().rules_toml;
         assert!(
             full.contains(&standalone),
             "standalone block must appear verbatim in the full serialization:\n\
@@ -942,12 +1054,12 @@ assert = { json-schema = "schemas/second.json" }
             .iter()
             .find(|r| r.name == "namespace-unique-priority")
             .unwrap();
-        let block = render_rule_block(rule);
+        let block = render_rule_block(rule).unwrap();
 
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("rules.toml"), &block).unwrap();
         let reloaded = crate::storage::ruleset_store::load_ruleset(
-            dir.path(),
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
             &toml::from_str::<crate::config::JitConfig>("").unwrap(),
         )
         .unwrap();
@@ -968,7 +1080,7 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
 "#,
         );
         let set = RuleSet::parse(&toml, None, []).unwrap();
-        let out = serialize_ruleset(&set);
+        let out = serialize_ruleset(&set).unwrap();
         // The rendered form must contain the namespace and scope.
         assert!(
             out.rules_toml.contains("namespace = \"req\""),

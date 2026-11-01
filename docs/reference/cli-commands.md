@@ -503,7 +503,7 @@ Suppress non-essential output (success messages, headers, warnings). Preserves d
 - Issue lists and query results
 - Issue IDs (from `issue create`)
 - Essential data output
-- Errors (always shown to stderr)
+- Errors (shown to stderr in human mode; under `--json`, failures are emitted as JSON envelopes to stdout)
 
 ### `--version`
 Print the CLI package version and build profile:
@@ -1017,7 +1017,7 @@ jit issue update --filter "assignee:agent:worker-1" --assignee "agent:worker-2"
 jit issue update --filter "label:epic:auth" --priority critical
 
 # Complex queries with AND/OR/NOT
-jit issue update --filter "state:ready AND NOT assignee:* AND priority:high" --assignee "agent:worker-1"
+jit issue update --filter "state:ready AND unassigned AND priority:high" --assignee "agent:worker-1"
 
 # Remove labels from multiple issues
 jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
@@ -1544,7 +1544,7 @@ jit gate define <KEY> --title <TITLE> --description <DESCRIPTION> [OPTIONS]
 ```
 
 **Arguments:**
-- `KEY` - Unique identifier (e.g., `tests`, `code-review`, `security-scan`)
+- `KEY` - Unique lowercase-kebab identifier (e.g., `tests`, `code-review`, `security-scan`); any other spelling is rejected with exit code `2`
 
 **Required Options:**
 - `--title <TITLE>` - Human-readable name
@@ -3668,7 +3668,7 @@ served from.
 
 ### `jit hooks install`
 
-Copy the hook templates into `.git/hooks/` and make them executable.
+Copy the hook templates into the `hooks/` directory of the selected repository's common git directory and make them executable.
 
 ```bash
 jit hooks install [--json]

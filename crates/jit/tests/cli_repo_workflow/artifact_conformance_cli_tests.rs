@@ -3,19 +3,42 @@
 //!
 //! The report is advice, not enforcement (`@/issue/8e071e18/decision/D-7`), so
 //! these cases pin both halves: what it names, and that naming it changes
-//! nothing. The repository, issue, and area fixtures come from the sibling
+//! nothing. The area and membership vocabulary comes from the sibling
 //! `doc_show_tests` module, and the canonical directory a case compares
-//! against is whatever `jit doc dir` resolves in that same repository, so no
+//! against is whatever `jit doc dir` resolves in the same repository, so no
 //! expectation here restates the naming rule.
 
-use crate::doc_show_tests::{
-    create_issue, declared_area, initialized_repo, jit, membership_type_and_namespace,
-    resolve_directory, undeclared_area, CreatedIssue,
-};
+use crate::doc_show_tests::{declared_area, membership_type_and_namespace, undeclared_area};
+use jit::domain::State;
+use jit::test_cli::{created_issue_id, JitCli};
+use jit::test_utils::setup_test_repo_with_config;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+
+/// The development root the repository declares.
+const DEVELOPMENT_ROOT: &str = "workspace";
+
+/// The shared taxonomy configuration plus the documentation registry this
+/// suite exercises, authored before initialization.
+fn conformance_config() -> String {
+    format!(
+        "{}\n[documentation]\ndevelopment_root = \"{DEVELOPMENT_ROOT}\"\n\
+         managed_paths = [\"{}\", \"{}\"]\n\
+         issue_scoped_areas = [\"{}\"]\n",
+        jit::test_taxonomy::test_taxonomy().config_fragment(),
+        declared_area(),
+        undeclared_area(),
+        declared_area(),
+    )
+}
+
+/// The identifiers a created issue answers to.
+struct CreatedIssue {
+    id: String,
+    short_id: String,
+}
 
 /// A short-id-shaped name no issue answers to: eight lowercase hex characters,
 /// which is the width and alphabet of the short id `jit` prints.
@@ -25,8 +48,6 @@ const UNOWNED_PREFIX: &str = "deadbeef";
 struct Report {
     /// Areas the run states it scanned.
     areas: Vec<String>,
-    /// The collection's declared length.
-    count: usize,
     /// Reported artifacts, keyed by the path each one names.
     artifacts: BTreeMap<String, Value>,
 }
@@ -48,18 +69,9 @@ impl Report {
     }
 }
 
-/// Run the report with `--json` in `repo`, requiring success, and parse it.
-fn conformance_report(repo: &Path) -> Report {
-    let output = jit(repo, &["doc", "conformance", "--json"]);
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    assert!(
-        output.status.success(),
-        "doc conformance --json exits successfully: {} {stdout}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let payload: Value = serde_json::from_str(&stdout)
-        .unwrap_or_else(|error| panic!("doc conformance --json parses ({error}): {stdout}"));
+/// Run the report with `--json`, requiring success, and parse it.
+fn conformance_report(cli: &JitCli) -> Report {
+    let payload = cli.run_json(["doc", "conformance"]).unwrap();
     let artifacts = payload["artifacts"]
         .as_array()
         .unwrap_or_else(|| panic!("the report wraps a collection named artifacts: {payload}"))
@@ -82,49 +94,56 @@ fn conformance_report(repo: &Path) -> Report {
             .iter()
             .map(|area| area.as_str().expect("an area is a string").to_string())
             .collect(),
-        count: payload["count"]
-            .as_u64()
-            .unwrap_or_else(|| panic!("the report counts its collection: {payload}"))
-            as usize,
         artifacts,
     }
 }
 
 /// Write a file at the repository-relative `path`, creating its parents.
-fn write_artifact(repo: &Path, path: &str) {
-    let absolute = repo.join(path);
+fn write_artifact(cli: &JitCli, path: &str) {
+    let absolute = cli.root().join(path);
     fs::create_dir_all(absolute.parent().expect("an artifact sits in a directory")).unwrap();
     fs::write(&absolute, format!("# {path}\n")).unwrap();
 }
 
 /// Create the repository-relative directory `path` and put no file in it.
-fn create_artifact_directory(repo: &Path, path: &str) {
-    fs::create_dir_all(repo.join(path)).unwrap();
+fn create_artifact_directory(cli: &JitCli, path: &str) {
+    fs::create_dir_all(cli.root().join(path)).unwrap();
 }
 
 /// An issue whose labels resolve a single membership value, so the directory it
 /// owns is distinguishable from the bare area it is written into.
-fn issue_owning_a_directory(repo: &Path, title: &str) -> CreatedIssue {
-    issue_owning(repo, title, "artifact-layout")
+fn issue_owning_a_directory(cli: &JitCli, title: &str) -> CreatedIssue {
+    issue_owning(cli, title, "artifact-layout")
 }
 
 /// The same under a named membership value, so two issues own two directories.
-fn issue_owning(repo: &Path, title: &str, membership: &str) -> CreatedIssue {
+fn issue_owning(cli: &JitCli, title: &str, membership: &str) -> CreatedIssue {
     let (issue_type, namespace) = membership_type_and_namespace();
-    create_issue(
-        repo,
-        title,
-        &[
-            format!("type:{issue_type}"),
-            format!("{namespace}:{membership}"),
-        ],
-    )
+    let created = cli
+        .run_json([
+            "issue",
+            "create",
+            "--title",
+            title,
+            "--label",
+            &format!("type:{issue_type}"),
+            "--label",
+            &format!("{namespace}:{membership}"),
+        ])
+        .unwrap();
+    CreatedIssue {
+        id: created_issue_id(&created).unwrap(),
+        short_id: created["short_id"].as_str().unwrap().to_string(),
+    }
 }
 
 /// Record, through `doc add`, that `id` owns the artifact at `path` — the
 /// repository's durable statement of ownership for a name that carries none.
-fn reference_document(repo: &Path, id: &str, path: &str) {
-    let output = jit(repo, &["doc", "add", id, path, "--skip-scan"]);
+fn reference_document(cli: &JitCli, id: &str, path: &str) {
+    let output = cli
+        .command(["doc", "add", id, path, "--skip-scan"])
+        .output()
+        .unwrap();
     assert!(
         output.status.success(),
         "doc add {id} {path}: {}",
@@ -134,8 +153,8 @@ fn reference_document(repo: &Path, id: &str, path: &str) {
 
 /// The verdict the human report prints under `path`, which is the line that
 /// follows the one naming it.
-fn human_verdict(repo: &Path, path: &str) -> String {
-    let output = jit(repo, &["doc", "conformance"]);
+fn human_verdict(cli: &JitCli, path: &str) -> String {
+    let output = cli.command(["doc", "conformance"]).output().unwrap();
     assert!(
         output.status.success(),
         "doc conformance exits successfully"
@@ -154,8 +173,8 @@ fn human_verdict(repo: &Path, path: &str) -> String {
 ///
 /// The fixture repository authors that registry as an explicit list, so this
 /// rewrites the list in place and leaves the rest of the table alone.
-fn declare_issue_scoped_areas(repo: &Path, areas: &[&str]) {
-    let config_path = repo.join(".jit/config.toml");
+fn declare_issue_scoped_areas(cli: &JitCli, areas: &[&str]) {
+    let config_path = cli.root().join(".jit/config.toml");
     let config = fs::read_to_string(&config_path).unwrap();
     let start = config
         .find("issue_scoped_areas = [")
@@ -233,20 +252,28 @@ fn differences(
 
 #[test]
 fn test_doc_conformance_names_an_artifact_sitting_outside_its_owning_issues_canonical_directory() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&conformance_config())
+            .unwrap()
+            .0,
+    );
     let area = declared_area();
-    let issue = issue_owning_a_directory(repo.path(), "Owns a canonical directory");
-    let canonical = resolve_directory(repo.path(), &issue.short_id, area);
+    let issue = issue_owning_a_directory(&cli, "Owns a canonical directory");
+    let canonical = cli
+        .run(["doc", "dir", &issue.short_id, area])
+        .unwrap()
+        .trim()
+        .to_string();
 
     // Two artifacts of the same shape and the same owner, separated only by
     // where they were written.
     let inside = format!("{canonical}/{}-plan.md", issue.short_id);
     let outside = format!("{area}/{}-plan.md", issue.short_id);
     [&inside, &outside].iter().for_each(|path| {
-        write_artifact(repo.path(), path);
+        write_artifact(&cli, path);
     });
 
-    let report = conformance_report(repo.path());
+    let report = conformance_report(&cli);
     let entry = report.require(&outside);
     assert_eq!(
         entry["canonical_directory"].as_str(),
@@ -272,11 +299,11 @@ fn test_doc_conformance_names_an_artifact_sitting_outside_its_owning_issues_cano
     // The verdict follows the location and nothing else: relocating the same
     // bytes under the same owner empties the report.
     fs::rename(
-        repo.path().join(&outside),
-        repo.path().join(format!("{canonical}/relocated.md")),
+        cli.root().join(&outside),
+        cli.root().join(format!("{canonical}/relocated.md")),
     )
     .unwrap();
-    let relocated = conformance_report(repo.path());
+    let relocated = conformance_report(&cli);
     assert!(
         relocated.artifacts.is_empty(),
         "moving the artifact into its canonical directory clears the report: {:?}",
@@ -286,10 +313,18 @@ fn test_doc_conformance_names_an_artifact_sitting_outside_its_owning_issues_cano
 
 #[test]
 fn test_doc_conformance_names_a_misplaced_prefixed_directory_holding_no_file() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&conformance_config())
+            .unwrap()
+            .0,
+    );
     let area = declared_area();
-    let issue = issue_owning_a_directory(repo.path(), "Owns directories rather than files");
-    let canonical = resolve_directory(repo.path(), &issue.short_id, area);
+    let issue = issue_owning_a_directory(&cli, "Owns directories rather than files");
+    let canonical = cli
+        .run(["doc", "dir", &issue.short_id, area])
+        .unwrap()
+        .trim()
+        .to_string();
 
     // Three misplaced directories carrying the owner's prefix, differing only
     // in what they hold: nothing at all, directories alone at every depth, and
@@ -298,12 +333,12 @@ fn test_doc_conformance_names_a_misplaced_prefixed_directory_holding_no_file() {
     let empty = format!("{area}/legacy/{}-plan", issue.short_id);
     let directories_only = format!("{area}/{}-notes", issue.short_id);
     let populated = format!("{area}/{}-draft", issue.short_id);
-    create_artifact_directory(repo.path(), &empty);
-    create_artifact_directory(repo.path(), &format!("{directories_only}/part/section"));
-    write_artifact(repo.path(), &format!("{populated}/plan.md"));
+    create_artifact_directory(&cli, &empty);
+    create_artifact_directory(&cli, &format!("{directories_only}/part/section"));
+    write_artifact(&cli, &format!("{populated}/plan.md"));
 
     let misplaced = [empty, directories_only, populated];
-    let report = conformance_report(repo.path());
+    let report = conformance_report(&cli);
     misplaced.iter().for_each(|directory| {
         let entry = report.require(directory);
         assert_eq!(
@@ -329,7 +364,7 @@ fn test_doc_conformance_names_a_misplaced_prefixed_directory_holding_no_file() {
         report.paths()
     );
     assert_eq!(
-        report.count,
+        report.artifacts.len(),
         misplaced.len(),
         "the three misplaced directories are the whole report: {:?}",
         report.paths()
@@ -338,20 +373,24 @@ fn test_doc_conformance_names_a_misplaced_prefixed_directory_holding_no_file() {
 
 #[test]
 fn test_doc_conformance_scans_exactly_the_areas_the_configuration_registry_declares() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&conformance_config())
+            .unwrap()
+            .0,
+    );
     let scaffolded = declared_area();
     let outside = undeclared_area();
-    let issue = issue_owning_a_directory(repo.path(), "Artifacts in two areas");
+    let issue = issue_owning_a_directory(&cli, "Artifacts in two areas");
 
     // The same misplaced shape in both areas, so what separates them is the
     // registry rather than anything about the artifact.
     let in_registry = format!("{scaffolded}/{}-plan.md", issue.short_id);
     let out_of_registry = format!("{outside}/{}-plan.md", issue.short_id);
     [&in_registry, &out_of_registry].iter().for_each(|path| {
-        write_artifact(repo.path(), path);
+        write_artifact(&cli, path);
     });
 
-    let scaffolded_report = conformance_report(repo.path());
+    let scaffolded_report = conformance_report(&cli);
     assert_eq!(
         scaffolded_report.areas,
         scaffolded_areas(),
@@ -366,8 +405,8 @@ fn test_doc_conformance_scans_exactly_the_areas_the_configuration_registry_decla
 
     // Declaring the other area instead moves the whole scan with it, which no
     // built-in list of areas could do.
-    declare_issue_scoped_areas(repo.path(), &[outside]);
-    let redeclared = conformance_report(repo.path());
+    declare_issue_scoped_areas(&cli, &[outside]);
+    let redeclared = conformance_report(&cli);
     assert_eq!(
         redeclared.areas,
         vec![outside.to_string()],
@@ -382,8 +421,8 @@ fn test_doc_conformance_scans_exactly_the_areas_the_configuration_registry_decla
     // A lexical spelling of an area names that area, and an entry that
     // normalizes to nothing names none: the registry decides membership under
     // the same rules `doc dir` applies to a caller's spelling.
-    declare_issue_scoped_areas(repo.path(), &["", &format!("./{scaffolded}/")]);
-    let respelled = conformance_report(repo.path());
+    declare_issue_scoped_areas(&cli, &["", &format!("./{scaffolded}/")]);
+    let respelled = conformance_report(&cli);
     assert_eq!(
         respelled.areas,
         vec![scaffolded.to_string()],
@@ -396,8 +435,8 @@ fn test_doc_conformance_scans_exactly_the_areas_the_configuration_registry_decla
     );
 
     // An empty registry opts every area out, so nothing is walked at all.
-    declare_issue_scoped_areas(repo.path(), &[]);
-    let none_declared = conformance_report(repo.path());
+    declare_issue_scoped_areas(&cli, &[]);
+    let none_declared = conformance_report(&cli);
     assert!(
         none_declared.areas.is_empty() && none_declared.artifacts.is_empty(),
         "declaring no issue-scoped area leaves nothing to scan: {:?}",
@@ -407,15 +446,24 @@ fn test_doc_conformance_scans_exactly_the_areas_the_configuration_registry_decla
 
 #[test]
 fn test_doc_conformance_exits_successfully_and_changes_nothing_whatever_it_finds() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&conformance_config())
+            .unwrap()
+            .0,
+    );
     let area = declared_area();
-    let issue = issue_owning_a_directory(repo.path(), "Unchanged by its own report");
+    let issue = issue_owning_a_directory(&cli, "Unchanged by its own report");
 
     // One unrelated read first. The storage layer publishes its advisory index
     // lock on the first read of any command, so warming it here keeps that
     // shared artifact out of the comparisons below and leaves them exact:
     // every file, with its bytes.
-    assert!(jit(repo.path(), &["issue", "list"]).status.success());
+    assert!(cli
+        .command(["issue", "list"])
+        .output()
+        .unwrap()
+        .status
+        .success());
 
     let nonconforming = format!("{area}/{}-plan.md", issue.short_id);
     let unattributed = format!("{area}/{UNOWNED_PREFIX}-notes.md");
@@ -425,11 +473,11 @@ fn test_doc_conformance_exits_successfully_and_changes_nothing_whatever_it_finds
         .iter()
         .for_each(|added| {
             if let Some(path) = added {
-                write_artifact(repo.path(), path);
+                write_artifact(&cli, path);
             }
-            let before = tree_snapshot(repo.path());
-            let report = conformance_report(repo.path());
-            let after = tree_snapshot(repo.path());
+            let before = tree_snapshot(cli.root());
+            let report = conformance_report(&cli);
+            let after = tree_snapshot(cli.root());
 
             assert!(
                 differences(&before, &after).is_empty(),
@@ -439,22 +487,22 @@ fn test_doc_conformance_exits_successfully_and_changes_nothing_whatever_it_finds
             );
             // The plain-text run is the same statement without --json, and it
             // exits alike.
-            let plain = jit(repo.path(), &["doc", "conformance"]);
+            let plain = cli.command(["doc", "conformance"]).output().unwrap();
             assert!(
                 plain.status.success(),
                 "doc conformance exits successfully: {}",
                 String::from_utf8_lossy(&plain.stderr)
             );
             assert!(
-                differences(&after, &tree_snapshot(repo.path())).is_empty(),
+                differences(&after, &tree_snapshot(cli.root())).is_empty(),
                 "the plain-text run mutates nothing either, but touched {:?}",
-                differences(&after, &tree_snapshot(repo.path()))
+                differences(&after, &tree_snapshot(cli.root()))
             );
         });
 
     // The successful exits above were not vacuous: by the last pass the report
     // had both kinds of finding to make.
-    let report = conformance_report(repo.path());
+    let report = conformance_report(&cli);
     assert!(
         report.entry(&nonconforming).is_some() && report.entry(&unattributed).is_some(),
         "the runs above had findings to report: {:?}",
@@ -464,26 +512,34 @@ fn test_doc_conformance_exits_successfully_and_changes_nothing_whatever_it_finds
 
 #[test]
 fn test_doc_conformance_findings_block_no_state_transition() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&conformance_config())
+            .unwrap()
+            .0,
+    );
     let area = declared_area();
-    let issue = issue_owning_a_directory(repo.path(), "Completes with a misplaced artifact");
+    let issue = issue_owning_a_directory(&cli, "Completes with a misplaced artifact");
     let nonconforming = format!("{area}/{}-plan.md", issue.short_id);
-    write_artifact(repo.path(), &nonconforming);
+    write_artifact(&cli, &nonconforming);
 
     // The precondition the rest of this case rests on.
     assert!(
-        conformance_report(repo.path())
-            .entry(&nonconforming)
-            .is_some(),
+        conformance_report(&cli).entry(&nonconforming).is_some(),
         "the artifact this issue owns is reported as nonconforming"
     );
 
     // The reported artifact stays put while its owner runs the lifecycle out.
-    ["in_progress", "done"].iter().for_each(|state| {
-        let output = jit(
-            repo.path(),
-            &["issue", "update", &issue.short_id, "--state", state],
-        );
+    [State::InProgress, State::Done].iter().for_each(|state| {
+        let output = cli
+            .command([
+                "issue",
+                "update",
+                &issue.short_id,
+                "--state",
+                state.as_str(),
+            ])
+            .output()
+            .unwrap();
         assert!(
             output.status.success(),
             "a nonconforming artifact blocks the transition to {state}: {}",
@@ -491,7 +547,7 @@ fn test_doc_conformance_findings_block_no_state_transition() {
         );
     });
 
-    let validate = jit(repo.path(), &["validate"]);
+    let validate = cli.command(["validate"]).output().unwrap();
     assert!(
         validate.status.success(),
         "a nonconforming artifact does not fail repository validation: {} {}",
@@ -499,33 +555,39 @@ fn test_doc_conformance_findings_block_no_state_transition() {
         String::from_utf8_lossy(&validate.stderr)
     );
     assert!(
-        repo.path().join(&nonconforming).exists(),
+        cli.root().join(&nonconforming).exists(),
         "the reported artifact is left where it is"
     );
 }
 
 #[test]
 fn test_doc_conformance_reports_an_artifact_with_no_resolvable_owner_as_unattributed() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&conformance_config())
+            .unwrap()
+            .0,
+    );
     let area = declared_area();
-    let issue = issue_owning_a_directory(repo.path(), "Resolvable owner");
+    let issue = issue_owning_a_directory(&cli, "Resolvable owner");
 
     let owned = format!("{area}/{}-plan.md", issue.short_id);
     let orphan = format!("{area}/{UNOWNED_PREFIX}-plan.md");
     [&owned, &orphan].iter().for_each(|path| {
-        write_artifact(repo.path(), path);
+        write_artifact(&cli, path);
     });
 
     // The precondition: nothing in this repository answers to the orphan's
     // prefix, while the sibling artifact's prefix resolves an issue.
     assert!(
-        !jit(repo.path(), &["issue", "show", UNOWNED_PREFIX])
+        !cli.command(["issue", "show", UNOWNED_PREFIX])
+            .output()
+            .unwrap()
             .status
             .success(),
         "no issue answers to {UNOWNED_PREFIX}"
     );
 
-    let report = conformance_report(repo.path());
+    let report = conformance_report(&cli);
     let orphan_entry = report.require(&orphan);
     let owned_entry = report.require(&owned);
 
@@ -555,16 +617,28 @@ fn test_doc_conformance_reports_an_artifact_with_no_resolvable_owner_as_unattrib
 
 #[test]
 fn test_doc_conformance_attributes_a_prefixless_artifact_to_the_issue_whose_reference_names_it() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&conformance_config())
+            .unwrap()
+            .0,
+    );
     let area = declared_area();
-    let host = issue_owning_a_directory(repo.path(), "Owns the directory they all sit in");
+    let host = issue_owning_a_directory(&cli, "Owns the directory they all sit in");
     let author = issue_owning(
-        repo.path(),
+        &cli,
         "Filed its record in another issue's directory",
         "other-initiative",
     );
-    let host_directory = resolve_directory(repo.path(), &host.short_id, area);
-    let author_directory = resolve_directory(repo.path(), &author.short_id, area);
+    let host_directory = cli
+        .run(["doc", "dir", &host.short_id, area])
+        .unwrap()
+        .trim()
+        .to_string();
+    let author_directory = cli
+        .run(["doc", "dir", &author.short_id, area])
+        .unwrap()
+        .trim()
+        .to_string();
 
     // Three artifacts of the same shape in the same directory, none of whose
     // names carries a short id. What separates them is what the repository says
@@ -576,12 +650,12 @@ fn test_doc_conformance_attributes_a_prefixless_artifact_to_the_issue_whose_refe
     [&at_home, &stranger, &unreferenced]
         .iter()
         .for_each(|path| {
-            write_artifact(repo.path(), path);
+            write_artifact(&cli, path);
         });
-    reference_document(repo.path(), &host.short_id, &at_home);
-    reference_document(repo.path(), &author.short_id, &stranger);
+    reference_document(&cli, &host.short_id, &at_home);
+    reference_document(&cli, &author.short_id, &stranger);
 
-    let report = conformance_report(repo.path());
+    let report = conformance_report(&cli);
     let entry = report.require(&stranger);
     assert_eq!(
         entry["issue_id"].as_str(),
@@ -606,8 +680,8 @@ fn test_doc_conformance_attributes_a_prefixless_artifact_to_the_issue_whose_refe
 
     // A second issue referencing the same artifact leaves an ownership the
     // report's inputs no longer settle.
-    reference_document(repo.path(), &host.short_id, &stranger);
-    let contested = conformance_report(repo.path());
+    reference_document(&cli, &host.short_id, &stranger);
+    let contested = conformance_report(&cli);
     let entry = contested.require(&stranger);
     assert!(
         entry["status"]
@@ -622,7 +696,7 @@ fn test_doc_conformance_attributes_a_prefixless_artifact_to_the_issue_whose_refe
 
     // The human verdict states what is unsettled rather than trailing off after
     // an identifier the name does not carry.
-    let verdict = human_verdict(repo.path(), &stranger);
+    let verdict = human_verdict(&cli, &stranger);
     assert!(
         verdict.contains("unattributed") && verdict.contains("reference"),
         "the human report says several issues reference it: {verdict}"
@@ -630,46 +704,26 @@ fn test_doc_conformance_attributes_a_prefixless_artifact_to_the_issue_whose_refe
 }
 
 #[test]
-fn test_doc_conformance_wraps_its_collection_in_the_count_and_collection_envelope() {
-    let repo = initialized_repo();
-    let area = declared_area();
-    let issue = issue_owning_a_directory(repo.path(), "Counted artifacts");
-
-    let empty = conformance_report(repo.path());
-    assert_eq!(
-        (empty.count, empty.artifacts.len()),
-        (0, 0),
-        "an empty collection is still counted"
-    );
-
-    // The count tracks the collection rather than being a constant.
-    (1..=3).for_each(|index| {
-        write_artifact(
-            repo.path(),
-            &format!("{area}/{}-note-{index}.md", issue.short_id),
-        );
-        let report = conformance_report(repo.path());
-        assert_eq!(
-            (report.count, report.artifacts.len()),
-            (index, index),
-            "count states the number of reported artifacts"
-        );
-    });
-}
-
-#[test]
 fn test_doc_conformance_human_output_names_each_artifact_and_where_it_belongs() {
-    let repo = initialized_repo();
+    let cli = JitCli::with_repository(
+        setup_test_repo_with_config(&conformance_config())
+            .unwrap()
+            .0,
+    );
     let area = declared_area();
-    let issue = issue_owning_a_directory(repo.path(), "Readable report");
-    let canonical = resolve_directory(repo.path(), &issue.short_id, area);
+    let issue = issue_owning_a_directory(&cli, "Readable report");
+    let canonical = cli
+        .run(["doc", "dir", &issue.short_id, area])
+        .unwrap()
+        .trim()
+        .to_string();
     let nonconforming = format!("{area}/{}-plan.md", issue.short_id);
     let unattributed = format!("{area}/{UNOWNED_PREFIX}-notes.md");
     [&nonconforming, &unattributed].iter().for_each(|path| {
-        write_artifact(repo.path(), path);
+        write_artifact(&cli, path);
     });
 
-    let output = jit(repo.path(), &["doc", "conformance"]);
+    let output = cli.command(["doc", "conformance"]).output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     assert!(
         output.status.success(),
@@ -690,8 +744,12 @@ fn test_doc_conformance_human_output_names_each_artifact_and_where_it_belongs() 
     });
 
     // A clean repository says so rather than printing an empty list.
-    let clean = initialized_repo();
-    let clean_output = jit(clean.path(), &["doc", "conformance"]);
+    let clean = JitCli::with_repository(
+        setup_test_repo_with_config(&conformance_config())
+            .unwrap()
+            .0,
+    );
+    let clean_output = clean.command(["doc", "conformance"]).output().unwrap();
     assert!(clean_output.status.success());
     assert!(
         !String::from_utf8_lossy(&clean_output.stdout)

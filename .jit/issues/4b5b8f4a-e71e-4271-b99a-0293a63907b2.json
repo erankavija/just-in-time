@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T21:42:12.298372913Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -9,11 +10,26 @@
   ],
   "description": "Retire the server's private file-backed repository and executor setups.\n\n## Background\n\nShared test support constructs an initialised file-backed repository from caller-supplied configuration and an executor over a file-backed root. The server crate's tests duplicate them; `create_test_app` builds on `initialize_file_backed_test_repository`, and `repository_missing_its_index` builds a repository and then removes its index.\n\nHelpers to retire, from the mechanical sweep in investigation §D.6 (function names are the identity; lines at `a5aac64b1`):\n\n- `crates/server/src/lib.rs`: `repository_missing_its_index` (`:93`).\n- `crates/server/src/routes.rs`: `test_executor` (`:1054`), `initialize_file_backed_test_repository` (`:1104`), `create_test_app_with_html_doc` (`:1699`), `create_app_with_raw_fixture` (`:2621`).\n- `crates/server/tests/server_integration/graceful_shutdown_tests.rs`: `initialize_repository` (`:75`), `executor_for` (`:81`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each helper under \"Helpers to retire\" no longer exists, and the tests that called it obtain what it built from the shared fixtures.\n- [hard] REQ-02: No server test defines a function that creates a file-backed repository or opens a file-backed executor of its own; a scenario that damages a repository does so to one built by the shared constructor.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-28T22:03:23.660357127Z",
+  "first_ready_at": "2026-10-28T21:48:42.866835182Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7c512a3e-9663-4621-9f11-338bf1fc4871",
+      "status": "passed",
+      "updated_at": "2026-10-28T21:59:51.745124546Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "66f19b6a-3686-4824-905d-5ff05ef7c3a0",
+      "status": "passed",
+      "updated_at": "2026-10-28T22:03:02.042501830Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4b5b8f4a-e71e-4271-b99a-0293a63907b2",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Server tests use the shared file-backed constructors",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T22:03:23.660357127Z"
 }

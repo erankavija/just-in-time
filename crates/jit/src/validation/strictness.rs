@@ -20,34 +20,28 @@
 //! and the transition path in the command layer) routes its block/allow decision
 //! through it so the three levels cannot drift apart.
 
-use std::str::FromStr;
-
 use crate::declarations::rules::Severity;
-use crate::errors::InvalidArgumentError;
+use crate::domain::vocabulary::wire_vocabulary;
 
-/// Repository-wide enforcement modulator from `[validation].strictness`.
-///
-/// See the module documentation for the full semantics. An absent key resolves
-/// to [`Strictness::DEFAULT`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Strictness {
-    /// Any violation (warning or error, enforced or not) blocks.
-    Strict,
-    /// Only an enforced error blocks (identical to no modulation).
-    Loose,
-    /// Nothing blocks; every violation is advisory.
-    Permissive,
+wire_vocabulary! {
+    /// Repository-wide enforcement modulator from `[validation].strictness`.
+    ///
+    /// See the module documentation for the full semantics. An absent key resolves
+    /// to [`Strictness::DEFAULT`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    pub enum Strictness {
+        /// Any violation (warning or error, enforced or not) blocks.
+        Strict = "strict",
+        /// Only an enforced error blocks (identical to no modulation).
+        Loose = "loose",
+        /// Nothing blocks; every violation is advisory.
+        Permissive = "permissive",
+    }
 }
 
 impl Default for Strictness {
     fn default() -> Self {
         Self::DEFAULT
-    }
-}
-
-impl std::fmt::Display for Strictness {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.token())
     }
 }
 
@@ -62,59 +56,19 @@ impl Strictness {
     /// This is the ONE modulated decision shared by every enforcement choke
     /// point. It reads — never mutates — the rule's `enforce` and `severity`:
     ///
-    /// - [`Strictness::Strict`] blocks on any reported violation (a `warn` or
-    ///   `error` finding; an `off` rule reports nothing and so never reaches
-    ///   here).
+    /// - [`Strictness::Strict`] blocks on any reported violation (a
+    ///   [`Severity::Off`] rule reports nothing and so never reaches here).
     /// - [`Strictness::Loose`] blocks only when the rule enforces AND its
-    ///   severity is `error` — the exact pre-strictness rule.
+    ///   severity is [`Severity::Error`], the exact pre-strictness rule.
     /// - [`Strictness::Permissive`] never blocks.
     pub fn blocks(self, enforce: bool, severity: Severity) -> bool {
         match self {
-            // An `off` rule is filtered out before evaluation, so any finding
-            // that reaches here is `warn` or `error`; guard on `!= Off` anyway so
-            // the predicate is total and self-explanatory.
+            // An `Off` rule is filtered out before evaluation, so any finding
+            // that reaches here has another severity; guard on `!= Off` anyway
+            // so the predicate is total and self-explanatory.
             Strictness::Strict => severity != Severity::Off,
             Strictness::Loose => enforce && severity == Severity::Error,
             Strictness::Permissive => false,
-        }
-    }
-
-    /// Stable lowercase token for this level, matching the `config.toml` grammar.
-    pub fn token(self) -> &'static str {
-        match self {
-            Strictness::Strict => "strict",
-            Strictness::Loose => "loose",
-            Strictness::Permissive => "permissive",
-        }
-    }
-
-    /// Resolve a strictness level from the optional `[validation].strictness`
-    /// config value, defaulting to [`Strictness::DEFAULT`] when the key is absent.
-    ///
-    /// An invalid value is surfaced as an error rather than silently defaulting,
-    /// so a misconfigured `config.toml` cannot quietly pick a strictness the
-    /// author did not intend.
-    pub fn from_config_value(value: Option<&str>) -> anyhow::Result<Self> {
-        match value {
-            None => Ok(Strictness::DEFAULT),
-            Some(raw) => Strictness::from_str(raw),
-        }
-    }
-}
-
-impl FromStr for Strictness {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        match s.to_lowercase().as_str() {
-            "strict" => Ok(Strictness::Strict),
-            "loose" => Ok(Strictness::Loose),
-            "permissive" => Ok(Strictness::Permissive),
-            _ => Err(InvalidArgumentError::new(format!(
-                "invalid [validation].strictness in .jit/config.toml: '{s}' \
-                 (expected strict, loose, or permissive)"
-            ))
-            .into()),
         }
     }
 }
@@ -183,56 +137,5 @@ mod tests {
     #[test]
     fn test_default_impl_is_the_named_default() {
         assert_eq!(Strictness::default(), Strictness::DEFAULT);
-    }
-
-    #[test]
-    fn test_from_config_value_parses_each_level() {
-        assert_eq!(
-            Strictness::from_config_value(None).unwrap(),
-            Strictness::DEFAULT,
-            "absent key resolves to the default"
-        );
-        assert_eq!(
-            Strictness::from_config_value(Some("strict")).unwrap(),
-            Strictness::Strict
-        );
-        assert_eq!(
-            Strictness::from_config_value(Some("loose")).unwrap(),
-            Strictness::Loose
-        );
-        assert_eq!(
-            Strictness::from_config_value(Some("permissive")).unwrap(),
-            Strictness::Permissive
-        );
-    }
-
-    #[test]
-    fn test_from_config_value_is_case_insensitive() {
-        assert_eq!(
-            Strictness::from_config_value(Some("STRICT")).unwrap(),
-            Strictness::Strict
-        );
-    }
-
-    #[test]
-    fn test_invalid_value_is_an_error_not_a_silent_default() {
-        let err = Strictness::from_config_value(Some("banana")).unwrap_err();
-        let msg = err.to_string();
-        assert!(msg.contains("banana"), "message names the bad value: {msg}");
-        assert!(
-            msg.contains("strict") && msg.contains("loose") && msg.contains("permissive"),
-            "message lists the accepted values: {msg}"
-        );
-    }
-
-    #[test]
-    fn test_token_round_trips_through_from_str() {
-        for level in [
-            Strictness::Strict,
-            Strictness::Loose,
-            Strictness::Permissive,
-        ] {
-            assert_eq!(Strictness::from_str(level.token()).unwrap(), level);
-        }
     }
 }

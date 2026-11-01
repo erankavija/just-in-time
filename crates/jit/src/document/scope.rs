@@ -1,12 +1,6 @@
 //! Scope selector for `jit doc check-links`.
 //!
-//! Mirrors the [`SnapshotScope`](crate::snapshot::SnapshotScope) pattern: a small
-//! typed enum with a [`FromStr`] parser and a [`Display`] that round-trips, so the
-//! CLI parses the `--scope` argument once into a value instead of re-checking
-//! `== "all"` / `strip_prefix("issue:")` inline.
-
 use std::fmt;
-use std::str::FromStr;
 
 /// Error returned when a string cannot be parsed as a [`DocumentScope`].
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -23,20 +17,22 @@ pub enum DocumentScopeParseError {
 pub enum DocumentScope {
     /// Check the documents of every issue.
     All,
-    /// Check the documents of a single issue, identified by id (possibly partial).
-    Issue(String),
+    /// Check the documents of one resolved issue.
+    Issue(crate::domain::identity::IssueId),
 }
 
-impl FromStr for DocumentScope {
-    type Err = DocumentScopeParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl DocumentScope {
+    /// Parse the selector, delegating its issue argument to the input boundary.
+    pub fn parse(
+        s: &str,
+        resolve: impl FnOnce(&str) -> anyhow::Result<crate::domain::identity::IssueId>,
+    ) -> anyhow::Result<Self> {
         if s == "all" {
             Ok(DocumentScope::All)
         } else if let Some(id) = s.strip_prefix("issue:") {
-            Ok(DocumentScope::Issue(id.to_string()))
+            Ok(DocumentScope::Issue(resolve(id)?))
         } else {
-            Err(DocumentScopeParseError::UnknownScope(s.to_string()))
+            Err(DocumentScopeParseError::UnknownScope(s.to_string()).into())
         }
     }
 }
@@ -53,36 +49,47 @@ impl fmt::Display for DocumentScope {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::identity::IssueId;
 
     #[test]
     fn test_document_scope_parse_all() {
-        assert_eq!(DocumentScope::from_str("all").unwrap(), DocumentScope::All);
+        assert_eq!(
+            DocumentScope::parse("all", |id| Ok(id.parse::<IssueId>()?)).unwrap(),
+            DocumentScope::All
+        );
         assert_eq!(DocumentScope::All.to_string(), "all");
     }
 
     #[test]
     fn test_document_scope_parse_issue() {
-        let scope = DocumentScope::from_str("issue:abc123").unwrap();
-        assert_eq!(scope, DocumentScope::Issue("abc123".to_string()));
-        assert_eq!(scope.to_string(), "issue:abc123");
+        let resolved = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0f0e_0d0c);
+        let scope = DocumentScope::parse("issue:abc123", |id| {
+            assert_eq!(id, "abc123");
+            Ok(resolved.clone())
+        })
+        .unwrap();
+        assert_eq!(scope, DocumentScope::Issue(resolved.clone()));
+        assert_eq!(scope.to_string(), format!("issue:{resolved}"));
     }
 
     #[test]
     fn test_document_scope_parse_invalid() {
-        let err = DocumentScope::from_str("label:epic").unwrap_err();
+        let err = DocumentScope::parse("label:epic", |id| Ok(id.parse::<IssueId>()?)).unwrap_err();
         assert_eq!(
-            err,
-            DocumentScopeParseError::UnknownScope("label:epic".to_string())
+            err.downcast_ref::<DocumentScopeParseError>().unwrap(),
+            &DocumentScopeParseError::UnknownScope("label:epic".to_string())
         );
         // The message preserves the original wording the CLI surfaced before.
         assert!(err.to_string().contains("Use 'all' or 'issue:ID'"));
     }
 
     #[test]
-    fn test_document_scope_issue_roundtrips_empty_id() {
-        // `issue:` with an empty id parses to an empty-id Issue and round-trips.
-        let scope = DocumentScope::from_str("issue:").unwrap();
-        assert_eq!(scope, DocumentScope::Issue(String::new()));
-        assert_eq!(scope.to_string(), "issue:");
+    fn test_document_scope_parse_issue_delegates_empty_id_to_resolver() {
+        let err = DocumentScope::parse("issue:", |id| {
+            assert!(id.is_empty());
+            anyhow::bail!("empty issue argument")
+        })
+        .unwrap_err();
+        assert_eq!(err.to_string(), "empty issue argument");
     }
 }

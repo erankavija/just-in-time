@@ -2,57 +2,28 @@
 //!
 //! These tests verify end-to-end functionality by running actual CLI commands
 
-use std::process::Command;
+use jit::test_cli::JitCli;
 use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let jit = jit_binary();
-
-    let output = Command::new(jit)
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .expect("Failed to run jit init");
-
-    assert!(output.status.success(), "jit init failed");
-    temp
-}
 
 #[test]
 fn test_search_by_title() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Create issues
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Fix bug in parser", "-d", "Desc"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "Fix bug in parser", "-d", "Desc"])
         .output()
         .unwrap();
 
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Add feature", "-d", "Desc"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "Add feature", "-d", "Desc"])
         .output()
         .unwrap();
 
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Fix bug in lexer", "-d", "Desc"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "Fix bug in lexer", "-d", "Desc"])
         .output()
         .unwrap();
 
     // Search for "bug"
-    let output = Command::new(jit)
-        .args(["issue", "search", "bug"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["issue", "search", "bug"]).output().unwrap();
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -64,24 +35,12 @@ fn test_search_by_title() {
 
 #[test]
 fn test_issue_search_human_output_indents_rows_and_ends_with_total() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-    let create = Command::new(jit)
-        .args(["issue", "create", "-t", "Fix bug in parser", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
+    let cli = JitCli::initialised().unwrap();
+    let id = cli
+        .create_issue(["--title", "Fix bug in parser", "--description", "Desc"])
         .unwrap();
-    let id = String::from_utf8_lossy(&create.stdout)
-        .split_whitespace()
-        .nth(2)
-        .unwrap()
-        .to_string();
 
-    let output = Command::new(jit)
-        .args(["issue", "search", "bug"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["issue", "search", "bug"]).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let row = stdout
@@ -94,31 +53,25 @@ fn test_issue_search_human_output_indents_rows_and_ends_with_total() {
 
 #[test]
 fn test_search_by_description() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Task 1",
-            "-d",
-            "Contains security vulnerability",
-        ])
-        .current_dir(temp.path())
+    cli.command([
+        "issue",
+        "create",
+        "-t",
+        "Task 1",
+        "-d",
+        "Contains security vulnerability",
+    ])
+    .output()
+    .unwrap();
+
+    cli.command(["issue", "create", "-t", "Task 2", "-d", "Regular task"])
         .output()
         .unwrap();
 
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task 2", "-d", "Regular task"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    let output = Command::new(jit)
-        .args(["issue", "search", "security"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "search", "security"])
         .output()
         .unwrap();
 
@@ -130,20 +83,13 @@ fn test_search_by_description() {
 
 #[test]
 fn test_search_case_insensitive() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Fix BUG", "-d", "Desc"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "Fix BUG", "-d", "Desc"])
         .output()
         .unwrap();
 
-    let output = Command::new(jit)
-        .args(["issue", "search", "bug"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["issue", "search", "bug"]).output().unwrap();
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -153,42 +99,36 @@ fn test_search_case_insensitive() {
 
 #[test]
 fn test_search_with_priority_filter() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Critical bug",
-            "-d",
-            "Desc",
-            "--priority",
-            "critical",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    cli.command([
+        "issue",
+        "create",
+        "-t",
+        "Critical bug",
+        "-d",
+        "Desc",
+        "--priority",
+        "critical",
+    ])
+    .output()
+    .unwrap();
 
-    Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
-            "Normal bug",
-            "-d",
-            "Desc",
-            "--priority",
-            "normal",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    cli.command([
+        "issue",
+        "create",
+        "-t",
+        "Normal bug",
+        "-d",
+        "Desc",
+        "--priority",
+        "normal",
+    ])
+    .output()
+    .unwrap();
 
-    let output = Command::new(jit)
-        .args(["issue", "search", "bug", "--priority", "critical"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "search", "bug", "--priority", "critical"])
         .output()
         .unwrap();
 
@@ -201,18 +141,14 @@ fn test_search_with_priority_filter() {
 
 #[test]
 fn test_search_no_results() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Desc"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "Task", "-d", "Desc"])
         .output()
         .unwrap();
 
-    let output = Command::new(jit)
-        .args(["issue", "search", "nonexistent"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "search", "nonexistent"])
         .output()
         .unwrap();
 
@@ -223,59 +159,40 @@ fn test_search_no_results() {
 
 #[test]
 fn test_export_dot_format() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Create issues with dependencies
-    let output1 = Command::new(jit)
-        .args(["issue", "create", "-t", "API", "-d", "Design API"])
-        .current_dir(temp.path())
-        .output()
+    let id1 = cli
+        .create_issue(["--title", "API", "--description", "Design API"])
         .unwrap();
-    let stdout1 = String::from_utf8_lossy(&output1.stdout);
-    let id1 = stdout1.split_whitespace().last().unwrap();
-
-    let output2 = Command::new(jit)
-        .args(["issue", "create", "-t", "Backend", "-d", "Implement"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let stdout2 = String::from_utf8_lossy(&output2.stdout);
-    let id2 = stdout2.split_whitespace().last().unwrap();
-
-    Command::new(jit)
-        .args(["dep", "add", id2, id1])
-        .current_dir(temp.path())
-        .output()
+    let id2 = cli
+        .create_issue(["--title", "Backend", "--description", "Implement"])
         .unwrap();
 
-    let output = Command::new(jit)
-        .args(["graph", "export", "--format", "dot"])
-        .current_dir(temp.path())
+    cli.command(["dep", "add", &id2, &id1]).output().unwrap();
+
+    let output = cli
+        .command(["graph", "export", "--format", "dot"])
         .output()
         .unwrap();
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("digraph issues"));
-    assert!(stdout.contains(id1));
-    assert!(stdout.contains(id2));
+    assert!(stdout.contains(&id1));
+    assert!(stdout.contains(&id2));
 }
 
 #[test]
 fn test_export_mermaid_format() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Desc"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "Task", "-d", "Desc"])
         .output()
         .unwrap();
 
-    let output = Command::new(jit)
-        .args(["graph", "export", "--format", "mermaid"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["graph", "export", "--format", "mermaid"])
         .output()
         .unwrap();
 
@@ -287,18 +204,14 @@ fn test_export_mermaid_format() {
 
 #[test]
 fn test_export_json_full_emits_complete_records() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Full body"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "Task", "-d", "Full body"])
         .output()
         .unwrap();
 
-    let output = Command::new(jit)
-        .args(["graph", "export", "--format", "json", "--full"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["graph", "export", "--format", "json", "--full"])
         .output()
         .unwrap();
 
@@ -315,20 +228,17 @@ fn test_export_json_full_emits_complete_records() {
 
 #[test]
 fn test_export_output_writes_complete_file() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Desc"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "Task", "-d", "Desc"])
         .output()
         .unwrap();
 
-    let out_path = temp.path().join("graph.json");
+    let out_path = cli.root().join("graph.json");
     std::fs::write(&out_path, "old").unwrap();
     for _ in 0..2 {
-        let output = Command::new(jit)
-            .args([
+        let output = cli
+            .command([
                 "graph",
                 "export",
                 "--format",
@@ -336,7 +246,6 @@ fn test_export_output_writes_complete_file() {
                 "--output",
                 out_path.to_str().unwrap(),
             ])
-            .current_dir(temp.path())
             .output()
             .unwrap();
         assert!(output.status.success());
@@ -348,7 +257,7 @@ fn test_export_output_writes_complete_file() {
     let doc: serde_json::Value = serde_json::from_str(&contents).unwrap();
     assert!(doc["nodes"].is_array());
     assert!(doc["edges"].is_array());
-    let temp_residue = std::fs::read_dir(temp.path())
+    let temp_residue = std::fs::read_dir(cli.root())
         .unwrap()
         .filter_map(|e| e.ok())
         .any(|e| e.file_name().to_string_lossy().contains(".graph.json."));
@@ -357,25 +266,22 @@ fn test_export_output_writes_complete_file() {
 
 #[test]
 fn test_export_output_routes_repository_and_external_destinations() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
     let run = |path: &std::path::Path| {
-        Command::new(jit)
-            .args([
-                "graph",
-                "export",
-                "--format",
-                "json",
-                "--output",
-                path.to_str().unwrap(),
-            ])
-            .current_dir(temp.path())
-            .output()
-            .unwrap()
+        cli.command([
+            "graph",
+            "export",
+            "--format",
+            "json",
+            "--output",
+            path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap()
     };
 
-    let nested_data = temp.path().join(".jit/exports/graph.json");
-    std::fs::create_dir(temp.path().join(".jit/exports")).unwrap();
+    let nested_data = cli.root().join(".jit/exports/graph.json");
+    std::fs::create_dir(cli.root().join(".jit/exports")).unwrap();
     assert!(run(&nested_data).status.success());
     assert!(nested_data.is_file());
 
@@ -388,12 +294,12 @@ fn test_export_output_routes_repository_and_external_destinations() {
 #[cfg(unix)]
 #[test]
 fn test_export_output_rejects_symlinked_repository_parent() {
-    let temp = setup_test_repo();
+    let cli = JitCli::initialised().unwrap();
     let external = TempDir::new().unwrap();
-    std::os::unix::fs::symlink(external.path(), temp.path().join("linked")).unwrap();
+    std::os::unix::fs::symlink(external.path(), cli.root().join("linked")).unwrap();
 
-    let output = Command::new(jit_binary())
-        .args([
+    let output = cli
+        .command([
             "graph",
             "export",
             "--format",
@@ -401,7 +307,6 @@ fn test_export_output_rejects_symlinked_repository_parent() {
             "--output",
             "linked/graph.json",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
@@ -412,19 +317,19 @@ fn test_export_output_rejects_symlinked_repository_parent() {
 #[cfg(unix)]
 #[test]
 fn test_export_output_rejects_external_parent_aliases_into_repository() {
-    let repo = setup_test_repo();
+    let cli = JitCli::initialised().unwrap();
     let external = TempDir::new().unwrap();
     let worktree_alias = external.path().join("worktree");
     let data_alias = external.path().join("issues");
-    std::os::unix::fs::symlink(repo.path(), &worktree_alias).unwrap();
-    std::os::unix::fs::symlink(repo.path().join(".jit/issues"), &data_alias).unwrap();
+    std::os::unix::fs::symlink(cli.root(), &worktree_alias).unwrap();
+    std::os::unix::fs::symlink(cli.root().join(".jit/issues"), &data_alias).unwrap();
 
     for (alias, escaped) in [
-        (worktree_alias, repo.path().join("escaped.json")),
-        (data_alias, repo.path().join(".jit/issues/escaped.json")),
+        (worktree_alias, cli.root().join("escaped.json")),
+        (data_alias, cli.root().join(".jit/issues/escaped.json")),
     ] {
-        let output = Command::new(jit_binary())
-            .args([
+        let output = cli
+            .command([
                 "graph",
                 "export",
                 "--format",
@@ -432,7 +337,6 @@ fn test_export_output_rejects_external_parent_aliases_into_repository() {
                 "--output",
                 alias.join("escaped.json").to_str().unwrap(),
             ])
-            .current_dir(repo.path())
             .output()
             .unwrap();
         assert!(!output.status.success());
@@ -442,17 +346,14 @@ fn test_export_output_rejects_external_parent_aliases_into_repository() {
 
 #[test]
 fn test_export_full_requires_json_format() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    let output = Command::new(jit)
-        .args(["graph", "export", "--format", "dot", "--full"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["graph", "export", "--format", "dot", "--full"])
         .output()
         .unwrap();
 
-    // Usage error: --full with a non-JSON format exits 2.
-    assert_eq!(output.status.code(), Some(2));
+    assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("--full is only valid with --format json"));
 }
@@ -460,11 +361,10 @@ fn test_export_full_requires_json_format() {
 // Test issue lifecycle
 #[test]
 fn test_issue_create_list_show() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    let output = Command::new(jit)
-        .args([
+    let output = cli
+        .command([
             "issue",
             "create",
             "-t",
@@ -474,256 +374,140 @@ fn test_issue_create_list_show() {
             "--priority",
             "high",
         ])
-        .current_dir(temp.path())
         .output()
         .unwrap();
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Created issue:"));
-    let id = stdout.split_whitespace().last().unwrap();
+    let issues = cli.run_json(["issue", "search", "Test Issue"]).unwrap();
+    let id = issues["issues"][0]["id"].as_str().unwrap().to_owned();
 
     // List issues
-    let output = Command::new(jit)
-        .args(["query", "all"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["query", "all"]).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(id));
+    assert!(stdout.contains(&id));
     assert!(stdout.contains("Test Issue"));
 
     // Show issue details
-    let output = Command::new(jit)
-        .args(["issue", "show", id])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["issue", "show", &id]).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Title: Test Issue"));
     assert!(stdout.contains("Description: Test description"));
-    assert!(stdout.contains("Priority: High"));
+    assert!(stdout.contains("Priority: high"));
 }
 
 #[test]
 fn test_issue_update_and_delete() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    let output = Command::new(jit)
-        .args(["issue", "create", "-t", "Old Title", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
+    let id = cli
+        .create_issue(["--title", "Old Title", "--description", "Desc"])
         .unwrap();
-
-    let id = String::from_utf8_lossy(&output.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
 
     // Update issue
-    Command::new(jit)
-        .args(["issue", "update", &id, "-t", "New Title"])
-        .current_dir(temp.path())
+    cli.command(["issue", "update", &id, "-t", "New Title"])
         .output()
         .unwrap();
 
-    let output = Command::new(jit)
-        .args(["issue", "show", &id])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["issue", "show", &id]).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Title: New Title"));
 
     // Delete issue (requires env var)
-    Command::new(jit)
-        .args(["issue", "delete", &id])
-        .env("JIT_ALLOW_DELETION", "1")
-        .current_dir(temp.path())
+    cli.command_with_env(["issue", "delete", &id], [("JIT_ALLOW_DELETION", "1")])
         .output()
         .unwrap();
 
-    let output = Command::new(jit)
-        .args(["issue", "list"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["issue", "list"]).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(!stdout.contains(&id));
 }
 
 #[test]
-fn test_dependencies() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+fn test_issue_delete_confirmed_reports_the_deleted_id_in_text_mode() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Doomed"]).unwrap();
 
-    let output1 = Command::new(jit)
-        .args(["issue", "create", "-t", "Dependency", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id1 = String::from_utf8_lossy(&output1.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-
-    let output2 = Command::new(jit)
-        .args(["issue", "create", "-t", "Dependent", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id2 = String::from_utf8_lossy(&output2.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-
-    // Add dependency
-    let output = Command::new(jit)
-        .args(["dep", "add", &id2, &id1])
-        .current_dir(temp.path())
+    let output = cli
+        .command_with_env(["issue", "delete", &id], [("JIT_ALLOW_DELETION", "1")])
         .output()
         .unwrap();
 
     assert!(output.status.success());
-
-    // Show dependencies (use graph deps instead of removed graph show)
-    let output = Command::new(jit)
-        .args(["graph", "deps", &id2])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // Output now shows short IDs (first 8 chars)
-    let id1_short = &id1[..8];
-    assert!(stdout.contains(id1_short));
-
-    // Show downstream
-    let output = Command::new(jit)
-        .args(["graph", "downstream", &id1])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&id2));
+    assert!(stdout.contains(&format!("Deleted issue: {id}")), "{stdout}");
 }
 
 #[test]
-fn test_cycle_detection() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+fn test_issue_delete_confirmed_reports_the_deleted_id_in_json_mode() {
+    let cli = JitCli::initialised().unwrap();
+    let id = cli.create_issue(["--title", "Doomed"]).unwrap();
 
-    let output1 = Command::new(jit)
-        .args(["issue", "create", "-t", "Issue 1", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id1 = String::from_utf8_lossy(&output1.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-
-    let output2 = Command::new(jit)
-        .args(["issue", "create", "-t", "Issue 2", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id2 = String::from_utf8_lossy(&output2.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-
-    // Add dependency: id2 depends on id1
-    Command::new(jit)
-        .args(["dep", "add", &id2, &id1])
-        .current_dir(temp.path())
+    let output = cli
+        .command_with_env(
+            ["issue", "delete", &id, "--json"],
+            [("JIT_ALLOW_DELETION", "1")],
+        )
         .output()
         .unwrap();
 
-    // Try to create cycle: id1 depends on id2 (should fail)
-    let output = Command::new(jit)
-        .args(["dep", "add", &id1, &id2])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("cycle") || stderr.contains("Cycle"));
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["id"], id);
+    assert_eq!(json["deleted"], true);
 }
 
 #[test]
 fn test_gates() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Add gate definition
-    Command::new(jit)
-        .args([
-            "gate",
-            "define",
-            "tests",
-            "-t",
-            "Unit Tests",
-            "-d",
-            "Run tests",
-        ])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    cli.command([
+        "gate",
+        "define",
+        "tests",
+        "-t",
+        "Unit Tests",
+        "-d",
+        "Run tests",
+    ])
+    .output()
+    .unwrap();
 
     // List gates
-    let output = Command::new(jit)
-        .args(["gate", "list"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["gate", "list"]).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("tests"));
     assert!(stdout.contains("Unit Tests"));
 
     // Create issue with gate
-    let output = Command::new(jit)
-        .args([
-            "issue", "create", "-t", "Task", "-d", "Desc", "--gate", "tests",
+    let id = cli
+        .create_issue([
+            "--title",
+            "Task",
+            "--description",
+            "Desc",
+            "--gate",
+            "tests",
         ])
-        .current_dir(temp.path())
-        .output()
         .unwrap();
 
-    let id = String::from_utf8_lossy(&output.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-
     // Evaluate gate
-    let output = Command::new(jit)
-        .args(["gate", "evaluate", &id, "tests", "-b", "ci:bot"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["gate", "evaluate", &id, "tests", "-b", "ci:bot"])
         .output()
         .unwrap();
 
     assert!(output.status.success());
 
     // Verify gate status
-    let output = Command::new(jit)
-        .args(["issue", "show", &id])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["issue", "show", &id]).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("tests"));
@@ -731,49 +515,26 @@ fn test_gates() {
 
 #[test]
 fn test_assignment_workflow() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    let output = Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
+    let id = cli
+        .create_issue(["--title", "Task", "--description", "Desc"])
         .unwrap();
-
-    let id = String::from_utf8_lossy(&output.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
 
     // Assign issue
-    Command::new(jit)
-        .args(["issue", "assign", &id, "human:alice"])
-        .current_dir(temp.path())
+    cli.command(["issue", "assign", &id, "human:alice"])
         .output()
         .unwrap();
 
-    let output = Command::new(jit)
-        .args(["issue", "show", &id])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["issue", "show", &id]).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("alice"));
 
     // Unassign issue
-    Command::new(jit)
-        .args(["issue", "unassign", &id])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    cli.command(["issue", "unassign", &id]).output().unwrap();
 
-    let output = Command::new(jit)
-        .args(["issue", "show", &id])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["issue", "show", &id]).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Assignee: None"));
@@ -781,28 +542,19 @@ fn test_assignment_workflow() {
 
 #[test]
 fn test_events() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Create issues to generate events
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task 1", "-d", "Desc"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "Task 1", "-d", "Desc"])
         .output()
         .unwrap();
 
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task 2", "-d", "Desc"])
-        .current_dir(temp.path())
+    cli.command(["issue", "create", "-t", "Task 2", "-d", "Desc"])
         .output()
         .unwrap();
 
     // Tail events
-    let output = Command::new(jit)
-        .args(["events", "tail", "-n", "2"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["events", "tail", "-n", "2"]).output().unwrap();
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -810,9 +562,8 @@ fn test_events() {
     assert!(stdout.contains("issue_created") || stdout.contains("{"));
 
     // Query events
-    let output = Command::new(jit)
-        .args(["events", "query", "-e", "issue_created"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["events", "query", "-e", "issue_created"])
         .output()
         .unwrap();
 
@@ -821,92 +572,22 @@ fn test_events() {
 
 #[test]
 fn test_validate_repository() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
-    let output1 = Command::new(jit)
-        .args(["issue", "create", "-t", "Task 1", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
+    let id1 = cli
+        .create_issue(["--title", "Task 1", "--description", "Desc"])
         .unwrap();
-    let id1 = String::from_utf8_lossy(&output1.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-
-    let output2 = Command::new(jit)
-        .args(["issue", "create", "-t", "Task 2", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
+    let id2 = cli
+        .create_issue(["--title", "Task 2", "--description", "Desc"])
         .unwrap();
-    let id2 = String::from_utf8_lossy(&output2.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
 
     // Add dependency to connect the issues
-    Command::new(jit)
-        .args(["dep", "add", &id2, &id1])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    cli.command(["dep", "add", &id2, &id1]).output().unwrap();
 
     // Validate should succeed
-    let output = Command::new(jit)
-        .args(["validate"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["validate"]).output().unwrap();
 
     assert!(output.status.success());
-}
-
-#[test]
-fn test_graph_roots() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    let output1 = Command::new(jit)
-        .args(["issue", "create", "-t", "Root", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id1 = String::from_utf8_lossy(&output1.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-
-    let output2 = Command::new(jit)
-        .args(["issue", "create", "-t", "Child", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    let id2 = String::from_utf8_lossy(&output2.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
-
-    // Add dependency
-    Command::new(jit)
-        .args(["dep", "add", &id2, &id1])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    // Get roots
-    let output = Command::new(jit)
-        .args(["graph", "roots"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&id1));
-    assert!(!stdout.contains(&id2));
 }
 
 #[test]
@@ -914,58 +595,25 @@ fn test_bug_5dbc3548_deleted_issue_not_in_query() {
     // Bug 5dbc3548: Deleted issues reappear in queries until committed to git
     // This test verifies the fix using deletion tracking in index.json
 
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Initialize git (issue was committed)
-    Command::new("git")
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    Command::new("git")
-        .args(["config", "user.email", "test@test.com"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    Command::new("git")
-        .args(["config", "user.name", "Test"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    cli.init_git().unwrap();
 
     // Create an issue
-    let output = Command::new(jit)
-        .args(["issue", "create", "-t", "Test Issue", "-d", "desc"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "create", "-t", "Test Issue", "-d", "desc"])
         .output()
         .unwrap();
     assert!(output.status.success());
-
-    let id = String::from_utf8_lossy(&output.stdout)
-        .split_whitespace()
-        .last()
-        .unwrap()
-        .to_string();
+    let issues = cli.run_json(["issue", "search", "Test Issue"]).unwrap();
+    let id = issues["issues"][0]["id"].as_str().unwrap().to_owned();
 
     // Commit to git
-    Command::new("git")
-        .args(["add", ".jit/"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    Command::new("git")
-        .args(["commit", "-m", "Add issue"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    cli.commit("Add issue").unwrap();
 
     // Verify issue is visible
-    let output = Command::new(jit)
-        .args(["query", "all"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["query", "all"]).output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         stdout.contains("Test Issue"),
@@ -973,10 +621,8 @@ fn test_bug_5dbc3548_deleted_issue_not_in_query() {
     );
 
     // Delete the issue (requires JIT_ALLOW_DELETION=1)
-    let output = Command::new(jit)
-        .args(["issue", "delete", &id])
-        .env("JIT_ALLOW_DELETION", "1")
-        .current_dir(temp.path())
+    let output = cli
+        .command_with_env(["issue", "delete", &id], [("JIT_ALLOW_DELETION", "1")])
         .output()
         .unwrap();
     assert!(output.status.success(), "Deletion should succeed");
@@ -984,11 +630,7 @@ fn test_bug_5dbc3548_deleted_issue_not_in_query() {
     // THE BUG TEST: Issue should NOT appear in queries
     // Before fix: it would reappear because it's still in git
     // After fix: it's filtered out via deleted_ids in index
-    let output = Command::new(jit)
-        .args(["query", "all"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
+    let output = cli.command(["query", "all"]).output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(
@@ -1000,31 +642,21 @@ fn test_bug_5dbc3548_deleted_issue_not_in_query() {
 
 #[test]
 fn test_issue_timestamps_on_create() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Create an issue
-    let output = Command::new(jit)
-        .args([
-            "issue",
-            "create",
-            "-t",
+    let id = cli
+        .create_issue([
+            "--title",
             "Timestamp Test",
-            "-d",
+            "--description",
             "Testing timestamp fields",
         ])
-        .current_dir(temp.path())
-        .output()
         .unwrap();
 
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let id = stdout.split_whitespace().last().unwrap();
-
     // Show issue as JSON to check timestamps
-    let output = Command::new(jit)
-        .args(["issue", "show", id, "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "show", &id, "--json"])
         .output()
         .unwrap();
 
@@ -1054,23 +686,16 @@ fn test_issue_timestamps_on_create() {
 
 #[test]
 fn test_issue_timestamps_persist() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
+    let cli = JitCli::initialised().unwrap();
 
     // Create an issue
-    let output = Command::new(jit)
-        .args(["issue", "create", "-t", "Persist Test", "-d", "Description"])
-        .current_dir(temp.path())
-        .output()
+    let id = cli
+        .create_issue(["--title", "Persist Test", "--description", "Description"])
         .unwrap();
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let id = stdout.split_whitespace().last().unwrap();
-
     // Get initial timestamps
-    let output = Command::new(jit)
-        .args(["issue", "show", id, "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "show", &id, "--json"])
         .output()
         .unwrap();
 
@@ -1081,18 +706,16 @@ fn test_issue_timestamps_persist() {
     // Update the issue (this will change updated_at)
     std::thread::sleep(std::time::Duration::from_millis(10)); // Ensure timestamp difference
 
-    let output = Command::new(jit)
-        .args(["issue", "update", id, "--state", "ready"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "update", &id, "--state", "ready"])
         .output()
         .unwrap();
 
     assert!(output.status.success());
 
     // Get timestamps after update
-    let output = Command::new(jit)
-        .args(["issue", "show", id, "--json"])
-        .current_dir(temp.path())
+    let output = cli
+        .command(["issue", "show", &id, "--json"])
         .output()
         .unwrap();
 

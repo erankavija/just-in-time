@@ -46,7 +46,6 @@
 use crate::declarations::rules::{
     Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, DEFAULT_ORIGIN,
 };
-use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::LabelNamespaces;
 use std::collections::{HashMap, HashSet};
 
@@ -368,25 +367,6 @@ pub fn type_hierarchy_known_schema(namespaces: &LabelNamespaces) -> serde_json::
     namespace_values_schema(crate::labels::TYPE_NAMESPACE, &hierarchy_types)
 }
 
-/// Build the repo's [`HierarchyConfig`] from its label-namespace registry.
-///
-/// The config carries exactly the `types` and `label_associations` that
-/// `config.toml`'s `[type_hierarchy]` declared, both empty for a repository
-/// declaring none. On the impossible case of a malformed hierarchy (empty type
-/// name / level 0) it yields [`HierarchyConfig::empty`] rather than panicking,
-/// keeping this total.
-///
-/// Exposed so the graph-rule evaluation call site
-/// (`CommandExecutor::evaluate_graph_rules`) can build the same repo
-/// [`HierarchyConfig`] to inject into `type-hierarchy` rules (D1).
-pub fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig {
-    HierarchyConfig::new(
-        namespaces.declared_type_hierarchy(),
-        namespaces.label_associations.clone().unwrap_or_default(),
-    )
-    .unwrap_or_else(|_| HierarchyConfig::empty())
-}
-
 /// Construct a local-scope rule with a shorthand or raw assertion already built.
 fn local_rule(
     name: &str,
@@ -551,7 +531,7 @@ mod tests {
     }
 
     fn issue_with(labels: &[&str]) -> Issue {
-        let mut issue = crate::domain::fixture_issue("t".to_string(), String::new());
+        let mut issue = crate::test_utils::fixture_issue("t".to_string(), String::new());
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue
     }
@@ -1021,7 +1001,7 @@ mod tests {
         assert!(rules
             .rules
             .iter()
-            .all(|r| { r.name != "orphan-leaf" && r.name != "strategic-consistency" }));
+            .all(|r| !matches!(r.assert, Assertion::TypeHierarchy { .. })));
         assert!(rules.rules.iter().all(|r| r.scope != RuleScope::Graph));
         assert!(rules
             .rules

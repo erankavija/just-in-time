@@ -24,34 +24,16 @@
 //! The test uses ONLY the isolated temp repo — this repo's real
 //! `.jit/config.toml` is never read or written.
 
+use jit::test_cli::JitCli;
 use serde_json::Value;
-use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-/// Bootstrap an isolated, default-initialized repo in a temp directory.
-fn setup_isolated_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let output = Command::new(jit_binary())
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .expect("failed to run jit init");
-    assert!(output.status.success(), "jit init failed");
-    temp
-}
 
 /// Append an arbitrary `[item_kinds.policy]` table to the repo's
 /// `.jit/config.toml`, naming `policies.md` as the source.
 ///
 /// Uses a non-reserved kind name (`policy`) and a non-default source filename
 /// to exercise the fully-generic markdown path rather than any built-in shortcut.
-fn configure_policy_kind(repo: &Path) {
-    let config_path = repo.join(".jit").join("config.toml");
+fn configure_policy_kind(cli: &JitCli) {
+    let config_path = cli.root().join(".jit").join("config.toml");
     let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
     config.push_str(
         "\n[item_kinds.policy]\n\
@@ -68,47 +50,15 @@ fn configure_policy_kind(repo: &Path) {
 
 /// Write a `policies.md` with two `POL-NN` items under a `## Policies`
 /// section at the repo root.
-fn write_policy_source(repo: &Path) {
+fn write_policy_source(cli: &JitCli) {
     std::fs::write(
-        repo.join("policies.md"),
+        cli.root().join("policies.md"),
         "# Project Policies\n\n\
          ## Policies\n\n\
          - POL-01: all file writes must be atomic (temp-then-rename)\n\
          - POL-02: no production Rust code may use unsafe\n",
     )
     .unwrap();
-}
-
-/// Run `jit item list [--kind <kind>] --json` from `repo` and return parsed JSON.
-fn item_list(repo: &Path, kind: Option<&str>) -> Value {
-    let mut cmd = Command::new(jit_binary());
-    cmd.arg("item").arg("list");
-    if let Some(k) = kind {
-        cmd.arg("--kind").arg(k);
-    }
-    cmd.arg("--json");
-    let output = cmd.current_dir(repo).output().unwrap();
-    assert!(
-        output.status.success(),
-        "jit item list failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).unwrap()
-}
-
-/// Run `jit item show <qualified_id> --json` from `repo` and return parsed JSON.
-fn item_show(repo: &Path, qualified_id: &str) -> Value {
-    let output = Command::new(jit_binary())
-        .args(["item", "show", qualified_id, "--json"])
-        .current_dir(repo)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "jit item show {qualified_id} failed: {}",
-        String::from_utf8_lossy(&output.stdout)
-    );
-    serde_json::from_slice(&output.stdout).unwrap()
 }
 
 /// Extract `qualified_id` strings from a `jit item list/search` JSON result.
@@ -137,14 +87,14 @@ fn qualified_ids(json: &Value) -> Vec<&str> {
 /// This repo's real `.jit/config.toml` is never touched.
 #[test]
 fn test_config_declared_markdown_kind_indexes_project_items() {
-    let temp = setup_isolated_repo();
-    configure_policy_kind(temp.path());
-    write_policy_source(temp.path());
+    let cli = JitCli::initialised().unwrap();
+    configure_policy_kind(&cli);
+    write_policy_source(&cli);
 
     // -----------------------------------------------------------------------
     // Part 1: unfiltered `jit item list` contains both policy items.
     // -----------------------------------------------------------------------
-    let all = item_list(temp.path(), None);
+    let all = cli.run_json(["item", "list"]).unwrap();
     let all_qids = qualified_ids(&all);
     assert!(
         all_qids.contains(&"@/policy/POL-01"),
@@ -178,9 +128,9 @@ fn test_config_declared_markdown_kind_indexes_project_items() {
     // Part 2: `--kind policy` returns exactly the two policy items and nothing
     // else (no issue-scope items from the package-supplied kinds bleed into the result).
     // -----------------------------------------------------------------------
-    let by_kind = item_list(temp.path(), Some("policy"));
+    let by_kind = cli.run_json(["item", "list", "--kind", "policy"]).unwrap();
     assert_eq!(
-        by_kind["count"].as_u64().unwrap(),
+        by_kind["items"].as_array().unwrap().len(),
         2,
         "--kind policy must return exactly 2 items; got: {:?}",
         qualified_ids(&by_kind)
@@ -199,7 +149,7 @@ fn test_config_declared_markdown_kind_indexes_project_items() {
     // Part 3: `jit item show @/policy/POL-01 --json` resolves through the same
     // generic path — no substrate-specific command or code branch required.
     // -----------------------------------------------------------------------
-    let shown = item_show(temp.path(), "@/policy/POL-01");
+    let shown = cli.run_json(["item", "show", "@/policy/POL-01"]).unwrap();
     assert_eq!(
         shown["item"]["self_id"].as_str(),
         Some("POL-01"),

@@ -1,19 +1,36 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T23:33:09.537598626Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
     "428646c5-14ce-4127-ab7e-2b0ed56b0195",
     "5491edd0-b77e-4d2d-9cd2-83a0e4cd56cb",
-    "cccfd407-725f-4c09-910a-817fbc35bab2"
+    "cccfd407-725f-4c09-910a-817fbc35bab2",
+    "f8021e35-cf67-4142-a1f3-5fa810fb7fc8"
   ],
   "description": "Aggregate the work that delivers this outcome: well-known files, schema paths and reserved targets go through VirtualPath, and ProfileId lives in the domain.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Well-known `.jit` files and schema paths come only from `VirtualPath` constants and constructors.\n- [hard] REQ-02: Reserved application targets are recognised by one `VirtualPath` predicate after classification.\n- [hard] REQ-03: `ProfileId` is a domain type, and profile dependency resolution compares `ProfileId` values.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:05:02.274832403Z",
+  "first_ready_at": "2026-10-25T10:59:43.340186138Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3a0b992e-b189-46aa-829f-916e0bf27213",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:04:54.255127258Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "47fe80cd-ca4c-47c8-bb85-98ea2ad978b1",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:01:18.701450204Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5dd29767-b7c9-4037-a99c-c6c9a1081344",
   "labels": [
     "type:story",
@@ -26,7 +43,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Repository paths and profile identity are typed",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-27T00:05:02.274832403Z"
 }

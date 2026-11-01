@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:16:39.570334164Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,11 +9,19 @@
   ],
   "description": "Rewrite the short-id lease records in this checkout's machine-local claims log to full issue ids, so the log decodes once lease issue ids are validated.\n\n## Background\n\nThe claims log `.git/jit/claims.jsonl` is machine-local and gitignored. This checkout's log holds 26 acquire records whose `issue_id` is an 8-character short id; its five active leases in `claims.index.json` are canonical. The current code accepts full-id lease records and resolves short-id records through a tolerance path (`crates/jit/src/storage/claim_coordinator.rs:294,806`), so rewriting the short ids to the full ids they resolve to changes no lease outcome.\n\n## Success Criteria\n\n- [hard] REQ-01: Each acquire record in this checkout's claims log whose issue id is a short id names the full id of the issue it resolves to, and records that resolve to no issue are dropped.\n- [hard] REQ-02: Every record in the log has a canonical issue id, and lease-enforced commands and repository validation succeed afterwards.\n- [hard] REQ-03: No code changes, and no compatibility reader is added.\n\n## Notes\n\nOther checkouts with short-id records are rewritten the same way; the log is not repository content (`@/inv/canonical-cutover`).\n",
   "documents": [],
+  "done_at": "2026-10-24T23:16:46.535515971Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "run_id": "78b7ac16-dc5c-4ac8-b960-20a115b91eda",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:16:41.745223743Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0abaeba0-4ef2-49af-8700-aae07a5cd8c2",
   "labels": [
     "type:task",
@@ -24,7 +33,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "This checkout's claims log names issues by full id",
-  "updated_at": "2026-10-22T19:43:14.504129552Z"
+  "updated_at": "2026-10-24T23:16:46.535515971Z"
 }

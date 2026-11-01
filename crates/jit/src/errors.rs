@@ -7,10 +7,12 @@
 //!
 //! Designed to help users understand what went wrong and how to fix it.
 
+use crate::domain::identity::GateKey;
 use std::fmt;
 
 use crate::declarations::GateMode;
-use crate::domain::{GateStatus, Issue, State, SHORT_ID_LENGTH};
+use crate::domain::identity::IssueId;
+use crate::domain::{GateStatus, Issue, State};
 
 /// An error with diagnostic context and remediation steps.
 ///
@@ -228,7 +230,7 @@ pub struct DeletionNotConfirmedError {
 impl DeletionNotConfirmedError {
     /// Build the refusal for `issue_id`, naming it in the example remediation
     /// command.
-    pub fn new(issue_id: impl std::fmt::Display) -> Self {
+    pub fn new(issue_id: IssueId) -> Self {
         let actionable = ActionableError::new(
             "Issue deletion is discouraged and requires explicit confirmation.",
         )
@@ -485,13 +487,12 @@ impl RedundantDependencyError {
     /// Build a [`RedundantDependencyError`] for an `attempted = (from, to)` edge
     /// that would leave `redundant_edges` (each a `(from, to)` pair) redundant.
     /// When the attempted edge is itself the redundant one it appears in
-    /// `redundant_edges`. Ids are shortened to [`SHORT_ID_LENGTH`] in the message.
-    pub fn new(attempted: (String, String), redundant_edges: Vec<(String, String)>) -> Self {
-        let short = |id: &str| id.chars().take(SHORT_ID_LENGTH).collect::<String>();
-        let (from, to) = (short(&attempted.0), short(&attempted.1));
+    /// `redundant_edges`. Ids are shortened with `short_id()` in the message.
+    pub fn new(attempted: (IssueId, IssueId), redundant_edges: Vec<(IssueId, IssueId)>) -> Self {
+        let (from, to) = (attempted.0.short_id(), attempted.1.short_id());
         let pairs = redundant_edges
             .iter()
-            .map(|(f, t)| format!("{}→{}", short(f), short(t)))
+            .map(|(f, t)| format!("{}→{}", f.short_id(), t.short_id()))
             .collect::<Vec<_>>()
             .join(", ");
         let message = format!(
@@ -519,9 +520,8 @@ impl RedundantDependencyError {
 /// the transitive-reduction check) both run for every edge first. If any edge
 /// fails either check, this error is returned and NONE of the batch's edges
 /// are applied and no event is logged for any of them (jit:c8518f2a, REQ-01).
-/// Every rejected edge is named, not only the first (REQ-02). Too-short
-/// prefixes are refused before any issue record is read, so a batch carrying
-/// one names only its too-short ids.
+/// Every rejected edge is named, not only the first (REQ-02). The CLI raises
+/// it too, naming every target it cannot resolve before calling the executor.
 ///
 /// Each rejected edge keeps its own originating typed error so a caller (the
 /// CLI) can still classify it individually — by downcast, never by message
@@ -532,25 +532,22 @@ impl RedundantDependencyError {
 #[error("{message}")]
 pub struct DependencyBatchRejectedError {
     message: String,
-    from_id: String,
+    from_id: IssueId,
     rejected: Vec<(String, anyhow::Error)>,
 }
 
 impl DependencyBatchRejectedError {
-    /// Build the aggregate rejection from every failing target: the as-supplied
-    /// target id text paired with the typed error that rejected it, in request
-    /// order.
-    pub fn new(from_id: impl Into<String>, rejected: Vec<(String, anyhow::Error)>) -> Self {
-        let from_id = from_id.into();
-        let short = |id: &str| id.chars().take(SHORT_ID_LENGTH).collect::<String>();
+    /// Pair each rejected target's as-supplied request text with its typed
+    /// error, in request order.
+    pub fn new(from_id: IssueId, rejected: Vec<(String, anyhow::Error)>) -> Self {
         let mut message = format!(
             "Rejected {} dependency edge{} for {}; none were added:\n",
             rejected.len(),
             if rejected.len() == 1 { "" } else { "s" },
-            short(&from_id),
+            from_id.short_id(),
         );
-        for (to, error) in &rejected {
-            message.push_str(&format!("  - {}: {}\n", to, error));
+        for (requested, error) in &rejected {
+            message.push_str(&format!("  - {}: {}\n", requested, error));
         }
         Self {
             message,
@@ -560,11 +557,11 @@ impl DependencyBatchRejectedError {
     }
 
     /// The issue the batch targeted (the `<from>` of `jit dep add`).
-    pub fn from_id(&self) -> &str {
+    pub fn from_id(&self) -> &IssueId {
         &self.from_id
     }
 
-    /// Every rejected edge: the as-supplied target id text paired with the
+    /// Every rejected edge: the as-supplied target request text paired with the
     /// typed error that rejected it, in request order.
     pub fn rejected(&self) -> &[(String, anyhow::Error)] {
         &self.rejected
@@ -579,7 +576,7 @@ impl DependencyBatchRejectedError {
 /// JSON serialization is handled by `crate::output`.
 #[derive(Debug, Clone)]
 pub struct TransitionBlockedError {
-    issue_id: String,
+    issue_id: IssueId,
     requested_state: State,
     actual_state: State,
     blockers: Vec<TransitionBlocker>,
@@ -593,15 +590,15 @@ pub struct TransitionBlockedError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TransitionBlocker {
     Dependency {
-        issue_id: String,
+        issue_id: IssueId,
         title: String,
         state: State,
     },
     MissingDependency {
-        issue_id: String,
+        issue_id: IssueId,
     },
     Gate {
-        gate_key: String,
+        gate_key: GateKey,
         status: GateStatus,
         /// The gate's registry mode, so the remediation hint can name the
         /// `--by <attestor>` form for a manual gate (jit:1d59070d REQ-03)
@@ -628,7 +625,7 @@ pub(crate) enum TransitionBlocker {
 
 impl TransitionBlockedError {
     pub(crate) fn dependencies(
-        issue_id: String,
+        issue_id: IssueId,
         requested_state: State,
         actual_state: State,
         blockers: Vec<TransitionBlocker>,
@@ -643,10 +640,10 @@ impl TransitionBlockedError {
     }
 
     pub(crate) fn gates(
-        issue_id: String,
+        issue_id: IssueId,
         requested_state: State,
         actual_state: State,
-        gates: Vec<(String, GateStatus, GateMode)>,
+        gates: Vec<(GateKey, GateStatus, GateMode)>,
     ) -> Self {
         Self {
             issue_id,
@@ -670,7 +667,7 @@ impl TransitionBlockedError {
     /// The error maps to exit 4 via [`TransitionBlockedError::error_code`] and
     /// the existing downcast in `main.rs`.
     pub(crate) fn graph_rules(
-        issue_id: String,
+        issue_id: IssueId,
         requested_state: State,
         actual_state: State,
         rules: Vec<(String, String)>,
@@ -692,7 +689,11 @@ impl TransitionBlockedError {
     ///
     /// `requested_state` is the attempted target, `origin` the only legal revive
     /// target. Maps to exit 4 like the other transition refusals.
-    pub(crate) fn archived_revive(issue_id: String, requested_state: State, origin: State) -> Self {
+    pub(crate) fn archived_revive(
+        issue_id: IssueId,
+        requested_state: State,
+        origin: State,
+    ) -> Self {
         Self {
             issue_id,
             requested_state,
@@ -712,7 +713,7 @@ impl TransitionBlockedError {
         &self.warnings
     }
 
-    pub(crate) fn issue_id(&self) -> &str {
+    pub(crate) fn issue_id(&self) -> &IssueId {
         &self.issue_id
     }
 
@@ -742,7 +743,7 @@ impl TransitionBlockedError {
     }
 
     pub(crate) fn summary(&self) -> String {
-        let requested = state_name(self.requested_state);
+        let requested = self.requested_state.as_str();
         if let Some(TransitionBlocker::ArchivedRevive { origin }) = self
             .blockers
             .iter()
@@ -752,7 +753,7 @@ impl TransitionBlockedError {
                 "Cannot revive archived issue to '{}': an archived issue only revives to its \
                  pre-archive state '{}'",
                 requested,
-                state_name(*origin)
+                origin.as_str()
             )
         } else if self
             .blockers
@@ -795,7 +796,7 @@ impl TransitionBlockedError {
                 format!(
                     "jit issue update {} --state {}  # revive restores the pre-archive state",
                     self.issue_id,
-                    state_name(*origin)
+                    origin.as_str()
                 )
             }
             _ => format!("jit graph deps {}", self.issue_id),
@@ -853,7 +854,7 @@ impl TransitionBlockedError {
                     vec![format!(
                         "jit issue update {} --state {}  # the only legal revive target",
                         self.issue_id,
-                        state_name(*origin)
+                        origin.as_str()
                     )]
                 }
             }))
@@ -885,7 +886,7 @@ impl TransitionBlocker {
         }
     }
 
-    pub(crate) fn missing_dependency(issue_id: String) -> Self {
+    pub(crate) fn missing_dependency(issue_id: IssueId) -> Self {
         Self::MissingDependency { issue_id }
     }
 }
@@ -931,20 +932,14 @@ impl fmt::Display for TransitionBlocker {
                 issue_id,
                 title,
                 state,
-            } => write!(
-                f,
-                "{} {} [{}]",
-                short_id(issue_id),
-                title,
-                state_name(*state)
-            ),
+            } => write!(f, "{} {} [{}]", issue_id.short_id(), title, state.as_str()),
             Self::MissingDependency { issue_id } => {
-                write!(f, "{} (missing issue) [missing]", short_id(issue_id))
+                write!(f, "{} (missing issue) [missing]", issue_id.short_id())
             }
             Self::Gate {
                 gate_key, status, ..
             } => {
-                write!(f, "{} [{}]", gate_key, gate_status_name(*status))
+                write!(f, "{} [{}]", gate_key, status)
             }
             Self::GraphRule { rule, message } => {
                 write!(f, "[{}] {}", rule, message)
@@ -953,35 +948,11 @@ impl fmt::Display for TransitionBlocker {
                 write!(
                     f,
                     "archived issue only revives to its pre-archive state [{}]",
-                    state_name(*origin)
+                    origin.as_str()
                 )
             }
         }
     }
-}
-
-pub(crate) fn state_name(state: State) -> &'static str {
-    match state {
-        State::Backlog => "backlog",
-        State::Ready => "ready",
-        State::InProgress => "in_progress",
-        State::Gated => "gated",
-        State::Done => "done",
-        State::Rejected => "rejected",
-        State::Archived => "archived",
-    }
-}
-
-pub(crate) fn gate_status_name(status: GateStatus) -> &'static str {
-    match status {
-        GateStatus::Pending => "pending",
-        GateStatus::Passed => "passed",
-        GateStatus::Failed => "failed",
-    }
-}
-
-pub(crate) fn short_id(issue_id: &str) -> String {
-    issue_id.chars().take(SHORT_ID_LENGTH).collect()
 }
 
 /// Helper to create lease not found errors with standard remediation.
@@ -1015,7 +986,7 @@ pub fn no_acting_identity() -> ActionableError {
 /// Used by `jit claim release <issue-id>` when the issue has no active lease to
 /// release. The message contains "not found" so callers that map error text to
 /// exit codes treat it like other lookup failures.
-pub fn no_active_lease(issue_id: &str) -> ActionableError {
+pub fn no_active_lease(issue_id: &IssueId) -> ActionableError {
     ActionableError::new(format!(
         "Issue {} has no active lease to release (not found)",
         issue_id
@@ -1030,7 +1001,7 @@ pub fn no_active_lease(issue_id: &str) -> ActionableError {
 }
 
 /// Helper to create already claimed errors with standard remediation.
-pub fn already_claimed(issue_id: &str, agent_id: &str, expires_info: &str) -> ActionableError {
+pub fn already_claimed(issue_id: &IssueId, agent_id: &str, expires_info: &str) -> ActionableError {
     ActionableError::new(format!(
         "Issue {} already claimed by {} {}",
         issue_id, agent_id, expires_info
@@ -1128,8 +1099,9 @@ mod tests {
 
     #[test]
     fn test_graph_rule_block_renders_rule_and_message_and_validation_code() {
+        let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
         let error = TransitionBlockedError::graph_rules(
-            "issue-123".to_string(),
+            id.clone(),
             State::Done,
             State::InProgress,
             vec![(
@@ -1149,7 +1121,7 @@ mod tests {
         assert!(rendered.contains("epic-done-needs-design-dep"));
         assert!(rendered.contains("must depend on a type:design issue"));
         // The remediation suggests explaining the rule and a forced override.
-        assert!(rendered.contains("jit validate --explain issue-123"));
+        assert!(rendered.contains(&format!("jit validate --explain {id}")));
         assert!(rendered.contains("--force"));
         // It is NOT misreported as a gate or dependency block.
         assert!(!rendered.contains("unmet dependencies"));
@@ -1158,34 +1130,35 @@ mod tests {
 
     #[test]
     fn test_dependency_block_names_assign_in_remediation() {
+        let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
         let error = TransitionBlockedError::dependencies(
-            "issue-123".to_string(),
+            id.clone(),
             State::InProgress,
             State::Backlog,
             vec![TransitionBlocker::MissingDependency {
-                issue_id: "dep-456".to_string(),
+                issue_id: crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_8765_4321),
             }],
         );
 
         let rendered = error.to_string();
-        assert!(rendered.contains("jit issue assign issue-123 <assignee>"));
+        assert!(rendered.contains(&format!("jit issue assign {id} <assignee>")));
         assert!(rendered.contains("no state change"));
 
         // The same hint is present in the remediation list (the JSON path).
         assert!(error
             .remediation_commands()
             .iter()
-            .any(|cmd| cmd.contains("jit issue assign issue-123")));
+            .any(|cmd| cmd.contains(&format!("jit issue assign {id}"))));
     }
 
     #[test]
     fn test_gate_block_does_not_name_assign_in_remediation() {
         let error = TransitionBlockedError::gates(
-            "issue-123".to_string(),
+            crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678),
             State::Done,
             State::Gated,
             vec![(
-                "code-review".to_string(),
+                "code-review".parse().unwrap(),
                 GateStatus::Pending,
                 GateMode::Auto,
             )],
@@ -1198,12 +1171,13 @@ mod tests {
     /// `--by` form, since a bare `gate evaluate` on it is now a usage error.
     #[test]
     fn test_gate_block_remediation_names_by_for_manual_gate() {
+        let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
         let error = TransitionBlockedError::gates(
-            "issue-123".to_string(),
+            id.clone(),
             State::Done,
             State::Gated,
             vec![(
-                "code-review".to_string(),
+                "code-review".parse().unwrap(),
                 GateStatus::Pending,
                 GateMode::Manual,
             )],
@@ -1212,24 +1186,29 @@ mod tests {
         let commands = error.remediation_commands();
         assert!(commands
             .iter()
-            .any(|cmd| cmd == "jit gate evaluate issue-123 code-review --by <attestor>"));
+            .any(|cmd| cmd == &format!("jit gate evaluate {id} code-review --by <attestor>")));
     }
 
     /// The auto-gate counterpart: no `--by` in the remediation, since the
     /// checker supplies the verdict.
     #[test]
     fn test_gate_block_remediation_omits_by_for_auto_gate() {
+        let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
         let error = TransitionBlockedError::gates(
-            "issue-123".to_string(),
+            id.clone(),
             State::Done,
             State::Gated,
-            vec![("tests".to_string(), GateStatus::Pending, GateMode::Auto)],
+            vec![(
+                "tests".parse().unwrap(),
+                GateStatus::Pending,
+                GateMode::Auto,
+            )],
         );
 
         let commands = error.remediation_commands();
         assert!(commands
             .iter()
-            .any(|cmd| cmd == "jit gate evaluate issue-123 tests"));
+            .any(|cmd| cmd == &format!("jit gate evaluate {id} tests")));
         assert!(!commands.iter().any(|cmd| cmd.contains("--by")));
     }
 
@@ -1245,10 +1224,11 @@ mod tests {
 
     #[test]
     fn test_already_claimed_helper() {
-        let error = already_claimed("issue-1", "agent:worker-1", "until 2026-01-15");
+        let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
+        let error = already_claimed(&id.clone(), "agent:worker-1", "until 2026-01-15");
         let msg = error.to_error_message();
 
-        assert!(msg.contains("Issue issue-1 already claimed"));
+        assert!(msg.contains(&format!("Issue {id} already claimed")));
         assert!(msg.contains("agent:worker-1"));
         assert!(msg.contains("jit claim status --issue"));
         assert!(msg.contains("force-evict"));
@@ -1296,13 +1276,14 @@ mod tests {
 
     #[test]
     fn test_deletion_not_confirmed_error_names_issue_and_env_var() {
-        let err = DeletionNotConfirmedError::new("abc12345");
+        let id = crate::test_utils::issue_id(1);
+        let err = DeletionNotConfirmedError::new(id.clone());
         let msg = err.to_string();
 
         assert_eq!(msg, err.message());
         assert!(msg.contains("discouraged"));
         assert!(msg.contains("JIT_ALLOW_DELETION=1"));
-        assert!(msg.contains("jit issue delete abc12345"));
+        assert!(msg.contains(&format!("jit issue delete {id}")));
         // ActionableError's rendering, not a bespoke format: no doubled prefix.
         assert!(!msg.contains("Error:"));
 
@@ -1327,7 +1308,9 @@ mod tests {
     fn test_lease_not_found_error_renders_actionable_message_verbatim() {
         // LeaseNotFoundError captures the full rendered ActionableError text so
         // the rich remediation block is preserved while remaining downcastable.
-        let actionable = no_active_lease("abc12345");
+        let actionable = no_active_lease(&crate::test_utils::issue_id(
+            0x123442348234123456789abcabc12345,
+        ));
         let expected = actionable.to_string();
         let err = LeaseNotFoundError::new(&actionable);
         assert_eq!(err.to_string(), expected);

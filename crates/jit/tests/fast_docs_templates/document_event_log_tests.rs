@@ -3,11 +3,12 @@
 //! `jit doc add` and `jit doc remove` mutate an issue's `documents` field, so
 //! each must append an `issue_updated` event with `fields: ["documents"]`,
 //! mirroring `issue update` / `bulk_update` / dependency commands.
-use jit::domain::Event;
+use jit::domain::identity::IssueId;
+use jit::domain::EventBody;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
-fn create_issue<S>(executor: &jit::commands::CommandExecutor<S>, title: &str) -> String
+fn create_issue<S>(executor: &jit::commands::CommandExecutor<S>, title: &str) -> IssueId
 where
     S: IssueStore + jit::storage::RepositoryStateStore,
 {
@@ -29,15 +30,22 @@ where
 
 /// Assert the last event is `issue_updated` for `issue_id` with the expected
 /// actor and `fields` containing `documents`.
-fn assert_last_event_is_documents_update(h: &TestHarness, issue_id: &str, expected_actor: &str) {
+fn assert_last_event_is_documents_update(
+    h: &TestHarness,
+    issue_id: &IssueId,
+    expected_actor: &str,
+) {
     let events = h.storage.read_events().unwrap();
     let event = events.last().expect("event log should not be empty");
 
     assert_eq!(event.get_type(), "issue_updated");
-    assert_eq!(event.get_issue_id(), issue_id);
+    assert_eq!(
+        event.issue_id().map(|id| id.as_str()),
+        Some(issue_id.as_str())
+    );
 
-    match event {
-        Event::IssueUpdated {
+    match event.body() {
+        EventBody::IssueUpdated {
             updated_by, fields, ..
         } => {
             assert_eq!(updated_by, expected_actor);
@@ -115,11 +123,11 @@ fn test_add_document_reference_same_path_updates_in_place() {
 
     let listed = h.executor.list_document_references(&id).unwrap();
     assert_eq!(
-        listed.documents.len(),
+        listed.items.len(),
         1,
         "re-adding the same path must not duplicate the reference"
     );
-    assert_eq!(listed.documents[0].path, "docs/spec.md");
+    assert_eq!(listed.items[0].path, "docs/spec.md");
 }
 
 #[test]
@@ -177,8 +185,8 @@ fn test_add_document_reference_same_path_refreshes_given_metadata() {
     assert_last_event_is_documents_update(&h, &id, "doc-update");
 
     let listed = h.executor.list_document_references(&id).unwrap();
-    assert_eq!(listed.documents.len(), 1);
-    assert_eq!(listed.documents[0].label.as_deref(), Some("Final"));
+    assert_eq!(listed.items.len(), 1);
+    assert_eq!(listed.items[0].label.as_deref(), Some("Final"));
 }
 
 #[test]
@@ -228,13 +236,9 @@ fn test_add_document_reference_new_path_appends() {
         .unwrap();
 
     let listed = h.executor.list_document_references(&id).unwrap();
-    assert_eq!(
-        listed.documents.len(),
-        2,
-        "distinct paths must both be kept"
-    );
+    assert_eq!(listed.items.len(), 2, "distinct paths must both be kept");
 
-    let paths: Vec<&str> = listed.documents.iter().map(|d| d.path.as_str()).collect();
+    let paths: Vec<&str> = listed.items.iter().map(|d| d.path.as_str()).collect();
     assert!(paths.contains(&"docs/spec.md"));
     assert!(paths.contains(&"docs/other.md"));
 
@@ -242,8 +246,8 @@ fn test_add_document_reference_new_path_appends() {
     let events = h.storage.read_events().unwrap();
     let add_tags: Vec<_> = events
         .iter()
-        .filter_map(|e| match e {
-            Event::IssueUpdated { updated_by, .. } => Some(updated_by.as_str()),
+        .filter_map(|e| match e.body() {
+            EventBody::IssueUpdated { updated_by, .. } => Some(updated_by.as_str()),
             _ => None,
         })
         .collect();
@@ -254,34 +258,15 @@ fn test_add_document_reference_new_path_appends() {
 fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
     use jit::commands::CommandExecutor;
     use jit::storage::{discover_repository_layout, JsonFileStorage};
+    use jit::test_harness::git::GitRepository;
     use sha2::{Digest, Sha256};
 
     let temp = tempfile::tempdir().unwrap();
-    let repo = git2::Repository::init(temp.path()).unwrap();
-    std::fs::create_dir_all(temp.path().join("docs")).unwrap();
-    std::fs::write(temp.path().join("docs/guide.md"), "![pinned](./logo.png)\n").unwrap();
-    std::fs::write(temp.path().join("docs/logo.png"), b"pinned asset").unwrap();
-    let mut index = repo.index().unwrap();
-    index
-        .add_path(std::path::Path::new("docs/guide.md"))
-        .unwrap();
-    index
-        .add_path(std::path::Path::new("docs/logo.png"))
-        .unwrap();
-    let tree_id = index.write_tree().unwrap();
-    let tree = repo.find_tree(tree_id).unwrap();
-    let signature = git2::Signature::now("JIT test", "jit@example.invalid").unwrap();
-    let revision = repo
-        .commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            "pinned document",
-            &tree,
-            &[],
-        )
-        .unwrap()
-        .to_string();
+    let repository = GitRepository::init(temp.path());
+    let revision = repository
+        .write("docs/guide.md", "![pinned](./logo.png)\n")
+        .write("docs/logo.png", b"pinned asset")
+        .commit("pinned document");
 
     let storage = JsonFileStorage::new(temp.path().join(".jit"));
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();

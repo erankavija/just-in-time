@@ -1,10 +1,12 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T09:43:40.055241707Z",
   "context": {},
   "created_at": "2026-08-13T13:46:34.522464488Z",
   "dependencies": [],
-  "description": "A fixture-receipt test fails on a process-cwd race roughly a third of full-suite runs, so a gate verdict can depend on test scheduling rather than the tree.\n\n## Background\n\n`test_utils::tests::test_profiled_repository_fixture_receipt_binds_setup_and_consumer_to_shared_runtime_target` panics intermittently under `cargo test --workspace`:\n\n    thread '...' panicked at crates/jit/src/test_utils.rs:1745:9:\n    compile the consumer artifact: error: Unable to proceed. Could not locate working directory.: No such file or directory (os error 2)\n\nThe failure is a race against another test's `TempDir`: the panicking test's cargo invocation resolves its working directory while a concurrently finishing test tears its temporary directory down. Observed during the `5a3ecba0` wave on 2026-08-13: roughly one failure per three `cargo test --workspace` runs on a 24-core host. Reproduced on a stashed base commit (two failures in six runs), so it predates that wave's changes and is not theirs.\n\nA test that fails on scheduling is the same defect class `0708d692` removed from the gate scripts: a verdict decided by the machine rather than the tree. The suite runs under nextest in gate runs (process-per-test), where the exposure may differ from `cargo test`'s in-process threading — whether the gate path is affected must be established, not assumed.\n\n## Success Criteria\n\n- [hard] REQ-01: The fixture-receipt test passes deterministically under repeated whole-suite runs on a multi-core host, evidenced by a run count that previously reproduced the failure.\n- [hard] REQ-02: The fix removes the test's dependence on another test's working directory rather than retrying over it or widening timeouts.\n- [hard] REQ-03: Whether the nextest gate path was exposed is established and recorded with the fix.\n",
+  "description": "A fixture-receipt test fails on a process-cwd race roughly a third of full-suite runs, so a gate verdict can depend on test scheduling rather than the tree.\n\n## Background\n\n`test_utils::tests::test_profiled_repository_fixture_receipt_binds_setup_and_consumer_to_shared_runtime_target` panics intermittently under `cargo test --workspace`:\n\n    thread '...' panicked at crates/jit/src/test_utils.rs:1745:9:\n    compile the consumer artifact: error: Unable to proceed. Could not locate working directory.: No such file or directory (os error 2)\n\nThe failure is a race against another test's `TempDir`: the panicking test's cargo invocation resolves its working directory while a concurrently finishing test tears its temporary directory down. Observed during the `5a3ecba0` wave on 2026-08-13: roughly one failure per three `cargo test --workspace` runs on a 24-core host. Reproduced on a stashed base commit (two failures in six runs), so it predates that wave's changes and is not theirs.\n\nA test that fails on scheduling is the same defect class `0708d692` removed from the gate scripts: a verdict decided by the machine rather than the tree. The suite runs under nextest in gate runs (process-per-test), where the exposure may differ from `cargo test`'s in-process threading — whether the gate path is affected must be established, not assumed.\n\n## Success Criteria\n\n- [hard] REQ-01: The fixture-receipt test passes deterministically under repeated whole-suite runs on a multi-core host, evidenced by a run count that previously reproduced the failure.\n- [hard] REQ-02: The fix removes the test's dependence on another test's working directory rather than retrying over it or widening timeouts.\n- [hard] REQ-03: Whether the nextest gate path was exposed is established and recorded with the fix.\n\n\n\nFurther evidence at `243842b0b`. The reported message reproduces by spawning cargo from a deleted working directory; tests could then chdir into a `TempDir` through `CurrentDirGuard`. `0e283d8fa` removed the guard and the last `set_current_dir`, and `test_workspace_never_mutates_process_state` now rejects it across `crates/`. `cargo test --workspace` ran 12 times, all exit 0 with 4659 passing; at the reported rate of one in three, 12 clean runs by chance is about 0.8%. Not reproduced at a commit before `0e283d8fa`; the issue's own 2-in-6 record stands for that. REQ-01's named test no longer exists, so this evidence covers the whole suite. Nextest's lack of exposure is by reasoning: each test has its own process.\n",
   "documents": [],
+  "done_at": "2026-11-01T10:24:26.383909884Z",
   "first_ready_at": "2026-08-13T13:46:34.522464488Z",
   "gates_required": [
     "cargo-ci",
@@ -12,14 +14,16 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-13T13:46:47.112767200Z",
-      "updated_by": null
+      "run_id": "be860948-b043-4c10-a1c9-7e7f78109d37",
+      "status": "passed",
+      "updated_at": "2026-11-01T09:51:45.742185584Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-13T13:46:47.259699462Z",
-      "updated_by": null
+      "run_id": "b67b2597-a6a5-40b6-b4b7-9f5b35afb672",
+      "status": "passed",
+      "updated_at": "2026-11-01T09:55:15.083566462Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "d2b7d19b-3ffe-4fae-bb2b-2cc43847e491",
@@ -30,7 +34,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "A fixture-receipt test races another test's TempDir and flakes a third of suite runs",
-  "updated_at": "2026-08-13T13:46:47.259699462Z"
+  "updated_at": "2026-11-01T10:24:26.383909884Z"
 }

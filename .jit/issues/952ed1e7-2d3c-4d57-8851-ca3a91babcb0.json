@@ -1,0 +1,42 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T03:55:55.737089687Z",
+  "context": {},
+  "created_at": "2026-11-01T03:47:53.341498536Z",
+  "dependencies": [
+    "14c08f51-2cbe-4e4b-8004-2f433d838ba4"
+  ],
+  "description": "Stop unit and integration tests from reading this repository's live `.jit/` tracker, so cargo-ci verdicts do not depend on tracker contents.\n\n## Background\n\nSeveral tests read the repository's own tracker through `CARGO_MANIFEST_DIR`: `crates/jit/src/repository_state/mutation.rs:1936` (event log) and `:1970` (issue, gate-run and index records), `crates/jit/src/declarations/gates.rs:391` (`gates.toml`), and `crates/jit/tests/fast_docs_templates/template_apply_tests.rs:1094,1138,1177`. A test here depends on whichever tracker state the worktree holds, so another lead's tracker commit can change the verdict of an unrelated change. `@/inv/orthogonal-tests` requires each test to build the state it reads in storage it owns.\n\n## Success Criteria\n\n- [hard] REQ-01: No test under `crates/` reads this repository's live `.jit/` directory.\n- [hard] REQ-02: Each property those tests prove is proven over a fixture or built state the test owns.\n- [hard] REQ-03: Whether this repository's own records decode and round-trip is checked through a configured repository-validation gate rather than the Rust test suite.\n",
+  "documents": [],
+  "done_at": "2026-11-01T08:13:45.674280947Z",
+  "first_ready_at": "2026-11-01T03:47:53.341498536Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d1290eb5-9e81-4455-9b4b-4e848e8d87e8",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:07:12.073640427Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "fefe81e2-3c7d-413e-a6fe-6e3c8c680f36",
+      "status": "passed",
+      "updated_at": "2026-11-01T08:12:33.508182310Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "952ed1e7-2d3c-4d57-8851-ca3a91babcb0",
+  "labels": [
+    "component:core",
+    "epic:test-topology",
+    "milestone:v1.0",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Tests stop reading the live tracker",
+  "updated_at": "2026-11-01T08:13:45.674280947Z"
+}

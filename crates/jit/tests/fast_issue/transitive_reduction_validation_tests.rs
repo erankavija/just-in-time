@@ -2,6 +2,7 @@
 //!
 //! Ensures the dependency DAG maintains its transitive reduction form with no
 //! redundant edges. Tests detection, auto-fix, and edge cases.
+use jit::domain::SHORT_ID_LENGTH;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
@@ -35,15 +36,15 @@ fn test_fix_transitive_reduction_logs_event() {
 
     let event = &events[events_before];
     assert_eq!(event.get_type(), "dependency_reduced");
-    assert_eq!(event.get_issue_id(), a);
+    assert_eq!(event.issue_id().map(|id| id.as_str()), Some(a.as_str()));
 
-    if let jit::domain::Event::DependencyReduced {
+    if let jit::domain::EventBody::DependencyReduced {
         issue_id,
         old_count,
         new_count,
         removed_deps,
         ..
-    } = event
+    } = event.body()
     {
         assert_eq!(issue_id, &a);
         assert_eq!(*old_count, 2);
@@ -325,7 +326,8 @@ fn test_dep_add_rejects_edge_that_shadows_existing_edge() {
     let msg = err.to_string();
     // The offending edge pair (A → C) must be named.
     assert!(
-        msg.contains(&a[..8]) && msg.contains(&c[..8]),
+        msg.contains(&a.as_str()[..SHORT_ID_LENGTH])
+            && msg.contains(&c.as_str()[..SHORT_ID_LENGTH]),
         "error must name the shadowed edge A→C, got: {msg}"
     );
     assert!(
@@ -361,7 +363,8 @@ fn test_dep_add_rejects_self_redundant_edge() {
         .expect_err("self-redundant add must be rejected");
     let msg = err.to_string();
     assert!(
-        msg.contains(&a[..8]) && msg.contains(&c[..8]),
+        msg.contains(&a.as_str()[..SHORT_ID_LENGTH])
+            && msg.contains(&c.as_str()[..SHORT_ID_LENGTH]),
         "error must name the redundant edge A→C, got: {msg}"
     );
 

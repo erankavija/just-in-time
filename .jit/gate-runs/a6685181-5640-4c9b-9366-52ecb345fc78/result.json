@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6f0d7a6ed0455553d7335db597d90f80cdaf119d",
+  "completed_at": "2026-10-27T00:41:58.538671538Z",
+  "duration_ms": 68276,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared git initializer replaces the private setup without changing test assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8b6285a6-8958-4ccd-a9fd-477743f98e8d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a6685181-5640-4c9b-9366-52ecb345fc78",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:40:50.262029813Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d6da391b2; 6f0d7a6e (merge carries no combined-diff resolution hunks)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05 (issue description); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed 2026-10-27T00:40:48Z (reused; exit code unavailable)\nTruncation recovery: narrowed policy lookup to target ancestors; reread test remainder, invariant entries, and merge-target patches; generated cache paths excluded as outside the impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared git initializer replaces the private setup without changing test assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

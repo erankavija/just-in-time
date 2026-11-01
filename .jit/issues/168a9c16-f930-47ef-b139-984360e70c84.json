@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-29T07:06:12.526843388Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Cut the label and filter subprocess tests outside the main query suite to wiring cases, now that the domain owns label and strategic query semantics.\n\n## Background\n\n`crates/jit/src/domain/queries.rs` owns `query_by_label`, `query_by_labels` and `query_strategic`. Subprocess tests in `crates/jit/tests/cli_query_graph` re-prove them. `label_filter_repeatable_query_tests.rs` (17 tests) proves AND semantics and a single-label regression for each of eight list subcommands. `label_query_json_tests.rs` (7) proves pattern semantics: exact, wildcard, no match and case. `query_json_tests.rs` (5) and the workflows of `label_hierarchy_e2e_test.rs` (4) assert filter membership. `query_json_tests.rs` also holds the guard against a parent filter given before the `query` subcommand, an argument-validation case with no other owner. The label-validation and hierarchy-warning properties of `label_hierarchy_e2e_test.rs` have no other owner.\n\n## Success Criteria\n\n- [hard] REQ-01: These files hold at most one case per list subcommand and per filter flag, each asserting that the filter reaches the domain query. They also keep the invalid-pattern error and the parent-filter guard as argument-validation cases.\n- [hard] REQ-02: Each removed case's property has an owning test in `crates/jit/src/domain/queries.rs` before the case is removed, so no semantic case remains here; the domain owners are added ahead of this change, which adds none itself.\n- [hard] REQ-03: The label-validation and hierarchy-warning assertions of `label_hierarchy_e2e_test.rs` remain.\n",
   "documents": [],
+  "done_at": "2026-10-29T07:42:49.225419249Z",
+  "first_ready_at": "2026-10-29T07:05:00.680468856Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b6705108-f013-4bf0-ab1a-9eee1bdff12a",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:38:04.835931500Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0e5d87ef-e0d4-4c91-bdef-7e8501310a4d",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:42:11.038641704Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "168a9c16-f930-47ef-b139-984360e70c84",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Label and filter CLI tests assert one wiring case per subcommand and flag",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-29T07:42:49.225419249Z"
 }

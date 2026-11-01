@@ -1,6 +1,7 @@
 //! Preset manager for loading a project's own gate presets
 
 use super::{GatePresetDefinition, PresetInfo};
+use crate::repository_state::{RepositoryLayout, VirtualPath};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fs;
@@ -8,21 +9,21 @@ use std::path::{Path, PathBuf};
 
 /// Manages the gate presets a project declares for itself.
 pub struct PresetManager {
-    jit_root: PathBuf,
+    layout: RepositoryLayout,
     presets: HashMap<String, GatePresetDefinition>,
 }
 
 impl PresetManager {
     /// Create a new preset manager
-    pub fn new(jit_root: PathBuf) -> Result<Self> {
-        let presets = Self::load_presets(&jit_root)?;
+    pub fn new(layout: RepositoryLayout) -> Result<Self> {
+        let presets = Self::load_presets(&layout)?;
 
-        Ok(Self { jit_root, presets })
+        Ok(Self { layout, presets })
     }
 
     /// Load custom presets from .jit/config/gate-presets/
-    fn load_presets(jit_root: &Path) -> Result<HashMap<String, GatePresetDefinition>> {
-        let presets_dir = jit_root.join("config").join("gate-presets");
+    fn load_presets(layout: &RepositoryLayout) -> Result<HashMap<String, GatePresetDefinition>> {
+        let presets_dir = layout.resolve(&VirtualPath::GATE_PRESETS)?;
 
         match fs::symlink_metadata(&presets_dir) {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -91,8 +92,8 @@ impl PresetManager {
     }
 
     /// Get custom presets directory path.
-    pub fn custom_presets_dir(&self) -> PathBuf {
-        self.jit_root.join("config").join("gate-presets")
+    pub fn custom_presets_dir(&self) -> Result<PathBuf> {
+        Ok(self.layout.resolve(&VirtualPath::GATE_PRESETS)?)
     }
 }
 
@@ -159,7 +160,7 @@ mod tests {
             name: name.to_string(),
             description: format!("Custom preset {}", name),
             gates: vec![GateTemplate {
-                key: "custom-gate".to_string(),
+                key: "custom-gate".parse().unwrap(),
                 title: "Custom Gate".to_string(),
                 description: "A custom gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -177,10 +178,11 @@ mod tests {
     #[test]
     fn test_load_presets_answers_with_nothing_when_the_project_declares_none() {
         let temp_dir = TempDir::new().unwrap();
-        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+        let presets_dir = layout.resolve(&VirtualPath::GATE_PRESETS).unwrap();
         fs::create_dir_all(&presets_dir).unwrap();
 
-        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
+        let manager = PresetManager::new(layout).unwrap();
         assert!(manager.presets.is_empty());
         assert!(manager.list_presets().is_empty());
     }
@@ -188,10 +190,11 @@ mod tests {
     #[test]
     fn test_get_preset() {
         let temp_dir = TempDir::new().unwrap();
-        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+        let presets_dir = layout.resolve(&VirtualPath::GATE_PRESETS).unwrap();
         fs::create_dir_all(&presets_dir).unwrap();
         create_test_preset_file(&presets_dir, "my-preset").unwrap();
-        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
+        let manager = PresetManager::new(layout).unwrap();
 
         let preset = manager.get_preset("my-preset").unwrap();
         assert_eq!(preset.name, "my-preset");
@@ -201,7 +204,10 @@ mod tests {
     #[test]
     fn test_get_nonexistent_preset() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
+        let manager = PresetManager::new(crate::test_utils::repository_layout_for_data_root(
+            temp_dir.path(),
+        ))
+        .unwrap();
 
         let result = manager.get_preset("nonexistent");
         assert!(result.is_err());
@@ -211,12 +217,13 @@ mod tests {
     #[test]
     fn test_load_custom_preset() {
         let temp_dir = TempDir::new().unwrap();
-        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+        let presets_dir = layout.resolve(&VirtualPath::GATE_PRESETS).unwrap();
         fs::create_dir_all(&presets_dir).unwrap();
 
         create_test_preset_file(&presets_dir, "my-preset").unwrap();
 
-        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
+        let manager = PresetManager::new(layout).unwrap();
 
         assert!(manager.has_preset("my-preset"));
         let preset = manager.get_preset("my-preset").unwrap();
@@ -227,11 +234,12 @@ mod tests {
     #[test]
     fn test_list_presets_reports_each_declared_preset_and_its_gate_count() {
         let temp_dir = TempDir::new().unwrap();
-        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+        let presets_dir = layout.resolve(&VirtualPath::GATE_PRESETS).unwrap();
         fs::create_dir_all(&presets_dir).unwrap();
         create_test_preset_file(&presets_dir, "my-preset").unwrap();
 
-        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
+        let manager = PresetManager::new(layout).unwrap();
         let list = manager.list_presets();
         assert_eq!(list.len(), 1);
         let listed = list.iter().find(|p| p.name == "my-preset").unwrap();
@@ -244,7 +252,8 @@ mod tests {
     #[test]
     fn test_custom_filename_must_match_embedded_name() {
         let temp_dir = TempDir::new().unwrap();
-        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+        let presets_dir = layout.resolve(&VirtualPath::GATE_PRESETS).unwrap();
         fs::create_dir_all(&presets_dir).unwrap();
 
         create_test_preset_file(&presets_dir, "embedded-name").unwrap();
@@ -253,7 +262,7 @@ mod tests {
             presets_dir.join("different-name.json"),
         )
         .unwrap();
-        let error = PresetManager::new(temp_dir.path().to_path_buf())
+        let error = PresetManager::new(layout)
             .err()
             .expect("filename mismatch must be rejected");
         assert!(error.to_string().contains("must match embedded name"));
@@ -262,12 +271,13 @@ mod tests {
     #[test]
     fn test_list_presets_is_sorted_by_name() {
         let temp_dir = TempDir::new().unwrap();
-        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+        let presets_dir = layout.resolve(&VirtualPath::GATE_PRESETS).unwrap();
         fs::create_dir_all(&presets_dir).unwrap();
         create_test_preset_file(&presets_dir, "zeta-checks").unwrap();
         create_test_preset_file(&presets_dir, "alpha-checks").unwrap();
 
-        let names = PresetManager::new(temp_dir.path().to_path_buf())
+        let names = PresetManager::new(layout)
             .unwrap()
             .list_presets()
             .into_iter()
@@ -279,23 +289,25 @@ mod tests {
     #[test]
     fn test_invalid_preset_file_returns_error() {
         let temp_dir = TempDir::new().unwrap();
-        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+        let presets_dir = layout.resolve(&VirtualPath::GATE_PRESETS).unwrap();
         fs::create_dir_all(&presets_dir).unwrap();
 
         // Create invalid JSON file
         fs::write(presets_dir.join("bad.json"), "{ invalid json }").unwrap();
 
-        let result = PresetManager::new(temp_dir.path().to_path_buf());
+        let result = PresetManager::new(layout);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_non_regular_json_preset_occupant_is_rejected() {
         let temp_dir = TempDir::new().unwrap();
-        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+        let presets_dir = layout.resolve(&VirtualPath::GATE_PRESETS).unwrap();
         fs::create_dir_all(presets_dir.join("directory.json")).unwrap();
 
-        let error = PresetManager::new(temp_dir.path().to_path_buf())
+        let error = PresetManager::new(layout)
             .err()
             .expect("a .json directory must be rejected");
         assert!(error.to_string().contains("must be an ordinary file"));
@@ -307,12 +319,13 @@ mod tests {
         use std::os::unix::fs::symlink;
 
         let temp_dir = TempDir::new().unwrap();
-        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+        let presets_dir = layout.resolve(&VirtualPath::GATE_PRESETS).unwrap();
         fs::create_dir_all(&presets_dir).unwrap();
         create_test_preset_file(&presets_dir, "regular").unwrap();
         symlink("regular.json", presets_dir.join("linked.json")).unwrap();
 
-        let error = PresetManager::new(temp_dir.path().to_path_buf())
+        let error = PresetManager::new(layout)
             .err()
             .expect("a .json symlink must be rejected without following");
         assert!(error.to_string().contains("must be an ordinary file"));
@@ -321,11 +334,16 @@ mod tests {
     #[test]
     fn test_non_directory_custom_preset_root_is_rejected() {
         let temp_dir = TempDir::new().unwrap();
-        let config_dir = temp_dir.path().join("config");
+        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
+        let config_dir = layout.resolve(&VirtualPath::CONFIG_DIR).unwrap();
         fs::create_dir_all(&config_dir).unwrap();
-        fs::write(config_dir.join("gate-presets"), "not a directory").unwrap();
+        fs::write(
+            layout.resolve(&VirtualPath::GATE_PRESETS).unwrap(),
+            "not a directory",
+        )
+        .unwrap();
 
-        let error = PresetManager::new(temp_dir.path().to_path_buf())
+        let error = PresetManager::new(layout)
             .err()
             .expect("a non-directory preset root must be rejected");
         assert!(error.to_string().contains("must be an ordinary directory"));
@@ -336,7 +354,10 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         // Don't create the presets directory
 
-        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
+        let manager = PresetManager::new(crate::test_utils::repository_layout_for_data_root(
+            temp_dir.path(),
+        ))
+        .unwrap();
         assert!(manager.presets.is_empty());
     }
 }

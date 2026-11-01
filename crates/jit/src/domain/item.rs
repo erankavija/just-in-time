@@ -39,13 +39,14 @@
 //! kinds, whose source path comes from config). A list entry without a matching
 //! self-id is plain prose and incurs no addressing requirement (REQ-06).
 
-use crate::config::{
-    ItemKindConfig, ItemKindSource, KindScopeConfig, SourceOfTruth, TomlSourceDescriptor,
-};
+use crate::config::{ItemKindConfig, ItemKindSource, SourceOfTruth, TomlSourceDescriptor};
 use crate::document::ContentParser;
+use crate::domain::id_pattern::{IdPattern, InvalidIdPatternError};
+use crate::domain::identity::{InvalidIdPrefixError, IssueId, IssueIdPrefix};
 use crate::domain::projection::project;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::domain::Issue;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
@@ -55,6 +56,9 @@ use thiserror::Error;
 /// `@/issue/<short-id>/<kind>/<self-id>` for an issue item — so the `issue`
 /// reserved segment, not the leading `@`, is what distinguishes the two.
 pub const PROJECT_SCOPE_SENTINEL: &str = "@";
+
+/// Reserved address segment that introduces issue-scoped item addresses.
+pub const ISSUE_ADDRESS_SEGMENT: &str = "issue";
 
 /// The substrate an addressable item belongs to (REQ-01), one input to its
 /// derived qualified id.
@@ -73,7 +77,7 @@ pub const PROJECT_SCOPE_SENTINEL: &str = "@";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Scope {
     /// An issue scope, carrying the issue's short-id (the qualified-id prefix).
-    Issue(String),
+    Issue(IssueIdPrefix),
     /// The project scope, rendered with the [`PROJECT_SCOPE_SENTINEL`] (`@`).
     Project,
 }
@@ -85,11 +89,11 @@ impl Scope {
     /// segment is taken as an issue scope verbatim (resolution of a short-id /
     /// unique prefix to a full id is a storage concern handled by the caller, not
     /// this pure parser).
-    pub fn parse(segment: &str) -> Self {
+    pub fn parse(segment: &str) -> Result<Self, InvalidIdPrefixError> {
         if segment == PROJECT_SCOPE_SENTINEL {
-            Scope::Project
+            Ok(Scope::Project)
         } else {
-            Scope::Issue(segment.to_string())
+            Ok(Scope::Issue(segment.parse()?))
         }
     }
 
@@ -100,7 +104,7 @@ impl Scope {
     pub fn prefix(&self) -> &str {
         match self {
             Scope::Project => PROJECT_SCOPE_SENTINEL,
-            Scope::Issue(short_id) => short_id,
+            Scope::Issue(short_id) => short_id.as_str(),
         }
     }
 
@@ -131,7 +135,7 @@ pub enum AddressScope {
     /// A named-project reference `@<name>`, carrying the unresolved name.
     NamedProject(String),
     /// An issue scope, carrying the issue short-id from `@/issue/<short-id>/...`.
-    Issue(String),
+    Issue(IssueIdPrefix),
 }
 
 impl AddressScope {
@@ -231,7 +235,7 @@ pub fn parse_kind_segmented_address(address: &str) -> Result<KindSegmentedAddres
     let rest: Vec<&str> = segments.collect();
 
     match rest.len() {
-        4 if rest[0] == KindScope::ISSUE_TOKEN => {
+        4 if rest[0] == ISSUE_ADDRESS_SEGMENT => {
             if !project_name.is_empty() {
                 return Err(invalid(
                     "the issue-item form must use the bare '@' scope, not a named project"
@@ -243,20 +247,19 @@ pub fn parse_kind_segmented_address(address: &str) -> Result<KindSegmentedAddres
             require_non_empty(kind, "kind", address)?;
             require_non_empty(self_id, "self-id", address)?;
             Ok(KindSegmentedAddress {
-                scope: AddressScope::Issue(short_id.to_string()),
+                scope: AddressScope::Issue(short_id.parse()?),
                 kind: kind.to_string(),
                 self_id: self_id.to_string(),
             })
         }
         4 => Err(invalid(format!(
             "expected the reserved segment '{}' after the scope, found '{}'",
-            KindScope::ISSUE_TOKEN,
-            rest[0]
+            ISSUE_ADDRESS_SEGMENT, rest[0]
         ))),
-        2 if rest[0] == KindScope::ISSUE_TOKEN => Err(invalid(format!(
+        2 if rest[0] == ISSUE_ADDRESS_SEGMENT => Err(invalid(format!(
             "'{}' is a reserved segment, not a kind name; use \
              @/issue/<short-id>/<kind>/<self-id> for issue-scoped addresses",
-            KindScope::ISSUE_TOKEN
+            ISSUE_ADDRESS_SEGMENT
         ))),
         2 => {
             let (kind, self_id) = (rest[0], rest[1]);
@@ -297,7 +300,7 @@ fn require_non_empty(segment: &str, label: &str, address: &str) -> Result<(), It
 ///
 /// The sugar form omits the kind segment [`parse_kind_segmented_address`]
 /// requires explicit; this recovers it by matching `self_id` against every
-/// ISSUE-scoped kind's `id-pattern` in `kinds` (the same `id_pattern.find`
+/// ISSUE-scoped kind's `id-pattern` in `kinds` (the same `IdPattern::regex().find`
 /// mechanism [`extract_raw_items`] uses to mint items). PROJECT-scoped kinds
 /// (`scope = "project"`, e.g. `invariant`, `definition`) are excluded from
 /// candidate matching regardless of whether their pattern would otherwise
@@ -348,7 +351,7 @@ pub fn expand_sugar_address(
     let candidates: Vec<&ItemKind> = kinds
         .iter()
         .filter(|kind| kind.kind_scope() == KindScope::Issue)
-        .filter(|kind| kind.id_pattern.find(self_id).is_some())
+        .filter(|kind| kind.id_pattern.regex().find(self_id).is_some())
         .collect();
 
     match candidates.as_slice() {
@@ -357,7 +360,7 @@ pub fn expand_sugar_address(
             self_id: self_id.to_string(),
         }),
         [only] => Ok(KindSegmentedAddress {
-            scope: AddressScope::Issue(short_id.to_string()),
+            scope: AddressScope::Issue(short_id.parse()?),
             kind: only.name().to_string(),
             self_id: self_id.to_string(),
         }),
@@ -372,28 +375,26 @@ pub fn expand_sugar_address(
     }
 }
 
-/// The declared addressing scope of an item *kind* (as opposed to a resolved
-/// [`Scope`], which carries a concrete issue short-id).
-///
-/// A kind is either issue-scoped (its items come from issue descriptions) or
-/// project-scoped (its items come from a config-declared `source` file and address
-/// as `@/<kind>/<self-id>`). This is the `scope` half of the kind registry's six-tuple
-/// the epic builds toward; sibling work adds the remaining `source-of-truth` field
-/// without disturbing this one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KindScope {
-    /// Items are projected from issue descriptions
-    /// (`@/issue/<short-id>/<kind>/<self-id>`).
-    Issue,
-    /// Items are projected from a config-declared source file
-    /// (`@/<kind>/<self-id>`).
-    Project,
+wire_vocabulary! {
+    /// The declared addressing scope of an item kind, distinct from a resolved
+    /// [`Scope`] carrying a concrete issue short-id.
+    ///
+    /// Issue-scoped kinds project items from issue descriptions; project-scoped
+    /// kinds project from a config-declared source file. This is the fifth field
+    /// of the item-kind six-tuple `(section, id-pattern, markers,
+    /// link-namespaces, scope, source-of-truth)`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum KindScope {
+        /// Items are projected from issue descriptions
+        /// (`@/issue/<short-id>/<kind>/<self-id>`).
+        Issue = "issue",
+        /// Items are projected from a config-declared source file
+        /// (`@/<kind>/<self-id>`).
+        Project = "project",
+    }
 }
 
 impl KindScope {
-    /// The token a kind declares its issue scope with.
-    pub const ISSUE_TOKEN: &'static str = "issue";
-
     /// Whether this kind is project-scoped (`@`).
     pub fn is_project(&self) -> bool {
         matches!(self, KindScope::Project)
@@ -403,6 +404,8 @@ impl KindScope {
 /// Errors raised while resolving item kinds or indexing items.
 #[derive(Debug, Error)]
 pub enum ItemError {
+    #[error(transparent)]
+    InvalidIssuePrefix(#[from] InvalidIdPrefixError),
     /// A declared item kind omits one or more required configuration fields.
     #[error("item kind '{kind}' is missing required field(s): {missing}")]
     MissingRequiredFields {
@@ -412,14 +415,12 @@ pub enum ItemError {
         missing: String,
     },
     /// A kind's `id-pattern` is not a valid regular expression.
-    #[error("item kind '{kind}' has an invalid id-pattern '{pattern}': {source}")]
+    #[error("item kind '{kind}' has an {source}")]
     InvalidIdPattern {
         /// The offending kind name.
         kind: String,
-        /// The pattern string that failed to compile.
-        pattern: String,
-        /// The underlying regex compilation error.
-        source: regex::Error,
+        /// The pattern that failed to compile.
+        source: InvalidIdPatternError,
     },
     /// Two addressable items of the SAME kind in one scope share a self-id
     /// (REQ-03). The same self-id under a *different* scope, or under a
@@ -439,8 +440,8 @@ pub enum ItemError {
     /// The body could not be parsed for the issue's content format.
     #[error("failed to parse description of issue {issue}: {source}")]
     Parse {
-        /// Short id of the issue whose body failed to parse.
-        issue: String,
+        /// Issue whose body failed to parse.
+        issue: IssueId,
         /// The underlying parser error.
         source: crate::document::ContentParserError,
     },
@@ -583,8 +584,7 @@ pub enum ItemError {
 pub struct ItemKind {
     name: String,
     section: String,
-    id_pattern_src: String,
-    id_pattern: regex::Regex,
+    id_pattern: IdPattern,
     markers: Vec<String>,
     link_namespaces: Vec<String>,
     kind_scope: KindScope,
@@ -616,19 +616,18 @@ impl ItemKind {
                 kind: name.to_string(),
                 missing: "section".to_string(),
             })?;
-        let id_pattern_src =
-            config
-                .id_pattern
-                .clone()
-                .ok_or_else(|| ItemError::MissingRequiredFields {
-                    kind: name.to_string(),
-                    missing: "id-pattern".to_string(),
-                })?;
-        let id_pattern =
-            regex::Regex::new(&id_pattern_src).map_err(|source| ItemError::InvalidIdPattern {
+        let id_pattern = config
+            .id_pattern
+            .clone()
+            .ok_or_else(|| ItemError::MissingRequiredFields {
                 kind: name.to_string(),
-                pattern: id_pattern_src.clone(),
-                source,
+                missing: "id-pattern".to_string(),
+            })
+            .and_then(|source| {
+                IdPattern::new(source).map_err(|source| ItemError::InvalidIdPattern {
+                    kind: name.to_string(),
+                    source,
+                })
             })?;
         let markers = config
             .markers
@@ -645,11 +644,8 @@ impl ItemKind {
                     kind: name.to_string(),
                     missing: "link-namespaces".to_string(),
                 })?;
-        // Scope is now a typed field — invalid tokens are rejected at TOML parse
-        // time, so this conversion is infallible.
         let kind_scope = match config.scope {
-            Some(KindScopeConfig::Issue) => KindScope::Issue,
-            Some(KindScopeConfig::Project) => KindScope::Project,
+            Some(scope) => scope,
             None => {
                 return Err(ItemError::MissingRequiredFields {
                     kind: name.to_string(),
@@ -695,7 +691,6 @@ impl ItemKind {
         Ok(Self {
             name: name.to_string(),
             section,
-            id_pattern_src,
             id_pattern,
             markers,
             link_namespaces,
@@ -787,7 +782,7 @@ impl ItemKind {
         (
             &self.section,
             self.markers.first().map(String::as_str),
-            &self.id_pattern_src,
+            self.id_pattern.as_str(),
         )
     }
 
@@ -848,7 +843,7 @@ pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {
         Scope::Project => format!("{PROJECT_SCOPE_SENTINEL}/{kind}/{self_id}"),
         Scope::Issue(short_id) => format!(
             "{PROJECT_SCOPE_SENTINEL}/{}/{short_id}/{kind}/{self_id}",
-            KindScope::ISSUE_TOKEN
+            ISSUE_ADDRESS_SEGMENT
         ),
     }
 }
@@ -879,12 +874,13 @@ pub fn is_qualified_reference(value: &str) -> bool {
 /// `<namespace>:@/<kind>/<value>` for a project-scope kind, and
 /// `<namespace>:<short-id>/<value>` for an issue-scope kind or a credit namespace.
 pub fn unqualified_link_message(
-    issue_short_id: &str,
+    issue_id: &IssueId,
     namespace: &str,
     value: &str,
     kinds: &[ItemKind],
     credit_namespaces: &HashSet<String>,
 ) -> Option<String> {
+    let issue_short_id = issue_id.short_id();
     if is_qualified_reference(value) {
         return None;
     }
@@ -925,7 +921,7 @@ pub fn unqualified_link_message(
 /// Carries the *derived* qualified id alongside the source self-id, the owning
 /// scope prefix (an issue short-id or `@`), the kind name, and the raw item text.
 /// Nothing here is stored — it is recomputed on demand by the indexers (REQ-05).
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 pub struct AddressableItem {
     /// The kind this item belongs to (display name).
     pub kind: String,
@@ -1034,7 +1030,7 @@ pub fn index_items(
     let projection = project(issue).with_sections(&issue.description, parser);
     let sections = projection.sections.unwrap_or_default();
     let raw = extract_raw_items(&sections, kinds);
-    derive_scope_items(&Scope::Issue(issue.short_id()), raw)
+    derive_scope_items(&Scope::parse(&issue.short_id())?, raw)
 }
 
 /// Extract raw item candidates from already-parsed sections across all kinds.
@@ -1060,7 +1056,11 @@ fn extract_raw_items(
                     return None;
                 }
                 // No self-id match means plain prose: skip, never error (REQ-06).
-                let self_id = kind.id_pattern.find(text).map(|m| m.as_str().to_string())?;
+                let self_id = kind
+                    .id_pattern
+                    .regex()
+                    .find(text)
+                    .map(|m| m.as_str().to_string())?;
                 Some(RawScopeItem {
                     kind: kind.name().to_string(),
                     self_id,
@@ -1150,9 +1150,11 @@ pub struct ProjectSource {
 ///
 /// ```
 /// use jit::config::ItemKindConfig;
-/// use jit::config::{KindScopeConfig, ItemKindSource, SourceOfTruth};
+/// use jit::config::{ItemKindSource, SourceOfTruth};
 /// use jit::document::MarkdownContentParser;
-/// use jit::domain::item::{index_project_sources, ItemKind, ProjectSource, RawScopeItem};
+/// use jit::domain::item::{
+///     index_project_sources, ItemKind, KindScope, ProjectSource, RawScopeItem,
+/// };
 ///
 /// // A markdown-first kind (`definition`, sourced from the glossary).
 /// let kind = ItemKind::from_config(
@@ -1162,7 +1164,7 @@ pub struct ProjectSource {
 ///         id_pattern: Some("[A-Z][a-z]+".into()),
 ///         markers: Some(vec![]),
 ///         link_namespaces: Some(vec!["defines".into()]),
-///         scope: Some(KindScopeConfig::Project),
+///         scope: Some(KindScope::Project),
 ///         source: Some(ItemKindSource::Path("docs/reference/glossary.md".into())),
 ///         source_of_truth: Some(SourceOfTruth::MarkdownFirst),
 ///         aliases: None,
@@ -1486,66 +1488,22 @@ mod tests {
     use super::*;
     use crate::document::MarkdownContentParser;
 
-    // The canonical kinds supplied by the package, rebuilt here from their exact
-    // field shape so the domain layer can pin that those fields project as
-    // expected. They are not baked into the engine (a repo with no `[item_kinds]`
-    // table has no kinds); these helpers stand in for the config-authored table.
+    use crate::test_utils::shipped_item_kind;
+
     fn req_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
-            markers: Some(vec!["[hard]".to_string()]),
-            link_namespaces: Some(vec!["satisfies".to_string()]),
-            scope: Some(KindScopeConfig::Issue),
-            source: None,
-            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-            aliases: None,
-        }
+        shipped_item_kind("requirement")
     }
 
     fn decision_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("decisions".to_string()),
-            id_pattern: Some("D-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["per".to_string()]),
-            scope: Some(KindScopeConfig::Issue),
-            source: None,
-            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-            aliases: None,
-        }
+        shipped_item_kind("decision")
     }
 
     fn risk_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("risks".to_string()),
-            id_pattern: Some("RISK-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["mitigates".to_string(), "resolves".to_string()]),
-            scope: Some(KindScopeConfig::Issue),
-            source: None,
-            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-            aliases: None,
-        }
+        shipped_item_kind("risk")
     }
 
     fn invariant_cfg() -> ItemKindConfig {
-        ItemKindConfig {
-            section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(KindScopeConfig::Project),
-            source: Some(ItemKindSource::Toml(TomlSourceDescriptor {
-                toml: ".jit/invariants.toml".to_string(),
-                table: "invariants".to_string(),
-                id_field: "id".to_string(),
-                text_field: "statement".to_string(),
-                link_fields: std::collections::BTreeMap::new(),
-            })),
-            source_of_truth: Some(SourceOfTruth::RegistryFirst),
-            aliases: None,
-        }
+        shipped_item_kind("invariant")
     }
 
     fn req_kind() -> ItemKind {
@@ -1568,9 +1526,14 @@ mod tests {
     fn test_unqualified_link_message_names_replacement_per_kind_scope() {
         let kinds = [req_kind(), invariant_kind()];
         let none = HashSet::new();
-        let issue_scoped =
-            unqualified_link_message("abc12345", "satisfies", "REQ-01", &kinds, &none)
-                .expect("bare satisfies value is reported");
+        let issue_scoped = unqualified_link_message(
+            &crate::test_utils::issue_id(1),
+            "satisfies",
+            "REQ-01",
+            &kinds,
+            &none,
+        )
+        .expect("bare satisfies value is reported");
         assert!(
             issue_scoped.contains("'satisfies:REQ-01'"),
             "{issue_scoped}"
@@ -1579,8 +1542,14 @@ mod tests {
             issue_scoped.contains("'satisfies:<short-id>/REQ-01'"),
             "{issue_scoped}"
         );
-        let project_scoped = unqualified_link_message("abc12345", "enforces", "dag", &kinds, &none)
-            .expect("bare enforces value is reported");
+        let project_scoped = unqualified_link_message(
+            &crate::test_utils::issue_id(1),
+            "enforces",
+            "dag",
+            &kinds,
+            &none,
+        )
+        .expect("bare enforces value is reported");
         assert!(
             project_scoped.contains("'enforces:@/invariant/dag'"),
             "{project_scoped}"
@@ -1590,8 +1559,14 @@ mod tests {
     #[test]
     fn test_unqualified_link_message_reports_credit_namespace_without_kind() {
         let credit = HashSet::from(["tests".to_string()]);
-        let message = unqualified_link_message("abc12345", "tests", "H-1", &[], &credit)
-            .expect("bare credit-namespace value is reported");
+        let message = unqualified_link_message(
+            &crate::test_utils::issue_id(1),
+            "tests",
+            "H-1",
+            &[],
+            &credit,
+        )
+        .expect("bare credit-namespace value is reported");
         assert!(message.contains("'tests:<short-id>/H-1'"), "{message}");
     }
 
@@ -1605,7 +1580,14 @@ mod tests {
             ("type", "task"),
         ] {
             assert!(
-                unqualified_link_message("a", namespace, value, &kinds, &credit).is_none(),
+                unqualified_link_message(
+                    &crate::test_utils::issue_id(1),
+                    namespace,
+                    value,
+                    &kinds,
+                    &credit
+                )
+                .is_none(),
                 "{namespace}:{value}"
             );
         }
@@ -1620,11 +1602,15 @@ mod tests {
     fn test_qualified_id_is_derived() {
         // REQ-01: qualified id is the uniform kind-segmented address, a pure
         // projection over (scope, kind, self-id).
-        let mut issue = crate::domain::fixture_issue("T".to_string(), String::new());
-        issue.id = "56ab0224-fd6e-4929-a61e-ffb1a3104496".to_string();
+        let mut issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
+        issue.id = crate::test_utils::issue_id(0xfd6e_4929_a61e_ffb1_a310_4496_56ab_0224);
         assert_eq!(
-            qualified_id(&Scope::Issue(issue.short_id()), "requirement", "REQ-01"),
-            "@/issue/56ab0224/requirement/REQ-01"
+            qualified_id(
+                &Scope::parse(&issue.short_id()).unwrap(),
+                "requirement",
+                "REQ-01"
+            ),
+            format!("@/issue/{}/requirement/REQ-01", issue.short_id())
         );
         assert_eq!(
             qualified_id(&Scope::Project, "invariant", "sample-invariant"),
@@ -1646,7 +1632,7 @@ mod tests {
             parse_kind_segmented_address("@/issue/56ab0224/requirement/REQ-01").unwrap();
         assert_eq!(
             issue_addr.scope,
-            AddressScope::Issue("56ab0224".to_string())
+            AddressScope::Issue("56ab0224".parse().unwrap())
         );
         assert_eq!(issue_addr.self_id, "REQ-01");
 
@@ -1659,7 +1645,7 @@ mod tests {
 
     #[test]
     fn test_index_items_projects_requirements() {
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: first\n- [hard] REQ-02: second\n".to_string(),
         );
@@ -1669,7 +1655,11 @@ mod tests {
         assert_eq!(items[0].kind, "requirement");
         assert_eq!(
             items[0].qualified_id,
-            qualified_id(&Scope::Issue(issue.short_id()), "requirement", "REQ-01")
+            qualified_id(
+                &Scope::parse(&issue.short_id()).unwrap(),
+                "requirement",
+                "REQ-01"
+            )
         );
         assert_eq!(
             items[0].qualified_id,
@@ -1681,7 +1671,7 @@ mod tests {
     #[test]
     fn test_index_items_graceful_degradation() {
         // REQ-06: a list line with no self-id is plain prose, not an error.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: real\n- [hard] just prose, no id\n"
                 .to_string(),
@@ -1694,7 +1684,7 @@ mod tests {
     #[test]
     fn test_index_items_marker_filters_prose() {
         // An unmarked criterion line is ignored by a marker-gated kind.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: hard one\n- REQ-99: soft, no marker\n"
                 .to_string(),
@@ -1733,7 +1723,7 @@ mod tests {
         // jit:16402e14 REQ-01/REQ-02: a GitHub task-list checkbox ahead of the
         // marker (`- [ ] [hard] ...`, `- [x] [hard] ...`) does not hide the
         // criterion from the item projection.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n\
              - [ ] [hard] REQ-01: unchecked box\n\
@@ -1753,7 +1743,7 @@ mod tests {
     #[test]
     fn test_index_items_duplicate_self_id_is_error() {
         // REQ-02: self-id uniqueness within an issue is validated.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: a\n- [hard] REQ-01: dup\n".to_string(),
         );
@@ -1767,42 +1757,42 @@ mod tests {
         // distinct items — uniqueness is keyed on (self_id, kind), not self_id
         // alone, so this is no longer a collision.
         let other = ItemKind::from_config(
-            "decision",
+            "custom-decision",
             &ItemKindConfig {
                 // Read the SAME section so both kinds see REQ-01.
                 section: Some("success_criteria".to_string()),
                 id_pattern: Some("REQ-\\d+".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec!["per".to_string()]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
             },
         )
         .unwrap();
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: a\n".to_string(),
         );
-        // The marker-gated requirement kind and the unmarked `decision` kind both
+        // The marker-gated requirement kind and the unmarked `custom-decision` kind both
         // claim REQ-01 from the same line; both are returned.
         let items = index_items(&issue, &[req_kind(), other], &MarkdownContentParser).unwrap();
         assert_eq!(items.len(), 2);
         assert!(items.iter().all(|item| item.self_id == "REQ-01"));
         let kinds: HashSet<&str> = items.iter().map(|item| item.kind.as_str()).collect();
-        assert_eq!(kinds, HashSet::from(["requirement", "decision"]));
+        assert_eq!(kinds, HashSet::from(["requirement", "custom-decision"]));
         // The kind is a segment of the minted id, so the two coexisting items derive
         // DISTINCT qualified ids that differ only by that segment.
         assert_ne!(items[0].qualified_id, items[1].qualified_id);
         let qids: HashSet<&str> = items.iter().map(|i| i.qualified_id.as_str()).collect();
         assert!(qids.iter().any(|q| q.ends_with("/requirement/REQ-01")));
-        assert!(qids.iter().any(|q| q.ends_with("/decision/REQ-01")));
+        assert!(qids.iter().any(|q| q.ends_with("/custom-decision/REQ-01")));
     }
 
     #[test]
     fn test_index_items_missing_section_is_empty() {
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Other\n\n- nothing here\n".to_string(),
         );
@@ -1816,24 +1806,24 @@ mod tests {
         // heard of) indexes purely from its four-tuple, proving no kind name is
         // hardcoded in indexing logic.
         let cfg = ItemKindConfig {
-            section: Some("decisions".to_string()),
-            id_pattern: Some("D-\\d+".to_string()),
+            section: Some("choices".to_string()),
+            id_pattern: Some("CH-\\d+".to_string()),
             markers: Some(vec![]),
-            link_namespaces: Some(vec!["per".to_string()]),
-            scope: Some(KindScopeConfig::Issue),
+            link_namespaces: Some(vec!["picks".to_string()]),
+            scope: Some(KindScope::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             aliases: None,
         };
-        let kind = ItemKind::from_config("decision", &cfg).unwrap();
-        let issue = crate::domain::fixture_issue(
+        let kind = ItemKind::from_config("custom-choice", &cfg).unwrap();
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
-            "## Decisions\n\n- D-1: use json\n- D-2: atomic writes\n".to_string(),
+            "## Choices\n\n- CH-1: use json\n- CH-2: atomic writes\n".to_string(),
         );
         let items = index_items(&issue, &[kind], &MarkdownContentParser).unwrap();
         assert_eq!(items.len(), 2);
-        assert_eq!(items[0].kind, "decision");
-        assert_eq!(items[0].self_id, "D-1");
+        assert_eq!(items[0].kind, "custom-choice");
+        assert_eq!(items[0].self_id, "CH-1");
     }
 
     #[test]
@@ -1843,13 +1833,18 @@ mod tests {
             id_pattern: Some("REQ-(".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["satisfies".to_string()]),
-            scope: Some(KindScopeConfig::Issue),
+            scope: Some(KindScope::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             aliases: None,
         };
         let err = ItemKind::from_config("broken", &cfg).unwrap_err();
         assert!(matches!(err, ItemError::InvalidIdPattern { .. }));
+        let message = err.to_string();
+        assert!(
+            message.contains("broken") && message.contains("REQ-("),
+            "error was: {message}"
+        );
     }
 
     #[test]
@@ -1860,7 +1855,10 @@ mod tests {
         let (section, marker, pattern) = kind.as_triple();
         assert_eq!(section, "success_criteria");
         assert_eq!(marker, Some("[hard]"));
-        assert_eq!(pattern, "[A-Z][A-Z0-9]*-[0-9]+");
+        assert_eq!(
+            pattern,
+            crate::declarations::rules::DEFAULT_CRITERION_ID_PATTERN
+        );
     }
 
     #[test]
@@ -1921,7 +1919,7 @@ mod tests {
     fn test_item_kind_resolution_reports_missing_declared_vocabulary_fields() {
         let config = ItemKindConfig {
             markers: Some(vec![]),
-            scope: Some(KindScopeConfig::Issue),
+            scope: Some(KindScope::Issue),
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             ..Default::default()
         };
@@ -1949,7 +1947,7 @@ mod tests {
 
     #[test]
     fn test_decision_kind_tuple() {
-        // The canonical decision kind: section `decisions`, D-NN ids, no marker,
+        // The shipped decision kind: section `decisions`, no marker,
         // `per` link namespace, issue-scoped, markdown-first.
         let decision = decision_kind();
         assert_eq!(decision.name(), "decision");
@@ -1960,12 +1958,12 @@ mod tests {
         let (section, marker, pattern) = decision.as_triple();
         assert_eq!(section, "decisions");
         assert_eq!(marker, None);
-        assert_eq!(pattern, "D-[0-9]+");
+        assert_eq!(Some(pattern), decision_cfg().id_pattern.as_deref());
     }
 
     #[test]
     fn test_invariant_kind_is_project_scope_registry_first() {
-        // The canonical invariant kind: project-scoped, registry-first, `enforces`
+        // The shipped invariant kind: project-scoped, registry-first, `enforces`
         // link namespace, and NO markdown `source` file (items come from the toml
         // registry named by its descriptor).
         let inv = invariant_kind();
@@ -1982,12 +1980,13 @@ mod tests {
         // registry-first project kind must declare a toml `source` descriptor, or it
         // is rejected at resolution with a typed MissingProjectSource — never a
         // silent empty result.
+        // A custom `policy` kind, absent from the default package.
         let base = |source: Option<ItemKindSource>| ItemKindConfig {
             section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            id_pattern: Some("POL-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(KindScopeConfig::Project),
+            scope: Some(KindScope::Project),
             source,
             source_of_truth: Some(SourceOfTruth::RegistryFirst),
             aliases: None,
@@ -2042,25 +2041,20 @@ mod tests {
         // config-declared `invariant` kind resolves as ordinary config like any
         // other name — declarations the old reserved-name branch rejected are now
         // accepted because the engine hardcodes no domain concept.
-        let cfg = |scope: KindScopeConfig, sot: SourceOfTruth, source: Option<ItemKindSource>| {
-            ItemKindConfig {
-                section: Some("success_criteria".to_string()),
-                id_pattern: Some("[a-z][a-z0-9-]*".to_string()),
-                markers: Some(vec![]),
-                link_namespaces: Some(vec!["enforces".to_string()]),
+        let cfg =
+            |scope: KindScope, sot: SourceOfTruth, source: Option<ItemKindSource>| ItemKindConfig {
                 scope: Some(scope),
                 source,
                 source_of_truth: Some(sot),
-                aliases: None,
-            }
-        };
+                ..invariant_cfg()
+            };
 
         // Markdown-first project `invariant` with a source: once a reserved-name
         // rejection, now an ordinary markdown-first project kind.
         let md = ItemKind::from_config(
             "invariant",
             &cfg(
-                KindScopeConfig::Project,
+                KindScope::Project,
                 SourceOfTruth::MarkdownFirst,
                 Some(ItemKindSource::Path("project-items.md".to_string())),
             ),
@@ -2074,7 +2068,7 @@ mod tests {
         // project-source requirement does not apply to issue scope).
         let issue = ItemKind::from_config(
             "invariant",
-            &cfg(KindScopeConfig::Issue, SourceOfTruth::RegistryFirst, None),
+            &cfg(KindScope::Issue, SourceOfTruth::RegistryFirst, None),
         )
         .unwrap();
         assert_eq!(issue.kind_scope(), KindScope::Issue);
@@ -2082,13 +2076,14 @@ mod tests {
 
     #[test]
     fn test_markdown_first_project_kind_still_requires_source() {
-        // The guard still fires for a markdown-first project kind with no source.
+        // The guard still fires for a markdown-first project kind with no source;
+        // `doc-req` is a custom kind.
         let cfg = ItemKindConfig {
             section: Some("success_criteria".to_string()),
-            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            id_pattern: Some("DOC-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["upholds".to_string()]),
-            scope: Some(KindScopeConfig::Project),
+            scope: Some(KindScope::Project),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
             aliases: None,
@@ -2271,7 +2266,7 @@ name = \"bare\"
     fn test_index_items_projects_decisions_with_canonical_kinds() {
         // The canonical kind set indexes a `## Decisions`
         // section's D-NN lines through the same generic parse path as requirements.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Decisions\n\n- D-01: use json\n- D-02: atomic writes\n".to_string(),
         );
@@ -2288,19 +2283,7 @@ name = \"bare\"
     fn test_resolve_item_kinds_uses_registry() {
         let mut map = HashMap::new();
         map.insert("requirement".to_string(), req_cfg());
-        map.insert(
-            "decision".to_string(),
-            ItemKindConfig {
-                section: Some("decisions".to_string()),
-                id_pattern: Some("D-\\d+".to_string()),
-                markers: Some(vec![]),
-                link_namespaces: Some(vec!["per".to_string()]),
-                scope: Some(KindScopeConfig::Issue),
-                source: None,
-                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-                aliases: None,
-            },
-        );
+        map.insert("decision".to_string(), decision_cfg());
         let kinds = resolve_item_kinds(Some(&map)).unwrap();
         // Returned in name order.
         assert_eq!(kinds.len(), 2);
@@ -2313,19 +2296,7 @@ name = \"bare\"
         // REQ-02: expanding a named kind yields the SAME triple as_triple exposes,
         // so the `kind=` sugar and the inline form resolve identically.
         let mut registry = HashMap::new();
-        registry.insert(
-            "requirement".to_string(),
-            ItemKindConfig {
-                section: Some("success_criteria".to_string()),
-                markers: Some(vec!["[hard]".to_string()]),
-                id_pattern: Some("REQ-\\d+".to_string()),
-                link_namespaces: Some(vec!["satisfies".to_string()]),
-                scope: Some(KindScopeConfig::Issue),
-                source: None,
-                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
-                aliases: None,
-            },
-        );
+        registry.insert("requirement".to_string(), req_cfg());
         let triple = expand_kind_triple(Some(&registry), "requirement").unwrap();
         let kind = ItemKind::from_config("requirement", &registry["requirement"]).unwrap();
         let (section, marker, pattern) = kind.as_triple();
@@ -2339,19 +2310,19 @@ name = \"bare\"
         // A declared kind expands with the values its configuration supplies.
         let mut registry = HashMap::new();
         registry.insert(
-            "requirement".to_string(),
+            "custom-requirement".to_string(),
             ItemKindConfig {
                 section: Some("criteria".to_string()),
                 id_pattern: Some("C-[0-9]+".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec!["references".to_string()]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
             },
         );
-        let triple = expand_kind_triple(Some(&registry), "requirement").unwrap();
+        let triple = expand_kind_triple(Some(&registry), "custom-requirement").unwrap();
         assert_eq!(triple.section, "criteria");
         assert_eq!(triple.id_pattern, "C-[0-9]+");
         // No markers declared -> no marker in the triple.
@@ -2380,7 +2351,7 @@ name = \"bare\"
                 id_pattern: Some("REQ-(".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec![]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -2402,12 +2373,12 @@ name = \"bare\"
     #[test]
     fn test_scope_parse_and_prefix() {
         // REQ-01: `@` is the project scope sentinel; anything else is an issue scope.
-        assert_eq!(Scope::parse("@"), Scope::Project);
-        assert!(Scope::parse("@").is_project());
+        assert_eq!(Scope::parse("@").unwrap(), Scope::Project);
+        assert!(Scope::parse("@").unwrap().is_project());
         assert_eq!(Scope::Project.prefix(), "@");
 
-        let issue = Scope::parse("56ab0224");
-        assert_eq!(issue, Scope::Issue("56ab0224".to_string()));
+        let issue = Scope::parse("56ab0224").unwrap();
+        assert_eq!(issue, Scope::Issue("56ab0224".parse().unwrap()));
         assert!(!issue.is_project());
         assert_eq!(issue.prefix(), "56ab0224");
     }
@@ -2564,16 +2535,16 @@ name = \"bare\"
         // Issue-scoped addresses carry no project identity, so the binding leaves
         // them untouched regardless of the declared local project name.
         assert_eq!(
-            AddressScope::Issue("56ab0224".to_string())
+            AddressScope::Issue("56ab0224".parse().unwrap())
                 .bind_local(Some("acme"))
                 .unwrap(),
-            Scope::Issue("56ab0224".to_string())
+            Scope::Issue("56ab0224".parse().unwrap())
         );
         assert_eq!(
-            AddressScope::Issue("56ab0224".to_string())
+            AddressScope::Issue("56ab0224".parse().unwrap())
                 .bind_local(None)
                 .unwrap(),
-            Scope::Issue("56ab0224".to_string())
+            Scope::Issue("56ab0224".parse().unwrap())
         );
     }
 
@@ -2582,7 +2553,7 @@ name = \"bare\"
         // REQ-01: `@/issue/<short-id>/<kind>/<self-id>` parses into
         // (Scope::Issue(short_id), kind, self_id); `issue` is a reserved segment.
         let addr = parse_kind_segmented_address("@/issue/56ab0224/requirement/REQ-01").unwrap();
-        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".parse().unwrap()));
         assert_eq!(addr.kind, "requirement");
         assert_eq!(addr.self_id, "REQ-01");
     }
@@ -2719,7 +2690,7 @@ name = \"bare\"
     fn test_same_self_id_distinct_across_scopes() {
         // REQ-04: the SAME self-id under two different scopes does not conflict and
         // yields two distinct qualified ids.
-        let issue = crate::domain::fixture_issue(
+        let issue = crate::test_utils::fixture_issue(
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: issue one\n".to_string(),
         );
@@ -2750,7 +2721,7 @@ name = \"bare\"
         // expands to that kind, with the address's short-id carried as
         // AddressScope::Issue and self_id passed through verbatim.
         let addr = expand_sugar_address("56ab0224/D-1", &[decision_kind(), risk_kind()]).unwrap();
-        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".parse().unwrap()));
         assert_eq!(addr.kind, "decision");
         assert_eq!(addr.self_id, "D-1");
     }
@@ -2760,7 +2731,7 @@ name = \"bare\"
         // REQ-01: a second, distinct issue-scoped kind resolves the same way.
         let addr =
             expand_sugar_address("56ab0224/RISK-1", &[decision_kind(), risk_kind()]).unwrap();
-        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".parse().unwrap()));
         assert_eq!(addr.kind, "risk");
         assert_eq!(addr.self_id, "RISK-1");
     }
@@ -2792,7 +2763,7 @@ name = \"bare\"
                 id_pattern: Some("X-[0-9]+".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec![]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -2806,7 +2777,7 @@ name = \"bare\"
                 id_pattern: Some("[A-Z]-[0-9]+".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec![]),
-                scope: Some(KindScopeConfig::Issue),
+                scope: Some(KindScope::Issue),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::MarkdownFirst),
                 aliases: None,
@@ -2834,7 +2805,7 @@ name = \"bare\"
         // pattern match — only the issue-scoped `requirement` kind is selected.
         let addr =
             expand_sugar_address("56ab0224/REQ-01", &[invariant_kind(), req_kind()]).unwrap();
-        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".parse().unwrap()));
         assert_eq!(addr.kind, "requirement");
         assert_eq!(addr.self_id, "REQ-01");
     }

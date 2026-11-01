@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-24T21:22:37.717854234Z",
+  "dependencies": [
+    "c2b3cefa-d690-4c6c-94dd-feaa3156acea"
+  ],
+  "description": "Give the issue state field one derivation: `jit issue update --state` and the lifecycle transitions (`jit claim`, state changes and rejection) run the same prechecks and the same divert of `Done` to `Gated`.\n\n## Background\n\n- The lifecycle path runs precheck gates when a `Ready` issue moves to `InProgress` (`lifecycle_requires_prechecks`, `crates/jit/src/commands/mod.rs:888-897`, used in the preflight of `publish_captured_lifecycle_mutation` `:2769`, at `:2798`, and rechecked at `:2915`; `captured_precheck_plan` `:659`). Checkers run in that preflight, outside the repository lock, and a strict unleased request is refused before they run (`:2840-2860`). The lifecycle path diverts `Done` with unpassed gates to `Gated` (`mod.rs:3107-3129`).\n- The field path (`derive_field_update`, `mod.rs:1279`; published by `publish_captured_field_update` `:2599`), which `jit issue update --state` and bulk update use, has its own `Done`-to-`Gated` divert (`mod.rs:1388-1409`) and runs no precheck: with an automatic precheck gate whose checker fails, `jit issue update <id> --state in_progress` still moves the issue to `InProgress`.\n- A unit test in `crates/jit/src/commands/validate.rs:3499-3509` calls `lifecycle_requires_prechecks` through `capture_mutation_preflight`.\n\n## Success Criteria\n\n- [hard] REQ-01: One state derivation decides a state change for both the field and the lifecycle paths: prechecks are a captured precondition of any `Ready` to `InProgress` change, run in the preflight as today, and one place diverts `Done` with unpassed gates to `Gated`.\n- [hard] REQ-02: A test sets an automatic precheck gate whose checker fails on a `Ready` issue and shows `jit issue update --state in_progress` refused with the issue left `Ready`; it fails on today's code, which moves the issue.\n- [hard] REQ-03: The existing lifecycle precheck, claim, lease-before-precheck and divert tests pass unchanged.\n\n## Notes\n\n- Behaviour change: `jit issue update --state in_progress` runs prechecks (in a preflight outside the repository lock, as `jit claim` does) and is refused when one fails.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d2acb105-cf3c-4278-ae86-9d3207ce7dd6",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:session-coherence",
+    "per:@/charter/D-20",
+    "component:core",
+    "component:gates",
+    "satisfies:b697a3f7/REQ-03"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "One state derivation for update and lifecycle transitions",
+  "updated_at": "2026-10-24T21:22:37.717854234Z"
+}

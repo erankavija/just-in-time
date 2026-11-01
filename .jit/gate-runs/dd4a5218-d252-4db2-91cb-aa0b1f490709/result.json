@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "320a12bba300f4d6a1e9b7f1abe40131f4ef95ed",
+  "completed_at": "2026-10-26T23:02:04.636216751Z",
+  "duration_ms": 271493,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The profile-test migration uses JitCli consistently, scopes JIT_* overrides per spawned process, and preserves assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "37218dff-534d-40e5-b70d-f7c9fa60bea3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dd4a5218-d252-4db2-91cb-aa0b1f490709",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T22:57:33.142469903Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: adf684b75; 320a12bba (scoped merge content matches adf684b75)\nPolicy sources: AGENTS.md\nResolved items: @/issue/37218dff/requirement/REQ-01–REQ-03 (.jit/issues/37218dff-534d-40e5-b70d-f7c9fa60bea3.json); @/issue/c780514e/requirement/REQ-05 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-10-26T22:57:20Z; exit code unavailable); code-review pending\nTruncation recovery: partitioned individual diffs by file/range; inspected current fixture and affected tests; verified merge-scoped tree equals adf684b75\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The profile-test migration uses JitCli consistently, scopes JIT_* overrides per spawned process, and preserves assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

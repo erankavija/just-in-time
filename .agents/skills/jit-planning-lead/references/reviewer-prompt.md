@@ -23,16 +23,21 @@ footprint and overlap/uncertainty advisory.
 
 Produce an assignment-simulation row for every finest-tier entry:
 
-| Key | One outcome | One bounded consumer family | Observable test boundary | Footprint credible | One focused cycle | No inner decomposition | No mixed deliverables | Result |
-|---|---|---|---|---|---|---|---|---|
+| Key | Coherent change | Observable test boundary | Footprint credible | One focused cycle | Not a chain link | Result |
+|---|---|---|---|---|---|---|
 
-Report only failing rows. Fail any row that does not pass or any unresolved sizing warning. Judge every
-visible per-code override and fail vague or cross-cutting waivers. Also fail
-missing hierarchy/source universes, invented refs, tier-laundered leaves,
-malformed/duplicate contract headings, overlaps, gaps, wrong ordering, broken
-intermediate states, unmitigated risks, or stale prior findings. Require the author
-to replace defective contracts/tasks, remove superseded prose, regenerate, and
-rerun all checks.
+Report only failing rows. Fail a row for oversize only when one worker cannot
+deliver it in one focused cycle, or when it combines implementation with release.
+Fail a row for undersize when it only links a producer-to-remover chain or a
+bridge pair that one task within the module would deliver. Fail a manifest over
+the issue budget, and any unresolved sizing warning. Obey a container decision
+the plan or manifest cites; preferring a different decision is not a finding.
+Judge every visible per-code override and fail vague or cross-cutting waivers.
+Also fail missing hierarchy/source universes, invented refs, tier-laundered
+leaves, malformed/duplicate contract headings, overlaps, gaps, wrong ordering,
+broken intermediate states, unmitigated risks, or stale prior findings. Require
+the author to replace or merge defective contracts/tasks, remove superseded prose,
+regenerate, and rerun all checks.
 
 Report blocking findings with artifact/code citations and exact corrections; omit
 passing checks and restated review scope. End with exactly `VERDICT: PASS` or

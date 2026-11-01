@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T22:38:09.550351331Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Retire the `cli_query_graph` suite's copy of the issue-construction fixture.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. `crates/jit/tests/cli_query_graph/main.rs` defines its own copy, which the suite's modules call.\n\n## Success Criteria\n\n- [hard] REQ-01: `cli_query_graph/main.rs` defines no issue-construction fixture, and the suite calls the shared one.\n- [hard] REQ-02: Each test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:18:25.690051050Z",
   "first_ready_at": "2026-10-22T15:28:23.565711601Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6e9675ca-3820-4549-b16d-3df8289132fa",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:10:22.385435789Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ef4b29d6-3c08-4555-abc8-2ee65b1dd6a8",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:14:48.708676768Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "33be0c83-6a02-411f-9565-d73ee99fedd1",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "cli_query_graph uses the shared issue fixture",
-  "updated_at": "2026-10-22T15:28:23.565711601Z"
+  "updated_at": "2026-10-27T00:18:25.690051050Z"
 }

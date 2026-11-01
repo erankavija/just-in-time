@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-28T22:06:24.830185712Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Stop the profile tests in `crates/jit/tests/cli_repo_workflow` reading ids or values from human-readable output.\n\n## Background\n\nShared test support provides one CLI process fixture, which reads the ids of issues it creates from `--json` output. These files still parse human-readable output with `split_whitespace`, mostly to scrape created ids. This entry covers `profile_cli_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files reads an id or other value from human-readable output; ids and values come from `--json` output.\n- [hard] REQ-02: Each edited test asserts the property it asserted before and passes alone, in any order and in parallel.\n",
   "documents": [],
+  "done_at": "2026-10-28T23:31:04.022741190Z",
+  "first_ready_at": "2026-10-26T23:39:00.944179871Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8bcf038b-d7f7-41b3-8744-39aeb5d37f71",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:29:00.791523342Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6a1bf2cb-3af1-4af3-a61f-1b1eab311c45",
+      "status": "passed",
+      "updated_at": "2026-10-28T23:30:14.787835051Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7208e568-cef2-4ab0-a2e5-5c85b7882fba",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "profile tests read created ids from JSON output",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-28T23:31:04.022741190Z"
 }

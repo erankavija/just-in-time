@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-bc1955a8",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "89962fdc88e019c2f00c93a76368b3ddadff7331",
+  "completed_at": "2026-10-25T04:31:24.917578890Z",
+  "duration_ms": 107449,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable ItemKind id-pattern changes meet the issue's hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bc1955a8-2e7e-4b2c-af2b-9ce9058cc1cd",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "acb8d40f-cc99-4506-97c4-40cfcdfa6e44",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T04:29:37.467930141Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 89962fdc8 (`jit:bc1955a8`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-15 (.jit issue description, markdown-first); @/charter/D-18 (dev/vision/9db27a3a-charter.md, markdown-first); @/invariant/semantic-types and @/invariant/convention-convergence (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T04:28:15Z)\nTruncation recovery: bounded rereads of AGENTS.md, ItemKind/IdPattern ranges, resolver callers, and canonical item sources\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable ItemKind id-pattern changes meet the issue's hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

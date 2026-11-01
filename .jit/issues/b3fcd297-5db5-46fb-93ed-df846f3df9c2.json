@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:2195c98f-lead",
+  "claimed_at": "2026-10-24T23:17:59.171585086Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
@@ -8,12 +9,26 @@
   ],
   "description": "Build schema file paths through one validated `VirtualPath` constructor.\n\n## Background\n\nSchema paths under `.jit/schemas` are spelled at `crates/jit/src/repository_state/initialize.rs:341,392,597`, `repository_state/mod.rs:1126`, `repository_state/profile_apply.rs:1881` and `repository_state/materialize.rs:290,538,592,639`. Rule serialization embeds a schema path in reference text (`repository_state/rule_serialize.rs:261`), and rule loading checks references with `starts_with(\"schemas/\")` (`declarations/rules.rs:1525`). `VirtualPath::SCHEMAS` names the directory (`repository_state/path.rs`).\n\n## Success Criteria\n\n- [hard] REQ-01: `VirtualPath::schema(name)` validates a single file-name component and is the only builder of a schema file path.\n- [hard] REQ-02: No production `format!` or string concatenation spells a `schemas/` path, and the rule-loading check uses the constructor.\n",
   "documents": [],
+  "done_at": "2026-10-25T02:13:51.377415769Z",
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c7da6f41-e8d3-43f5-8acd-5c2304065725",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:13:50.510542278Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a05854e1-eb40-4871-a571-99d4581ee712",
+      "status": "passed",
+      "updated_at": "2026-10-25T02:01:43.782840039Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b3fcd297-5db5-46fb-93ed-df846f3df9c2",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Schema paths come from a VirtualPath constructor",
-  "updated_at": "2026-10-22T19:43:33.407092002Z"
+  "updated_at": "2026-10-25T02:13:51.377415769Z"
 }

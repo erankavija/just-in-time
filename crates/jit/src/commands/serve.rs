@@ -1,7 +1,7 @@
 //! `jit serve` — Start the JIT API and web UI server as a background daemon process.
 //!
-//! Manages a `jit-server` process per repository, using a PID file at
-//! `.jit/server.pid.json` for lifecycle tracking and collision detection.
+//! Manages a `jit-server` process per repository through its data-root PID
+//! record for lifecycle tracking and collision detection.
 //! Auto-selects an available port in the range 3000–3099 when the preferred
 //! port is already bound.
 
@@ -9,17 +9,18 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Child;
 use std::time::{Duration, Instant};
 
+use crate::repository_state::{RepositoryLayout, VirtualPath};
 use anyhow::{bail, Context, Result};
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
 // ────────────────────────────────────────────────────────────────────────────
 
-/// Runtime state persisted in `.jit/server.pid.json`.
+/// Runtime state persisted at [`VirtualPath::SERVER_PID`].
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ServerPidFile {
     /// OS process ID of the running `jit-server` process.
@@ -48,6 +49,42 @@ pub enum ServeOutcome {
     AlreadyRunning { pid: u32, port: u16 },
 }
 
+/// Inputs to [`run_foreground`].
+#[derive(Debug)]
+pub struct ForegroundOptions {
+    /// Selected repository roots used to resolve the data directory and PID record.
+    pub layout: RepositoryLayout,
+    /// Preferred starting port (auto-selects if unavailable).
+    pub preferred_port: u16,
+    /// Explicit web UI directory; `None` auto-detects with [`find_web_dir`].
+    pub web_dir: Option<PathBuf>,
+    /// Override the server binary path (testing only; normally resolved by
+    /// [`find_server_binary`] automatically).
+    pub server_binary: Option<PathBuf>,
+}
+
+/// What a foreground server is about to serve, handed to the caller once the
+/// port is bound and the binary and web dir are resolved, before the child is
+/// spawned.
+#[derive(Debug)]
+pub struct ForegroundLaunch {
+    pub port: u16,
+    /// The web UI directory the child serves, or `None` for embedded assets.
+    pub web_dir: Option<PathBuf>,
+}
+
+/// Outcome of `jit serve --fg`.
+#[derive(Debug, PartialEq)]
+pub enum ForegroundOutcome {
+    /// A live server was already running; nothing was spawned.
+    AlreadyRunning { pid: u32, port: u16 },
+    /// The foreground server ran and exited.
+    Exited {
+        port: u16,
+        status: std::process::ExitStatus,
+    },
+}
+
 /// Outcome of `jit serve --stop`.
 #[derive(Debug, PartialEq)]
 pub enum StopOutcome {
@@ -61,18 +98,18 @@ pub enum StopOutcome {
 // PID file helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-/// Returns the canonical path of the PID file for the given data directory.
 pub fn foreground_exit_code(child_code: Option<i32>) -> i32 {
     child_code.unwrap_or(1)
 }
 
-pub fn pid_file_path(data_dir: &Path) -> PathBuf {
-    data_dir.join("server.pid.json")
+/// Resolve the PID record through the selected repository layout.
+pub fn pid_file_path(layout: &RepositoryLayout) -> Result<PathBuf> {
+    Ok(layout.resolve(&VirtualPath::SERVER_PID)?)
 }
 
 /// Reads and deserialises the PID file, returning `None` if it does not exist.
-pub fn read_pid_file(data_dir: &Path) -> Result<Option<ServerPidFile>> {
-    let path = pid_file_path(data_dir);
+pub fn read_pid_file(layout: &RepositoryLayout) -> Result<Option<ServerPidFile>> {
+    let path = pid_file_path(layout)?;
     if !path.exists() {
         return Ok(None);
     }
@@ -82,8 +119,8 @@ pub fn read_pid_file(data_dir: &Path) -> Result<Option<ServerPidFile>> {
 }
 
 /// Writes the PID file atomically (temp → rename).
-pub fn write_pid_file(data_dir: &Path, pf: &ServerPidFile) -> Result<()> {
-    let path = pid_file_path(data_dir);
+pub fn write_pid_file(layout: &RepositoryLayout, pf: &ServerPidFile) -> Result<()> {
+    let path = pid_file_path(layout)?;
     let tmp = path.with_extension("pid.tmp");
     let json = serde_json::to_string_pretty(pf).context("Failed to serialise PID file")?;
     std::fs::write(&tmp, json).context("Failed to write PID file tmp")?;
@@ -92,8 +129,8 @@ pub fn write_pid_file(data_dir: &Path, pf: &ServerPidFile) -> Result<()> {
 }
 
 /// Removes the PID file, ignoring "not found" errors.
-pub fn remove_pid_file(data_dir: &Path) -> Result<()> {
-    let path = pid_file_path(data_dir);
+pub fn remove_pid_file(layout: &RepositoryLayout) -> Result<()> {
+    let path = pid_file_path(layout)?;
     match std::fs::remove_file(&path) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -463,11 +500,11 @@ fn terminate_child(child: &mut Child) {
 /// Options for starting the server as a background daemon.
 #[derive(Debug)]
 pub struct ServeOptions {
-    /// Absolute path to the `.jit` data directory.
-    pub data_dir: PathBuf,
+    /// Selected repository roots used to resolve the data directory and server files.
+    pub layout: RepositoryLayout,
     /// Preferred starting port (auto-selects if unavailable).
     pub preferred_port: u16,
-    /// Log file path. Defaults to `<data_dir>/server.log`.
+    /// Log file path. Defaults to [`VirtualPath::SERVER_LOG`].
     pub log_file: Option<PathBuf>,
     /// Directory containing built web UI static files.
     /// `None` means auto-detect; use [`find_web_dir`] before calling `start_server`.
@@ -518,10 +555,7 @@ pub fn find_web_dir() -> Option<PathBuf> {
 /// outcome reports the child's own state rather than its state at one chosen
 /// moment.
 ///
-/// Foreground mode is handled by the caller, not this function. Use
-/// [`find_available_port`] to bind the socket and [`spawn_with_listener`] to
-/// hand it to the child — the same inheritance path this function uses — so
-/// the port is never re-bound across the process boundary.
+/// Foreground mode is [`run_foreground`].
 ///
 /// # Errors
 /// Returns an error when the port cannot be bound, the server binary cannot be
@@ -531,10 +565,11 @@ pub fn find_web_dir() -> Option<PathBuf> {
 /// written only once the server has answered, so no record names a process that
 /// is not serving.
 pub fn start_server(opts: ServeOptions, watch: StartupWatch<'_>) -> Result<ServeOutcome> {
-    let data_dir = &opts.data_dir;
+    let layout = &opts.layout;
+    let data_dir = layout.data_root();
 
     // Check existing PID file
-    if let Some(pf) = read_pid_file(data_dir)? {
+    if let Some(pf) = read_pid_file(layout)? {
         if is_process_alive(pf.pid) {
             return Ok(ServeOutcome::AlreadyRunning {
                 pid: pf.pid,
@@ -542,7 +577,7 @@ pub fn start_server(opts: ServeOptions, watch: StartupWatch<'_>) -> Result<Serve
             });
         }
         // Stale PID — clean up
-        remove_pid_file(data_dir)?;
+        remove_pid_file(layout)?;
     }
 
     // Bind the serving socket here and hand this exact socket to the child
@@ -554,7 +589,10 @@ pub fn start_server(opts: ServeOptions, watch: StartupWatch<'_>) -> Result<Serve
         .local_addr()
         .context("Failed to read bound port")?
         .port();
-    let log_file = opts.log_file.unwrap_or_else(|| data_dir.join("server.log"));
+    let log_file = match opts.log_file {
+        Some(log_file) => log_file,
+        None => layout.resolve(&VirtualPath::SERVER_LOG)?,
+    };
     let server_bin = match opts.server_binary {
         Some(p) => p,
         None => find_server_binary()?,
@@ -635,7 +673,7 @@ pub fn start_server(opts: ServeOptions, watch: StartupWatch<'_>) -> Result<Serve
         data_dir: data_dir.to_path_buf(),
         log_file: log_file.clone(),
     };
-    if let Err(e) = write_pid_file(data_dir, &pf) {
+    if let Err(e) = write_pid_file(layout, &pf) {
         // PID file write failed but the child is already detached and running.
         // Kill it now so we do not leave an orphaned, untrackable process.
         terminate_child(&mut child);
@@ -651,17 +689,75 @@ pub fn start_server(opts: ServeOptions, watch: StartupWatch<'_>) -> Result<Serve
     })
 }
 
+/// Runs the server in the foreground until it exits.
+///
+/// `on_bound` runs once the port is bound and the binary and web dir are
+/// resolved; the child is then spawned and awaited. A live server recorded in
+/// the PID file short-circuits to [`ForegroundOutcome::AlreadyRunning`].
+///
+/// # Errors
+/// Returns an error if the PID file is unreadable, no port or server binary is
+/// available, the child cannot be spawned, or waiting on it fails.
+pub fn run_foreground(
+    opts: ForegroundOptions,
+    on_bound: impl FnOnce(&ForegroundLaunch),
+) -> Result<ForegroundOutcome> {
+    if let Some(pf) = read_pid_file(&opts.layout)? {
+        if is_process_alive(pf.pid) {
+            return Ok(ForegroundOutcome::AlreadyRunning {
+                pid: pf.pid,
+                port: pf.port,
+            });
+        }
+    }
+
+    let listener = find_available_port(opts.preferred_port)?;
+    let port = listener
+        .local_addr()
+        .context("Failed to read bound port")?
+        .port();
+    let server_bin = match opts.server_binary {
+        Some(p) => p,
+        None => find_server_binary()?,
+    };
+    let data_dir = opts
+        .layout
+        .data_root()
+        .to_str()
+        .ok_or_else(|| anyhow::anyhow!("data_dir is not valid UTF-8"))?;
+    let web_dir = opts.web_dir.or_else(find_web_dir).filter(|d| d.is_dir());
+
+    on_bound(&ForegroundLaunch {
+        port,
+        web_dir: web_dir.clone(),
+    });
+
+    let mut cmd = std::process::Command::new(&server_bin);
+    cmd.arg("--data-dir")
+        .arg(data_dir)
+        .arg("--bind")
+        .arg(format!("0.0.0.0:{port}"));
+    if let Some(web) = &web_dir {
+        cmd.arg("--web-dir").arg(web);
+    }
+    // Hand the bound socket to the child (inherited fd on Unix); it adopts
+    // this exact socket instead of re-binding.
+    let mut child = spawn_with_listener(&mut cmd, listener).context("Failed to run jit-server")?;
+    let status = child.wait().context("Failed to wait on jit-server")?;
+    Ok(ForegroundOutcome::Exited { port, status })
+}
+
 /// Stops the running server for the given data directory.
 ///
 /// Sends `SIGTERM` to the server process and removes the PID file.
 /// Returns [`StopOutcome::NotRunning`] if no server was running or the PID
 /// file is stale.
-pub fn stop_server(data_dir: &Path) -> Result<StopOutcome> {
-    let pf = match read_pid_file(data_dir)? {
+pub fn stop_server(layout: &RepositoryLayout) -> Result<StopOutcome> {
+    let pf = match read_pid_file(layout)? {
         Some(pf) if is_process_alive(pf.pid) => pf,
         Some(_) => {
             // Stale PID — clean up silently.
-            remove_pid_file(data_dir)?;
+            remove_pid_file(layout)?;
             return Ok(StopOutcome::NotRunning);
         }
         None => return Ok(StopOutcome::NotRunning),
@@ -691,7 +787,7 @@ pub fn stop_server(data_dir: &Path) -> Result<StopOutcome> {
         );
     }
 
-    remove_pid_file(data_dir)?;
+    remove_pid_file(layout)?;
     Ok(StopOutcome::Stopped { pid, port })
 }
 
@@ -699,12 +795,12 @@ pub fn stop_server(data_dir: &Path) -> Result<StopOutcome> {
 ///
 /// Returns `Some(ServerPidFile)` when a live server is found, `None` when
 /// no server is running or the PID file is stale (stale files are cleaned up).
-pub fn server_status(data_dir: &Path) -> Result<Option<ServerPidFile>> {
-    match read_pid_file(data_dir)? {
+pub fn server_status(layout: &RepositoryLayout) -> Result<Option<ServerPidFile>> {
+    match read_pid_file(layout)? {
         Some(pf) if is_process_alive(pf.pid) => Ok(Some(pf)),
         Some(_) => {
             // Stale — clean up
-            remove_pid_file(data_dir)?;
+            remove_pid_file(layout)?;
             Ok(None)
         }
         None => Ok(None),
@@ -718,7 +814,42 @@ pub fn server_status(data_dir: &Path) -> Result<Option<ServerPidFile>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use tempfile::TempDir;
+
+    fn test_layout(data_root: &Path) -> RepositoryLayout {
+        crate::test_utils::repository_layout_for_data_root(data_root)
+    }
+
+    fn test_pid_path(data_root: &Path) -> PathBuf {
+        pid_file_path(&test_layout(data_root)).unwrap()
+    }
+
+    fn test_log_path(data_root: &Path) -> PathBuf {
+        test_layout(data_root)
+            .resolve(&VirtualPath::SERVER_LOG)
+            .unwrap()
+    }
+
+    fn write_test_pid_file(data_root: &Path, pid_file: &ServerPidFile) {
+        write_pid_file(&test_layout(data_root), pid_file).unwrap();
+    }
+
+    fn read_test_pid_file(data_root: &Path) -> Result<Option<ServerPidFile>> {
+        read_pid_file(&test_layout(data_root))
+    }
+
+    fn remove_test_pid_file(data_root: &Path) -> Result<()> {
+        remove_pid_file(&test_layout(data_root))
+    }
+
+    fn test_server_status(data_root: &Path) -> Result<Option<ServerPidFile>> {
+        server_status(&test_layout(data_root))
+    }
+
+    fn test_stop_server(data_root: &Path) -> Result<StopOutcome> {
+        stop_server(&test_layout(data_root))
+    }
 
     // ── PID file round-trip ──────────────────────────────────────────────────
 
@@ -732,13 +863,13 @@ mod tests {
             port: 3000,
             started_at: Utc::now(),
             data_dir: data_dir.to_path_buf(),
-            log_file: data_dir.join("server.log"),
+            log_file: test_log_path(data_dir),
         };
 
-        write_pid_file(data_dir, &pf).unwrap();
-        assert!(pid_file_path(data_dir).exists());
+        write_test_pid_file(data_dir, &pf);
+        assert!(test_pid_path(data_dir).exists());
 
-        let read_back = read_pid_file(data_dir).unwrap().unwrap();
+        let read_back = read_test_pid_file(data_dir).unwrap().unwrap();
         assert_eq!(read_back.pid, pf.pid);
         assert_eq!(read_back.port, pf.port);
         assert_eq!(read_back.data_dir, pf.data_dir);
@@ -747,7 +878,7 @@ mod tests {
     #[test]
     fn test_read_pid_file_returns_none_when_missing() {
         let tmp = TempDir::new().unwrap();
-        let result = read_pid_file(tmp.path()).unwrap();
+        let result = read_test_pid_file(tmp.path()).unwrap();
         assert!(result.is_none());
     }
 
@@ -761,10 +892,10 @@ mod tests {
             port: 3001,
             started_at: Utc::now(),
             data_dir: data_dir.to_path_buf(),
-            log_file: data_dir.join("server.log"),
+            log_file: test_log_path(data_dir),
         };
-        write_pid_file(data_dir, &pf).unwrap();
-        let tmp_path = pid_file_path(data_dir).with_extension("pid.tmp");
+        write_test_pid_file(data_dir, &pf);
+        let tmp_path = test_pid_path(data_dir).with_extension("pid.tmp");
         assert!(
             !tmp_path.exists(),
             "tmp file should be removed after rename"
@@ -775,8 +906,8 @@ mod tests {
     fn test_remove_pid_file_idempotent() {
         let tmp = TempDir::new().unwrap();
         // Should not error even when file does not exist.
-        remove_pid_file(tmp.path()).unwrap();
-        remove_pid_file(tmp.path()).unwrap();
+        remove_test_pid_file(tmp.path()).unwrap();
+        remove_test_pid_file(tmp.path()).unwrap();
     }
 
     #[test]
@@ -788,13 +919,13 @@ mod tests {
             port: 3005,
             started_at: Utc::now(),
             data_dir: data_dir.to_path_buf(),
-            log_file: data_dir.join("server.log"),
+            log_file: test_log_path(data_dir),
         };
-        write_pid_file(data_dir, &pf).unwrap();
-        assert!(pid_file_path(data_dir).exists());
+        write_test_pid_file(data_dir, &pf);
+        assert!(test_pid_path(data_dir).exists());
 
-        remove_pid_file(data_dir).unwrap();
-        assert!(!pid_file_path(data_dir).exists());
+        remove_test_pid_file(data_dir).unwrap();
+        assert!(!test_pid_path(data_dir).exists());
     }
 
     // ── Process liveness ────────────────────────────────────────────────────
@@ -916,19 +1047,15 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_inherit_listener_scrubs_inherited_listen_pid() {
-        let mut env = crate::test_utils::EnvGuard::acquire();
-
-        // Simulate a parent process environment that already carries a
-        // foreign LISTEN_PID — e.g. jit itself was launched under a
-        // socket-activation manager, or a stale exported shell variable
-        // lingers. `Command` inherits the parent's environment by default,
-        // so without an explicit removal this would reach the child
-        // unchanged and cause listenfd to reject our LISTEN_FDS on a PID
-        // mismatch, falling back to a re-bind (the race REQ-2 forbids).
-        env.set("LISTEN_PID", "1");
-
+        // A foreign LISTEN_PID reaching the child — e.g. jit itself was
+        // launched under a socket-activation manager, or a stale exported
+        // shell variable lingers — makes listenfd reject our LISTEN_FDS on a
+        // PID mismatch, falling back to a re-bind (the race REQ-2 forbids).
+        // The command carries it explicitly, so the test never changes the
+        // process environment other tests' children inherit.
         let listener = find_available_port(0).unwrap();
         let mut cmd = std::process::Command::new("true");
+        cmd.env("LISTEN_PID", "1");
         let result = inherit_listener(&mut cmd, &listener);
 
         result.unwrap();
@@ -937,7 +1064,7 @@ mod tests {
         // value means an explicit `env_remove`, which unconditionally wins
         // over whatever the parent process's real environment carries at
         // spawn time — this is the property that makes the fix correct
-        // regardless of the ambient LISTEN_PID set above.
+        // regardless of an inherited LISTEN_PID.
         let envs: std::collections::HashMap<String, Option<String>> = cmd
             .get_envs()
             .map(|(k, v)| {
@@ -967,16 +1094,13 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_inherit_listener_child_never_sees_inherited_listen_pid() {
-        let mut env = crate::test_utils::EnvGuard::acquire();
-
         // End-to-end version of the assertion above: actually spawn a child
         // and inspect the environment it received, so the test fails if
         // `Command`'s override semantics ever change out from under the
         // `get_envs`-only assertion in the sibling test.
-        env.set("LISTEN_PID", "999999");
-
         let listener = find_available_port(0).unwrap();
         let mut cmd = std::process::Command::new("env");
+        cmd.env("LISTEN_PID", "999999");
         let inherit_result = inherit_listener(&mut cmd, &listener);
         let output = inherit_result.and_then(|()| {
             cmd.output()
@@ -988,8 +1112,8 @@ mod tests {
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
             !stdout.lines().any(|line| line.starts_with("LISTEN_PID=")),
-            "child must not see a LISTEN_PID inherited from the parent's own \
-             environment; got env:\n{stdout}"
+            "child must not see a LISTEN_PID that reached its command before \
+             the handoff; got env:\n{stdout}"
         );
         assert!(
             stdout.lines().any(|line| line == "LISTEN_FDS=1"),
@@ -1010,14 +1134,14 @@ mod tests {
             port: 3000,
             started_at: Utc::now(),
             data_dir: data_dir.to_path_buf(),
-            log_file: data_dir.join("server.log"),
+            log_file: test_log_path(data_dir),
         };
-        write_pid_file(data_dir, &pf).unwrap();
+        write_test_pid_file(data_dir, &pf);
 
-        let status = server_status(data_dir).unwrap();
+        let status = test_server_status(data_dir).unwrap();
         assert!(status.is_none(), "dead PID should be cleaned up");
         assert!(
-            !pid_file_path(data_dir).exists(),
+            !test_pid_path(data_dir).exists(),
             "stale PID file should be removed"
         );
     }
@@ -1025,7 +1149,7 @@ mod tests {
     #[test]
     fn test_server_status_returns_none_when_no_pid_file() {
         let tmp = TempDir::new().unwrap();
-        let status = server_status(tmp.path()).unwrap();
+        let status = test_server_status(tmp.path()).unwrap();
         assert!(status.is_none());
     }
 
@@ -1034,7 +1158,7 @@ mod tests {
     #[test]
     fn test_stop_server_when_not_running() {
         let tmp = TempDir::new().unwrap();
-        let outcome = stop_server(tmp.path()).unwrap();
+        let outcome = test_stop_server(tmp.path()).unwrap();
         assert_eq!(outcome, StopOutcome::NotRunning);
     }
 
@@ -1048,13 +1172,13 @@ mod tests {
             port: 3000,
             started_at: Utc::now(),
             data_dir: data_dir.to_path_buf(),
-            log_file: data_dir.join("server.log"),
+            log_file: test_log_path(data_dir),
         };
-        write_pid_file(data_dir, &pf).unwrap();
+        write_test_pid_file(data_dir, &pf);
 
-        let outcome = stop_server(data_dir).unwrap();
+        let outcome = test_stop_server(data_dir).unwrap();
         assert_eq!(outcome, StopOutcome::NotRunning);
-        assert!(!pid_file_path(data_dir).exists());
+        assert!(!test_pid_path(data_dir).exists());
     }
 
     // ── liveness probe ───────────────────────────────────────────────────────
@@ -1141,11 +1265,7 @@ mod tests {
     }
 
     fn executable_script(path: PathBuf, body: &str) -> PathBuf {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::write(&path, body).unwrap();
-        let mut perms = std::fs::metadata(&path).unwrap().permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&path, perms).unwrap();
+        crate::test_utils::write_executable(&path, body).unwrap();
         path
     }
 
@@ -1156,7 +1276,7 @@ mod tests {
     /// in parallel.
     fn opts_for(data_dir: &Path, server_binary: PathBuf) -> ServeOptions {
         ServeOptions {
-            data_dir: data_dir.to_path_buf(),
+            layout: test_layout(data_dir),
             preferred_port: 0,
             log_file: None,
             web_dir: None,
@@ -1193,6 +1313,35 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
+    fn test_run_foreground_reports_child_exit_status() {
+        let tmp = TempDir::new().unwrap();
+        let data_dir = tmp.path().join(".jit");
+        std::fs::create_dir(&data_dir).unwrap();
+        let stub = executable_script(tmp.path().join("stub-server"), "#!/bin/sh\nexit 7\n");
+        let mut launched = None;
+
+        let outcome = run_foreground(
+            ForegroundOptions {
+                layout: test_layout(&data_dir),
+                preferred_port: 0,
+                web_dir: None,
+                server_binary: Some(stub),
+            },
+            |launch| launched = Some(launch.port),
+        )
+        .unwrap();
+
+        match outcome {
+            ForegroundOutcome::Exited { port, status } => {
+                assert_eq!(status.code(), Some(7));
+                assert_eq!(Some(port), launched);
+            }
+            other => panic!("expected the child to run and exit, got {other:?}"),
+        }
+    }
+
+    #[test]
+    #[cfg(unix)]
     fn test_start_server_errors_when_child_exits_immediately() {
         let tmp = TempDir::new().unwrap();
         let data_dir = tmp.path();
@@ -1212,7 +1361,7 @@ mod tests {
             "error message should mention startup exit, got: {msg}"
         );
         assert!(
-            !pid_file_path(data_dir).exists(),
+            !test_pid_path(data_dir).exists(),
             "PID file must not be written when the server exits during startup"
         );
     }
@@ -1264,7 +1413,7 @@ mod tests {
             "the failure should carry the status the child exited with, got: {msg}"
         );
         assert!(
-            !pid_file_path(data_dir).exists(),
+            !test_pid_path(data_dir).exists(),
             "PID file must not be written for a child that exited"
         );
     }
@@ -1318,7 +1467,7 @@ mod tests {
             "a child that answered and then exited is a startup failure, got: {msg}"
         );
         assert!(
-            !pid_file_path(data_dir).exists(),
+            !test_pid_path(data_dir).exists(),
             "no PID file records a process that has already exited"
         );
     }
@@ -1363,7 +1512,7 @@ mod tests {
              watched, got: {msg}"
         );
         assert!(
-            !pid_file_path(data_dir).exists(),
+            !test_pid_path(data_dir).exists(),
             "PID file must not be written for a server that never answered"
         );
         let child_pid: u32 = std::fs::read_to_string(&announced_pid)
@@ -1402,11 +1551,11 @@ mod tests {
 
         // Read the record and stop the server before asserting, so a failing
         // assertion leaves nothing running.
-        let recorded = read_pid_file(data_dir).unwrap();
+        let recorded = read_test_pid_file(data_dir).unwrap();
         let recorded_is_alive = recorded
             .as_ref()
             .is_some_and(|record| is_process_alive(record.pid));
-        let stopped = stop_server(data_dir).unwrap();
+        let stopped = test_stop_server(data_dir).unwrap();
 
         let record = recorded.expect("a started server leaves a record");
         assert_eq!(
@@ -1457,7 +1606,7 @@ mod tests {
         // final one, which `start_server` reads before it spawns anything: a
         // directory there is a PID file it cannot parse, and the start fails at
         // that first read having spawned nothing at all.
-        let pid_path = pid_file_path(data_dir);
+        let pid_path = test_pid_path(data_dir);
         let staging_blocker = pid_path.with_extension("pid.tmp");
         std::fs::create_dir_all(&staging_blocker).unwrap();
 

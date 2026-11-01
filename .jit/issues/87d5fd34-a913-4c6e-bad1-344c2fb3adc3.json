@@ -1,0 +1,41 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T09:21:45.485444934Z",
+  "context": {},
+  "created_at": "2026-11-01T09:21:44.900259272Z",
+  "dependencies": [],
+  "description": "Make the suite pass when tests share a process, as `cargo test` runs them.\n\n## Background\n\n`.github/workflows/ci.yml:158` runs `cargo test --workspace`, which runs a target's tests as threads of one process; `cargo-ci` runs each test in its own process through nextest. Thirteen shuffled shared-process runs (`--shuffle-seed` 1-13, at `0b4874edf`) found failures that nextest cannot see:\n\n- `test_command_exit_codes_serve_foreground_passthrough_is_dual_form`: `Text file busy` on spawning a script the test just wrote, on 4 of 13 seeds. A thread forking while the test still holds the script open for writing keeps it busy until that child execs.\n- `test_inspect_pinned_targets_lists_only_requested_paths_of_a_commit_tree` (seed 3) and `test_probe_runs_one_git_process_in_the_probed_directory` (seed 13): both use a git stand-in, and the cause is unconfirmed.\n- `test_run_shutdown_sequence_keeps_a_stalled_connection_running_for_the_whole_deadline` (seed 10): `ConnectionReset` reading the closed connection.\n\nSerial, 32-thread and hash-partitioned nextest runs of the whole workspace all pass.\n\n## Success Criteria\n\n- [hard] REQ-01: One shared test-support helper writes an executable a test then runs, leaving no window for another thread's fork and using no retry around spawn; no test writes one any other way. A script stand-in runs through its interpreter where the test allows it; where a real exec is needed, this issue states how the window closes.\n- [hard] REQ-02: The other three failures each have a stated cause, and each is fixed or shown to be that same race. d2b7d19b is reproduced and fixed here, or shown gone, and closed with that evidence.\n- [hard] REQ-03: 20 shuffled shared-process runs of every target in the workspace, with distinct seeds, pass; the seeds and command are recorded on this issue.\n\n\n\n\n## Evidence\n\nMechanism at `b5f2d9730`: `test_utils::write_executable` and `seal_executable` move the bytes to an inode only a `cp` child ever wrote, then rename it over the original, so no descriptor in the test process can hold it open for writing and nothing retries a spawn. `test_write_executable_runs_while_other_threads_fork` failed 3 of 3 runs with `Text file busy` with sealing removed.\n\n- The probe and inspect failures are the same race. A stress run on the old code (8 forking threads, 1500 iterations) gave `probe` returning `None` 125 times, and direct spawns hit `ETXTBSY` 151 times. `probe` treats a spawn failure as \"no checkout\"; the inspect test uses the same stand-in and maps a spawn failure to `GitUnavailable`, and was not itself stressed.\n- The shutdown failure has a separate cause, in the test: the drain started once the connection was counted, before the server read it, so a graceful notice closed it with the request unread and the peer got a reset. Polling the count reproduced it 5 of 5 times. The tests now wait for handler entry, with no sleeps or timeouts added; the two sibling tests with the same precondition race were fixed too.\n- d2b7d19b: `test_profiled_repository_fixture_receipt_binds_setup_and_consumer_to_shared_runtime_target` no longer exists (`9c0bdda7d`, 2a6bc44c), and nothing under `crates/` changes the working directory, so the reported race has no remaining source. None of the 33 shuffled shared-process runs (13 before this change, 20 after) showed it, against about 1 in 3 reported.\n\nShuffled shared-process runs: seeds 1-20 at `b5f2d9730`, all 14 test executables, 92,680 tests passed and none failed; no log contains `Text file busy` or `ConnectionReset`.\n\n    cargo test --workspace --tests --no-run --message-format=json\n    cd crates/jit   # crates/server for jit_server-* and server_integration-*\n    CARGO=$(rustup which cargo) RUSTC_BOOTSTRAP=1 \"$bin\" -Z unstable-options --shuffle-seed \"$seed\"\n\nShuffling is libtest's unstable flag, one process per target, not across targets. No mechanical check enforces that every test writes executables through the helper; that rests on the sweep at this commit.\n\n\n\nFollow-up at `243842b0b`: `seal_executable` folded into the one helper `test_utils::write_executable`, and the fake reviewer runs as `bash <path>`, so nothing execs it. Real exec remains for stand-ins a process finds by path (`git`, `rg`), the `jit-server` sibling, the `serve` stubs, git hooks and the `jit` copy. The window closes because the exec'd file is an inode only a `cp` child wrote, and that child has exited before the helper returns. Net +38 lines overall. Seeds 1-20 rerun at this commit: 92,680 passed, none failed.\n",
+  "documents": [],
+  "done_at": "2026-11-01T09:43:16.193877614Z",
+  "first_ready_at": "2026-11-01T09:21:44.900259272Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e925aaad-39d6-45b2-97af-42d65da36b67",
+      "status": "passed",
+      "updated_at": "2026-11-01T09:58:12.161404602Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "259746a5-0a06-46a9-9338-91327a2246c2",
+      "status": "passed",
+      "updated_at": "2026-11-01T10:00:40.384714041Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "87d5fd34-a913-4c6e-bad1-344c2fb3adc3",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:shared-test-fixtures",
+    "component:testing",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "The suite passes when tests share a process",
+  "updated_at": "2026-11-01T10:00:40.384714041Z"
+}

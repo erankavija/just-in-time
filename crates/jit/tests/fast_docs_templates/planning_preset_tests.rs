@@ -7,34 +7,18 @@
 use jit::declarations::{GateMode, GateStage};
 use jit::domain::Priority;
 use jit::storage::{IssueStore, JsonFileStorage};
+use jit::test_utils::{declaration_dir, file_executor};
 use jit::CommandExecutor;
 use std::sync::{mpsc, Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 use tempfile::TempDir;
 
-/// A file-backed executor over a repository whose gate-preset directory is the
-/// one a project declares its presets in.
-///
-/// A project-defined preset lives under `.jit/config/gate-presets/`, which the
-/// in-memory harness does not model, so these cases run over a real store.
-fn file_backed_executor(temp: &TempDir) -> CommandExecutor<JsonFileStorage> {
-    jit::test_mode::enable();
-    let worktree = temp.path().join("worktree");
-    std::fs::create_dir(&worktree).unwrap();
-    let data_root = worktree.join(".jit");
-    std::fs::create_dir(&data_root).unwrap();
-    let storage = JsonFileStorage::new(data_root);
-    std::fs::write(storage.root().join("config.toml"), "").unwrap();
-    let layout = jit::storage::discover_repository_layout(&worktree, storage.root()).unwrap();
-    CommandExecutor::new(storage).with_layout(layout)
-}
-
 /// Define `key` as a manual postcheck gate in the repository's own registry.
-fn define_gate(executor: &CommandExecutor<JsonFileStorage>, key: &str) {
+fn define_gate(executor: &CommandExecutor<JsonFileStorage>, key: &jit::domain::identity::GateKey) {
     executor
         .define_gate(
-            key.to_string(),
+            key,
             format!("{key} gate"),
             format!("Repository-declared {key} gate"),
             GateStage::Postcheck,
@@ -50,7 +34,7 @@ fn define_gate(executor: &CommandExecutor<JsonFileStorage>, key: &str) {
 fn preset_captured_from_gates(
     executor: &CommandExecutor<JsonFileStorage>,
     preset: &str,
-    gates: &[&str],
+    gates: &[jit::domain::identity::GateKey],
 ) -> std::path::PathBuf {
     let (reference, _) = executor
         .issues()
@@ -67,7 +51,7 @@ fn preset_captured_from_gates(
         .expect("create reference issue");
     for gate in gates {
         define_gate(executor, gate);
-        executor.add_gate(&reference, (*gate).to_string()).unwrap();
+        executor.add_gate(&reference, gate).unwrap();
     }
     executor
         .create_gate_preset(preset, &reference)
@@ -96,8 +80,8 @@ fn test_project_defined_preset_fixtures_isolate_concurrent_writes() {
             let ready = Arc::clone(&ready);
             let sender = sender.clone();
             thread::spawn(move || {
-                let temp = TempDir::new().expect("create fixture temp directory");
-                let executor = file_backed_executor(&temp);
+                let temp = declaration_dir(&[("worktree/.jit/config.toml", "")]).unwrap();
+                let executor = file_executor(&temp.path().join("worktree")).unwrap();
                 let data_root = executor.storage().root().to_path_buf();
                 let worktree_root = data_root
                     .parent()
@@ -111,7 +95,7 @@ fn test_project_defined_preset_fixtures_isolate_concurrent_writes() {
                 let saved_path = preset_captured_from_gates(
                     &executor,
                     &format!("concurrent-{worker}"),
-                    &["tests"],
+                    &["tests".parse().unwrap()],
                 );
                 sender
                     .send(ConcurrentFixtureMessage::Complete(
@@ -168,17 +152,19 @@ fn test_project_defined_preset_fixtures_isolate_concurrent_writes() {
 }
 
 /// @/inv/event-log (jit:bb7d57a2): a preset application that WRITES the gate
-/// registry appends a registry-scoped audit event per definition write —
-/// `gate_definition_created` for a new key, `gate_definition_updated` for a
-/// timeout-override overwrite — and a no-write re-application appends none.
+/// registry appends a registry-scoped audit event per definition write (a
+/// created event for a new key, an updated event for a timeout-override
+/// overwrite), and a no-write re-application appends none.
 #[test]
 fn test_apply_gate_preset_appends_definition_events() {
-    let temp = TempDir::new().unwrap();
-    let executor = file_backed_executor(&temp);
+    let temp = declaration_dir(&[("worktree/.jit/config.toml", "")]).unwrap();
+    let executor = file_executor(&temp.path().join("worktree")).unwrap();
     // Captured from a definition the project authors, then removed from the
     // registry, so the first application is the write that defines its key.
-    preset_captured_from_gates(&executor, "review", &["team-review"]);
-    executor.remove_gate_definition("team-review").unwrap();
+    preset_captured_from_gates(&executor, "review", &["team-review".parse().unwrap()]);
+    executor
+        .remove_gate_definition(&"team-review".parse().unwrap())
+        .unwrap();
 
     let issue_with = |title: &str| {
         executor
@@ -260,12 +246,16 @@ fn test_apply_gate_preset_appends_definition_events() {
 /// because the save/list/show path reads `.jit/config/gate-presets/`.
 #[test]
 fn test_project_defined_preset_save_list_show_apply_in_process() {
-    let temp = TempDir::new().unwrap();
-    let executor = file_backed_executor(&temp);
+    let temp = declaration_dir(&[("worktree/.jit/config.toml", "")]).unwrap();
+    let executor = file_executor(&temp.path().join("worktree")).unwrap();
 
     // SAVE: capture a reference issue's gates into a project-defined preset,
     // written under the project's gate-presets directory.
-    let saved_path = preset_captured_from_gates(&executor, "ci", &["tests", "code-review"]);
+    let saved_path = preset_captured_from_gates(
+        &executor,
+        "ci",
+        &["tests".parse().unwrap(), "code-review".parse().unwrap()],
+    );
     assert!(
         saved_path.exists(),
         "preset should be written to disk at {saved_path:?}"
@@ -324,11 +314,13 @@ fn test_project_defined_preset_save_list_show_apply_in_process() {
     let (result, _warnings) = executor
         .apply_gate_preset(&target, "ci", None, false, false, &[])
         .expect("apply project-defined preset");
-    assert!(result.added.contains(&"tests".to_string()));
-    assert!(result.added.contains(&"code-review".to_string()));
+    assert!(result.added.contains(&"tests".parse().unwrap()));
+    assert!(result.added.contains(&"code-review".parse().unwrap()));
 
     // The target issue now requires both gates.
     let issue = executor.storage().load_issue(&target).expect("load target");
-    assert!(issue.gates_required.contains(&"tests".to_string()));
-    assert!(issue.gates_required.contains(&"code-review".to_string()));
+    assert!(issue.gates_required.contains(&"tests".parse().unwrap()));
+    assert!(issue
+        .gates_required
+        .contains(&"code-review".parse().unwrap()));
 }

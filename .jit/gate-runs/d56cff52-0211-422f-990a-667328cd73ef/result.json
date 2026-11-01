@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6e18820676f30f4f4f75322e7fecd5c17b87681c",
+  "completed_at": "2026-10-28T22:09:40.006148144Z",
+  "duration_ms": 182212,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs",
+        "id": "F1",
+        "line": 870,
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-10",
+          "@/invariant/no-ignored-tests"
+        ],
+        "severity": "low",
+        "summary": "The MCP parity test treats a missing Node.js executable as a successful skip."
+      }
+    ],
+    "summary": "Current fallback-scope tests obtain created IDs through the shared JSON-backed fixture; one pre-existing advisory remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6a5de806-d295-4fd4-9c4d-fe0551be21d7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d56cff52-0211-422f-990a-667328cd73ef",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T22:06:37.794139625Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fallback — no reachable commit contains `jit:6a5de806`\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/orthogonal-tests, @/invariant/no-ignored-tests (.jit/invariants.toml); @/issue/c780514e/requirement/REQ-05, @/issue/c780514e/requirement/REQ-10 (issue markdown)\nGate evidence: cargo-ci passed (2026-10-28T22:06:36Z; exit code unavailable); code-review pending\nTruncation recovery: none\n\n1. F1 — advisory, pre-existing (low): [`validate_cli_rule_tests.rs:870`](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs:870) returns successfully when Node is unavailable, bypassing the MCP parity assertion. Blame attributes this to `1a0ffcbeb`, predating this issue. References: @/issue/c780514e/requirement/REQ-10, @/invariant/no-ignored-tests.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Current fallback-scope tests obtain created IDs through the shared JSON-backed fixture; one pre-existing advisory remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The MCP parity test treats a missing Node.js executable as a successful skip.\",\"file\":\"crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs\",\"line\":870,\"references\":[\"@/issue/c780514e/requirement/REQ-10\",\"@/invariant/no-ignored-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

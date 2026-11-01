@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-29T07:44:16.720405209Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Remove numeric exit-code assertions that re-prove projected rows from the `cli_issue` suite, keeping each test's own property and its error-class evidence.\n\n## Background\n\nThe exit-code projection suite (`cli_issue/command_exit_code_projection_tests.rs`) binds each command-to-exit-code row in both invocation forms, and its wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command. Outside it, a subprocess test asserts success or failure and the property it adds, such as a JSON verdict, an error envelope code, remediation text or empty stdout. It names a numeric exit code only for a command and code pair the projection has no row for. The sweep counts numeric `.code(N)`, single- and multi-line `status.code()` comparisons with `Some(...)` (literal, `ExitCode::X` or derived), symbolic `ExitCode::X.code()`, and helpers that take an expected code.\n\nExit-code assertion sites in `crates/jit/tests/cli_issue`: `batch_create_tests.rs` (10), `top_level_failure_envelope_tests.rs` (6), `issue_status_projection_tests.rs` (4), `issue_show_projection_test.rs` (4), `issue_create_description_file_tests.rs` (3), `error_json_tests.rs` (1), `issue_search_label_filter_tests.rs` (1), `stored_record_classification_tests.rs` (1), `search_exit_status_tests.rs` (1), `snapshot_export_tests.rs` (1), `verb_hint_tests.rs` (1), `serve_failure_envelope_tests.rs` (1), `container_rollup_tests.rs` (1). Out of scope: the recorded-corpus contracts `failure_probe_fixture.rs`, `failure_envelope_contract_tests.rs` and `failure_probe_coverage_tests.rs`, which compare statuses against the registered error classification.\n\nThis entry covers `issue_status_projection_tests.rs`, `issue_show_projection_test.rs`, `top_level_failure_envelope_tests.rs`, `verb_hint_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts a numeric exit code for a command and code pair the projection binds; each asserts success or failure instead.\n- [hard] REQ-02: Where a numeric exit code was a test's only evidence of which error class its path takes, the test asserts that class another way, such as the `error.code` of the `--json` envelope, instead of bare failure.\n- [hard] REQ-03: Each edited test keeps the other properties it asserted, and a test whose only assertion was a projected exit code with no class to preserve no longer exists.\n",
   "documents": [],
+  "done_at": "2026-10-31T23:32:22.167748351Z",
+  "first_ready_at": "2026-10-29T07:09:43.565037073Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6393b33a-646a-4be0-a629-db10305a8dac",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:28:37.880730738Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "335a9088-cd7b-434e-b536-d71b280d3d7f",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:30:49.608474647Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "69341a9d-a518-4ed6-972e-070760d085ab",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Issue show and failure-envelope tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-31T23:32:22.167748351Z"
 }

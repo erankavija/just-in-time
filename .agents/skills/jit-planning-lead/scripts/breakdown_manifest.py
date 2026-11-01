@@ -22,12 +22,13 @@ PLANNING = {"outcome", "contract_refs", "produces_contracts", "source_refs", "la
 TERMINAL_TEXT = {"consumer_family", "test_boundary", "worker_sized_reason"}
 TERMINAL_REQUIRED = TERMINAL_TEXT | {"footprint"}
 TERMINAL_ALLOWED = TERMINAL_REQUIRED | {"warning_overrides"}
+DEFAULT_MAX_ISSUES = 50
 WARNING_CODES = {
     "acceptance-clusters",
     "broad-quantifier",
+    "chain-link",
     "implementation-release",
     "independent-verbs",
-    "mixed-deliverables",
     "multiple-consumer-families",
     "multiple-test-boundaries",
     "weak-worker-sized-reason",
@@ -148,7 +149,36 @@ def check_conformance(path):
     return failures
 
 
-def sizing_warnings(entry):
+def footprint_paths(entry):
+    planning = entry.get("planning")
+    terminal = planning.get("terminal") if isinstance(planning, dict) else None
+    footprint = terminal.get("footprint") if isinstance(terminal, dict) else None
+    if not footprint_is_valid(footprint):
+        return set()
+    return {path for kind in ("creates", "touches") for path in footprint.get(kind, [])}
+
+
+def chain_links(entries, terminal_types):
+    # A small terminal sharing a footprint path with a direct terminal neighbour is a
+    # link in an in-module chain (producer, adoption, removal) that one task delivers.
+    terminals = {
+        entry["key"]: entry for entry in entries
+        if isinstance(entry, dict) and isinstance(entry.get("key"), str) and entry.get("type") in terminal_types
+    }
+    neighbours = {key: set() for key in terminals}
+    for key, entry in terminals.items():
+        for dep in entry.get("depends_on", []) if strings(entry.get("depends_on", [])) else []:
+            if dep in terminals:
+                neighbours[key].add(dep)
+                neighbours[dep].add(key)
+    return {
+        key for key, entry in terminals.items()
+        if 0 < len(footprint_paths(entry)) <= 2
+        and any(footprint_paths(entry) & footprint_paths(terminals[other]) for other in neighbours[key])
+    }
+
+
+def sizing_warnings(entry, is_chain_link=False):
     planning = entry["planning"]
     terminal = planning.get("terminal")
     if not terminal:
@@ -171,9 +201,8 @@ def sizing_warnings(entry):
         warnings.append(("multiple-consumer-families", "names more than one consumer family"))
     if re.search(r"[,/]|\band\b", terminal["test_boundary"].lower()):
         warnings.append(("multiple-test-boundaries", "names more than one test boundary"))
-    categories = sum(bool(re.search(rf"\b{word}\w*\b", text)) for word in ("foundation", "migrat", "delet", "document", "releas"))
-    if categories > 1:
-        warnings.append(("mixed-deliverables", "mixes independently testable deliverable categories"))
+    if is_chain_link:
+        warnings.append(("chain-link", "is a small link in an in-module chain; merge it with its neighbour"))
     if len(re.findall(r"^###\s+", description, re.MULTILINE)) >= 3:
         warnings.append(("acceptance-clusters", "contains three or more acceptance clusters"))
     if re.search(r"\b(implement|migrate|update)\w*\b", text) and re.search(r"\b(release|publish|deploy)\w*\b", text):
@@ -258,12 +287,15 @@ def reaches_finer(key, level, by_key, type_levels):
     return False
 
 
-def validate(entries, terminal_types, type_levels, known_sources, required_sources, required_criteria, contracts, contract_errors=()):
+def validate(entries, terminal_types, type_levels, known_sources, required_sources, required_criteria, contracts, contract_errors=(), max_issues=DEFAULT_MAX_ISSUES):
     errors, warnings, overridden, advisories = list(contract_errors), [], [], []
     if not isinstance(entries, list):
         return ["manifest root must be a bare JSON array"], [], [], []
     if not entries:
         return ["manifest must contain at least one issue"], [], [], []
+    if len(entries) > max_issues:
+        errors.append(f"manifest has {len(entries)} issues, over the budget of {max_issues}; merge coherent changes or defer criteria")
+    links = chain_links(entries, terminal_types)
     keys = [entry.get("key") for entry in entries if isinstance(entry, dict) and isinstance(entry.get("key"), str)]
     if len(keys) != len(set(keys)):
         errors.append("keys must be unique")
@@ -362,7 +394,7 @@ def validate(entries, terminal_types, type_levels, known_sources, required_sourc
                 if not isinstance(overrides, dict) or any(code not in WARNING_CODES or not isinstance(reason, str) or not reason.strip() for code, reason in overrides.items()):
                     errors.append(f"{at}.planning.terminal.warning_overrides must map stable warning codes to non-empty reasons")
                     overrides = {}
-                findings = sizing_warnings(entry) if is_terminal else []
+                findings = sizing_warnings(entry, key in links) if is_terminal else []
                 found_codes = {code for code, _ in findings}
                 for code, message in findings:
                     if code in overrides:
@@ -508,6 +540,7 @@ def main():
     check.add_argument("--required-criterion", action="append", default=[])
     check.add_argument("--plan")
     check.add_argument("--deny-warnings", action="store_true")
+    check.add_argument("--max-issues", type=int, default=DEFAULT_MAX_ISSUES)
     check.add_argument("--json", action="store_true")
     draw = sub.add_parser("render")
     draw.add_argument("manifest")
@@ -538,7 +571,7 @@ def main():
             contracts, contract_errors = contract_modes(plan)
         errors, warnings, overridden, advisories = validate(
             load(args.manifest), terminal, levels, args.known_source, args.required_source,
-            args.required_criterion, contracts, contract_errors
+            args.required_criterion, contracts, contract_errors, args.max_issues
         )
         result = {
             "valid": not errors and not (args.deny_warnings and warnings),

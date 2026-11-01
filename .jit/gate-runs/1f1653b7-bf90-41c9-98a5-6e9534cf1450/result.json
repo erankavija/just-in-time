@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-5fac48b8",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e46561ba72cbcac2f79de2fab4d98ff485369349",
+  "completed_at": "2026-10-29T06:57:24.892702291Z",
+  "duration_ms": 253544,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria pass; the prior staging-alias finding is resolved by the amended REQ-01.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5fac48b8-54cc-476b-b9ab-cda5f745923f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1f1653b7-bf90-41c9-98a5-6e9534cf1450",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-29T06:53:11.348261265Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:5fac48b8 commits 4e3db0f77, 4608d2843, eae46f9f6, 412403bca, 00815ee44, e46561ba7\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/5fac48b8/requirement/REQ-01–REQ-05 (issue description); @/issue/2195c98f/requirement/REQ-01 (issue description); @/invariant/semantic-types, canonical-cutover, essential-code-prose, orthogonal-tests, semantic-test-assertions, shared-test-contracts, event-log (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0 (2026-10-29T06:51:16Z); code-review failed, exit 1 (prior run; its F1 is resolved by the amended REQ-01)\nTruncation recovery: reread the 4608d2843 patch by path group; separately inspected the complete mutation finalizer patch and affected current call sites/tests\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria pass; the prior staging-alias finding is resolved by the amended REQ-01.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

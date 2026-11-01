@@ -1,17 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-29T08:38:50.938250314Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
-    "3ee3a4d1-3e66-4935-ad2c-4df89663cea7"
+    "3ee3a4d1-3e66-4935-ad2c-4df89663cea7",
+    "c797b59b-0f5e-4e12-9a36-b3b95d7b92c1"
   ],
-  "description": "Give the validated newtype the `IssueId` name and remove the temporary alias bridge, so the compiler enforces issue identity and stored ids decode strictly.\n\n## Background\n\nIssue identity has been adopted through `crate::domain::identity::IssueId`, a temporary alias for `String`, plus an `IssueIdStaging` trait that gives `String` a `short_id()`. The validated newtype sits in the same module under a staging name. Each production family and each test suite has been retyped to the alias using only the newtype's trait set, so the remaining residue is where strings become ids: the identity module itself, the identifier authority in `repository_state/mutation.rs` (`IdAuthority::uuid_at`, `:149-162`), which wraps generated UUIDs, record decoding in the JSON and memory backends, and lease-record decoding in `storage/claim_coordinator.rs`. The memory backend builds record paths with `.expect` (`storage/memory.rs:338-339`), which panics on a non-canonical id. Lease records in this checkout's machine-local claims log already name issues by full id. Interim call-site prefix parses that once bridged the resolver's retyping have been replaced by parsing at the CLI and server entry points.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::identity::IssueId` is the validated newtype; the `String` alias, the staging name and the `IssueIdStaging` trait no longer exist.\n- [hard] REQ-02: No production code builds an `IssueId` from a string except record decoding, prefix resolution and the identifier authority.\n- [hard] REQ-03: Decoding an issue record whose id or dependency is non-canonical fails with an error naming the record path, and a storage test shows it.\n- [hard] REQ-04: Resolving a non-canonical id against the memory backend returns its not-found error, where it used to panic, and a storage test shows it.\n- [hard] REQ-05: A lease record whose issue id is not canonical fails to decode with an error naming the record.\n- [hard] REQ-06: No production `IssueIdPrefix` parse remains outside the CLI and server entry points and the item-address decoder, and the only production `resolve_issue_id` call under `commands/` is the item-address resolution in `commands/item.rs`.\n- [hard] REQ-07: Issue, index, event and gate-run JSON in this repository loads and re-serializes byte-identically.\n\n## Notes\n\nNo compatibility reader is added for non-canonical stored ids (`@/inv/canonical-cutover`).\n",
+  "description": "Give the validated newtype the `IssueId` name and remove the temporary alias bridge, so the compiler enforces issue identity and stored ids decode strictly.\n\n## Background\n\nIssue identity has been adopted through `crate::domain::identity::IssueId`, a temporary alias for `String`, plus an `IssueIdStaging` trait that gives `String` a `short_id()`. The validated newtype sits in the same module under a staging name. Each production family and each test suite has been retyped to the alias using only the newtype's trait set, so the remaining residue is where strings become ids: the identity module itself, the identifier authority in `repository_state/mutation.rs` (`IdAuthority::uuid_at`, `:149-162`), which wraps generated UUIDs, record decoding in the JSON and memory backends, and lease-record decoding in `storage/claim_coordinator.rs`. The memory backend builds record paths with `.expect` (`storage/memory.rs:338-339`), which panics on a non-canonical id. Lease records in this checkout's machine-local claims log already name issues by full id. Interim call-site prefix parses that once bridged the resolver's retyping have been replaced by parsing at the CLI and server entry points.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::identity::IssueId` is the validated newtype; the `String` alias, the staging name and the `IssueIdStaging` trait no longer exist.\n- [hard] REQ-02: No production code builds an `IssueId` from a string except record decoding, prefix resolution and the identifier authority.\n- [hard] REQ-03: Decoding an issue record whose id or dependency is non-canonical fails with an error naming the record path, and a storage test shows it.\n- [hard] REQ-04: Resolving a non-canonical id against the memory backend returns its not-found error, where it used to panic, and a storage test shows it.\n- [hard] REQ-05: A lease record whose issue id is not canonical fails to decode with an error naming the record.\n- [hard] REQ-06: No production `IssueIdPrefix` parse remains outside the CLI and server entry points and the item-address decoder, and the only production `resolve_issue_id` call under `commands/` is the item-address resolution in `commands/item.rs`.\n- [hard] REQ-07: Issue, index and event JSON and current-format gate-run JSON in this repository load and re-serialize byte-identically, and every other stored gate-run record decodes and reproduces its id fields.\n\n## Notes\n\nNo compatibility reader is added for non-canonical stored ids (`@/inv/canonical-cutover`).\n",
   "documents": [],
+  "done_at": "2026-10-31T23:10:47.318871716Z",
+  "first_ready_at": "2026-10-29T08:38:50.218683391Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f87f3579-e844-4ebd-a4ff-b217fd0eb788",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:10:27.844915624Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "71ad9216-e854-4585-a432-fd15164544b1",
+      "status": "passed",
+      "updated_at": "2026-10-31T23:09:49.817191832Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7abcc22d-c931-4da8-94b0-c9c894333540",
   "labels": [
     "type:task",
@@ -26,7 +43,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "IssueId becomes the validated newtype",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-31T23:10:47.318871716Z"
 }

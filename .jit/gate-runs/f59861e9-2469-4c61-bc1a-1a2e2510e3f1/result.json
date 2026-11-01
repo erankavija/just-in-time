@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-f8021e35",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "75bacd1c64cd6ed820f7bb90ccce8deac668b66b",
+  "completed_at": "2026-10-26T23:51:23.562169348Z",
+  "duration_ms": 132137,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The watcher derives relevant .jit path names from VirtualPath constants and preserves the prior relevance behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f8021e35-cf67-4142-a1f3-5fa810fb7fc8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f59861e9-2469-4c61-bc1a-1a2e2510e3f1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T23:49:11.424268783Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 72509317e (`jit:f8021e35`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-07 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci pending, exit code none; code-review pending, no recorded runs\nTruncation recovery: none\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The watcher derives relevant .jit path names from VirtualPath constants and preserves the prior relevance behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

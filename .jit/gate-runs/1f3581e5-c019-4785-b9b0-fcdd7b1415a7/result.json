@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b939e20e1b5557e45f77f67f723fc328125b1670",
+  "completed_at": "2026-11-01T07:44:39.773410352Z",
+  "duration_ms": 219762,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/cargo-ci-selftest.sh",
+        "id": "F1",
+        "line": 386,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/cargo-ci-selftest"
+        ],
+        "severity": "medium",
+        "summary": "The required dynamic regression self-test for the lock-timeout requirements is pending; cargo-ci does not execute it."
+      }
+    ],
+    "summary": "REQ-01 and REQ-02 lack executed dynamic verification because the required cargo-ci self-test is pending.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8c6adea6-3c14-48c8-a25e-bcba658c0570",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1f3581e5-c019-4785-b9b0-fcdd7b1415a7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T07:41:00.010613752Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2643 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1960d-f793-76f1-a2d2-88c34e89356a\n--------\nuser\n--- 2630 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0c5879905, 16f2c6e67, a70f02a36, 842d5a3a1, b63ac370d, b939e20e1\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci-selftest, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending (no run); cargo-ci-selftest pending (no run)\nTruncation recovery: Narrow reads covered the benchmark lock/sample paths, self-test assertions, registries, and merge-parent stats; unrelated dev-document hits were outside the script lock/sample impact cone.\n\n1. **[blocking, issue-impact]** REQ-01 and REQ-02 remain materially unverified: their dynamic regression coverage is in `scripts/cargo-ci-selftest.sh:386-395`, but the required `cargo-ci-selftest` gate has no run. The recorded `cargo-ci` pass does not invoke that shell self-test, so it cannot establish the lock-timeout behavior. References: @/gate/cargo-ci-selftest.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-01 and REQ-02 lack executed dynamic verification because the required cargo-ci self-test is pending.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The required dynamic regression self-test for the lock-timeout requirements is pending; cargo-ci does not execute it.\",\"file\":\"scripts/cargo-ci-selftest.sh\",\"line\":386,\"references\":[\"@/gate/cargo-ci-selftest\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

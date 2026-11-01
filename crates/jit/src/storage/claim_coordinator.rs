@@ -16,6 +16,7 @@ use crate::storage::clock::{Clock, SystemClock};
 use crate::storage::StorageWarning;
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Duration, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -24,19 +25,23 @@ use uuid::Uuid;
 
 use super::lock::FileLocker;
 use super::worktree_paths::WorktreePaths;
+use crate::domain::identity::{IssueId, LeaseId, WorktreeId};
+use crate::domain::Assignee;
 use crate::errors;
 
 /// A lease granting exclusive write access to an issue
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct Lease {
     /// Unique lease identifier (UUID)
-    pub lease_id: String,
+    pub lease_id: LeaseId,
     /// Issue being claimed
-    pub issue_id: String,
+    pub issue_id: IssueId,
     /// Agent holding the lease
-    pub agent_id: String,
+    #[serde(deserialize_with = "deserialize_agent_id")]
+    #[schemars(with = "String")]
+    pub agent_id: Assignee,
     /// Worktree where lease was acquired
-    pub worktree_id: String,
+    pub worktree_id: WorktreeId,
     /// Git branch (informational)
     pub branch: Option<String>,
     /// Time-to-live in seconds (0 = indefinite)
@@ -50,6 +55,15 @@ pub struct Lease {
     /// Whether the lease is stale (computed during index rebuild for TTL=0 leases)
     #[serde(default)]
     pub stale: bool,
+}
+
+fn deserialize_agent_id<'de, D>(deserializer: D) -> std::result::Result<Assignee, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = String::deserialize(deserializer)?;
+    raw.parse()
+        .map_err(|error| serde::de::Error::custom(format!("agent_id: {error}")))
 }
 
 impl Lease {
@@ -92,29 +106,29 @@ pub enum ClaimOp {
     },
     /// Renew an existing lease
     Renew {
-        lease_id: String,
+        lease_id: LeaseId,
         new_expires_at: Option<DateTime<Utc>>,
         new_last_beat: DateTime<Utc>,
     },
     /// Heartbeat for indefinite leases (updates last_beat only)
     Heartbeat {
-        lease_id: String,
+        lease_id: LeaseId,
         new_last_beat: DateTime<Utc>,
     },
     /// Release a lease explicitly
     Release {
-        lease_id: String,
+        lease_id: LeaseId,
         released_at: DateTime<Utc>,
     },
     /// Automatically evict expired lease
     AutoEvict {
-        lease_id: String,
+        lease_id: LeaseId,
         evicted_at: DateTime<Utc>,
         reason: String,
     },
     /// Force evict a lease (admin operation)
     ForceEvict {
-        lease_id: String,
+        lease_id: LeaseId,
         evicted_at: DateTime<Utc>,
         reason: String,
     },
@@ -193,7 +207,8 @@ impl ClaimsIndex {
         }
 
         let content = fs::read_to_string(&index_path).context("Failed to read claims index")?;
-        serde_json::from_str(&content).context("Failed to parse claims index")
+        serde_json::from_str(&content)
+            .with_context(|| format!("Failed to parse claims index at {}", index_path.display()))
     }
 
     /// Non-fatal warnings derived from the index's diagnostic state.
@@ -210,8 +225,8 @@ impl ClaimsIndex {
     }
 
     /// Find active lease for an issue
-    pub fn find_lease(&self, issue_id: &str) -> Option<&Lease> {
-        self.leases.iter().find(|l| l.issue_id == issue_id)
+    pub fn find_lease(&self, issue_id: &IssueId) -> Option<&Lease> {
+        self.leases.iter().find(|l| &l.issue_id == issue_id)
     }
 
     /// Add a lease to the index
@@ -222,13 +237,13 @@ impl ClaimsIndex {
     }
 
     /// Remove a lease from the index
-    pub fn remove_lease(&mut self, lease_id: &str) {
-        self.leases.retain(|l| l.lease_id != lease_id);
+    pub fn remove_lease(&mut self, lease_id: &LeaseId) {
+        self.leases.retain(|l| &l.lease_id != lease_id);
     }
 
     /// Find a lease by lease_id
-    pub fn find_lease_by_id(&self, lease_id: &str) -> Option<&Lease> {
-        self.leases.iter().find(|l| l.lease_id == lease_id)
+    pub fn find_lease_by_id(&self, lease_id: &LeaseId) -> Option<&Lease> {
+        self.leases.iter().find(|l| &l.lease_id == lease_id)
     }
 }
 
@@ -236,8 +251,8 @@ impl ClaimsIndex {
 pub struct ClaimCoordinator {
     paths: WorktreePaths,
     locker: FileLocker,
-    worktree_id: String,
-    agent_id: String,
+    worktree_id: WorktreeId,
+    agent_id: Assignee,
     /// Whether to fsync the audit log and index on every write. Defaults to
     /// `true` for crash durability in production. Tests that exercise pure
     /// index/rebuild logic (not crash recovery) disable it via
@@ -263,56 +278,30 @@ pub(crate) struct ClaimsMutationGuard {
 }
 
 impl ClaimsMutationGuard {
-    fn resolved_active_leases<'a>(
-        &'a self,
-        canonical_issue_id: &str,
-        resolve_issue_id: impl Fn(&str) -> Result<String>,
-    ) -> Result<Vec<&'a Lease>> {
-        self.index
-            .leases
-            .iter()
-            .filter(|lease| !lease.is_expired(self.now) && !lease.is_stale(self.now))
-            .filter(|lease| {
-                ClaimCoordinator::is_issue_identity_candidate(&lease.issue_id, canonical_issue_id)
-            })
-            .map(|lease| resolve_issue_id(&lease.issue_id).map(|resolved| (lease, resolved)))
-            .collect::<Result<Vec<_>>>()
-            .map(|leases| {
-                leases
-                    .into_iter()
-                    .filter_map(|(lease, resolved)| {
-                        (resolved == canonical_issue_id).then_some(lease)
-                    })
-                    .collect()
-            })
+    fn active_leases<'a>(&'a self, issue_id: &'a IssueId) -> impl Iterator<Item = &'a Lease> {
+        self.index.leases.iter().filter(move |lease| {
+            &lease.issue_id == issue_id && !lease.is_expired(self.now) && !lease.is_stale(self.now)
+        })
     }
 
     pub(crate) fn has_active_lease(
         &self,
-        canonical_issue_id: &str,
-        current_agent: Option<&str>,
-        resolve_issue_id: impl Fn(&str) -> Result<String>,
-    ) -> Result<bool> {
-        Ok(self
-            .resolved_active_leases(canonical_issue_id, resolve_issue_id)?
-            .into_iter()
-            .any(|lease| current_agent.is_none_or(|agent| lease.agent_id.as_str() == agent)))
+        issue_id: &IssueId,
+        current_agent: Option<&Assignee>,
+    ) -> bool {
+        self.active_leases(issue_id)
+            .any(|lease| current_agent.is_none_or(|agent| &lease.agent_id == agent))
     }
 
-    /// Resolve active persisted spellings against the final captured issue set
-    /// and return the first lease conflicting with `current_agent`.
+    /// Return the first active lease on `issue_id` not held by `current_agent`.
     pub(crate) fn conflicting_lease(
         &self,
-        canonical_issue_id: &str,
-        current_agent: Option<&str>,
-        resolve_issue_id: impl Fn(&str) -> Result<String>,
-    ) -> Result<Option<Lease>> {
-        let conflict = self
-            .resolved_active_leases(canonical_issue_id, resolve_issue_id)?
-            .into_iter()
-            .find(|lease| current_agent.is_none_or(|agent| lease.agent_id.as_str() != agent))
-            .cloned();
-        Ok(conflict)
+        issue_id: &IssueId,
+        current_agent: Option<&Assignee>,
+    ) -> Option<Lease> {
+        self.active_leases(issue_id)
+            .find(|lease| current_agent.is_none_or(|agent| &lease.agent_id != agent))
+            .cloned()
     }
 
     /// Non-fatal diagnostics observed in the held control-plane snapshot.
@@ -333,8 +322,8 @@ impl ClaimCoordinator {
     pub fn new(
         paths: WorktreePaths,
         locker: FileLocker,
-        worktree_id: String,
-        agent_id: String,
+        worktree_id: WorktreeId,
+        agent_id: Assignee,
     ) -> Self {
         Self {
             paths,
@@ -389,7 +378,7 @@ impl ClaimCoordinator {
         fs::create_dir_all(lock_parent)?;
         let lock = self
             .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
         let now = self.clock.now();
         let index = self.rebuild_index_from_log_at(now, true)?;
         Ok(ClaimsMutationGuard {
@@ -416,13 +405,13 @@ impl ClaimCoordinator {
     /// - Issue already claimed by another agent
     /// - Lock timeout
     /// - I/O errors
-    pub fn acquire_claim(&self, issue_id: &str, ttl_secs: u64) -> Result<Lease> {
+    pub fn acquire_claim(&self, issue_id: &IssueId, ttl_secs: u64) -> Result<Lease> {
         // 1. Acquire exclusive lock with metadata for diagnostics
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         fs::create_dir_all(lock_path.parent().unwrap())?;
         let _guard = self
             .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
 
         // 2. Load index and evict expired leases
         let mut index = self.load_claims_index()?;
@@ -438,15 +427,15 @@ impl ClaimCoordinator {
 
             bail!(
                 "{}",
-                errors::already_claimed(issue_id, &existing.agent_id, &expires_info)
+                errors::already_claimed(issue_id, &existing.agent_id.to_string(), &expires_info)
             );
         }
 
         // 4. Create new lease
         let now = self.clock.now();
         let lease = Lease {
-            lease_id: Uuid::new_v4().to_string(),
-            issue_id: issue_id.to_string(),
+            lease_id: LeaseId::try_from(Uuid::new_v4().to_string())?,
+            issue_id: issue_id.clone(),
             agent_id: self.agent_id.clone(),
             worktree_id: self.worktree_id.clone(),
             branch: self.get_current_branch().ok(),
@@ -495,7 +484,7 @@ impl ClaimCoordinator {
     /// - Per-repo limit enforced from config
     pub fn acquire_claim_with_reason(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         ttl_secs: u64,
         reason: Option<&str>,
         max_indefinite_per_agent: u32,
@@ -520,7 +509,7 @@ impl ClaimCoordinator {
         fs::create_dir_all(lock_path.parent().unwrap())?;
         let _guard = self
             .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
 
         // 2. Load index and evict expired leases
         let mut index = self.load_claims_index()?;
@@ -536,7 +525,7 @@ impl ClaimCoordinator {
 
             bail!(
                 "{}",
-                errors::already_claimed(issue_id, &existing.agent_id, &expires_info)
+                errors::already_claimed(issue_id, &existing.agent_id.to_string(), &expires_info)
             );
         }
 
@@ -578,8 +567,8 @@ impl ClaimCoordinator {
         // 5. Create new lease
         let now = self.clock.now();
         let lease = Lease {
-            lease_id: Uuid::new_v4().to_string(),
-            issue_id: issue_id.to_string(),
+            lease_id: LeaseId::try_from(Uuid::new_v4().to_string())?,
+            issue_id: issue_id.clone(),
             agent_id: self.agent_id.clone(),
             worktree_id: self.worktree_id.clone(),
             branch: self.get_current_branch().ok(),
@@ -620,18 +609,14 @@ impl ClaimCoordinator {
     /// interrupted attempt is recognized even when its index was never published.
     /// An existing lease for the same issue, agent, and worktree is treated as a
     /// convergent retry (the lease is reused and no second acquire is logged).
-    /// Persisted issue-id spellings are resolved under the coordinator lock before
-    /// any log or index mutation; a resolution error leaves coordinator and
-    /// repository state untouched. While still holding the lock,
-    /// `repository_sync` runs with the resulting lease. `issue_id` must already be
-    /// canonical (resolved to its full id).
+    /// While still holding the lock, `repository_sync` runs with the resulting
+    /// lease.
     pub fn acquire_claim_synchronized<T>(
         &self,
-        issue_id: &str,
+        issue_id: &IssueId,
         ttl_secs: u64,
         reason: Option<&str>,
         limits: ClaimAcquireLimits,
-        resolve_issue_id: impl Fn(&str) -> Result<String>,
         repository_sync: impl FnOnce(&Lease) -> Result<T>,
     ) -> Result<(Lease, T)> {
         // Enter coordination first: a repository-session holder cannot coordinate.
@@ -653,7 +638,7 @@ impl ClaimCoordinator {
         fs::create_dir_all(lock_path.parent().unwrap())?;
         let _guard = self
             .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
 
         // The append-only log is authoritative. Always replay it under the held
         // lock: a syntactically valid index can still be stale after a crash
@@ -661,33 +646,10 @@ impl ClaimCoordinator {
         // expired entries in memory until normal auto-eviction has been logged.
         let now = self.clock.now();
         let mut index = self.rebuild_index_from_log_at(now, true)?;
-        let resolved_issue_ids = index
-            .leases
-            .iter()
-            .filter(|lease| !lease.is_expired(now))
-            .filter(|lease| Self::is_issue_identity_candidate(&lease.issue_id, issue_id))
-            .map(|lease| {
-                resolve_issue_id(&lease.issue_id)
-                    .with_context(|| {
-                        format!(
-                            "Failed to resolve persisted issue id '{}' for lease {}",
-                            lease.issue_id, lease.lease_id
-                        )
-                    })
-                    .map(|canonical_id| (lease.lease_id.clone(), canonical_id))
-            })
-            .collect::<Result<Vec<_>>>()?;
-
         self.evict_expired_at(&mut index, now)?;
         self.write_index_atomic(&index)?;
 
-        let existing_lease_id = resolved_issue_ids
-            .iter()
-            .find(|(_, canonical_id)| canonical_id == issue_id)
-            .map(|(lease_id, _)| lease_id);
-        let existing = existing_lease_id
-            .and_then(|lease_id| index.find_lease_by_id(lease_id))
-            .cloned();
+        let existing = index.find_lease(issue_id).cloned();
 
         let lease = match existing {
             Some(existing)
@@ -706,7 +668,11 @@ impl ClaimCoordinator {
                 };
                 bail!(
                     "{}",
-                    errors::already_claimed(issue_id, &existing.agent_id, &expires_info)
+                    errors::already_claimed(
+                        issue_id,
+                        &existing.agent_id.to_string(),
+                        &expires_info
+                    )
                 );
             }
             None => {
@@ -740,8 +706,8 @@ impl ClaimCoordinator {
                 }
                 let now = self.clock.now();
                 let lease = Lease {
-                    lease_id: Uuid::new_v4().to_string(),
-                    issue_id: issue_id.to_string(),
+                    lease_id: LeaseId::try_from(Uuid::new_v4().to_string())?,
+                    issue_id: issue_id.clone(),
                     agent_id: self.agent_id.clone(),
                     worktree_id: self.worktree_id.clone(),
                     branch: self.get_current_branch().ok(),
@@ -769,14 +735,6 @@ impl ClaimCoordinator {
         Ok((lease, synced))
     }
 
-    /// Return whether a persisted spelling could denote the requested canonical
-    /// issue id. This is only a resolver-call shortlist: canonical equality after
-    /// `resolve_issue_id` remains the identity decision.
-    fn is_issue_identity_candidate(stored: &str, requested: &str) -> bool {
-        crate::domain::issue_id::IssueIdPrefix::parse(stored)
-            .is_ok_and(|stored| stored.matches(requested))
-    }
-
     /// Send a heartbeat for an indefinite lease.
     ///
     /// Updates `last_beat` without changing expiration. This is used to
@@ -789,13 +747,13 @@ impl ClaimCoordinator {
     /// # Returns
     ///
     /// The updated lease with new `last_beat` timestamp.
-    pub fn heartbeat(&self, lease_id: &str) -> Result<Lease> {
+    pub fn heartbeat(&self, lease_id: &LeaseId) -> Result<Lease> {
         // 1. Acquire exclusive lock
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         fs::create_dir_all(lock_path.parent().unwrap())?;
         let _guard = self
             .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
 
         // 2. Load index
         let mut index = self.load_claims_index()?;
@@ -803,7 +761,7 @@ impl ClaimCoordinator {
         // 3. Find the lease
         let lease = index
             .find_lease_by_id(lease_id)
-            .ok_or_else(|| crate::errors::LeaseNotFoundError::by_id(lease_id))?
+            .ok_or_else(|| crate::errors::LeaseNotFoundError::by_id(lease_id.as_str()))?
             .clone();
 
         // 4. Verify ownership
@@ -822,7 +780,7 @@ impl ClaimCoordinator {
 
         // 6. Append heartbeat operation to log
         let op = ClaimOp::Heartbeat {
-            lease_id: lease_id.to_string(),
+            lease_id: lease_id.clone(),
             new_last_beat,
         };
         self.append_claim_op(&op)?;
@@ -981,12 +939,12 @@ impl ClaimCoordinator {
     /// - Lease not found
     /// - Lease not owned by current agent
     /// - Lease already expired
-    pub fn renew_lease(&self, lease_id: &str, extension_secs: u64) -> Result<Lease> {
+    pub fn renew_lease(&self, lease_id: &LeaseId, extension_secs: u64) -> Result<Lease> {
         // 1. Acquire exclusive lock with metadata
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         let _guard = self
             .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
 
         // 2. Load index and evict expired
         let mut index = self.load_claims_index()?;
@@ -996,9 +954,9 @@ impl ClaimCoordinator {
         let lease = index
             .leases
             .iter()
-            .find(|l| l.lease_id == lease_id)
+            .find(|l| &l.lease_id == lease_id)
             .ok_or_else(|| {
-                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id))
+                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id.as_str()))
             })?;
 
         // 4. Verify ownership
@@ -1007,8 +965,8 @@ impl ClaimCoordinator {
                 "{}",
                 errors::not_owner(
                     &format!("lease {}", lease_id),
-                    &lease.agent_id,
-                    &self.agent_id
+                    &lease.agent_id.to_string(),
+                    &self.agent_id.to_string()
                 )
             );
         }
@@ -1026,7 +984,7 @@ impl ClaimCoordinator {
 
         // 6. Log renewal
         let op = ClaimOp::Renew {
-            lease_id: lease_id.to_string(),
+            lease_id: lease_id.clone(),
             new_expires_at,
             new_last_beat,
         };
@@ -1052,12 +1010,12 @@ impl ClaimCoordinator {
     ///
     /// - Lease not found
     /// - Lease not owned by current agent
-    pub fn release_lease(&self, lease_id: &str) -> Result<()> {
+    pub fn release_lease(&self, lease_id: &LeaseId) -> Result<()> {
         // 1. Acquire exclusive lock with metadata
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         let _guard = self
             .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
 
         // 2. Load index
         let mut index = self.load_claims_index()?;
@@ -1066,9 +1024,9 @@ impl ClaimCoordinator {
         let lease = index
             .leases
             .iter()
-            .find(|l| l.lease_id == lease_id)
+            .find(|l| &l.lease_id == lease_id)
             .ok_or_else(|| {
-                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id))
+                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id.as_str()))
             })?;
 
         // 4. Verify ownership
@@ -1077,15 +1035,15 @@ impl ClaimCoordinator {
                 "{}",
                 errors::not_owner(
                     &format!("lease {}", lease_id),
-                    &lease.agent_id,
-                    &self.agent_id
+                    &lease.agent_id.to_string(),
+                    &self.agent_id.to_string()
                 )
             );
         }
 
         // 5. Log release
         let op = ClaimOp::Release {
-            lease_id: lease_id.to_string(),
+            lease_id: lease_id.clone(),
             released_at: self.clock.now(),
         };
         self.append_claim_op(&op)?;
@@ -1107,26 +1065,27 @@ impl ClaimCoordinator {
     /// # Errors
     ///
     /// - Lease not found
-    pub fn force_evict_lease(&self, lease_id: &str, reason: &str) -> Result<()> {
+    pub fn force_evict_lease(&self, lease_id: &LeaseId, reason: &str) -> Result<()> {
         // 1. Acquire exclusive lock with metadata
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         let _guard = self
             .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
 
         // 2. Load index
         let mut index = self.load_claims_index()?;
 
         // 3. Verify lease exists
-        if !index.leases.iter().any(|l| l.lease_id == lease_id) {
+        if !index.leases.iter().any(|l| &l.lease_id == lease_id) {
             return Err(
-                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id)).into(),
+                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id.as_str()))
+                    .into(),
             );
         }
 
         // 4. Log eviction
         let op = ClaimOp::ForceEvict {
-            lease_id: lease_id.to_string(),
+            lease_id: lease_id.clone(),
             evicted_at: self.clock.now(),
             reason: reason.to_string(),
         };
@@ -1155,14 +1114,14 @@ impl ClaimCoordinator {
     /// Returns an error if the index cannot be loaded
     pub fn get_active_leases(
         &self,
-        issue_id: Option<&crate::domain::issue_id::IssueIdPrefix>,
+        issue_id: Option<&crate::domain::identity::IssueIdPrefix>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
         // 1. Acquire exclusive lock with metadata (needed for evict_expired which writes)
         let lock_path = self.paths.shared_jit.join("locks/claims.lock");
         let _guard = self
             .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
+            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
 
         // 2. Load index, evict expired leases, and persist the eviction so the
         //    next read does not log it again
@@ -1181,7 +1140,7 @@ impl ClaimCoordinator {
                     }
                 }
                 if let Some(aid) = agent_id {
-                    if lease.agent_id != aid {
+                    if lease.agent_id.to_string() != aid {
                         return false;
                     }
                 }
@@ -1230,7 +1189,7 @@ impl ClaimCoordinator {
         use std::io::{BufRead, BufReader};
 
         let log_path = self.paths.shared_jit.join("claims.jsonl");
-        let mut active: HashMap<String, Lease> = HashMap::new();
+        let mut active: HashMap<LeaseId, Lease> = HashMap::new();
         let mut max_seq = 0u64;
         let mut expected_seq = 1u64;
         let mut sequence_gaps = Vec::new();
@@ -1239,14 +1198,19 @@ impl ClaimCoordinator {
             let file = fs::File::open(&log_path).context("Failed to open claims log")?;
             let reader = BufReader::new(file);
 
-            for line in reader.lines() {
+            for (index, line) in reader.lines().enumerate() {
                 let line = line.context("Failed to read line from claims log")?;
                 if line.trim().is_empty() {
                     continue;
                 }
 
-                let entry: ClaimLogEntry =
-                    serde_json::from_str(&line).context("Failed to parse claim log entry")?;
+                let entry: ClaimLogEntry = serde_json::from_str(&line).with_context(|| {
+                    format!(
+                        "Failed to parse claim log entry at {}:{}",
+                        log_path.display(),
+                        index + 1
+                    )
+                })?;
 
                 // Check for sequence gaps
                 if entry.seq != expected_seq {
@@ -1398,7 +1362,7 @@ impl ClaimCoordinator {
 #[cfg(test)]
 fn acquire_claim_when_reached(
     coordinator: &ClaimCoordinator,
-    issue_id: &str,
+    issue_id: &IssueId,
     ttl_secs: u64,
     claimants: &Claimants,
 ) -> Result<Lease> {
@@ -1471,10 +1435,10 @@ mod tests {
     fn make_lease(ttl_secs: u64, expires_at: Option<DateTime<Utc>>) -> Lease {
         let now = Utc::now();
         Lease {
-            lease_id: "lease-x".to_string(),
-            issue_id: "issue-x".to_string(),
-            agent_id: "agent:1".to_string(),
-            worktree_id: "wt:abc123".to_string(),
+            lease_id: "00000000-0000-4000-8000-000000000001".parse().unwrap(),
+            issue_id: crate::test_utils::issue_id(8),
+            agent_id: "agent:1".parse().unwrap(),
+            worktree_id: "wt:abc123".parse().unwrap(),
             branch: Some("main".to_string()),
             ttl_secs,
             acquired_at: now,
@@ -1517,8 +1481,8 @@ mod tests {
         let coordinator = ClaimCoordinator::new(
             paths,
             FileLocker::new(lock_wait),
-            "wt:test123".to_string(),
-            "agent:test".to_string(),
+            "wt:test123".parse().unwrap(),
+            "agent:test".parse().unwrap(),
         );
 
         coordinator.init().unwrap();
@@ -1549,43 +1513,24 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let lease = coordinator.acquire_claim("issue-001", 600).unwrap();
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(9), 600)
+            .unwrap();
 
-        assert_eq!(lease.issue_id, "issue-001");
-        assert_eq!(lease.agent_id, "agent:test");
-        assert_eq!(lease.worktree_id, "wt:test123");
+        assert_eq!(lease.issue_id, crate::test_utils::issue_id(9));
+        assert_eq!(lease.agent_id.to_string(), "agent:test");
+        assert_eq!(lease.worktree_id.as_str(), "wt:test123");
         assert_eq!(lease.ttl_secs, 600);
         assert!(lease.expires_at.is_some());
-    }
-
-    #[test]
-    fn test_acquire_synchronized_recognizes_short_id_lease() {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-        // A lease recorded under a short-id spelling by a prior path.
-        coordinator.acquire_claim("abcdef12", 600).unwrap();
-        // A canonical full-id acquire recognizes it and never duplicates the lease.
-        let (lease, ()) = coordinator
-            .acquire_claim_synchronized(
-                "abcdef1234567890",
-                600,
-                None,
-                ClaimAcquireLimits::new(100, 100),
-                |persisted_id| Ok(format!("{persisted_id}34567890")),
-                |_| Ok(()),
-            )
-            .unwrap();
-        assert_eq!(lease.issue_id, "abcdef12");
-        assert_eq!(coordinator.load_claims_index().unwrap().leases.len(), 1);
-        let log = std::fs::read_to_string(temp_dir.path().join(".git/jit/claims.jsonl")).unwrap();
-        assert_eq!(log.lines().count(), 1, "no duplicate acquire is logged");
     }
 
     #[test]
     fn test_acquire_synchronized_reconciles_index_from_log() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
-        coordinator.acquire_claim("issue-recon", 600).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(10), 600)
+            .unwrap();
         // Simulate a crash where the durable log advanced but the derived index was
         // never published.
         std::fs::remove_file(temp_dir.path().join(".git/jit/claims.index.json")).unwrap();
@@ -1593,15 +1538,14 @@ mod tests {
         // own lease, and never appends a duplicate acquire.
         let (lease, ()) = coordinator
             .acquire_claim_synchronized(
-                "issue-recon",
+                &crate::test_utils::issue_id(10),
                 600,
                 None,
                 ClaimAcquireLimits::new(100, 100),
-                |persisted_id| Ok(persisted_id.to_string()),
                 |_| Ok(()),
             )
             .unwrap();
-        assert_eq!(lease.issue_id, "issue-recon");
+        assert_eq!(lease.issue_id, crate::test_utils::issue_id(10));
         assert_eq!(coordinator.load_claims_index().unwrap().leases.len(), 1);
         let log = std::fs::read_to_string(temp_dir.path().join(".git/jit/claims.jsonl")).unwrap();
         assert_eq!(
@@ -1615,10 +1559,14 @@ mod tests {
     fn test_acquire_synchronized_reconciles_valid_but_stale_index_from_log() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
-        coordinator.acquire_claim("issue-first", 600).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(11), 600)
+            .unwrap();
         let stale_index =
             std::fs::read(temp_dir.path().join(".git/jit/claims.index.json")).unwrap();
-        let durable = coordinator.acquire_claim("issue-second", 600).unwrap();
+        let durable = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(12), 600)
+            .unwrap();
         std::fs::write(
             temp_dir.path().join(".git/jit/claims.index.json"),
             stale_index,
@@ -1627,11 +1575,10 @@ mod tests {
 
         let (lease, ()) = coordinator
             .acquire_claim_synchronized(
-                "issue-second",
+                &crate::test_utils::issue_id(12),
                 600,
                 None,
                 ClaimAcquireLimits::new(100, 100),
-                |persisted_id| Ok(persisted_id.to_string()),
                 |_| Ok(()),
             )
             .unwrap();
@@ -1646,7 +1593,9 @@ mod tests {
     fn test_acquire_synchronized_rejects_another_agents_lease() {
         let temp_dir = TempDir::new().unwrap();
         let owner = setup_coordinator(&temp_dir);
-        owner.acquire_claim("issue-owned", 600).unwrap();
+        owner
+            .acquire_claim(&crate::test_utils::issue_id(13), 600)
+            .unwrap();
         // A different agent cannot acquire the same issue.
         let locker = FileLocker::new(StdDuration::from_secs(
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
@@ -1660,22 +1609,21 @@ mod tests {
                 shared_jit: temp_dir.path().join(".git/jit"),
             },
             locker,
-            "wt:other".to_string(),
-            "agent:other".to_string(),
+            "wt:other".parse().unwrap(),
+            "agent:other".parse().unwrap(),
         );
         let result = other.acquire_claim_synchronized(
-            "issue-owned",
+            &crate::test_utils::issue_id(13),
             600,
             None,
             ClaimAcquireLimits::new(100, 100),
-            |persisted_id| Ok(persisted_id.to_string()),
             |_| Ok(()),
         );
         assert!(result.is_err(), "another agent's lease blocks acquisition");
     }
 
     #[test]
-    fn test_acquire_synchronized_evicts_expired_unresolvable_lease_before_resolution() {
+    fn test_acquire_synchronized_evicts_expired_lease_of_another_issue() {
         use crate::storage::clock::FixedClock;
         use std::cell::Cell;
 
@@ -1683,29 +1631,30 @@ mod tests {
         let base = Utc::now();
         let clock = Arc::new(FixedClock::new(base));
         let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
-        coordinator.acquire_claim("deleted-issue", 1).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(14), 1)
+            .unwrap();
         clock.set(base + Duration::seconds(2));
         let repository_sync_ran = Cell::new(false);
 
         let (lease, ()) = coordinator
             .acquire_claim_synchronized(
-                "active-issue",
+                &crate::test_utils::issue_id(15),
                 600,
                 None,
                 ClaimAcquireLimits::new(100, 100),
-                |_| anyhow::bail!("expired lease issue no longer resolves"),
                 |_| {
                     repository_sync_ran.set(true);
                     Ok(())
                 },
             )
-            .expect("an expired unresolvable lease must not block another issue");
+            .expect("an expired lease on another issue must not block this one");
 
-        assert_eq!(lease.issue_id, "active-issue");
+        assert_eq!(lease.issue_id, crate::test_utils::issue_id(15));
         assert!(repository_sync_ran.get());
         let index = coordinator.load_claims_index().unwrap();
         assert_eq!(index.leases.len(), 1);
-        assert_eq!(index.leases[0].issue_id, "active-issue");
+        assert_eq!(index.leases[0].issue_id, crate::test_utils::issue_id(15));
     }
 
     #[test]
@@ -1713,7 +1662,9 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        coordinator.acquire_claim("issue-004", 600).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(16), 600)
+            .unwrap();
 
         // The append-only claim log lives in the shared control plane
         // (.git/jit/claims.jsonl), never in the per-worktree data plane
@@ -1728,7 +1679,9 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let lease = coordinator.acquire_claim("issue-002", 0).unwrap();
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(17), 0)
+            .unwrap();
 
         assert_eq!(lease.ttl_secs, 0);
         assert!(lease.expires_at.is_none());
@@ -1741,10 +1694,12 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // First claim succeeds
-        coordinator.acquire_claim("issue-003", 600).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(18), 600)
+            .unwrap();
 
         // Second claim fails
-        let result = coordinator.acquire_claim("issue-003", 600);
+        let result = coordinator.acquire_claim(&crate::test_utils::issue_id(18), 600);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("already claimed"));
     }
@@ -1778,8 +1733,8 @@ mod tests {
                     let coordinator = ClaimCoordinator::new(
                         paths,
                         locker,
-                        format!("wt:thread{}", i),
-                        format!("agent:thread{}", i),
+                        WorktreeId::try_from(format!("wt:thread{}", i)).unwrap(),
+                        format!("agent:thread{}", i).parse().unwrap(),
                     );
 
                     coordinator.init().unwrap();
@@ -1788,9 +1743,12 @@ mod tests {
                     barrier.wait();
 
                     // All try to claim same issue
-                    if let Ok(lease) =
-                        acquire_claim_when_reached(&coordinator, "issue-race", 600, &claimants)
-                    {
+                    if let Ok(lease) = acquire_claim_when_reached(
+                        &coordinator,
+                        &crate::test_utils::issue_id(19),
+                        600,
+                        &claimants,
+                    ) {
                         successes.lock().unwrap().push(lease);
                     }
                 })
@@ -1821,7 +1779,7 @@ mod tests {
         let held = hold_claims_lock(&temp_dir);
 
         let while_held = coordinator
-            .acquire_claim("issue-held", 600)
+            .acquire_claim(&crate::test_utils::issue_id(20), 600)
             .expect_err("the lock is held, so this caller cannot reach the coordinator");
 
         assert!(
@@ -1831,7 +1789,9 @@ mod tests {
         );
         drop(held);
         assert!(
-            coordinator.acquire_claim("issue-held", 600).is_ok(),
+            coordinator
+                .acquire_claim(&crate::test_utils::issue_id(20), 600)
+                .is_ok(),
             "the same call is granted once the lock is free, so the expired wait \
              said nothing about the issue"
         );
@@ -1849,7 +1809,7 @@ mod tests {
     fn test_acquire_claim_grants_every_distinct_issue_when_every_lock_wait_expires() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = Arc::new(coordinator_with_lock_wait(&temp_dir, EXPIRING_LOCK_WAIT));
-        let issue_ids: Vec<String> = (0..8).map(|i| format!("iss-{i:03}")).collect();
+        let issue_ids: Vec<IssueId> = (0..8).map(crate::test_utils::issue_id).collect();
         let claimants = Claimants::new();
         let held = hold_claims_lock(&temp_dir);
 
@@ -1898,7 +1858,12 @@ mod tests {
                 let coordinator = Arc::clone(&coordinator);
                 let claimants = Arc::clone(&claimants);
                 thread::spawn(move || {
-                    acquire_claim_when_reached(&coordinator, "issue-contended", 600, &claimants)
+                    acquire_claim_when_reached(
+                        &coordinator,
+                        &crate::test_utils::issue_id(21),
+                        600,
+                        &claimants,
+                    )
                 })
             })
             .collect::<Vec<_>>();
@@ -1931,14 +1896,103 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        coordinator.acquire_claim("issue-004", 600).unwrap();
+        let issue_id = crate::test_utils::issue_id(16);
+        coordinator.acquire_claim(&issue_id, 600).unwrap();
 
         let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
         assert!(log_path.exists());
 
         let content = fs::read_to_string(log_path).unwrap();
-        assert!(content.contains("issue-004"));
+        assert!(content.contains(issue_id.as_str()));
         assert!(content.contains("acquire"));
+    }
+
+    #[test]
+    fn test_claim_log_round_trips_existing_lines_byte_for_byte() {
+        let header = r#"{"schema_version":1,"seq":1,"timestamp":"2026-01-06T20:00:00Z","op":"#;
+        let lease_id = "b53beeba-32f2-4671-a407-2d94e4d13d41";
+        let issue_id = crate::test_utils::issue_id(1);
+        let fields = [
+            format!(
+                r#""acquire","lease_id":"{lease_id}","issue_id":"{issue_id}","agent_id":"agent:valid","worktree_id":"wt:main","branch":null,"ttl_secs":0,"acquired_at":"2026-01-06T20:00:00Z","expires_at":null,"last_beat":"2026-01-06T20:00:00Z","stale":false}}"#
+            ),
+            format!(
+                r#""renew","lease_id":"{lease_id}","new_expires_at":null,"new_last_beat":"2026-01-06T20:00:00Z"}}"#
+            ),
+            format!(
+                r#""heartbeat","lease_id":"{lease_id}","new_last_beat":"2026-01-06T20:00:00Z"}}"#
+            ),
+            format!(r#""release","lease_id":"{lease_id}","released_at":"2026-01-06T20:00:00Z"}}"#),
+            format!(
+                r#""auto-evict","lease_id":"{lease_id}","evicted_at":"2026-01-06T20:00:00Z","reason":"expired"}}"#
+            ),
+            format!(
+                r#""force-evict","lease_id":"{lease_id}","evicted_at":"2026-01-06T20:00:00Z","reason":"admin"}}"#
+            ),
+        ];
+        for fields in fields {
+            let line = format!("{header}{fields}");
+            let decoded: ClaimLogEntry = serde_json::from_str(&line).unwrap();
+            assert_eq!(serde_json::to_string(&decoded).unwrap(), line);
+        }
+    }
+
+    /// One acquire entry of the claims log, encoded as a JSON object.
+    fn acquire_entry_value() -> serde_json::Value {
+        let now = Utc::now();
+        serde_json::to_value(ClaimLogEntry {
+            schema_version: 1,
+            seq: 1,
+            timestamp: now,
+            operation: ClaimOp::Acquire {
+                lease: Lease {
+                    lease_id: "00000000-0000-4000-8000-000000000002".parse().unwrap(),
+                    issue_id: crate::test_utils::issue_id(7),
+                    agent_id: "agent:valid".parse().unwrap(),
+                    worktree_id: "wt:main".parse().unwrap(),
+                    branch: None,
+                    ttl_secs: 600,
+                    acquired_at: now,
+                    expires_at: None,
+                    last_beat: now,
+                    stale: false,
+                },
+            },
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn test_claim_log_decode_rejects_invalid_agent_id_and_names_field() {
+        let mut line = acquire_entry_value();
+        line["agent_id"] = serde_json::Value::String("invalid".to_string());
+        let line = serde_json::to_string(&line).unwrap();
+
+        let error = serde_json::from_str::<ClaimLogEntry>(&line).unwrap_err();
+
+        assert!(
+            error.to_string().contains("agent_id"),
+            "the claims-log decode error should name the invalid field, got: {error}"
+        );
+    }
+
+    #[test]
+    fn test_rebuild_index_from_log_rejects_a_non_canonical_issue_id_naming_the_record() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        let mut entry = acquire_entry_value();
+        let non_canonical = crate::test_utils::issue_id(0xabcd).as_str().to_uppercase();
+        entry["issue_id"] = serde_json::Value::String(non_canonical.clone());
+        let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
+        fs::create_dir_all(log_path.parent().unwrap()).unwrap();
+        fs::write(&log_path, format!("{entry}\n")).unwrap();
+
+        let error = format!("{:#}", coordinator.rebuild_index_from_log().unwrap_err());
+
+        assert!(
+            error.contains(&format!("{}:1", log_path.display())) && error.contains(&non_canonical),
+            "{error}"
+        );
     }
 
     #[test]
@@ -1946,14 +2000,16 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        coordinator.acquire_claim("issue-005", 600).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(22), 600)
+            .unwrap();
 
         let index_path = temp_dir.path().join(".git/jit/claims.index.json");
         assert!(index_path.exists());
 
         let index = coordinator.load_claims_index().unwrap();
         assert_eq!(index.leases.len(), 1);
-        assert_eq!(index.leases[0].issue_id, "issue-005");
+        assert_eq!(index.leases[0].issue_id, crate::test_utils::issue_id(22));
     }
 
     #[test]
@@ -1964,10 +2020,10 @@ mod tests {
         // Create a lease that's already expired
         let mut index = coordinator.load_claims_index().unwrap();
         let expired_lease = Lease {
-            lease_id: Uuid::new_v4().to_string(),
-            issue_id: "issue-006".to_string(),
-            agent_id: "agent:old".to_string(),
-            worktree_id: "wt:old".to_string(),
+            lease_id: Uuid::new_v4().to_string().parse().unwrap(),
+            issue_id: crate::test_utils::issue_id(23),
+            agent_id: "agent:old".parse().unwrap(),
+            worktree_id: "wt:old".parse().unwrap(),
             branch: None,
             ttl_secs: 60,
             acquired_at: Utc::now() - Duration::seconds(120),
@@ -1979,8 +2035,10 @@ mod tests {
         coordinator.write_index_atomic(&index).unwrap();
 
         // Now try to claim - should evict expired and succeed
-        let lease = coordinator.acquire_claim("issue-006", 600).unwrap();
-        assert_eq!(lease.agent_id, "agent:test");
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(23), 600)
+            .unwrap();
+        assert_eq!(lease.agent_id.to_string(), "agent:test");
     }
 
     fn logged_operations(temp_dir: &TempDir) -> Vec<ClaimOp> {
@@ -2003,7 +2061,9 @@ mod tests {
         let base = Utc::now();
         let clock = Arc::new(FixedClock::new(base));
         let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
-        let expired = coordinator.acquire_claim("issue-expiring", 1).unwrap();
+        let expired = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(24), 1)
+            .unwrap();
         clock.set(base + Duration::seconds(2));
 
         let reads = (0..3)
@@ -2029,7 +2089,9 @@ mod tests {
     fn test_get_active_leases_without_expired_leases_appends_nothing() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
-        coordinator.acquire_claim("issue-live", 600).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(25), 600)
+            .unwrap();
         let before = logged_operations(&temp_dir).len();
 
         coordinator.get_active_leases(None, None).unwrap();
@@ -2044,7 +2106,9 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Acquire a finite lease
-        let lease = coordinator.acquire_claim("issue-007", 600).unwrap();
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(26), 600)
+            .unwrap();
         let original_expiry = lease.expires_at.unwrap();
 
         // Wait a bit
@@ -2065,7 +2129,9 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Acquire an indefinite lease
-        let lease = coordinator.acquire_claim("issue-008", 0).unwrap();
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(27), 0)
+            .unwrap();
         let original_heartbeat = lease.last_beat;
 
         // Wait a bit
@@ -2085,7 +2151,10 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let result = coordinator.renew_lease("fake-lease-id", 600);
+        let result = coordinator.renew_lease(
+            &"00000000-0000-4000-8000-000000000007".parse().unwrap(),
+            600,
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
@@ -2096,7 +2165,9 @@ mod tests {
         let coordinator1 = setup_coordinator(&temp_dir);
 
         // Agent 1 acquires lease
-        let lease = coordinator1.acquire_claim("issue-009", 600).unwrap();
+        let lease = coordinator1
+            .acquire_claim(&crate::test_utils::issue_id(28), 600)
+            .unwrap();
 
         // Create coordinator for different agent
         let paths = WorktreePaths {
@@ -2111,8 +2182,8 @@ mod tests {
             FileLocker::new(StdDuration::from_secs(
                 crate::runtime_defaults::LOCK_TIMEOUT_SECS,
             )),
-            "wt:other".to_string(),
-            "agent:other".to_string(),
+            "wt:other".parse().unwrap(),
+            "agent:other".parse().unwrap(),
         );
 
         // Agent 2 tries to renew - should fail
@@ -2127,15 +2198,19 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Acquire and release
-        let lease = coordinator.acquire_claim("issue-010", 600).unwrap();
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(29), 600)
+            .unwrap();
         coordinator.release_lease(&lease.lease_id).unwrap();
 
         // Verify lease is gone from index
         let index = coordinator.load_claims_index().unwrap();
-        assert!(index.find_lease("issue-010").is_none());
+        assert!(index.find_lease(&crate::test_utils::issue_id(29)).is_none());
 
         // Should be able to claim again
-        let new_lease = coordinator.acquire_claim("issue-010", 600).unwrap();
+        let new_lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(29), 600)
+            .unwrap();
         assert_ne!(new_lease.lease_id, lease.lease_id); // Different lease
     }
 
@@ -2144,7 +2219,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let result = coordinator.release_lease("fake-lease-id");
+        let result =
+            coordinator.release_lease(&"00000000-0000-4000-8000-000000000007".parse().unwrap());
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
@@ -2155,7 +2231,9 @@ mod tests {
         let coordinator1 = setup_coordinator(&temp_dir);
 
         // Agent 1 acquires lease
-        let lease = coordinator1.acquire_claim("issue-011", 600).unwrap();
+        let lease = coordinator1
+            .acquire_claim(&crate::test_utils::issue_id(30), 600)
+            .unwrap();
 
         // Create coordinator for different agent
         let paths = WorktreePaths {
@@ -2170,8 +2248,8 @@ mod tests {
             FileLocker::new(StdDuration::from_secs(
                 crate::runtime_defaults::LOCK_TIMEOUT_SECS,
             )),
-            "wt:other".to_string(),
-            "agent:other".to_string(),
+            "wt:other".parse().unwrap(),
+            "agent:other".parse().unwrap(),
         );
 
         // Agent 2 tries to release - should fail
@@ -2186,7 +2264,9 @@ mod tests {
         let coordinator1 = setup_coordinator(&temp_dir);
 
         // Agent 1 acquires lease
-        let lease = coordinator1.acquire_claim("issue-012", 600).unwrap();
+        let lease = coordinator1
+            .acquire_claim(&crate::test_utils::issue_id(31), 600)
+            .unwrap();
 
         // Create admin coordinator
         let paths = WorktreePaths {
@@ -2201,8 +2281,8 @@ mod tests {
             FileLocker::new(StdDuration::from_secs(
                 crate::runtime_defaults::LOCK_TIMEOUT_SECS,
             )),
-            "wt:admin".to_string(),
-            "admin:alice".to_string(),
+            "wt:admin".parse().unwrap(),
+            "admin:alice".parse().unwrap(),
         );
 
         // Admin force evicts (no ownership check)
@@ -2212,10 +2292,12 @@ mod tests {
 
         // Verify lease is gone
         let index = coordinator1.load_claims_index().unwrap();
-        assert!(index.find_lease("issue-012").is_none());
+        assert!(index.find_lease(&crate::test_utils::issue_id(31)).is_none());
 
         // Should be able to claim again
-        coordinator1.acquire_claim("issue-012", 600).unwrap();
+        coordinator1
+            .acquire_claim(&crate::test_utils::issue_id(31), 600)
+            .unwrap();
     }
 
     #[test]
@@ -2223,7 +2305,10 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let result = coordinator.force_evict_lease("fake-lease-id", "test");
+        let result = coordinator.force_evict_lease(
+            &"00000000-0000-4000-8000-000000000007".parse().unwrap(),
+            "test",
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
@@ -2234,7 +2319,9 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Perform various operations
-        let lease = coordinator.acquire_claim("issue-013", 600).unwrap();
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(32), 600)
+            .unwrap();
         coordinator.renew_lease(&lease.lease_id, 600).unwrap();
         coordinator.release_lease(&lease.lease_id).unwrap();
 
@@ -2269,8 +2356,12 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Create some leases
-        coordinator.acquire_claim("issue-rebuild-1", 600).unwrap();
-        coordinator.acquire_claim("issue-rebuild-2", 600).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(33), 600)
+            .unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(34), 600)
+            .unwrap();
 
         // Rebuild from log
         let rebuilt = coordinator.rebuild_index_from_log().unwrap();
@@ -2279,11 +2370,11 @@ mod tests {
         assert!(rebuilt
             .leases
             .iter()
-            .any(|l| l.issue_id == "issue-rebuild-1"));
+            .any(|l| l.issue_id == crate::test_utils::issue_id(33)));
         assert!(rebuilt
             .leases
             .iter()
-            .any(|l| l.issue_id == "issue-rebuild-2"));
+            .any(|l| l.issue_id == crate::test_utils::issue_id(34)));
         assert_eq!(rebuilt.last_seq, 2);
     }
 
@@ -2293,7 +2384,9 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Acquire and release
-        let lease = coordinator.acquire_claim("issue-rebuild-3", 600).unwrap();
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(35), 600)
+            .unwrap();
         coordinator.release_lease(&lease.lease_id).unwrap();
 
         // Rebuild should show no active leases
@@ -2307,7 +2400,9 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Create lease that expires immediately
-        coordinator.acquire_claim("issue-rebuild-4", 1).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(36), 1)
+            .unwrap();
 
         // Wait for expiry
         thread::sleep(StdDuration::from_millis(1100));
@@ -2322,7 +2417,9 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let lease = coordinator.acquire_claim("issue-rebuild-5", 600).unwrap();
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(37), 600)
+            .unwrap();
         let original_expiry = lease.expires_at.unwrap();
 
         // Renew
@@ -2341,7 +2438,9 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let lease = coordinator.acquire_claim("issue-rebuild-6", 600).unwrap();
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(38), 600)
+            .unwrap();
 
         // Force evict
         coordinator
@@ -2359,7 +2458,9 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Create indefinite lease
-        let lease = coordinator.acquire_claim("issue-rebuild-7", 0).unwrap();
+        let lease = coordinator
+            .acquire_claim(&crate::test_utils::issue_id(39), 0)
+            .unwrap();
 
         // Rebuild
         let rebuilt = coordinator.rebuild_index_from_log().unwrap();
@@ -2377,9 +2478,15 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Multiple operations
-        coordinator.acquire_claim("issue-rebuild-8", 600).unwrap();
-        coordinator.acquire_claim("issue-rebuild-9", 600).unwrap();
-        coordinator.acquire_claim("issue-rebuild-10", 600).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(40), 600)
+            .unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(41), 600)
+            .unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(42), 600)
+            .unwrap();
 
         let rebuilt = coordinator.rebuild_index_from_log().unwrap();
 
@@ -2402,10 +2509,10 @@ mod tests {
             timestamp: Utc::now(),
             operation: ClaimOp::Acquire {
                 lease: Lease {
-                    lease_id: "lease-1".to_string(),
-                    issue_id: "issue-1".to_string(),
-                    agent_id: "agent:test".to_string(),
-                    worktree_id: "wt:main".to_string(),
+                    lease_id: "00000000-0000-4000-8000-000000000002".parse().unwrap(),
+                    issue_id: crate::test_utils::issue_id(7),
+                    agent_id: "agent:test".parse().unwrap(),
+                    worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
                     ttl_secs: 600,
                     acquired_at: Utc::now(),
@@ -2422,10 +2529,10 @@ mod tests {
             timestamp: Utc::now(),
             operation: ClaimOp::Acquire {
                 lease: Lease {
-                    lease_id: "lease-2".to_string(),
-                    issue_id: "issue-2".to_string(),
-                    agent_id: "agent:test".to_string(),
-                    worktree_id: "wt:main".to_string(),
+                    lease_id: "00000000-0000-4000-8000-000000000003".parse().unwrap(),
+                    issue_id: crate::test_utils::issue_id(43),
+                    agent_id: "agent:test".parse().unwrap(),
+                    worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
                     ttl_secs: 600,
                     acquired_at: Utc::now(),
@@ -2443,10 +2550,10 @@ mod tests {
             timestamp: Utc::now(),
             operation: ClaimOp::Acquire {
                 lease: Lease {
-                    lease_id: "lease-3".to_string(),
-                    issue_id: "issue-3".to_string(),
-                    agent_id: "agent:test".to_string(),
-                    worktree_id: "wt:main".to_string(),
+                    lease_id: "00000000-0000-4000-8000-000000000004".parse().unwrap(),
+                    issue_id: crate::test_utils::issue_id(44),
+                    agent_id: "agent:test".parse().unwrap(),
+                    worktree_id: "wt:main".parse().unwrap(),
                     branch: None,
                     ttl_secs: 600,
                     acquired_at: Utc::now(),
@@ -2495,11 +2602,11 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Write an index with two active leases for the same issue (corruption).
-        let make_lease = |lease_id: &str| Lease {
-            lease_id: lease_id.to_string(),
-            issue_id: "issue-dup".to_string(),
-            agent_id: "agent:test".to_string(),
-            worktree_id: "wt:main".to_string(),
+        let make_lease = |lease_id: LeaseId| Lease {
+            lease_id,
+            issue_id: crate::test_utils::issue_id(45),
+            agent_id: "agent:test".parse().unwrap(),
+            worktree_id: "wt:main".parse().unwrap(),
             branch: None,
             ttl_secs: 600,
             acquired_at: Utc::now(),
@@ -2511,7 +2618,10 @@ mod tests {
             schema_version: 1,
             generated_at: Utc::now(),
             last_seq: 2,
-            leases: vec![make_lease("lease-a"), make_lease("lease-b")],
+            leases: vec![
+                make_lease("00000000-0000-4000-8000-000000000005".parse().unwrap()),
+                make_lease("00000000-0000-4000-8000-000000000006".parse().unwrap()),
+            ],
             sequence_gaps: Vec::new(),
         };
         coordinator.write_index_atomic(&index).unwrap();
@@ -2524,7 +2634,7 @@ mod tests {
         assert_eq!(
             warnings,
             vec![StorageWarning::DuplicateLease {
-                issue_id: "issue-dup".to_string()
+                issue_id: crate::test_utils::issue_id(45)
             }],
             "Duplicate lease must surface a DuplicateLease warning"
         );
@@ -2552,9 +2662,9 @@ mod tests {
         let base = Utc::now();
         let clock = Arc::new(FixedClock::new(base));
         let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
-        let issue_id = "abcd1111111111111111111111111111";
+        let issue_id = crate::test_utils::issue_id(46);
         coordinator
-            .acquire_claim_with_reason(issue_id, 0, Some("probe"), 1, 1)
+            .acquire_claim_with_reason(&issue_id, 0, Some("probe"), 1, 1)
             .unwrap();
 
         let is_enforced_after = |elapsed_secs: i64| {
@@ -2562,8 +2672,7 @@ mod tests {
             coordinator
                 .lock_claims_for_repository_mutation()
                 .unwrap()
-                .has_active_lease(issue_id, None, |raw| Ok(raw.to_string()))
-                .unwrap()
+                .has_active_lease(&issue_id, None)
         };
         assert!(is_enforced_after(threshold));
         assert!(!is_enforced_after(threshold + 1));
@@ -2577,15 +2686,32 @@ mod tests {
         // Default limit is 2 indefinite leases per agent
         // First two should succeed
         coordinator
-            .acquire_claim_with_reason("issue-1", 0, Some("Manual task 1"), 2, 10)
+            .acquire_claim_with_reason(
+                &crate::test_utils::issue_id(7),
+                0,
+                Some("Manual task 1"),
+                2,
+                10,
+            )
             .unwrap();
         coordinator
-            .acquire_claim_with_reason("issue-2", 0, Some("Manual task 2"), 2, 10)
+            .acquire_claim_with_reason(
+                &crate::test_utils::issue_id(43),
+                0,
+                Some("Manual task 2"),
+                2,
+                10,
+            )
             .unwrap();
 
         // Third should fail - exceeds per-agent limit
-        let result =
-            coordinator.acquire_claim_with_reason("issue-3", 0, Some("Manual task 3"), 2, 10);
+        let result = coordinator.acquire_claim_with_reason(
+            &crate::test_utils::issue_id(44),
+            0,
+            Some("Manual task 3"),
+            2,
+            10,
+        );
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
@@ -2595,7 +2721,9 @@ mod tests {
         );
 
         // But finite TTL should still work
-        coordinator.acquire_claim("issue-4", 600).unwrap();
+        coordinator
+            .acquire_claim(&crate::test_utils::issue_id(47), 600)
+            .unwrap();
     }
 
     #[test]
@@ -2604,7 +2732,8 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // TTL=0 without reason should fail
-        let result = coordinator.acquire_claim_with_reason("issue-1", 0, None, 2, 10);
+        let result =
+            coordinator.acquire_claim_with_reason(&crate::test_utils::issue_id(7), 0, None, 2, 10);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
@@ -2615,7 +2744,13 @@ mod tests {
 
         // TTL=0 with reason should succeed
         coordinator
-            .acquire_claim_with_reason("issue-1", 0, Some("Manual oversight"), 2, 10)
+            .acquire_claim_with_reason(
+                &crate::test_utils::issue_id(7),
+                0,
+                Some("Manual oversight"),
+                2,
+                10,
+            )
             .unwrap();
     }
 
@@ -2626,7 +2761,7 @@ mod tests {
 
         // Acquire indefinite lease
         let lease = coordinator
-            .acquire_claim_with_reason("issue-1", 0, Some("Long task"), 2, 10)
+            .acquire_claim_with_reason(&crate::test_utils::issue_id(7), 0, Some("Long task"), 2, 10)
             .unwrap();
         let original_beat = lease.last_beat;
 
@@ -2654,7 +2789,7 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         let lease = coordinator
-            .acquire_claim_with_reason("issue-1", 0, Some("Manual"), 2, 10)
+            .acquire_claim_with_reason(&crate::test_utils::issue_id(7), 0, Some("Manual"), 2, 10)
             .unwrap();
 
         coordinator.heartbeat(&lease.lease_id).unwrap();
@@ -2672,16 +2807,15 @@ mod tests {
     fn test_claims_mutation_guard_replays_log_and_holds_lock_without_repair() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
-        let issue_id = "abcd1111111111111111111111111111";
-        coordinator.acquire_claim(issue_id, 600).unwrap();
+        let issue_id = crate::test_utils::issue_id(46);
+        coordinator.acquire_claim(&issue_id, 600).unwrap();
         let index_path = temp_dir.path().join(".git/jit/claims.index.json");
         fs::remove_file(&index_path).unwrap();
 
         let guard = coordinator.lock_claims_for_repository_mutation().unwrap();
 
-        assert!(guard
-            .has_active_lease(issue_id, Some("agent:test"), |raw| Ok(raw.to_string()))
-            .unwrap());
+        let current_agent: Assignee = "agent:test".parse().unwrap();
+        assert!(guard.has_active_lease(&issue_id, Some(&current_agent)));
         assert!(
             !index_path.exists(),
             "inspection must not repair derived state"
@@ -2691,6 +2825,22 @@ mod tests {
         assert!(contender.try_lock_exclusive(&lock_path).unwrap().is_none());
         drop(guard);
         assert!(contender.try_lock_exclusive(&lock_path).unwrap().is_some());
+    }
+
+    #[test]
+    fn test_claims_mutation_guard_lease_blocks_only_its_own_issue() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        let leased = crate::test_utils::issue_id(48);
+        let other = crate::test_utils::issue_id(49);
+        coordinator.acquire_claim(&leased, 600).unwrap();
+        let guard = coordinator.lock_claims_for_repository_mutation().unwrap();
+        let stranger: Assignee = "agent:stranger".parse().unwrap();
+
+        assert!(guard.has_active_lease(&leased, None));
+        assert!(!guard.has_active_lease(&other, None));
+        assert!(guard.conflicting_lease(&leased, Some(&stranger)).is_some());
+        assert!(guard.conflicting_lease(&other, Some(&stranger)).is_none());
     }
 }
 

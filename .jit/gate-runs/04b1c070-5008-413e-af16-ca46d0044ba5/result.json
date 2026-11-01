@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-0af95f14",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ead055422bb11fe3836c32481a87b638f2541251",
+  "completed_at": "2026-10-28T22:54:15.299728275Z",
+  "duration_ms": 257317,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared canonical issue-ID fixture and attributable test migrations satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0af95f14-ce17-497b-9420-be71325ec0a5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "04b1c070-5008-413e-af16-ca46d0044ba5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-28T22:49:57.982135024Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a1e7ff646, 2b9db949e, ead055422 (`jit:0af95f14`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-01 (issue Markdown); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-10-28T22:49:12Z; code-review pending\nTruncation recovery: per-commit file lists and sliced per-file diffs for large patches; focused fixture, ID-assignment, rustdoc, graph-node, and snapshot-path reads\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared canonical issue-ID fixture and attributable test migrations satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

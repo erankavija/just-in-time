@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cb9f94b994520574769a4740194171fde3eb7c91",
+  "completed_at": "2026-10-27T01:03:43.932111510Z",
+  "duration_ms": 271216,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed migration consistently routes JIT subprocesses, repository setup, Git setup, environment overrides, and JSON ID parsing through the shared fixture.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9c3b9da2-bb21-4d02-aead-6d970c71d821",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9586ea35-97fa-49ed-a8e4-e70d7e8a92ce",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:59:12.715750108Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 92e343c7a, cb9f94b9 (the merge also carries separately tagged co-migrations outside this issue’s scope)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-05 (.jit issue, markdown-first); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci — passed, exit code none, 2026-10-27T00:59:09Z\nTruncation recovery: recovered the attributed diffs by file/range and inspected current fixture, migration, and scoped-test sources\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed migration consistently routes JIT subprocesses, repository setup, Git setup, environment overrides, and JSON ID parsing through the shared fixture.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

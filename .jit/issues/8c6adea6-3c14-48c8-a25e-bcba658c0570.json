@@ -1,0 +1,48 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-11-01T07:34:21.350865027Z",
+  "context": {},
+  "created_at": "2026-11-01T07:34:20.308887706Z",
+  "dependencies": [],
+  "description": "Stop `scripts/benchmark-rust-build.sh` discarding earlier samples when it never gets the build lock.\n\n## Background\n\n`init_empty_jsonl` truncates `raw/clean-samples.jsonl` and `raw/rebuild-samples.jsonl` (line 585) before the script first takes the build lock (line 603). Since d6635a93 the wait has a bound, so a timeout now exits with the committed samples already emptied and a `target.*` directory left behind.\n\n## Success Criteria\n\n- [hard] REQ-01: A run that never holds the build lock leaves the existing sample files unchanged, and a timeout at any acquisition leaves no `target.*` directory.\n- [hard] REQ-02: A timeout after the run first held the lock exits non-zero with a message naming how many samples were written.\n\n",
+  "documents": [],
+  "done_at": "2026-11-01T07:51:41.603185569Z",
+  "first_ready_at": "2026-11-01T07:34:20.308887706Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "cargo-ci-selftest"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2667c914-faee-4d78-8d7d-c9af5a17f887",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:45:45.259927866Z",
+      "updated_by": "auto:executor"
+    },
+    "cargo-ci-selftest": {
+      "run_id": "ec1d4635-8d54-4b83-8cb3-117c07ea2204",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:46:15.245582287Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7fee9fd1-8997-47ad-8b5c-4eea5ba4ed2a",
+      "status": "passed",
+      "updated_at": "2026-11-01T07:47:26.177673692Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "8c6adea6-3c14-48c8-a25e-bcba658c0570",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:suite-cost",
+    "component:testing",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "A benchmark run that never gets the build lock keeps its earlier samples",
+  "updated_at": "2026-11-01T07:51:41.603185569Z"
+}

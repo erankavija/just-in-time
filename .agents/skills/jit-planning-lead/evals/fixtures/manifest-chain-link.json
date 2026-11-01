@@ -1,0 +1,44 @@
+[
+  {
+    "key": "add-loader",
+    "title": "Add the configuration loader",
+    "description": "Add the storage configuration loader.\n\n## Success Criteria\n\n- The loader reads the configuration file.",
+    "type": "task",
+    "priority": "high",
+    "labels": ["component:planning"],
+    "gates": ["cargo-ci"],
+    "depends_on": [],
+    "planning": {
+      "outcome": "One storage configuration loader",
+      "contract_refs": [],
+      "source_refs": ["REQ-13"],
+      "terminal": {
+        "consumer_family": "configuration loading",
+        "test_boundary": "loader unit tests",
+        "worker_sized_reason": "One loader and its focused unit tests.",
+        "footprint": {"touches": ["config.rs"]}
+      }
+    }
+  },
+  {
+    "key": "remove-old-loader",
+    "title": "Remove the old configuration loader",
+    "description": "Remove the superseded configuration loader.\n\n## Success Criteria\n\n- Only the storage loader reads configuration.",
+    "type": "task",
+    "priority": "high",
+    "labels": ["component:planning"],
+    "gates": ["cargo-ci"],
+    "depends_on": ["add-loader"],
+    "planning": {
+      "outcome": "One configuration reader remains",
+      "contract_refs": [],
+      "source_refs": ["REQ-13"],
+      "terminal": {
+        "consumer_family": "configuration loading",
+        "test_boundary": "loader unit tests",
+        "worker_sized_reason": "One deletion and its focused unit tests.",
+        "footprint": {"touches": ["config.rs"]}
+      }
+    }
+  }
+]

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "25515e0f57a80d855c132af37779f4bb6a541ae6",
+  "completed_at": "2026-11-01T04:36:00.628390517Z",
+  "duration_ms": 97560,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Both hard criteria are verifiably met by the shared IssueStore conformance matrix, repository-state finalization tests, backend-specific tests, and a recorded passing cargo-ci run for HEAD.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "eae17510-00c4-40fe-832c-b783b518112c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3c862a43-9d93-44dd-8071-c06ce33da252",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T04:34:23.067523011Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both hard criteria are verifiably met by the shared IssueStore conformance matrix, repository-state finalization tests, backend-specific tests, and a recorded passing cargo-ci run for HEAD.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

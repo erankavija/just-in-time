@@ -1,0 +1,44 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-26T23:42:04.526675862Z",
+  "context": {},
+  "created_at": "2026-10-26T23:41:51.396313638Z",
+  "dependencies": [],
+  "description": "Make the server's change watcher recognise `.jit` files through `VirtualPath` instead of raw file names.\n\n## Background\n\n`crates/server/src/watcher.rs` decides which filesystem events refresh the web UI. Its relevance filter matches `\"gate-runs\"`, `\"issues\"`, `\"index.json\"` and `\"gates.toml\"` as string literals (`watcher.rs:105-121`), although `crates/jit/src/repository_state/path.rs` declares each of these as a `VirtualPath` constant (`GATE_RUNS`, `ISSUES`, `INDEX`, `GATES`). The watcher therefore restates the repository layout, and a renamed constant would silently stop refreshing.\n\n## Success Criteria\n\n- [hard] REQ-01: No string literal in `crates/server/src/watcher.rs`, its test module included, names a well-known `.jit` file or directory; each comes from a `VirtualPath` constant or constructor.\n- [hard] REQ-02: The watcher refreshes on exactly the same set of paths as before: issue records, gate-run records, the index and the gate registry.\n\n## Notes\n\n`VirtualPath` exposes the relative path of each constant; compare event paths against those values rather than against copies of the names.\n",
+  "documents": [],
+  "done_at": "2026-10-26T23:58:34.761618211Z",
+  "first_ready_at": "2026-10-26T23:41:51.396313638Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e71ed01e-3943-4b4b-938a-9275ea01c8f1",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:58:23.349615181Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f59861e9-2469-4c61-bc1a-1a2e2510e3f1",
+      "status": "passed",
+      "updated_at": "2026-10-26T23:51:23.792649395Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "f8021e35-cf67-4142-a1f3-5fa810fb7fc8",
+  "labels": [
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:repository-paths",
+    "component:server",
+    "satisfies:2195c98f/REQ-07",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "The server watcher recognises .jit files through VirtualPath",
+  "updated_at": "2026-10-26T23:58:34.761618211Z"
+}

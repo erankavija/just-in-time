@@ -1,0 +1,45 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T22:32:41.857314796Z",
+  "context": {},
+  "created_at": "2026-10-27T22:30:55.763199637Z",
+  "dependencies": [],
+  "description": "Give the `query all` filter composition and gated readiness pure domain owners, so the CLI query suite can drop its remaining semantic cases.\n\n## Background\n\n`CommandExecutor::query_all` in `crates/jit/src/commands/query.rs` composes the state, assignee, priority and label filters itself, by successive `retain` calls in the command layer. No pure domain function or domain test owns that AND-composition, so the CLI suite `crates/jit/tests/cli_query_graph/query_tests.rs` still holds three combined-filter cases (state with priority, state with assignee, state with label) as its only proof of it. The same suite holds the only proof that an issue in `Ready` whose required gates have not passed still appears in `query_ready` (gates gate completion, not start). The domain owners for the other query properties live in `crates/jit/src/domain/queries.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure function in `crates/jit/src/domain/queries.rs` applies the `query all` filters (state, assignee, priority, labels) as a conjunction over a slice of issues, and `query_all` applies its result without filtering issues itself.\n- [hard] REQ-02: Unit tests in `domain/queries.rs` own the conjunction of each filter with each other filter, and a property-based test shows the result is exactly the issues every supplied filter admits.\n- [hard] REQ-03: A unit test in `domain/queries.rs` owns that an unassigned, unblocked `Ready` issue with unpassed required gates is in `query_ready`'s result.\n- [hard] REQ-04: `query all` output and exit status are unchanged for every filter combination.\n",
+  "documents": [],
+  "done_at": "2026-10-27T22:50:01.007841362Z",
+  "first_ready_at": "2026-10-27T22:30:55.763199637Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "072f08cf-c595-415b-ab1e-91e282608ccf",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:43:17.073347084Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "025e337e-059d-47b6-b827-072f123a8b17",
+      "status": "passed",
+      "updated_at": "2026-10-27T22:47:20.368730672Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "ea5ffaba-f183-46ae-8704-c4a17b5ebc60",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "story:query-graph-ownership",
+    "component:core",
+    "component:testing",
+    "satisfies:c780514e/REQ-02",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/orthogonal-tests",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Domain owners for query-all filter composition and gated readiness",
+  "updated_at": "2026-10-27T22:50:01.007841362Z"
+}

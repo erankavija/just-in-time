@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-f265e748",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5d83ac6e6daf7ad0112bbed64e685556f17c7692",
+  "completed_at": "2026-10-25T23:06:48.169019710Z",
+  "duration_ms": 136104,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/event_catalog.rs",
+        "id": "F1",
+        "line": 272,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/2195c98f/requirement/REQ-04",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "EventTag::sample constructs issue IDs as raw Strings and will not compile after IssueId becomes the validated newtype."
+      }
+    ],
+    "summary": "The event catalog retains raw String issue-ID construction, leaving hard REQ-04 unmet.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f265e748-e350-4ba6-949f-575acf122bd9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6600e707-6be8-41e2-86cf-3aaa424f780a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T23:04:32.064718603Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3014 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f265e748\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1754e-f8e6-7040-896e-48d40bfe774f\n--------\nuser\n--- 3001 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f1aaadc03, 5d83ac6e6 (`jit:f265e748`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2195c98f/requirement/REQ-04 (.jit/issues/2195c98f-95a9-45d0-8582-d93c1d1fec45.json); @/invariant/semantic-types (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci: pending, no exit code\nTruncation recovery: none\n\n1. [blocking, issue-impact] `EventTag::sample` still constructs issue IDs as raw `String`s at `crates/jit/src/domain/event_catalog.rs:272` (and its dependency ID at line 319). This direct event-family caller will fail when `IssueId` becomes the validated newtype, so hard REQ-04 is unmet. Parse typed IDs instead. References: @/issue/2195c98f/requirement/REQ-04, @/invariant/semantic-types.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The event catalog retains raw String issue-ID construction, leaving hard REQ-04 unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"EventTag::sample constructs issue IDs as raw Strings and will not compile after IssueId becomes the validated newtype.\",\"file\":\"crates/jit/src/domain/event_catalog.rs\",\"line\":272,\"references\":[\"@/issue/2195c98f/requirement/REQ-04\",\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

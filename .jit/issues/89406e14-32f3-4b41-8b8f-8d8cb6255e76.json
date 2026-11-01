@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-22T14:28:23.206571472Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
@@ -8,13 +8,33 @@
   ],
   "description": "Make the `scripts/generate-shipped-policy-regions-selftest.sh` self-test pass as the registered gate `shipped-policy-regions-selftest` over the script it tests.\n\n## Background\n\n`scripts/generate-shipped-policy-regions-selftest.sh` is a re-runnable self-test of `scripts/generate-shipped-policy-regions.sh`: idempotence on a current tree, restoration of a corrupted region with every byte outside its markers kept, and failure on malformed markers. It exits 2 when `git` or `jit` is missing. Until planning, no gate ran it. The gate `shipped-policy-regions-selftest` was registered in `.jit/gates.toml` at planning, so this task and the container can require it; this task makes it pass and keeps its inputs complete.\n\n## Success Criteria\n\n- [hard] REQ-01: The registered gate `shipped-policy-regions-selftest` runs `scripts/generate-shipped-policy-regions-selftest.sh`, and its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures; its declaration in `.jit/gates.toml` carries `mode` with no `auto` key.\n- [hard] REQ-02: `shipped-policy-regions-selftest` fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the tree with this change.\n",
   "documents": [],
+  "done_at": "2026-10-24T23:19:45.595283958Z",
   "first_ready_at": "2026-10-22T14:27:42.375050721Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "shipped-policy-regions-selftest"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "078e1c7a-2378-4cf8-b633-4bb1c9beb257",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:44.766765529Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "11dc2e29-0f19-4158-867e-8789e71d216b",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:18:02.153763813Z",
+      "updated_by": "auto:executor"
+    },
+    "shipped-policy-regions-selftest": {
+      "run_id": "93df51f9-7e20-425f-b937-4707c919bab9",
+      "status": "passed",
+      "updated_at": "2026-10-24T23:14:21.799619065Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "89406e14-32f3-4b41-8b8f-8d8cb6255e76",
   "labels": [
     "type:task",
@@ -29,7 +49,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Shipped-policy region generator self-test runs as a declared gate",
-  "updated_at": "2026-10-22T14:44:31.773897595Z"
+  "updated_at": "2026-10-24T23:19:45.595283958Z"
 }

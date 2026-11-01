@@ -4,15 +4,33 @@
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
-    "7721a2a9-76ef-469c-b2d9-5e4d59f3eccc"
+    "4269f866-4107-429d-ae5b-06dfdfd290de",
+    "7721a2a9-76ef-469c-b2d9-5e4d59f3eccc",
+    "8c6adea6-3c14-48c8-a25e-bcba658c0570",
+    "d6635a93-822d-4f64-b171-f4485dde4a10"
   ],
   "description": "Aggregate the work that delivers this outcome: the default suite runs no nested cargo build or tool-skipping test, fixtures are keyed on inputs, and footprint and clock are reported.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: A test whose tool is missing fails, the default suite runs no nested cargo build, and shell-script self-tests run as declared gates.\n- [hard] REQ-02: The profiled-repository fixture is reused under a key derived only from its inputs, the product binary has no hidden fixture subcommand, and no test-runner configuration lists individual test names.\n- [hard] REQ-03: The build-footprint budget checker passes, and integration-target count and active test-executable bytes are reported before and after.\n- [hard] REQ-04: The cargo-ci suite clock is reported before and after, and no test in the default suite exceeds 5 s on a warm target at load ≤ 10.\n",
   "documents": [],
+  "done_at": "2026-11-01T10:43:28.421305198Z",
+  "first_ready_at": "2026-11-01T10:28:43.298741182Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3038f3d6-6f5e-47c6-b35e-32df52d792cb",
+      "status": "passed",
+      "updated_at": "2026-11-01T11:12:05.003638815Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "1045ba83-34af-4858-9645-181f0fc31716",
+      "status": "passed",
+      "updated_at": "2026-11-01T10:43:00.457135872Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "45e3e442-e157-4d73-918c-2fc7df04accc",
   "labels": [
     "type:story",
@@ -30,7 +48,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "The default suite runs within its time and footprint budgets",
-  "updated_at": "2026-10-22T15:41:06.985319640Z"
+  "updated_at": "2026-11-01T11:12:05.003638815Z"
 }

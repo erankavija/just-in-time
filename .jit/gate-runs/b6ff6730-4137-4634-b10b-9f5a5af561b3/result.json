@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-e1a6c8c2",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e18d9a58388205733e1604da2cc233ee329d9481",
+  "completed_at": "2026-10-25T08:39:41.778932942Z",
+  "duration_ms": 87593,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e1a6c8c2-bace-4c0c-8d01-1842dfac7f80",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b6ff6730-4137-4634-b10b-9f5a5af561b3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T08:38:14.185787984Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 38fcc04d, 490cc871, 124d8fbd, e18d9a58; 30450c18, 2f7d6919, b59daaa3 record-only; uncommitted `.jit` changes excluded\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/e1a6c8c2/requirement/REQ-01, @/issue/e1a6c8c2/requirement/REQ-02, @/issue/2195c98f/requirement/REQ-07; @/charter/D-18; @/invariant/semantic-types\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T08:36:51Z); prior code-review failed (exit 1), with its fixture-resolution finding resolved\nTruncation recovery: re-read bounded per-commit/path patches and current affected sources; truncated historical gate-record patches excluded as records of past\n\n1. No findings. The listed loaders and fixtures now use `VirtualPath` constants and resolve host paths through `RepositoryLayout::resolve`; the prior fixture findings are addressed.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

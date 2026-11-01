@@ -1,7 +1,7 @@
 //! Deterministic steering-scenario harness (issue 7aacfd89, CC-9).
 //!
-//! Exercises validation steering end to end by driving the real `jit` binary in
-//! isolated temp repos against the seed scenarios from the June 2026 evaluation.
+//! Exercises validation steering end to end in isolated fixture repositories
+//! against the seed scenarios from the June 2026 evaluation.
 //! Each scenario is defined purely as data in
 //! `crates/jit/tests/fixtures/steering/<name>/scenario.toml`.
 //!
@@ -13,20 +13,8 @@
 //!
 //! See `crates/jit/tests/fixtures/steering/README.md` for the full schema.
 //!
-//! ## Isolation guarantee
-//!
-//! Every scenario runs in a fresh `TempDir`. Two mechanisms together guarantee
-//! that the production `.jit/` is never touched:
-//!
-//! 1. **cwd isolation** — every `jit` invocation uses `.current_dir(temp.path())`
-//!    so the default `.jit/` resolution anchors inside the temp directory.
-//! 2. **env sanitization** — all `jit` invocations are constructed through
-//!    `jit_cmd()`, which calls `.env_remove` on every JIT_* variable that can
-//!    redirect or alter storage (`JIT_DATA_DIR`, `JIT_ALLOW_DELETION`,
-//!    `JIT_LOCK_TIMEOUT`) and pins
-//!    `JIT_AGENT_ID` to `"agent:steering-harness"` for determinism.
-//!    An absolute `JIT_DATA_DIR` value would otherwise discard the temp cwd and
-//!    write directly to an arbitrary path on the developer's machine.
+//! Each scenario owns a [`JitCli`] repository; its commands set the scenario
+//! agent identity in the child process.
 //!
 //! ## Fresh-evidence note
 //!
@@ -37,10 +25,9 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
+use jit::test_cli::{created_issue_id, JitCli};
 use serde::Deserialize;
-use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------
 // Scenario schema types
@@ -85,7 +72,8 @@ enum CaptureMode {
 /// Per-step assertion.
 #[derive(Debug, Deserialize)]
 struct Expect {
-    /// Expected process exit code.
+    /// Zero expects success and any other value failure; the status itself
+    /// belongs to the command exit-code projection suite.
     exit: Option<i32>,
     /// Substrings that must appear in the combined stdout + stderr.
     #[serde(default)]
@@ -112,10 +100,6 @@ enum EnforcementPoint {
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
 /// Root of the workspace; used to locate `docs/examples/`.
 fn workspace_root() -> PathBuf {
     // CARGO_MANIFEST_DIR points to `crates/jit`; go two levels up.
@@ -125,42 +109,8 @@ fn workspace_root() -> PathBuf {
         .expect("workspace root must exist")
 }
 
-/// Build a sanitized `jit` [`Command`] anchored in `dir`.
-///
-/// Removes every JIT_* environment variable that can redirect or alter storage,
-/// and pins `JIT_AGENT_ID` to a fixed harness identity. This is the single place
-/// all scenario spawns go through; never call `Command::new(jit_binary())` directly
-/// in this module.
-///
-/// Variables removed:
-/// - `JIT_DATA_DIR` — would redirect `.jit/` to an arbitrary (possibly absolute) path.
-/// - `JIT_ALLOW_DELETION` — would allow destructive operations not expected by tests.
-/// - `JIT_LOCK_TIMEOUT` — could slow tests or interact with external lock state.
-fn jit_cmd(dir: &Path) -> Command {
-    let mut cmd = Command::new(jit_binary());
-    cmd.current_dir(dir)
-        .env_remove("JIT_DATA_DIR")
-        .env_remove("JIT_ALLOW_DELETION")
-        .env_remove("JIT_LOCK_TIMEOUT")
-        .env("JIT_AGENT_ID", "agent:steering-harness");
-    cmd
-}
-
-/// Initialize a fresh isolated repo and install the named ruleset.
-fn setup_scenario_repo(ruleset: &str) -> TempDir {
-    let temp = TempDir::new().expect("tempdir");
-
-    // `jit init` in the temp dir.
-    let out = jit_cmd(temp.path())
-        .arg("init")
-        .output()
-        .expect("jit init failed to spawn");
-    assert!(
-        out.status.success(),
-        "jit init failed in scenario repo: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
+/// Install the named ruleset into a repository owned by the caller.
+fn install_scenario_ruleset(cli: &JitCli, ruleset: &str) {
     // Preserve generated defaults and append the example rules. The canonical
     // derived-state validator owns the default family and its schemas.
     let example_dir = workspace_root().join("docs/examples").join(ruleset);
@@ -173,13 +123,13 @@ fn setup_scenario_repo(ruleset: &str) -> TempDir {
     for name in ["config.toml", "templates.toml"] {
         let source = example_dir.join(name);
         if source.exists() {
-            fs::copy(&source, temp.path().join(".jit").join(name))
+            fs::copy(&source, cli.root().join(".jit").join(name))
                 .unwrap_or_else(|e| panic!("failed to copy {}: {e}", source.display()));
         }
     }
 
     let rules_src = example_dir.join("rules.toml");
-    let rules_dst = temp.path().join(".jit/rules.toml");
+    let rules_dst = cli.root().join(".jit/rules.toml");
     let mut rules = fs::read_to_string(&rules_dst).expect("read initialized rules");
     rules.push_str(
         &fs::read_to_string(&rules_src)
@@ -189,23 +139,10 @@ fn setup_scenario_repo(ruleset: &str) -> TempDir {
 
     let schemas_src = example_dir.join("schemas");
     if schemas_src.exists() {
-        let schemas_dst = temp.path().join(".jit/schemas");
+        let schemas_dst = cli.root().join(".jit/schemas");
         copy_dir_all(&schemas_src, &schemas_dst)
             .unwrap_or_else(|e| panic!("failed to copy schemas: {e}"));
     }
-
-    let repaired = jit_cmd(temp.path())
-        .args(["validate", "--fix"])
-        .output()
-        .expect("jit validate --fix failed to spawn");
-    assert!(
-        repaired.status.success(),
-        "ruleset repair failed: stdout={} stderr={}",
-        String::from_utf8_lossy(&repaired.stdout),
-        String::from_utf8_lossy(&repaired.stderr)
-    );
-
-    temp
 }
 
 /// Recursively copy a directory.
@@ -222,39 +159,6 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
-}
-
-/// Extract the first UUID (8-4-4-4-12 hex) from a string.
-fn extract_uuid(s: &str) -> Option<String> {
-    // Simple pattern scan: look for the standard UUID shape.
-    let bytes = s.as_bytes();
-    let mut i = 0;
-    while i + 36 <= bytes.len() {
-        let candidate = &s[i..i + 36];
-        if is_uuid(candidate) {
-            return Some(candidate.to_string());
-        }
-        i += 1;
-    }
-    None
-}
-
-fn is_uuid(s: &str) -> bool {
-    let b = s.as_bytes();
-    if b.len() != 36 {
-        return false;
-    }
-    // Pattern: 8-4-4-4-12 hex digits separated by hyphens at positions 8,13,18,23.
-    for (idx, &byte) in b.iter().enumerate() {
-        if idx == 8 || idx == 13 || idx == 18 || idx == 23 {
-            if byte != b'-' {
-                return false;
-            }
-        } else if !byte.is_ascii_hexdigit() {
-            return false;
-        }
-    }
-    true
 }
 
 /// Substitute `$<slot>` and `$<slot>_short` in argv with captured ids.
@@ -309,14 +213,28 @@ fn step_enforcement_point(argv: &[String]) -> Option<EnforcementPoint> {
 // Core runner
 // ---------------------------------------------------------------------------
 
-fn run_scenario(name: &str, fixture_dir: &Path) {
+fn run_scenario(cli: &JitCli, name: &str, fixture_dir: &Path) {
     let toml_path = fixture_dir.join("scenario.toml");
     let toml_src = fs::read_to_string(&toml_path)
         .unwrap_or_else(|e| panic!("scenario {name}: cannot read scenario.toml: {e}"));
     let scenario: Scenario = toml::from_str(&toml_src)
         .unwrap_or_else(|e| panic!("scenario {name}: cannot parse scenario.toml: {e}"));
 
-    let repo = setup_scenario_repo(&scenario.ruleset);
+    install_scenario_ruleset(cli, &scenario.ruleset);
+
+    let repaired = cli
+        .command_with_env(
+            ["validate", "--fix"],
+            [("JIT_AGENT_ID", "agent:steering-harness")],
+        )
+        .output()
+        .expect("jit validate --fix failed to spawn");
+    assert!(
+        repaired.status.success(),
+        "ruleset repair failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&repaired.stdout),
+        String::from_utf8_lossy(&repaired.stderr)
+    );
 
     // Captured id slots: slot_name -> full UUID.
     let mut ids: HashMap<String, String> = HashMap::new();
@@ -324,56 +242,69 @@ fn run_scenario(name: &str, fixture_dir: &Path) {
     for (step_idx, step) in scenario.steps.iter().enumerate() {
         let argv = substitute_argv(&step.argv, &ids);
 
-        let output = jit_cmd(repo.path())
-            .args(&argv)
+        let capture_id = step.capture == CaptureMode::Id && step.id_slot.is_some();
+        let command_argv = if capture_id {
+            argv.iter()
+                .cloned()
+                .chain(std::iter::once("--json".to_owned()))
+                .collect::<Vec<_>>()
+        } else {
+            argv.clone()
+        };
+        let output = cli
+            .command_with_env(&command_argv, [("JIT_AGENT_ID", "agent:steering-harness")])
             .output()
             .unwrap_or_else(|e| panic!("scenario {name} step {step_idx}: failed to spawn: {e}"));
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         let combined = format!("{stdout}{stderr}");
-        let exit_code = output.status.code().unwrap_or(-1);
 
         // Capture UUID if requested.
         if step.capture == CaptureMode::Id {
             if let Some(slot) = &step.id_slot {
-                let uuid = extract_uuid(&combined).unwrap_or_else(|| {
+                let json = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
                     panic!(
-                        "scenario {name} step {step_idx}: capture=id but no UUID found in output.\n\
+                        "scenario {name} step {step_idx}: capture=id returned invalid JSON: {error}\n\
                          argv: {argv:?}\n\
                          stdout: {stdout}\n\
                          stderr: {stderr}"
                     )
                 });
+                let uuid = created_issue_id(&json)
+                    .unwrap_or_else(|error| panic!("scenario {name} step {step_idx}: {error}"));
                 ids.insert(slot.clone(), uuid);
             }
         }
 
         // Apply per-step assertions.
         //
-        // If no `expect` block is present the step must still succeed (exit 0).
-        // Unexpected non-zero exits are swallowed otherwise, silently hiding
+        // If no `expect` block is present the step must still succeed.
+        // Unexpected failures are swallowed otherwise, silently hiding
         // intermediate failures.
         let default_exit_zero = step.expect.is_none();
         if default_exit_zero {
-            assert_eq!(
-                exit_code, 0,
-                "scenario {name} step {step_idx}: expected exit 0 (implicit default) got {exit_code}\n\
+            assert!(
+                output.status.success(),
+                "scenario {name} step {step_idx}: expected success (implicit default) got {:?}\n\
                  argv: {argv:?}\n\
                  stdout: {stdout}\n\
-                 stderr: {stderr}"
+                 stderr: {stderr}",
+                output.status
             );
         }
 
         if let Some(expect) = &step.expect {
-            // Exit code.
+            // Success or failure.
             if let Some(want_exit) = expect.exit {
                 assert_eq!(
-                    exit_code, want_exit,
-                    "scenario {name} step {step_idx}: expected exit {want_exit} got {exit_code}\n\
+                    output.status.success(),
+                    want_exit == 0,
+                    "scenario {name} step {step_idx}: expected exit {want_exit} got {:?}\n\
                      argv: {argv:?}\n\
                      stdout: {stdout}\n\
-                     stderr: {stderr}"
+                     stderr: {stderr}",
+                    output.status
                 );
             }
 
@@ -468,27 +399,14 @@ fn test_all_steering_scenarios() {
     );
 
     for (name, path) in &scenarios {
-        run_scenario(name, path);
+        let cli = JitCli::initialised().unwrap();
+        run_scenario(&cli, name, path);
     }
 }
 
 // ---------------------------------------------------------------------------
 // Unit tests for the harness helpers
 // ---------------------------------------------------------------------------
-
-#[test]
-fn test_extract_uuid_finds_uuid() {
-    let s = "Created issue: 4793351c-0148-4994-832f-96052ffcf8cc\n";
-    assert_eq!(
-        extract_uuid(s),
-        Some("4793351c-0148-4994-832f-96052ffcf8cc".to_string())
-    );
-}
-
-#[test]
-fn test_extract_uuid_none_for_plain_text() {
-    assert_eq!(extract_uuid("no uuid here"), None);
-}
 
 #[test]
 fn test_substitute_argv_replaces_slot_and_short() {
@@ -583,33 +501,4 @@ fn test_substitute_argv_prefix_collision() {
     let result = substitute_argv(&argv, &ids);
     assert_eq!(result[0], "aaaaaaaa-0000-0000-0000-000000000000");
     assert_eq!(result[1], "bbbbbbbb-0000-0000-0000-000000000000");
-}
-
-#[test]
-fn test_jit_cmd_strips_jit_data_dir() {
-    // Verify jit_cmd explicitly removes the isolation-breaking variables and
-    // pins JIT_AGENT_ID, by inspecting the Command's configured env overrides
-    // directly (Command::get_envs reports removals as (key, None)). No
-    // process-global env mutation is needed, so this is safe under parallel
-    // test execution.
-    let tmp = TempDir::new().expect("tempdir for env test");
-    let cmd = jit_cmd(tmp.path());
-
-    let envs: std::collections::HashMap<_, _> = cmd
-        .get_envs()
-        .map(|(k, v)| (k.to_os_string(), v.map(|v| v.to_os_string())))
-        .collect();
-
-    for removed in ["JIT_DATA_DIR", "JIT_ALLOW_DELETION"] {
-        assert_eq!(
-            envs.get(std::ffi::OsStr::new(removed)),
-            Some(&None),
-            "jit_cmd must remove {removed} from the child environment"
-        );
-    }
-    assert_eq!(
-        envs.get(std::ffi::OsStr::new("JIT_AGENT_ID")),
-        Some(&Some("agent:steering-harness".into())),
-        "jit_cmd must pin JIT_AGENT_ID for determinism"
-    );
 }

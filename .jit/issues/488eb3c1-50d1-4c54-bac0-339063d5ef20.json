@@ -1,18 +1,34 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-31T23:03:23.866771278Z",
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
     "5c232305-0ba2-4838-9419-4bd63af92dce",
     "7abcc22d-c931-4da8-94b0-c9c894333540"
   ],
-  "description": "Give gate keys one validated type in gate definitions, gate-run results, gate events and the storage trait.\n\n## Background\n\n`GateDefinition.key` is a `String` (`crates/jit/src/declarations/gates.rs:159`), and the registry enforces no grammar on it; loading checks only duplicates (`gates.rs:281`). `GateRunResult.gate_key` (`domain/types.rs:943`) and the gate event variants (`types.rs:1339,1352,1365,1376`) hold strings, as do `IssueStore::find_reusable_gate_run(gate_key: &str, ..)` (`storage/mod.rs:287-289`) and `GateRunResult::is_reusable_for` (`types.rs:1022`). Each gate key in this repository is lowercase-kebab. The domain's lowercase-kebab predicate, shared with profile ids, lives in `domain::identity`.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::identity::GateKey` accepts keys that satisfy the shared lowercase-kebab predicate and rejects other input with an error naming the key.\n- [hard] REQ-02: A gate registry holding a malformed key fails to load with that error, and defining a gate with a malformed key is rejected.\n- [hard] REQ-03: `GateDefinition.key`, `GateRunResult.gate_key`, the gate fields of event bodies and `find_reusable_gate_run` use `GateKey`.\n- [hard] REQ-04: The gate registry, gate-run records and the event log of this repository load and re-serialize byte-identically.\n\n## Notes\n\nThe grammar is the engine's own token rule, so it is mechanism rather than repository vocabulary (`@/inv/domain-agnostic`).\n",
+  "description": "Give gate keys one validated type in gate definitions, gate-run results, gate events and the storage trait.\n\n## Background\n\n`GateDefinition.key` is a `String` (`crates/jit/src/declarations/gates.rs:159`), and the registry enforces no grammar on it; loading checks only duplicates (`gates.rs:281`). `GateRunResult.gate_key` (`domain/types.rs:943`) and the gate event variants (`types.rs:1339,1352,1365,1376`) hold strings, as do `IssueStore::find_reusable_gate_run(gate_key: &str, ..)` (`storage/mod.rs:287-289`) and `GateRunResult::is_reusable_for` (`types.rs:1022`). Each gate key in this repository is lowercase-kebab. The domain's lowercase-kebab predicate, shared with profile ids, lives in `domain::identity`.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::identity::GateKey` accepts keys that satisfy the shared lowercase-kebab predicate and rejects other input with an error naming the key.\n- [hard] REQ-02: A gate registry holding a malformed key fails to load with that error, and defining a gate with a malformed key is rejected.\n- [hard] REQ-03: `GateDefinition.key`, `GateRunResult.gate_key`, the gate fields of event bodies and `find_reusable_gate_run` use `GateKey`.\n- [hard] REQ-04: The gate registry of this repository parses with its declarations equal after a serialize-and-parse round trip, and re-serializing that output is byte-identical. Current-format gate-run records and the event log of this repository load and re-serialize byte-identically, and every other stored gate-run record decodes and reproduces its id fields.\n\n## Notes\n\nThe grammar is the engine's own token rule, so it is mechanism rather than repository vocabulary (`@/inv/domain-agnostic`).\n",
   "documents": [],
+  "done_at": "2026-11-01T02:39:07.074366313Z",
+  "first_ready_at": "2026-10-31T23:10:47.595090080Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "562aecbb-2403-46e8-b542-7f32aae6ca8e",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:39:01.434091959Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e1e21409-d4cf-4643-90eb-6a1079cbabfc",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:33:50.351828848Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "488eb3c1-50d1-4c54-bac0-339063d5ef20",
   "labels": [
     "type:task",
@@ -25,7 +41,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Gate keys are a validated GateKey in the registry and gate runs",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-11-01T02:39:07.074366313Z"
 }

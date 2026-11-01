@@ -16,6 +16,7 @@
 //! straight into the output layer, and [`Serialize`](serde::Serialize) so it
 //! can be embedded in `--json` payloads as structured data.
 
+use crate::domain::identity::IssueId;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::fmt;
@@ -42,7 +43,7 @@ pub enum StorageWarning {
     /// claims index (a sign the index is inconsistent and must be rebuilt).
     DuplicateLease {
         /// The issue ID that had more than one active lease.
-        issue_id: String,
+        issue_id: IssueId,
     },
     /// The claims index was inconsistent and has been rebuilt from the log.
     IndexRebuilt,
@@ -171,10 +172,13 @@ mod tests {
     #[test]
     fn test_serialize_tags_variant_kind() {
         let warning = StorageWarning::DuplicateLease {
-            issue_id: "abc".to_string(),
+            issue_id: crate::test_utils::issue_id(54),
         };
         let value = serde_json::to_value(&warning).unwrap();
         assert_eq!(value["kind"], "duplicate_lease");
-        assert_eq!(value["issue_id"], "abc");
+        assert_eq!(
+            value["issue_id"],
+            serde_json::to_value(crate::test_utils::issue_id(54)).unwrap()
+        );
     }
 }

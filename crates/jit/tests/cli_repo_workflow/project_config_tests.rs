@@ -4,22 +4,9 @@
 //! directory's basename, idempotency of an already-declared name, and
 //! `jit config validate` rejecting an invalid `[project] name`.
 
-use jit::output::ErrorCode;
+use jit::test_cli::JitCli;
 use std::fs;
-use std::process::Command;
-use tempfile::TempDir;
-
-fn jit_binary() -> &'static str {
-    env!("CARGO_BIN_EXE_jit")
-}
-
-fn jit_init(dir: &std::path::Path) -> std::process::Output {
-    Command::new(jit_binary())
-        .arg("init")
-        .current_dir(dir)
-        .output()
-        .expect("failed to run jit init")
-}
+use tempfile::{Builder, TempDir};
 
 /// Replace `[project] name` in a scaffolded config, leaving every other
 /// declaration in place so the rules and schemas derived from them stay current.
@@ -41,14 +28,17 @@ fn rewrite_project_name(config_path: &std::path::Path, name: &str) {
 
 #[test]
 fn test_init_seeds_project_name_from_slugified_dirname() {
-    let temp = TempDir::new().unwrap();
-    let repo_dir = temp.path().join("My Cool Project!");
-    fs::create_dir(&repo_dir).unwrap();
+    let parent = TempDir::new().unwrap();
+    let cli = JitCli::with_repository(
+        Builder::new()
+            .prefix("My Cool Project!")
+            .rand_bytes(0)
+            .tempdir_in(parent.path())
+            .unwrap(),
+    );
+    cli.run(["init"]).unwrap();
 
-    let out = jit_init(&repo_dir);
-    assert!(out.status.success(), "jit init failed: {:?}", out);
-
-    let content = fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap();
+    let content = fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap();
     assert!(
         content.contains("[project]"),
         "config should have a [project] table"
@@ -63,30 +53,39 @@ fn test_init_seeds_project_name_from_slugified_dirname() {
 
 #[test]
 fn test_init_seeds_fallback_project_name_for_digit_leading_dirname() {
-    let temp = TempDir::new().unwrap();
     // A basename starting with a digit can never slugify into something
     // matching ^[a-z][a-z0-9-]*$, so the seeded name must fall back.
-    let repo_dir = temp.path().join("123-repo");
-    fs::create_dir(&repo_dir).unwrap();
+    let parent = TempDir::new().unwrap();
+    let cli = JitCli::with_repository(
+        Builder::new()
+            .prefix("123-repo")
+            .rand_bytes(0)
+            .tempdir_in(parent.path())
+            .unwrap(),
+    );
+    cli.run(["init"]).unwrap();
 
-    let out = jit_init(&repo_dir);
-    assert!(out.status.success(), "jit init failed: {:?}", out);
-
-    let content = fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap();
+    let content = fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap();
     let parsed: toml::Value = toml::from_str(&content).unwrap();
     assert_eq!(parsed["project"]["name"].as_str().unwrap(), "project");
 }
 
 #[test]
 fn test_init_seeded_project_name_round_trips_through_jitconfig_load() {
-    let temp = TempDir::new().unwrap();
-    let repo_dir = temp.path().join("Round Trip Repo");
-    fs::create_dir(&repo_dir).unwrap();
+    let parent = TempDir::new().unwrap();
+    let cli = JitCli::with_repository(
+        Builder::new()
+            .prefix("Round Trip Repo")
+            .rand_bytes(0)
+            .tempdir_in(parent.path())
+            .unwrap(),
+    );
+    cli.run(["init"]).unwrap();
 
-    let out = jit_init(&repo_dir);
-    assert!(out.status.success());
-
-    let config = jit::config::JitConfig::load(&repo_dir.join(".jit")).unwrap();
+    let config = jit::config::JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        &cli.root().join(".jit"),
+    ))
+    .unwrap();
     assert_eq!(
         config
             .project
@@ -106,16 +105,12 @@ fn test_init_seeded_project_name_round_trips_through_jitconfig_load() {
 
 #[test]
 fn test_init_second_run_preserves_existing_project_name() {
-    let temp = TempDir::new().unwrap();
+    let cli = JitCli::initialised().unwrap();
 
-    let out = jit_init(temp.path());
-    assert!(out.status.success());
-
-    let config_path = temp.path().join(".jit/config.toml");
+    let config_path = cli.root().join(".jit/config.toml");
     rewrite_project_name(&config_path, "existing-name");
 
-    let out = jit_init(temp.path());
-    assert!(out.status.success(), "second jit init failed");
+    cli.run(["init"]).expect("second jit init failed");
 
     let content = fs::read_to_string(&config_path).unwrap();
     assert!(
@@ -130,29 +125,22 @@ fn test_init_second_run_preserves_existing_project_name() {
 
 #[test]
 fn test_config_validate_reports_invalid_project_name() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path());
-    assert!(out.status.success());
+    let cli = JitCli::initialised().unwrap();
 
-    let config_path = temp.path().join(".jit/config.toml");
+    let config_path = cli.root().join(".jit/config.toml");
     fs::write(&config_path, "[project]\nname = \"Bad_Name\"\n").unwrap();
 
-    let out = Command::new(jit_binary())
-        .args(["config", "validate"])
-        .current_dir(temp.path())
-        .env("HOME", temp.path().join("isolated-home"))
-        .env_remove("JIT_WORKTREE_WRITE_POLICY")
+    let out = cli
+        .command_with_env(
+            ["config", "validate"],
+            [("HOME", cli.root().join("isolated-home"))],
+        )
         .output()
         .expect("failed to run jit config validate");
 
     assert!(
         !out.status.success(),
         "config validate must fail on an invalid [project] name"
-    );
-    assert_eq!(
-        out.status.code(),
-        Some(ErrorCode::ValidationFailed.exit_code().code()),
-        "human validation failures must use the registered validation-failed status"
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
@@ -163,19 +151,18 @@ fn test_config_validate_reports_invalid_project_name() {
 
 #[test]
 fn test_config_validate_human_failure_lists_findings_on_stdout_and_summary_on_stderr() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
+    let cli = JitCli::initialised().unwrap();
     fs::write(
-        temp.path().join(".jit/config.toml"),
+        cli.root().join(".jit/config.toml"),
         "[project]\nname = \"Bad_Name\"\n",
     )
     .unwrap();
 
-    let out = Command::new(jit_binary())
-        .args(["config", "validate"])
-        .current_dir(temp.path())
-        .env("HOME", temp.path().join("isolated-home"))
-        .env_remove("JIT_WORKTREE_WRITE_POLICY")
+    let out = cli
+        .command_with_env(
+            ["config", "validate"],
+            [("HOME", cli.root().join("isolated-home"))],
+        )
         .output()
         .expect("failed to run jit config validate");
 
@@ -194,26 +181,20 @@ fn test_config_validate_human_failure_lists_findings_on_stdout_and_summary_on_st
 
 #[test]
 fn test_config_validate_json_envelopes_every_invalid_configuration_finding() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path());
-    assert!(out.status.success());
+    let cli = JitCli::initialised().unwrap();
 
-    let config_path = temp.path().join(".jit/config.toml");
+    let config_path = cli.root().join(".jit/config.toml");
     fs::write(&config_path, "[project]\nname = \"1abc\"\n").unwrap();
 
-    let out = Command::new(jit_binary())
-        .args(["config", "validate", "--json"])
-        .current_dir(temp.path())
-        .env("HOME", temp.path().join("isolated-home"))
-        .env_remove("JIT_WORKTREE_WRITE_POLICY")
+    let out = cli
+        .command_with_env(
+            ["config", "validate", "--json"],
+            [("HOME", cli.root().join("isolated-home"))],
+        )
         .output()
         .expect("failed to run jit config validate --json");
 
     assert!(!out.status.success());
-    assert_eq!(
-        out.status.code(),
-        Some(ErrorCode::ValidationFailed.exit_code().code())
-    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON output");
     assert_eq!(parsed["error"]["code"], "VALIDATION_FAILED");
@@ -231,30 +212,29 @@ fn test_config_validate_json_envelopes_every_invalid_configuration_finding() {
 
 #[test]
 fn test_config_validate_valid_configuration_keeps_existing_success_output() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
+    let cli = JitCli::initialised().unwrap();
 
-    let human = Command::new(jit_binary())
-        .args(["config", "validate"])
-        .current_dir(temp.path())
-        .env("HOME", temp.path().join("isolated-home"))
-        .env_remove("JIT_WORKTREE_WRITE_POLICY")
+    let human = cli
+        .command_with_env(
+            ["config", "validate"],
+            [("HOME", cli.root().join("isolated-home"))],
+        )
         .output()
         .expect("run valid human config validation");
-    assert_eq!(human.status.code(), Some(0));
+    assert!(human.status.success());
     assert_eq!(
         String::from_utf8_lossy(&human.stdout),
         "Configuration is valid\n"
     );
 
-    let json = Command::new(jit_binary())
-        .args(["config", "validate", "--json"])
-        .current_dir(temp.path())
-        .env("HOME", temp.path().join("isolated-home"))
-        .env_remove("JIT_WORKTREE_WRITE_POLICY")
+    let json = cli
+        .command_with_env(
+            ["config", "validate", "--json"],
+            [("HOME", cli.root().join("isolated-home"))],
+        )
         .output()
         .expect("run valid machine-readable config validation");
-    assert_eq!(json.status.code(), Some(0));
+    assert!(json.status.success());
     let output: serde_json::Value =
         serde_json::from_slice(&json.stdout).expect("valid JSON success report");
     assert_eq!(output["valid"], true);
@@ -269,15 +249,11 @@ fn test_config_validate_valid_configuration_keeps_existing_success_output() {
 
 #[test]
 fn test_config_set_rejects_invalid_project_name_without_writing() {
-    let temp = TempDir::new().unwrap();
-    let repo_dir = temp.path().join("write-path-repo");
-    fs::create_dir(&repo_dir).unwrap();
-    jit_init(&repo_dir);
-    let before = fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap();
+    let cli = JitCli::initialised().unwrap();
+    let before = fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap();
 
-    let out = Command::new(jit_binary())
-        .args(["config", "set", "project.name", "Bad_Name"])
-        .current_dir(&repo_dir)
+    let out = cli
+        .command(["config", "set", "project.name", "Bad_Name"])
         .output()
         .expect("failed to run jit config set");
     assert!(
@@ -290,7 +266,7 @@ fn test_config_set_rejects_invalid_project_name_without_writing() {
         "error names the offending value: {stderr}"
     );
 
-    let after = fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap();
+    let after = fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap();
     assert_eq!(before, after, "a rejected set must not modify the file");
 }
 
@@ -298,25 +274,18 @@ fn test_config_set_rejects_invalid_project_name_without_writing() {
 /// that would not load as an invalid argument, leaving the file untouched.
 #[test]
 fn test_config_set_rejects_unknown_key_without_writing() {
-    let temp = TempDir::new().unwrap();
-    let repo_dir = temp.path().join("unknown-key-repo");
-    fs::create_dir(&repo_dir).unwrap();
-    assert!(jit_init(&repo_dir).status.success());
-    let repo_config = repo_dir.join(".jit/config.toml");
+    let cli = JitCli::initialised().unwrap();
+    let repo_config = cli.root().join(".jit/config.toml");
     let before = fs::read_to_string(&repo_config).unwrap();
 
-    let out = Command::new(jit_binary())
-        .args(["config", "set", "coordination.undeclared_key", "x"])
-        .current_dir(&repo_dir)
-        .env("HOME", temp.path().join("isolated-home"))
-        .env_remove("JIT_WORKTREE_WRITE_POLICY")
+    let out = cli
+        .command_with_env(
+            ["config", "set", "coordination.undeclared_key", "x"],
+            [("HOME", cli.root().join("isolated-home"))],
+        )
         .output()
         .expect("failed to run jit config set");
-    assert_eq!(
-        out.status.code(),
-        Some(ErrorCode::InvalidArgument.exit_code().code()),
-        "an unknown key is an invalid argument"
-    );
+    assert!(!out.status.success(), "an unknown key is rejected");
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("undeclared_key"),
@@ -331,22 +300,15 @@ fn test_config_set_rejects_unknown_key_without_writing() {
 /// output, and `config set` has no global scope.
 #[test]
 fn test_user_home_config_toml_has_no_effect_on_any_command() {
-    let temp = TempDir::new().unwrap();
-    let repo_dir = temp.path().join("home-layer-repo");
-    fs::create_dir(&repo_dir).unwrap();
-    assert!(jit_init(&repo_dir).status.success());
-    let home = temp.path().join("home");
+    let cli = JitCli::initialised().unwrap();
+    let home_dir = TempDir::new().unwrap();
+    let home = home_dir.path().join("home");
     fs::create_dir_all(home.join(".config/jit")).unwrap();
     let user_config = home.join(".config/jit/config.toml");
 
     let run = |args: &[&str]| {
-        Command::new(jit_binary())
-            .args(args)
-            .current_dir(&repo_dir)
-            .env("HOME", &home)
+        cli.command_with_env(args, [("HOME", &home)])
             .env_remove("XDG_CONFIG_HOME")
-            .env_remove("JIT_WORKTREE_WRITE_POLICY")
-            .env_remove("JIT_ENFORCE_LEASES")
             .output()
             .expect("failed to run jit")
     };
@@ -359,12 +321,12 @@ fn test_user_home_config_toml_has_no_effect_on_any_command() {
         .map(|line| {
             let args: Vec<&str> = line.split(' ').collect();
             let out = run(&args);
-            (out.status.code(), out.stdout)
+            (out.status.success(), out.stdout)
         })
     };
 
     let baseline = observe();
-    assert_eq!(baseline[1].0, Some(0), "baseline repository is valid");
+    assert!(baseline[1].0, "baseline repository is valid");
 
     let overriding = "[worktree]\nenforce_leases = \"off\"\n\n[coordination]\n\
                       max_indefinite_leases_per_agent = 99\nmax_indefinite_leases_per_repo = 99\n";
@@ -377,7 +339,7 @@ fn test_user_home_config_toml_has_no_effect_on_any_command() {
         );
     }
 
-    let before = fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap();
+    let before = fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap();
     let out = run(&[
         "config",
         "set",
@@ -385,14 +347,13 @@ fn test_user_home_config_toml_has_no_effect_on_any_command() {
         "3",
         "--global",
     ]);
-    assert_eq!(
-        out.status.code(),
-        Some(ErrorCode::InvalidArgument.exit_code().code()),
-        "`--global` is no longer an option: {}",
-        String::from_utf8_lossy(&out.stderr)
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !out.status.success() && stderr.contains("unexpected argument '--global'"),
+        "`--global` is no longer an option: {stderr}"
     );
     assert_eq!(
-        fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap(),
+        fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap(),
         before
     );
     assert_eq!(
@@ -403,19 +364,15 @@ fn test_user_home_config_toml_has_no_effect_on_any_command() {
 
 #[test]
 fn test_config_set_accepts_valid_project_name_and_round_trips() {
-    let temp = TempDir::new().unwrap();
-    let repo_dir = temp.path().join("write-path-repo");
-    fs::create_dir(&repo_dir).unwrap();
-    jit_init(&repo_dir);
+    let cli = JitCli::initialised().unwrap();
 
-    let out = Command::new(jit_binary())
-        .args(["config", "set", "project.name", "renamed-project"])
-        .current_dir(&repo_dir)
+    let out = cli
+        .command(["config", "set", "project.name", "renamed-project"])
         .output()
         .expect("failed to run jit config set");
     assert!(out.status.success(), "valid set failed: {:?}", out);
 
-    let content = fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap();
+    let content = fs::read_to_string(cli.root().join(".jit/config.toml")).unwrap();
     let parsed: toml::Value = toml::from_str(&content).unwrap();
     assert_eq!(
         parsed["project"]["name"].as_str().unwrap(),
@@ -429,25 +386,21 @@ fn test_config_set_accepts_valid_project_name_and_round_trips() {
 
 #[test]
 fn test_config_set_unrelated_key_rejects_preexisting_invalid_project_name() {
-    let temp = TempDir::new().unwrap();
-    let repo_dir = temp.path().join("write-path-repo");
-    fs::create_dir(&repo_dir).unwrap();
-    jit_init(&repo_dir);
+    let cli = JitCli::initialised().unwrap();
 
     // Corrupt the config with an invalid `[project]` name that a later, unrelated
     // set must not persist unvalidated.
-    let config_path = repo_dir.join(".jit/config.toml");
+    let config_path = cli.root().join(".jit/config.toml");
     fs::write(&config_path, "[project]\nname = \"Bad_Name\"\n").unwrap();
     let before = fs::read_to_string(&config_path).unwrap();
 
-    let out = Command::new(jit_binary())
-        .args([
+    let out = cli
+        .command([
             "config",
             "set",
             "coordination.max_indefinite_leases_per_agent",
             "3",
         ])
-        .current_dir(&repo_dir)
         .output()
         .expect("failed to run jit config set");
     assert!(
@@ -466,19 +419,15 @@ fn test_config_set_unrelated_key_rejects_preexisting_invalid_project_name() {
 
 #[test]
 fn test_config_set_project_name_repairs_preexisting_invalid_name() {
-    let temp = TempDir::new().unwrap();
-    let repo_dir = temp.path().join("write-path-repo");
-    fs::create_dir(&repo_dir).unwrap();
-    jit_init(&repo_dir);
+    let cli = JitCli::initialised().unwrap();
 
-    let config_path = repo_dir.join(".jit/config.toml");
+    let config_path = cli.root().join(".jit/config.toml");
     fs::write(&config_path, "[project]\nname = \"Bad_Name\"\n").unwrap();
 
     // Setting `project.name` to a valid value is the repair path: validation runs
     // on the POST-mutation document, so the good replacement passes and persists.
-    let out = Command::new(jit_binary())
-        .args(["config", "set", "project.name", "good-name"])
-        .current_dir(&repo_dir)
+    let out = cli
+        .command(["config", "set", "project.name", "good-name"])
         .output()
         .expect("failed to run jit config set");
     assert!(

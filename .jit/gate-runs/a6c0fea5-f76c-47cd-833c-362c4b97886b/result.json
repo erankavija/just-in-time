@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-acb38457",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a5db61b0bd36c051f7eeb16d47b28261d871f659",
+  "completed_at": "2026-10-25T06:06:00.462484436Z",
+  "duration_ms": 82622,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied; EdgeView now delegates to its node and prior findings are addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "acb38457-0d4a-47e6-b8ea-cab3a92b7676",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a6c0fea5-f76c-47cd-833c-362c4b97886b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-25T06:04:37.840312676Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b93356e1a, e96302bf5, a5db61b0b (`jit:acb38457`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md; .jit/issues/acb38457-0d4a-47e6-b8ea-cab3a92b7676.json\nResolved items: @/issue/acb38457/requirement/REQ-01, REQ-02; @/issue/2195c98f/requirement/REQ-01; @/invariant/semantic-types, essential-code-prose, semantic-test-assertions, orthogonal-tests, architecture-dependency-direction; @/charter/D-18; @/gate/cargo-ci\nGate evidence: cargo-ci passed (exit 0, 2026-10-25T06:03:16Z); prior code-review failed (exit 1, structured findings addressed)\nTruncation recovery: narrowed current reads of graph/mod.rs, graph/hierarchy.rs, and hierarchy vector fixtures\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; EdgeView now delegates to its node and prior findings are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

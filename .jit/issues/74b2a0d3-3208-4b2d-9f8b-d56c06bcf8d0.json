@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-27T00:05:38.572334673Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Move the gate-check, issue, item, executor and snapshot command unit tests from the library's own issue-construction fixture to the shared one.\n\n## Background\n\nShared test support (`crate::test_utils`) defines `fixture_issue(title, description)`, which drafts an issue and assigns it a random UUID. Copies with the same body still exist. The library copy is the `pub(crate)` `fixture_issue` in `crates/jit/src/domain/types.rs`, called as `crate::domain::types::fixture_issue` from the unit-test modules in the footprint.\n\nThis entry covers `item.rs`, `mod.rs`, `gate_check.rs`, `issue.rs`, `snapshot.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test modules in this entry's footprint call `crate::test_utils::fixture_issue`, and none calls `crate::domain::types::fixture_issue`; call sites change only their path.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
   "documents": [],
+  "done_at": "2026-10-27T00:32:38.059777381Z",
   "first_ready_at": "2026-10-22T15:28:23.751654696Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5e67fd04-5c90-494f-8eb2-033da4650bc1",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:27:02.373501201Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9059efa1-88e9-4f4d-b9aa-c9858754e87d",
+      "status": "passed",
+      "updated_at": "2026-10-27T00:30:30.903998234Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "74b2a0d3-3208-4b2d-9f8b-d56c06bcf8d0",
   "labels": [
     "type:task",
@@ -25,7 +40,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Gate-check, issue, item, executor and snapshot command unit tests use the shared issue fixture",
-  "updated_at": "2026-10-22T15:28:23.751654696Z"
+  "updated_at": "2026-10-27T00:32:38.059777381Z"
 }

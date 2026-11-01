@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-29T07:06:13.951411662Z",
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
@@ -8,11 +9,26 @@
   ],
   "description": "Remove numeric exit-code assertions that re-prove projected rows from the `cli_repo_workflow` suite, keeping each test's own property and its error-class evidence.\n\n## Background\n\nThe exit-code projection suite (`cli_issue/command_exit_code_projection_tests.rs`) binds each command-to-exit-code row in both invocation forms, and its wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command. Outside it, a subprocess test asserts success or failure and the property it adds, such as a JSON verdict, an error envelope code, remediation text or empty stdout. It names a numeric exit code only for a command and code pair the projection has no row for. The sweep counts numeric `.code(N)`, single- and multi-line `status.code()` comparisons with `Some(...)` (literal, `ExitCode::X` or derived), symbolic `ExitCode::X.code()`, and helpers that take an expected code.\n\nExit-code assertion sites in `crates/jit/tests/cli_repo_workflow`: `profile_cli_tests.rs` (9), `claim_integration_tests.rs` (5), `config_get_tests.rs` (4), `project_config_tests.rs` (4), `serve_cli_tests.rs` (2), `first_guess_residuals_test.rs` (1), `format_compat_cli_tests.rs` (1), `integration_test.rs` (1), `lock_contention_tests.rs` (1), `profile_concurrency_tests.rs` (1), `repo_discovery_tests.rs` (1), `worktree_cli_tests.rs` (1), `profile_acceptance_tests.rs` (1). `profile_acceptance_tests.rs` asserts through its `failed_json_with_path` helper (`:105`), which takes an expected code. `repo_discovery_tests.rs:355` (not-found rather than generic error), `lock_contention_tests.rs:66` and `profile_concurrency_tests.rs:119` (lock timeout) use the code as their error-class evidence.\n\nThis entry covers `claim_integration_tests.rs`, `lock_contention_tests.rs`, `repo_discovery_tests.rs`, `worktree_cli_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts a numeric exit code for a command and code pair the projection binds; each asserts success or failure instead.\n- [hard] REQ-02: Where a numeric exit code was a test's only evidence of which error class its path takes, the test asserts that class another way, such as the `error.code` of the `--json` envelope, instead of bare failure.\n- [hard] REQ-03: Each edited test keeps the other properties it asserted, and a test whose only assertion was a projected exit code with no class to preserve no longer exists.\n",
   "documents": [],
+  "done_at": "2026-10-29T07:30:26.408416296Z",
+  "first_ready_at": "2026-10-29T07:29:57.927504808Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d630bb43-9852-41c5-8b1d-e44e9877b8be",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:25:25.246652327Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9f1913d9-2b08-46da-bc5a-e2bc775f222a",
+      "status": "passed",
+      "updated_at": "2026-10-29T07:26:33.957201918Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6a13eeac-f6e6-4da3-93b5-6432f06b3f6f",
   "labels": [
     "type:task",
@@ -26,7 +42,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Claim, lock and discovery tests stop re-asserting projected exit codes",
-  "updated_at": "2026-10-22T14:27:42.375050721Z"
+  "updated_at": "2026-10-29T07:30:26.408416296Z"
 }

@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fd77e353920c9459393db00ef5585ec0afdd806b",
+  "completed_at": "2026-10-26T23:39:30.057835598Z",
+  "duration_ms": 103372,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/gate_field_contract_test.rs",
+        "id": "F1",
+        "line": 85,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/5f4daf6b/requirement/REQ-01",
+          "@/issue/5f4daf6b/requirement/REQ-04",
+          "@/invariant/shared-test-contracts",
+          "@/charter/D-18"
+        ],
+        "severity": "high",
+        "summary": "gate_field_contract_test.rs recreates taxonomy repository setup inline in 16 tests rather than using the shared fixture."
+      }
+    ],
+    "summary": "The gate-field migration still duplicates local taxonomy repository setup instead of using the shared fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5f4daf6b-0f7f-4900-aa7f-689f9b6709c4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "77ad1d39-f8ba-4dad-8af1-61ececd2a882",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-26T23:37:46.685282936Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14392 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a17a93-c466-7f41-b30b-4d83f3c68a14\n--------\nuser\n--- 14379 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c8d04c4fa29bcb846a1aca67c53d60acacd994a6; fd77e353920c9459393db00ef5585ec0afdd806b (landing merge; no later scoped-file delta)\nPolicy sources: AGENTS.md\nResolved items: @/issue/5f4daf6b/requirement/REQ-01–REQ-04 (.jit/issues/5f4daf6b-0f7f-4900-aa7f-689f9b6709c4.json); @/issue/c780514e/requirement/REQ-05–REQ-06 (.jit/issues/c780514e-8491-40a7-8844-3974bba91257.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-10-26T23:37:30Z; exit code none); code-review pending (no prior run)\nTruncation recovery: per-file c8d04c4f patches and bounded current-file reads for all six scoped tests; scoped c8d04c4f-to-HEAD comparison\n\n1. **Blocking, issue-impact** — `gate_field_contract_test.rs` recreates the taxonomy repository setup inline 16 times (`declaration_dir`, direct `TaxonomyRepo` construction, and `jit init`) rather than using the shared `setup_test_repo_with_taxonomy` fixture. This retains the local repository setup this migration must remove and bypasses the shared fixture’s construction contract. Use the shared taxonomy repository fixture, then wrap its temporary directory with `JitCli` for subprocesses. References: `@/issue/5f4daf6b/requirement/REQ-01`, `@/issue/5f4daf6b/requirement/REQ-04`, `@/invariant/shared-test-contracts`, `@/charter/D-18`. [gate_field_contract_test.rs:85](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/gate_field_contract_test.rs:85)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The gate-field migration still duplicates local taxonomy repository setup instead of using the shared fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"gate_field_contract_test.rs recreates taxonomy repository setup inline in 16 tests rather than using the shared fixture.\",\"file\":\"crates/jit/tests/cli_issue/gate_field_contract_test.rs\",\"line\":85,\"references\":[\"@/issue/5f4daf6b/requirement/REQ-01\",\"@/issue/5f4daf6b/requirement/REQ-04\",\"@/invariant/shared-test-contracts\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

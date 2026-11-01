@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8a105a0fc30d5ee04dac198818e09455f5685666",
+  "completed_at": "2026-10-27T00:30:30.648908286Z",
+  "duration_ms": 206980,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five scoped test modules use the shared fixture and preserve their assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "74b2a0d3-3208-4b2d-9f8b-d56c06bcf8d0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9059efa1-88e9-4f4d-b9aa-c9858754e87d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-27T00:27:03.668233988Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ff47fbe47; 8a105a0fc (merge integration)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c780514e/requirement/REQ-06 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-27T00:25:37Z); code-review pending\nTruncation recovery: Re-read direct commit patches per affected file; isolated merge-only item/mod changes to separately tagged commits\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five scoped test modules use the shared fixture and preserve their assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
