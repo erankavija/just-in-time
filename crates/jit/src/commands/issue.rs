@@ -930,7 +930,7 @@ mod tests {
         let mut registry = storage.load_gate_registry().unwrap();
         for key in ["tests", "code-review"] {
             registry.gates.insert(
-                key.to_string(),
+                key.parse().unwrap(),
                 GateDefinition {
                     version: 1,
                     key: key.parse().unwrap(),
@@ -1212,7 +1212,7 @@ mod tests {
         // Define a manual precheck gate (TDD reminder)
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "tdd-reminder".to_string(),
+            "tdd-reminder".parse().unwrap(),
             GateDefinition {
                 version: 1,
                 key: "tdd-reminder".parse().unwrap(),
@@ -1279,7 +1279,7 @@ mod tests {
         // Define a manual precheck gate
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "tdd-reminder".to_string(),
+            "tdd-reminder".parse().unwrap(),
             GateDefinition {
                 version: 1,
                 key: "tdd-reminder".parse().unwrap(),
@@ -1546,7 +1546,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut registry = storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "manual-start".to_string(),
+            "manual-start".parse().unwrap(),
             GateDefinition {
                 version: 1,
                 key: "manual-start".parse().unwrap(),

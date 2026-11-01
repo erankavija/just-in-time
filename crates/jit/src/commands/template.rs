@@ -1166,7 +1166,7 @@ fn attach_captured_gates(
                                 0,
                                 EventBody::draft_gate_definition_created(gate.key.clone()),
                             ));
-                            registry.gates.insert(gate.key.to_string(), gate.clone());
+                            registry.gates.insert(gate.key.clone(), gate.clone());
                         }
                         gate.key
                     })

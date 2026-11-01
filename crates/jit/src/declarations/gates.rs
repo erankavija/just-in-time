@@ -157,7 +157,7 @@ fn default_gate_priority() -> u32 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct GateRegistry {
     /// Gate key to definition.
-    pub gates: HashMap<String, GateDefinition>,
+    pub gates: HashMap<GateKey, GateDefinition>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -174,7 +174,7 @@ pub fn parse_gate_registry(bytes: &[u8]) -> Result<GateRegistry, GateDeclaration
         .into_iter()
         .try_fold(GateRegistry::default(), |mut registry, gate| {
             let key = gate.key.clone();
-            if registry.gates.insert(key.to_string(), gate).is_some() {
+            if registry.gates.insert(key.clone(), gate).is_some() {
                 Err(GateDeclarationError::DuplicateKey(key))
             } else {
                 Ok(registry)
@@ -365,8 +365,8 @@ mode = "manual"
         };
         let registry = GateRegistry {
             gates: HashMap::from([
-                ("zeta".to_string(), gate("zeta")),
-                ("alpha".to_string(), gate("alpha")),
+                ("zeta".parse().unwrap(), gate("zeta")),
+                ("alpha".parse().unwrap(), gate("alpha")),
             ]),
         };
         let bytes = serialize_gate_registry(&registry).unwrap();

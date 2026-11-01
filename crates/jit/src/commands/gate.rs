@@ -441,7 +441,7 @@ fn derive_gate_preset_application(
         let existed = registry.gates.contains_key(gate.key.as_str());
         if timeout_override.is_some() || !existed {
             edits_registry = true;
-            registry.gates.insert(gate.key.to_string(), gate.clone());
+            registry.gates.insert(gate.key.clone(), gate.clone());
             intents.push(MutationIntent::RecordEvent {
                 phase: 0,
                 event: Box::new(if existed {
@@ -637,7 +637,7 @@ fn derive_gate_registry_mutation(
             }
             registry
                 .gates
-                .insert(definition.key.to_string(), definition.clone());
+                .insert(definition.key.clone(), definition.clone());
             (
                 EventBody::draft_gate_definition_created(definition.key.clone()),
                 CapturedGateRegistryOutcome::Defined,
@@ -646,11 +646,11 @@ fn derive_gate_registry_mutation(
         CapturedGateRegistryMutation::Update { key, update } => {
             let current = registry
                 .gates
-                .get(key)
+                .get(key.as_str())
                 .cloned()
                 .ok_or_else(|| crate::storage::GateNotFoundError::by_key(key))?;
             let updated = updated_gate_definition(current, update.clone())?;
-            registry.gates.insert(key.clone(), updated.clone());
+            registry.gates.insert(updated.key.clone(), updated.clone());
             (
                 EventBody::draft_gate_definition_updated(updated.key.clone()),
                 CapturedGateRegistryOutcome::Updated(Box::new(updated)),
@@ -659,7 +659,7 @@ fn derive_gate_registry_mutation(
         CapturedGateRegistryMutation::Remove { key } => {
             let removed = registry
                 .gates
-                .remove(key)
+                .remove(key.as_str())
                 .ok_or_else(|| crate::storage::GateNotFoundError::by_key(key))?;
             (
                 EventBody::draft_gate_definition_removed(removed.key),
@@ -816,7 +816,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let registry = self.storage.load_gate_registry()?;
         let gate = registry
             .gates
-            .get(&gate_key)
+            .get(gate_key.as_str())
             .ok_or_else(|| crate::storage::GateNotFoundError::single(&gate_key))?;
 
         // Check if gate is automated - if so, run the checker instead
@@ -976,7 +976,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Check if gate is automated - reject manual pass/fail
         let registry = self.storage.load_gate_registry()?;
-        if let Some(gate) = registry.gates.get(&gate_key) {
+        if let Some(gate) = registry.gates.get(gate_key.as_str()) {
             if gate.mode == GateMode::Auto {
                 return Err(anyhow!(
                     "Gate '{}' is automated and cannot be manually failed. Use 'jit gate evaluate {} {}' to run the checker.",
@@ -1403,7 +1403,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .map(|gate_key| {
                     let gate = registry
                         .gates
-                        .get(gate_key)
+                        .get(gate_key.as_str())
                         .ok_or_else(|| crate::storage::GateNotFoundError::in_registry(gate_key))?;
                     Ok(GateTemplate {
                         key: gate.key.clone(),
@@ -1446,7 +1446,7 @@ mod tests {
         // Define an automated gate that will pass
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "auto-gate".to_string(),
+            "auto-gate".parse().unwrap(),
             GateDefinition {
                 version: 1,
                 key: "auto-gate".parse().unwrap(),
@@ -1503,7 +1503,7 @@ mod tests {
     fn define_manual_gate(executor: &CommandExecutor<InMemoryStorage>, key: &str) {
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            key.to_string(),
+            key.parse().unwrap(),
             GateDefinition {
                 version: 1,
                 key: key.parse().unwrap(),
@@ -1575,7 +1575,7 @@ mod tests {
         // Define an automated gate that will fail
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "auto-gate".to_string(),
+            "auto-gate".parse().unwrap(),
             GateDefinition {
                 version: 1,
                 key: "auto-gate".parse().unwrap(),
@@ -1635,7 +1635,7 @@ mod tests {
         // Define a manual gate
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            "manual-gate".to_string(),
+            "manual-gate".parse().unwrap(),
             GateDefinition {
                 version: 1,
                 key: "manual-gate".parse().unwrap(),
@@ -2131,7 +2131,7 @@ mod tests {
 
         let mut concurrent = crate::declarations::GateRegistry::default();
         concurrent.gates.insert(
-            "theirs".to_string(),
+            "theirs".parse().unwrap(),
             GateDefinition {
                 version: 1,
                 key: "theirs".parse().unwrap(),

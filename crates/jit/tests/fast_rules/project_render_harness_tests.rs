@@ -234,7 +234,7 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
     let storage = InMemoryStorage::new();
     let mut registry = GateRegistry::default();
     registry.gates.insert(
-        "cargo-ci".to_string(),
+        "cargo-ci".parse().unwrap(),
         manual_gate("cargo-ci", "Cargo CI", "fmt + clippy"),
     );
     let executor = memory_executor_declaring(

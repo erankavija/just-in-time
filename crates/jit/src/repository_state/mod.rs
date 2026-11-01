@@ -1361,7 +1361,7 @@ mod tests {
         let mut mismatched = GateRegistry::default();
         mismatched
             .gates
-            .insert("distinct".to_string(), gate_definition("distinct"));
+            .insert("distinct".parse().unwrap(), gate_definition("distinct"));
         let declarations = RepositoryDeclarations {
             configuration: &configuration,
             gates: &mismatched,

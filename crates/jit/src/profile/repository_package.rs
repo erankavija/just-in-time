@@ -1778,7 +1778,7 @@ mod tests {
         ] {
             gates
                 .gates
-                .insert(key.to_string(), declared_gate(&package, key));
+                .insert(key.parse().unwrap(), declared_gate(&package, key));
         }
         let expected = render_rules_and_gates_markdown(&rules, &gates, ProjectionStyle::Full);
         assert_eq!(

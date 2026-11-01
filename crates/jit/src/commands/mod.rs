@@ -651,7 +651,7 @@ fn has_broad_precheck(issue: &Issue, registry: &crate::declarations::GateRegistr
     issue
         .gates_required
         .iter()
-        .filter_map(|key| registry.gates.get(key))
+        .filter_map(|key| registry.gates.get(key.as_str()))
         .any(|gate| {
             gate.stage == crate::declarations::GateStage::Precheck
                 && is_broad_builtin_precheck(gate)
@@ -670,7 +670,7 @@ fn captured_precheck_plan(
     let gates = issue
         .gates_required
         .iter()
-        .filter_map(|key| registry.gates.get(key).map(|gate| (key, gate)))
+        .filter_map(|key| registry.gates.get(key.as_str()).map(|gate| (key, gate)))
         .filter(|(_, gate)| gate.stage == GateStage::Precheck)
         .collect::<Vec<_>>();
     let broad_builtin = has_broad_precheck(issue, registry);
@@ -1327,7 +1327,7 @@ fn derive_field_update(
     let missing_gates = request
         .add_gates
         .iter()
-        .filter(|key| !evidence.declarations.gates.gates.contains_key(*key))
+        .filter(|key| !evidence.declarations.gates.gates.contains_key(key.as_str()))
         .cloned()
         .collect::<Vec<_>>();
     if !missing_gates.is_empty() {
@@ -1640,7 +1640,7 @@ fn apply_captured_issue_mutation(
         CapturedIssueMutation::AddGates { gate_keys, .. } => {
             let missing = gate_keys
                 .iter()
-                .filter(|key| !registry.gates.contains_key(*key))
+                .filter(|key| !registry.gates.contains_key(key.as_str()))
                 .cloned()
                 .collect::<Vec<_>>();
             if !missing.is_empty() {
@@ -1664,7 +1664,7 @@ fn apply_captured_issue_mutation(
             }
             let events = added
                 .iter()
-                .filter_map(|key| registry.gates.get(key))
+                .filter_map(|key| registry.gates.get(key.as_str()))
                 .map(|gate| {
                     (
                         1,
@@ -1728,7 +1728,7 @@ fn apply_captured_issue_mutation(
             }
             let gate = registry
                 .gates
-                .get(gate_key)
+                .get(gate_key.as_str())
                 .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
             if gate.mode == GateMode::Auto {
                 return Err(anyhow!(
@@ -1804,7 +1804,7 @@ fn unpassed_gate_blockers(
                 .unwrap_or(GateStatus::Pending);
             let mode = registry
                 .gates
-                .get(&gate_key)
+                .get(gate_key.as_str())
                 .map(|gate| gate.mode)
                 .unwrap_or(GateMode::Manual);
             (gate_key, status, mode)
@@ -3818,7 +3818,7 @@ mod tests {
         storage.add_worktree_file("start-prompt.md", "captured prompt");
         let mut registry = GateRegistry::default();
         registry.gates.insert(
-            "auto-start".to_string(),
+            "auto-start".parse().unwrap(),
             GateDefinition {
                 version: 1,
                 key: "auto-start".parse().unwrap(),
@@ -3841,7 +3841,7 @@ mod tests {
             },
         );
         registry.gates.insert(
-            "manual-start".to_string(),
+            "manual-start".parse().unwrap(),
             GateDefinition {
                 version: 1,
                 key: "manual-start".parse().unwrap(),
@@ -3987,7 +3987,7 @@ mod tests {
             inputs: None,
         };
         GateRegistry {
-            gates: std::collections::HashMap::from([(key.to_string(), definition)]),
+            gates: std::collections::HashMap::from([(key.parse().unwrap(), definition)]),
         }
     }
 

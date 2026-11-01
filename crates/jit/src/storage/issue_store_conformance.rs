@@ -483,7 +483,7 @@ fn test_list_issues_is_empty_before_any_issue_is_published<B: Backend>() {
 fn test_load_gate_registry_reads_the_declared_gates_and_none_when_absent<B: Backend>() {
     let gate = ci_preset().gates[0].to_gate();
     let registry = GateRegistry {
-        gates: [(gate.key.to_string(), gate)].into_iter().collect(),
+        gates: [(gate.key.clone(), gate)].into_iter().collect(),
     };
     let declared = Repository::<B>::seeded(&[(
         VirtualPath::GATES,

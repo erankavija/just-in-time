@@ -420,6 +420,14 @@ impl GateKey {
     }
 }
 
+/// Lets a string-held key address a `GateKey`-keyed map; the derived `Hash` and
+/// `Eq` delegate to the inner string, as `Borrow` requires.
+impl std::borrow::Borrow<str> for GateKey {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
 impl TryFrom<&str> for GateKey {
     type Error = InvalidGateKeyError;
 
@@ -544,6 +552,13 @@ mod tests {
             assert_eq!(serde_json::from_value::<GateKey>(encoded).unwrap(), key);
             assert_eq!(String::from(key), input);
         }
+    }
+
+    #[test]
+    fn test_gate_key_keyed_map_resolves_a_str_lookup_through_borrow() {
+        let map = std::collections::HashMap::from([(GateKey::try_from("cargo-ci").unwrap(), 1)]);
+        assert_eq!(map.get("cargo-ci"), Some(&1));
+        assert_eq!(map.get("other"), None);
     }
 
     #[test]

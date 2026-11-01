@@ -442,7 +442,7 @@ fn validate_integrity(
             }
         }
         for gate in &issue.gates_required {
-            if !gates.gates.contains_key(gate) {
+            if !gates.gates.contains_key(gate.as_str()) {
                 return Err(anyhow!(
                     "Gate '{}' required by issue '{}' is not defined in registry",
                     gate,
@@ -597,7 +597,7 @@ fn collect_enforcement_drift_findings(
 
     let rule_names: Option<BTreeSet<&str>> =
         rules.map(|rules| rules.rules.iter().map(|rule| rule.name.as_str()).collect());
-    let gate_keys: BTreeSet<&str> = gates.gates.keys().map(String::as_str).collect();
+    let gate_keys: BTreeSet<&str> = gates.gates.keys().map(|key| key.as_str()).collect();
     enforcement_drift(
         &config.invariants.invariants,
         rule_names
