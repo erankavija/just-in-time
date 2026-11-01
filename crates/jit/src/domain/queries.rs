@@ -944,6 +944,23 @@ mod tests {
     }
 
     #[test]
+    fn test_query_blocked_omits_done_dependency_from_reasons() {
+        let done = state_issue(0, State::Done);
+        let open = state_issue(1, State::InProgress);
+        let blocked = dependent_of(2, &[&done, &open]);
+        let reason = BlockingReason::Dependency {
+            id: open.id.clone(),
+            title: open.title.clone(),
+            state: State::InProgress,
+        };
+
+        let result = query_blocked(&[done, open, blocked]);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].1, [reason]);
+    }
+
+    #[test]
     fn test_query_blocked_omits_rejected_dependency_from_reasons() {
         // A Rejected dependency is met: only the in_progress one is a reason.
         let mut rejected = crate::test_utils::fixture_issue("Abandoned".to_string(), String::new());
