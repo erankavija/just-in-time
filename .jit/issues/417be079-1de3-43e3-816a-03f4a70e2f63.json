@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1182e06b-d487-4ac4-96e5-2b6e0d4c5fe1",
+      "status": "passed",
+      "updated_at": "2026-11-01T03:49:17.859960521Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "417be079-1de3-43e3-816a-03f4a70e2f63",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Issue gate fields are keyed by GateKey",
-  "updated_at": "2026-11-01T03:46:17.019349411Z"
+  "updated_at": "2026-11-01T03:49:17.859960521Z"
 }
