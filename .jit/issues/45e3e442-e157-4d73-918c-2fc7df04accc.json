@@ -4,6 +4,7 @@
   "context": {},
   "created_at": "2026-10-22T14:27:42.375050721Z",
   "dependencies": [
+    "4269f866-4107-429d-ae5b-06dfdfd290de",
     "7721a2a9-76ef-469c-b2d9-5e4d59f3eccc",
     "8c6adea6-3c14-48c8-a25e-bcba658c0570",
     "d6635a93-822d-4f64-b171-f4485dde4a10"
@@ -34,5 +35,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "The default suite runs within its time and footprint budgets",
-  "updated_at": "2026-11-01T08:03:33.451538225Z"
+  "updated_at": "2026-11-01T09:23:07.765103047Z"
 }
