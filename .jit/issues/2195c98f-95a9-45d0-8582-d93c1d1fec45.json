@@ -37,15 +37,15 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "run_id": "f6918ce9-19ed-4a4d-a9f9-f3adcec07de5",
-      "status": "failed",
-      "updated_at": "2026-11-01T04:49:03.377500341Z",
+      "run_id": "8e445bfa-633d-440f-b848-c03ade9c6672",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:28:45.465794931Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
-      "run_id": "a5d00b98-0383-45ab-b90f-c8536dd9d0ec",
+      "run_id": "ef0fd351-e5ef-4949-9c3a-fb33cb8f3540",
       "status": "passed",
-      "updated_at": "2026-11-01T04:44:39.421504132Z",
+      "updated_at": "2026-11-01T05:26:20.931671524Z",
       "updated_by": "auto:executor"
     }
   },
@@ -63,5 +63,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-11-01T05:26:05.801104493Z"
+  "updated_at": "2026-11-01T05:28:45.465794931Z"
 }
