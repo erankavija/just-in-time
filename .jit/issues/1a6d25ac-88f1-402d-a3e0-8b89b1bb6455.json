@@ -1,9 +1,10 @@
 {
-  "assignee": null,
+  "assignee": "agent:gf2-record-repair",
+  "claimed_at": "2026-11-01T14:08:21.757246106Z",
   "context": {},
   "created_at": "2026-11-01T13:24:02.039097168Z",
   "dependencies": [],
-  "description": "Bring gf2's stored records to canonical writer form so whole-repository `jit validate` passes there under the current binary. This repository owns the verified procedure; the rewrite itself runs in gf2 with its owner's approval.\n\n## Background\n\nRecord-fidelity validation rejects gf2's records written by older writers: event lines with an earlier key order, issue timestamps spelled `+00:00`, and one empty gate-run directory. Events are merged with `merge=union`, so rewriting the log on main while unmerged branches append to it can duplicate events unless each branch is canonicalized before it merges.\n\n## Success Criteria\n\n- [hard] REQ-01: A test on a clone with a real unmerged gf2 branch shows what merging produces after the rewrite, and the outcome is reported.\n- [hard] REQ-02: One per-branch script applies the gate-key rename and record canonicalization, covers gate-run records, and a second run changes nothing.\n- [hard] REQ-03: Whole-repository `jit validate` passes on gf2 main under the installed binary.\n\n## Notes\n\nThe rewrite and removal of the empty gate-run directory need approval from gf2's owner. No product repair path is added: records from older writers are repaired per repository.",
+  "description": "Bring gf2's stored records to canonical writer form so whole-repository `jit validate` passes there under the current binary. This repository owns the verified procedure; the rewrite itself runs in gf2 with its owner's approval.\n\n## Background\n\nRecord-fidelity validation rejects gf2's records written by older writers: event lines with an earlier key order, issue timestamps spelled `+00:00`, and one empty gate-run directory. Events are merged with `merge=union`, and merge tests on real gf2 branches show that running a rewrite or the gate-key rename on a branch multiplies duplicated events, while merging an unmodified branch adds none on 60 of 68 branches.\n\n## Success Criteria\n\n- [hard] REQ-01: A test on a clone with a real unmerged gf2 branch shows what merging produces after the rewrite, and the outcome is reported.\n- [hard] REQ-02: One main-only script canonicalizes records, covers gate-run records, and a second run changes nothing; branches merge main unmodified.\n- [hard] REQ-03: Whole-repository `jit validate` passes on gf2 main under the installed binary.\n\n## Notes\n\nThe rewrite and removal of the empty gate-run directory need approval from gf2's owner. No product repair path is added: records from older writers are repaired per repository.\n\nThe gate-key rename and this rewrite stay separate scripts. Eight stale branches do not merge cleanly: `formal-verification` and `worktree-agent-{0a357f94,85fc5ff4,9fb40c83,b64dc9c4,b9302771,c04dd4ac}` need `--dedupe-events` before committing a merge into main, with main checked out. `worktree-agent-cad241e6` is not repaired by that in either direction and holds 2 events main lacks. Those branches belong to gf2's owner and stay untouched.\n\nThis issue closes on the rewrite's commit on gf2 main plus `jit validate` rc 0 there.\n",
   "documents": [],
   "first_ready_at": "2026-11-01T13:24:02.039097168Z",
   "gates_required": [],
@@ -18,5 +19,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Repair gf2's stored records to canonical writer form",
-  "updated_at": "2026-11-01T13:24:02.039097168Z"
+  "updated_at": "2026-11-01T14:08:21.885012169Z"
 }

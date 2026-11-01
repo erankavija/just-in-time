@@ -22142,3 +22142,5 @@
 {"from":"ready","id":"ed5c9dae-76a8-4e56-8af3-0b1af6d2e474","issue_id":"3a3b86cf-1aee-416a-88c9-e3ab8cdbe124","timestamp":"2026-11-01T14:06:08.266059278Z","to":"done","type":"issue_state_changed"}
 {"id":"e6ac885c-c3d9-4e3e-8754-4cb54f58cfd1","issue_id":"3a3b86cf-1aee-416a-88c9-e3ab8cdbe124","timestamp":"2026-11-01T14:06:08.266059278Z","type":"issue_completed"}
 {"from":"backlog","id":"2642812a-7681-4d18-8e70-19c2664b5a19","issue_id":"5f82e09a-2b31-4f51-acf3-7d4c87501ab2","timestamp":"2026-11-01T14:06:08.388677895Z","to":"ready","type":"issue_state_changed"}
+{"assignee":"agent:gf2-record-repair","id":"3f1bbfbc-175e-47bb-a4a6-fb18f1674b61","issue_id":"1a6d25ac-88f1-402d-a3e0-8b89b1bb6455","timestamp":"2026-11-01T14:08:21.757246106Z","type":"issue_claimed"}
+{"fields":["description"],"id":"fd6a4100-b36f-431e-a6c3-62e76e415f27","issue_id":"1a6d25ac-88f1-402d-a3e0-8b89b1bb6455","timestamp":"2026-11-01T14:08:21.885012169Z","type":"issue_updated","updated_by":"issue-update"}
