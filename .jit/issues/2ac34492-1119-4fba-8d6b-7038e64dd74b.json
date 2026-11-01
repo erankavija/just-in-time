@@ -17,6 +17,12 @@
       "status": "passed",
       "updated_at": "2026-11-01T02:10:02.003997245Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1e0f3d46-3f16-4037-97f5-2afd45f5b6b2",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:12:49.378743492Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "2ac34492-1119-4fba-8d6b-7038e64dd74b",
@@ -33,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Criteria checks bind through check labels only",
-  "updated_at": "2026-11-01T02:10:02.003997245Z"
+  "updated_at": "2026-11-01T02:12:49.378743492Z"
 }
