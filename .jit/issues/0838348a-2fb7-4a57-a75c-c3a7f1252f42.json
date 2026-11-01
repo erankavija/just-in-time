@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d34f81d7-3237-4134-910c-cbf70542803b",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:16:08.942126344Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e6531d78-66fc-4c4a-b55f-dfea69fd84bc",
+      "status": "failed",
+      "updated_at": "2026-11-01T18:21:19.170570918Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0838348a-2fb7-4a57-a75c-c3a7f1252f42",
   "labels": [
     "epic:lead-friction",
@@ -22,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Delete the test-only update_issue_state",
-  "updated_at": "2026-11-01T17:47:08.108951950Z"
+  "updated_at": "2026-11-01T18:21:19.170570918Z"
 }
