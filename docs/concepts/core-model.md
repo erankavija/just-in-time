@@ -862,6 +862,10 @@ jit issue reject $ISSUE --reason "duplicate"
 # Adds label: resolution:duplicate
 ```
 
+The reason becomes a label value, so it must satisfy the label format (a letter or
+digit first, then letters, digits, `.`, `_`, `/`, `-`). A reason with spaces or
+other punctuation is refused before anything is written.
+
 ## Labels
 
 Labels provide organizational membership using `namespace:value` format for filtering and grouping.

@@ -49,7 +49,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     ///
     /// # Returns
     ///
-    /// Returns Ok with (count of fixes applied, messages), or Err if validation fails
+    /// Returns Ok with (count of fixes applied, messages), or Err if validation fails.
+    /// In fix mode a repository that still fails validation with nothing
+    /// repaired is an Err naming the findings `--fix` cannot repair.
     pub fn validate_with_fix(&mut self, fix: bool, dry_run: bool) -> Result<(usize, Vec<String>)> {
         // First run standard validation
         let validation_result = self.validate_silent();
@@ -83,6 +85,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             let (repair_fixes, mut messages) = self.repair_derived_state(dry_run)?;
             total_fixes += repair_fixes;
             all_messages.append(&mut messages);
+
+            if total_fixes == 0 {
+                validation_result.map_err(|error| {
+                    crate::errors::ValidationFailedError::new(format!(
+                        "--fix has no automatic repair for these findings: {error}"
+                    ))
+                })?;
+            }
 
             // Add summary message
             if dry_run {

@@ -686,8 +686,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
     }
 
     /// Reject an issue, recording `reason` as its `resolution:` label in the
-    /// same mutation. Rejection bypasses rule enforcement, so label-rule
-    /// findings surface as warnings.
+    /// same mutation. A `reason` that cannot form a valid label is refused
+    /// before anything is written. Rejection bypasses rule enforcement, so
+    /// other label-rule findings surface as warnings.
     pub fn reject_issue(&self, id: &IssueId, reason: Option<&str>) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
@@ -697,7 +698,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         };
         let mut request = CapturedFieldUpdate::label_edit(
             id.clone(),
-            CapturedLabelEdit::AppendUnchecked(format!("resolution:{reason}")),
+            CapturedLabelEdit::AppendUnchecked(crate::labels::resolution_label(reason)?),
         );
         request.state = Some(State::Rejected);
         request.enforce_lease = true;
@@ -3547,6 +3548,95 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         assert_eq!(issue.state, State::Rejected);
         assert!(issue.labels.iter().any(|label| label == "owner:concurrent"));
         assert!(issue.labels.iter().any(|label| label == "resolution:done"));
+    }
+
+    #[test]
+    fn test_reject_issue_refuses_reason_that_cannot_form_a_label_without_writing() {
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let issue = crate::test_utils::fixture_issue("Reject prose".into(), String::new());
+        let prior = issue.clone();
+        let id = seed_fixture_issue(&executor, issue);
+        let events_before = executor.storage.read_events().unwrap().len();
+
+        let error = executor
+            .issues()
+            .reject_issue(&id, Some("Premise removed. See x"))
+            .unwrap_err();
+
+        assert!(error
+            .downcast_ref::<crate::errors::InvalidArgumentError>()
+            .is_some());
+        let issue = executor.storage.load_issue(&id).unwrap();
+        assert_eq!(issue.state, prior.state);
+        assert_eq!(issue.labels, prior.labels);
+        assert_eq!(executor.storage.read_events().unwrap().len(), events_before);
+    }
+
+    #[test]
+    fn test_update_issue_remove_label_fails_atomically_when_any_label_is_absent() {
+        let executor = crate::commands::test_helpers::memory_executor(InMemoryStorage::new());
+        let mut issue = crate::test_utils::fixture_issue("Remove".into(), String::new());
+        issue.labels = vec!["component:core".to_string()];
+        let id = seed_fixture_issue(&executor, issue);
+
+        let result = executor.issues().update_issue(
+            &id,
+            None,
+            None,
+            None,
+            None,
+            vec![],
+            vec!["component:core".to_string(), "component:absent".to_string()],
+            None,
+            None,
+            false,
+        );
+
+        assert!(result.is_err());
+        assert_eq!(
+            executor.storage.load_issue(&id).unwrap().labels,
+            vec!["component:core".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_update_issue_remove_label_removes_a_malformed_label() {
+        let executor = crate::commands::test_helpers::memory_executor(InMemoryStorage::new());
+        let mut issue = crate::test_utils::fixture_issue("Remove".into(), String::new());
+        issue.labels = vec![
+            "component:core".to_string(),
+            "resolution:Not valid: prose".to_string(),
+        ];
+        let id = seed_fixture_issue(&executor, issue);
+
+        executor
+            .issues()
+            .update_issue(
+                &id,
+                None,
+                None,
+                None,
+                None,
+                vec![],
+                vec!["resolution:Not valid: prose".to_string()],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+
+        assert_eq!(
+            executor.storage.load_issue(&id).unwrap().labels,
+            vec!["component:core".to_string()]
+        );
     }
 
     #[test]

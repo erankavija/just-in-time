@@ -392,7 +392,8 @@ jit issue update <id> --type bug
 ```
 
 `--label` has the alias `--add-label` and the short form `-l`. Both `--label` and
-`--remove-label` are repeatable and accept comma-separated values.
+`--remove-label` are repeatable and accept comma-separated values. Removing a label
+the issue lacks fails and removes nothing.
 
 ---
 

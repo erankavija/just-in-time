@@ -947,7 +947,7 @@ jit issue update --filter <QUERY> [OPTIONS]
 | `-s`, `--state <STATE>` | Requested lifecycle state. |
 | `--type <KIND>` | Replace the issue's `type:*` label with `type:<kind>`. Long-only. |
 | `-l`, `--label <LABEL>` | Add labels (alias `--add-label`). Repeatable and comma-separated; adds to the existing set. |
-| `--remove-label <LABEL>` | Remove labels. Repeatable and comma-separated. |
+| `--remove-label <LABEL>` | Remove labels. Repeatable and comma-separated. Single-issue mode fails, removing nothing, when the issue lacks any named label; a stored label containing a comma therefore cannot be named. |
 | `--add-gate <GATE>` | Require additional registered gates. Repeatable and comma-separated. |
 | `--remove-gate <GATE>` | Drop gates from the issue's requirements. |
 | `--assignee <ASSIGNEE>` | Set the assignee, in `type:identifier` form. |
@@ -1464,7 +1464,7 @@ jit issue reject $ISSUE --reason "wont-fix" --quiet
 - **Bypasses gates:** Can reject from any state, even with failing gates
 - **Closure outcome:** Records rejection without dependency or gate checks; do not
   treat it as an enforced no-return source state for later `issue update` calls
-- **Optional reason:** `--reason` adds a `resolution:*` label in the same mutation as the rejection, so a failure leaves neither
+- **Optional reason:** `--reason` adds a `resolution:<reason>` label in the same mutation as the rejection, so a failure leaves neither. A reason that cannot form a valid label (spaces, punctuation, empty) is refused with exit code 2 before anything is written; put prose in the issue description instead
 - **Immediate:** No validation or gate checks
 
 **Common rejection reasons:**
@@ -3250,7 +3250,7 @@ jit validate --branch-drift [--leases] [--json]
 | `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`, a rule failure exits `1`, and invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
 | `--scope <ID>` | Evaluates the rules matching each issue in a container's transitive dependency closure, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
-| `--fix` | Apply automatic rule/graph/state fixes and derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. |
+| `--fix` | Apply automatic rule/graph/state fixes and derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. A repository that still fails validation after nothing was repaired exits `4` with `VALIDATION_FAILED`, naming the findings `--fix` cannot repair; `--fix` and plain `validate` never disagree on validity. |
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
 | `--leases` | Check that active leases are consistent and not stale. |
 

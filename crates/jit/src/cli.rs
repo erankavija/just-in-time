@@ -1038,7 +1038,7 @@ pub enum IssueCommands {
         /// Issue ID
         id: String,
 
-        /// Reason for rejection (adds resolution:REASON label)
+        /// Reason for rejection (adds resolution:REASON label; the reason must be a valid label value)
         #[arg(long)]
         reason: Option<String>,
     },
