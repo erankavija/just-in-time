@@ -67,10 +67,11 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
     let prior = prepare_changed_profile(&repository);
     let serial_repository = JitCli::initialised().unwrap();
     prepare_changed_profile(&serial_repository);
-    file_executor(serial_repository.root())
-        .unwrap()
-        .apply_profile(&[selector()])
-        .unwrap();
+    jit::test_utils::apply_selected_packages(
+        &file_executor(serial_repository.root()).unwrap(),
+        &[selector()],
+    )
+    .unwrap();
     let serial_new = LifecycleState::capture(serial_repository.root());
     let prior_event_count = std::fs::read_to_string(repository.root().join(".jit/events.jsonl"))
         .unwrap()
@@ -80,7 +81,10 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
     let winner_path = repository.root().to_path_buf();
     let winner_pause = Arc::clone(&pause);
     let winner = std::thread::spawn(move || {
-        executor_with_interruptions(&winner_path, winner_pause).apply_profile(&[selector()])
+        jit::test_utils::apply_selected_packages(
+            &executor_with_interruptions(&winner_path, winner_pause),
+            &[selector()],
+        )
     });
 
     pause.wait_until_reached();
@@ -137,10 +141,11 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
         after_winner.is_semantically_equivalent_to(&serial_new),
         "the concurrent outcomes must equal the complete serial winner state"
     );
-    let retried = file_executor(repository.root())
-        .unwrap()
-        .apply_profile(&[selector()])
-        .unwrap();
+    let retried = jit::test_utils::apply_selected_packages(
+        &file_executor(repository.root()).unwrap(),
+        &[selector()],
+    )
+    .unwrap();
     assert_eq!(
         retried.requested().unwrap().status,
         ProfileApplicationStatus::Unchanged,

@@ -1,9 +1,9 @@
 //! Deterministic resolution of a participating profile-package graph.
 //!
 //! Package loading is a command concern. This module receives the complete
-//! candidate set — selected packages, already-applied packages, and any
-//! dependencies loaded for them — and settles the graph without consulting
-//! the filesystem or choosing a winner from selector order.
+//! candidate set — selected packages and the dependencies loaded for them —
+//! and settles the graph without consulting the filesystem or choosing a winner
+//! from selector order.
 
 use super::ProfilePackage;
 use crate::domain::identity::ProfileId;
@@ -44,9 +44,8 @@ pub struct ResolvedProfileGraph {
 impl ResolvedProfileGraph {
     /// Resolve every supplied package and return a dependency-first order.
     ///
-    /// The supplied map must contain the selected packages, every applied
-    /// package that remains in the repository, and the dependency closure of
-    /// both. The resolver still verifies that closure, compatibility, and
+    /// The supplied map must contain the selected packages and their dependency
+    /// closure. The resolver still verifies that closure, compatibility, and
     /// incompatibility claims are all satisfied before returning.
     pub fn resolve(
         packages: BTreeMap<ProfileId, ProfilePackage>,
@@ -180,17 +179,28 @@ impl ResolvedProfileGraph {
         })
     }
 
-    /// Return all participating packages in canonical dependency-first order.
-    pub fn packages(&self) -> Vec<ProfilePackage> {
-        self.order
-            .iter()
-            .filter_map(|id| self.packages.get(id).cloned())
-            .collect()
+    /// Each participating package's transitive dependencies.
+    pub fn transitive_dependencies(&self) -> BTreeMap<ProfileId, BTreeSet<ProfileId>> {
+        self.order.iter().fold(BTreeMap::new(), |mut closure, id| {
+            let required = self.dependencies.get(id).into_iter().flatten();
+            let reached = required
+                .flat_map(|dependency| {
+                    closure
+                        .get(dependency)
+                        .into_iter()
+                        .flatten()
+                        .chain(std::iter::once(dependency))
+                        .cloned()
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            closure.insert(id.clone(), reached);
+            closure
+        })
     }
 
     /// Return the selected roots and their dependency closure in canonical
-    /// dependency-first order. Unselected applied packages are constraints,
-    /// not packages to publish again.
+    /// dependency-first order.
     pub fn selected_packages(&self) -> Vec<ProfilePackage> {
         let mut reachable = self.selected.clone();
         let mut pending = VecDeque::from_iter(self.selected.iter().cloned());
@@ -345,6 +355,46 @@ mod tests {
                 .map(|package| package.model().id.to_string())
                 .collect::<Vec<_>>(),
             vec!["alpha", "zulu"]
+        );
+    }
+
+    #[test]
+    fn test_transitive_dependencies_closes_over_a_chain() {
+        let temp = TempDir::new().unwrap();
+        let packages = [("top", Some("middle")), ("middle", Some("base")), ("base", None)]
+            .map(|(id, dependency)| {
+                let _ = package_tree(&temp, id);
+                let declared = dependency
+                    .map(|dependency| format!("\n[[dependency]]\nid = \"{dependency}\"\nversion = \"*\"\n"))
+                    .unwrap_or_default();
+                std::fs::write(
+                    temp.path().join(id).join("manifest.toml"),
+                    format!(
+                        "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\ncompatible-jit = \">=0.2.0, <2.0.0\"\n{declared}\n[[asset]]\nsource = \"assets/content.txt\"\ntarget = \"docs/{id}.txt\"\n"
+                    ),
+                )
+                .unwrap();
+                let package = ProfilePackage::from_directory(&temp.path().join(id)).unwrap();
+                (package.model().id.clone(), package)
+            })
+            .into_iter()
+            .collect();
+
+        let closure = ResolvedProfileGraph::resolve(
+            packages,
+            selected(&["top"]),
+            &EngineVersion::running().unwrap(),
+        )
+        .unwrap()
+        .transitive_dependencies();
+
+        assert_eq!(
+            closure[&ProfileId::try_from("top").unwrap()],
+            selected(&["middle", "base"])
+        );
+        assert_eq!(
+            closure[&ProfileId::try_from("base").unwrap()],
+            selected(&[])
         );
     }
 

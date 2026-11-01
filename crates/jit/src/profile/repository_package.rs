@@ -869,7 +869,7 @@ mod tests {
             &temp.path().join("profiles").join(PACKAGE_ID),
         )
         .unwrap();
-        let applied = executor.apply_profile_package(&package).unwrap();
+        let applied = crate::test_utils::apply_package(&executor, &package).unwrap();
         assert_eq!(
             applied.requested().unwrap().status,
             super::super::ProfileApplicationStatus::Applied
@@ -946,7 +946,7 @@ mod tests {
         let rendered = fs::read_to_string(temp.path().join(&reference.target)).unwrap();
         assert_eq!(rendered.matches("@/gate/").count(), 6);
 
-        let unchanged = reloaded.apply_profile_package(&package).unwrap();
+        let unchanged = crate::test_utils::apply_package(&reloaded, &package).unwrap();
         assert_eq!(
             unchanged.requested().unwrap().status,
             super::super::ProfileApplicationStatus::Unchanged

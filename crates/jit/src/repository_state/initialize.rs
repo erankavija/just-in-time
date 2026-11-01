@@ -823,13 +823,13 @@ fn resolve_gitattributes(
 fn derive_profile_application_candidate(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
-    contested_assets: &BTreeMap<VirtualPath, Vec<super::ContributionConflictOwner>>,
+    contested_files: &BTreeMap<VirtualPath, Vec<super::ContributionConflictOwner>>,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let composed = super::profile_apply::compose_profile_targets_with_context(
         base,
         profile.claims.clone(),
         profile.contribution_context.clone(),
-        contested_assets,
+        contested_files,
     )
     .map_err(rule_materialization_error)?;
     let contributions = composed
@@ -957,13 +957,12 @@ pub(super) fn derive_profile_applications(
     let mut lifecycle_profiles = Vec::with_capacity(profiles.len());
     let mut applied_profiles = forced_changed.clone();
     let mut aggregate_changed = !forced_changed.is_empty();
-    let contested_assets = super::profile_apply::contested_asset_targets(
+    let contested_files = super::profile_apply::contested_file_targets(
         profiles.iter().map(|profile| &profile.claims),
     );
 
     for profile in profiles {
-        let candidate =
-            derive_profile_application_candidate(&proposed, profile, &contested_assets)?;
+        let candidate = derive_profile_application_candidate(&proposed, profile, &contested_files)?;
         let candidate_actions = candidate
             .delta
             .actions()
