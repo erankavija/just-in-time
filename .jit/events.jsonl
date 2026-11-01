@@ -22194,3 +22194,9 @@
 {"fields":["description"],"id":"708b4f91-33b7-4380-a247-4bdf99a33f12","issue_id":"9c008d2d-decc-4845-b309-e01a42e98eda","timestamp":"2026-11-01T14:39:21.080709975Z","type":"issue_updated","updated_by":"issue-update"}
 {"from":"in_progress","id":"a0935c38-a26e-448c-9cec-6b0b7688af0d","issue_id":"9c008d2d-decc-4845-b309-e01a42e98eda","timestamp":"2026-11-01T14:39:22.753599571Z","to":"done","type":"issue_state_changed"}
 {"id":"99cc28b7-08ad-42af-9025-82c22eb620ae","issue_id":"9c008d2d-decc-4845-b309-e01a42e98eda","timestamp":"2026-11-01T14:39:22.753599571Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"176eb711-f90e-410c-86ed-270ea5f763a8","issue_id":"da12ad66-7451-4700-9731-74a36c895bb9","timestamp":"2026-11-01T14:43:40.967326219Z","type":"gate_failed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"15562f28-85aa-482e-9fb9-7b9bd7560be8","issue_id":"aeafc378-3073-4b32-be1b-53a05b656168","timestamp":"2026-11-01T14:46:32.853404640Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"11d60710-1e3e-480e-afd2-751dcf01f0d1","issue_id":"17fbcf25-67cd-41a8-acc4-adb6df43b4a2","priority":"normal","timestamp":"2026-11-01T14:46:32.965250606Z","title":"Remove the lease check from the git hooks","type":"issue_created"}
+{"fields":["dependencies"],"id":"f023ebdf-e13c-44c9-b5e8-c4321926f7f6","issue_id":"aeafc378-3073-4b32-be1b-53a05b656168","timestamp":"2026-11-01T14:46:33.580503389Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"c188b96f-7f56-4160-b222-ecd626632b4b","issue_id":"17fbcf25-67cd-41a8-acc4-adb6df43b4a2","timestamp":"2026-11-01T14:46:33.794682986Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"363aaf29-d843-4dc5-b4ab-7a83ad157fdd","issue_id":"17fbcf25-67cd-41a8-acc4-adb6df43b4a2","timestamp":"2026-11-01T14:46:33.794682986Z","type":"issue_claimed"}

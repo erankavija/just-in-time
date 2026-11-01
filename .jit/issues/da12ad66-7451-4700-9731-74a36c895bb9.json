@@ -15,7 +15,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2c55a366-bb10-4fa6-917f-1437e7d83d22",
+      "status": "failed",
+      "updated_at": "2026-11-01T14:43:40.967326219Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "da12ad66-7451-4700-9731-74a36c895bb9",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Give issue rejection one command form",
-  "updated_at": "2026-11-01T14:29:54.599630870Z"
+  "updated_at": "2026-11-01T14:43:40.967326219Z"
 }
