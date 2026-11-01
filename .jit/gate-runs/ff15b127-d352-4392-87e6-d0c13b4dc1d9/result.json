@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0ea91b1a70ee7144e04adc70af7de16bee204fba",
+  "completed_at": "2026-11-01T15:14:41.145390468Z",
+  "duration_ms": 305221,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".agents/skills/jit-execution-lead/scripts/land.sh",
+        "id": "F1",
+        "line": 37,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "The direct --locked script mode performs tracker commits and merges without the repository write lock or redo-record refusal."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/aeafc378-3073-4b32-be1b-53a05b656168.json",
+        "id": "F2",
+        "line": 7,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The required net-line accounting for the shipped change is not reported in the attributable commits or issue record."
+      }
+    ],
+    "summary": "The landing wrapper has an unlocked bypass, and the required net-line report is absent.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "aeafc378-3073-4b32-be1b-53a05b656168",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ff15b127-d352-4392-87e6-d0c13b4dc1d9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T15:09:35.924137483Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6106 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a197a8-f997-7353-9d79-2d4525fb5e14\n--------\nuser\n--- 6093 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 8103e370, b5b621755, 59f359cfa, 0ea91b1a7\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1 and @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T15:08:07Z); code-review unrun\nTruncation recovery: repeated broad searches as bounded per-commit stats/patches, focused current-file reads, and targeted skill scans; ignored historical gate stdout and archived material outside the impact cone.\n\n1. **F1 — blocking, issue-impact, high.** [`land.sh`](.agents/skills/jit-execution-lead/scripts/land.sh:37) accepts a direct `--locked <branch>` invocation and immediately calls `land` without acquiring `jit worktree exec`’s repository write lock or checking for a redo record. This exposed invocation can create the neutral tracker commit and merge concurrently with tracker mutations, violating REQ-02/REQ-03’s lock and coherent-state guarantee. The smoke test exercises only the normal wrapper path. References: @/invariant/derived-state-coherence.\n\n2. **F2 — blocking, issue-impact, medium.** REQ-04 requires the net line count to be reported, but neither the tagged commit messages nor the issue’s current record contains a net-line accounting for the shipped implementation; raw diff statistics are not an authored report. [`aeafc378-3073-4b32-be1b-53a05b656168.json`](.jit/issues/aeafc378-3073-4b32-be1b-53a05b656168.json:7)\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The landing wrapper has an unlocked bypass, and the required net-line report is absent.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The direct --locked script mode performs tracker commits and merges without the repository write lock or redo-record refusal.\",\"file\":\".agents/skills/jit-execution-lead/scripts/land.sh\",\"line\":37,\"references\":[\"@/invariant/derived-state-coherence\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The required net-line accounting for the shipped change is not reported in the attributable commits or issue record.\",\"file\":\".jit/issues/aeafc378-3073-4b32-be1b-53a05b656168.json\",\"line\":7,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
