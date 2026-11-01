@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "4c842984-5e01-46d6-84f6-67823910a290",
-      "status": "failed",
-      "updated_at": "2026-11-01T01:59:21.728073615Z",
+      "run_id": "998aab3b-278a-489e-8c72-49ef42feee57",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:20:16.539712392Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate keys are a validated GateKey in the registry and gate runs",
-  "updated_at": "2026-11-01T01:59:21.728073615Z"
+  "updated_at": "2026-11-01T02:20:16.539712392Z"
 }
