@@ -1,15 +1,14 @@
 use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::identity::ProfileId;
-use crate::domain::{ProfileLifecycleOperation, ProfileOrigin};
+use crate::domain::ProfileLifecycleOperation;
 use crate::profile::{
-    build_profile_claims_from_resolved, capture_package_tree, pack_captured_package_archive,
-    read_package_archive, resolve_package, CapturedPackageTree, EngineVersion, PackageCaptureError,
-    ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileComposedApplyResult, ProfileGraphError, ProfilePackEntry, ProfilePackResult,
-    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfileShowEntry, ProfileShowResult,
-    ProfileTargetAction, ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName,
-    ResolvedProfileContent, ResolvedProfileGraph, VariableInputs,
-    MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
+    build_profile_claims_from_resolved, capture_package_tree, pack_package_archive,
+    read_package_archive, resolve_package, EngineVersion, PackageCaptureError, ProfileAddEntry,
+    ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
+    ProfileGraphError, ProfilePackEntry, ProfilePackResult, ProfilePackage, ProfilePackageError,
+    ProfileShowEntry, ProfileShowResult, ProfileTargetAction, ProfileTargetChange,
+    ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph,
+    VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
 use crate::profile::{profile_run_entry, ProfileRunMode};
 use crate::repository_state::{
@@ -27,7 +26,6 @@ use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 /// Project one run's dependency-first per-package answers onto the ordered root
 /// observations the caller made.
@@ -68,14 +66,6 @@ pub(super) fn selection_profile_results(
     Ok(ProfileComposedApplyResult::new(observations))
 }
 
-/// One ordered profile selection from the command boundary: the package
-/// directory, resolved relative to the repository worktree.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ProfileSelector {
-    /// A package directory, resolved relative to the repository worktree.
-    Path(PathBuf),
-}
-
 /// A malformed `--profile` selector.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ProfileSelectorError {
@@ -92,26 +82,17 @@ pub enum ProfileSelectorError {
     EmptyPath,
 }
 
-impl FromStr for ProfileSelector {
-    type Err = ProfileSelectorError;
-
-    fn from_str(selector: &str) -> Result<Self, Self::Err> {
-        if selector.is_empty() {
-            Err(ProfileSelectorError::EmptyPath)
-        } else if selector.starts_with("id:") || selector.starts_with("path:") {
-            Err(ProfileSelectorError::TaggedSelector {
-                selector: selector.to_string(),
-            })
-        } else {
-            Ok(Self::path(selector))
-        }
-    }
-}
-
-impl ProfileSelector {
-    /// Construct a selector from a worktree-relative or absolute spelling.
-    pub fn path(path: impl Into<PathBuf>) -> Self {
-        Self::Path(path.into())
+/// Parse one `--profile` value into the package directory it names, resolved
+/// later relative to the repository worktree.
+pub fn parse_profile_selector(selector: &str) -> Result<PathBuf, ProfileSelectorError> {
+    if selector.is_empty() {
+        Err(ProfileSelectorError::EmptyPath)
+    } else if selector.starts_with("id:") || selector.starts_with("path:") {
+        Err(ProfileSelectorError::TaggedSelector {
+            selector: selector.to_string(),
+        })
+    } else {
+        Ok(PathBuf::from(selector))
     }
 }
 
@@ -137,20 +118,8 @@ pub enum ProfileResolutionError {
         /// Capture failure.
         source: PackageCaptureError,
     },
-}
-
-/// Failure composing the set of packages one application applies.
-///
-/// Both variants are raised while the closure is still being built, before the
-/// first package is applied, so a repository never carries part of a set it
-/// could not compose.
-#[derive(Debug, thiserror::Error)]
-pub enum ProfileDependencyError {
-    /// A declared dependency resolves through no route.
-    ///
-    /// The declaring package is named beside it because an adopter asked for
-    /// that one: a bare failure over the dependency would name a package they
-    /// never installed by name.
+    /// A declared dependency could not be loaded. The declaring package is
+    /// named because the adopter never asked for the dependency by name.
     #[error(
         "profile '{package}' declares a dependency on profile '{dependency}', \
          which cannot be resolved: {cause:#}"
@@ -160,70 +129,8 @@ pub enum ProfileDependencyError {
         package: String,
         /// Dependency that manifest names.
         dependency: String,
-        /// Why every resolution route refused it.
+        /// Why loading it failed.
         cause: anyhow::Error,
-    },
-    /// A dependency is present but outside the version range its declarer
-    /// requires.
-    #[error(
-        "profile '{package}' requires dependency '{dependency}' at '{required}', but the participating package provides '{found}'"
-    )]
-    DependencyVersionMismatch {
-        /// Package whose manifest declares the dependency.
-        package: String,
-        /// Dependency whose version did not satisfy the requirement.
-        dependency: String,
-        /// Authored dependency range.
-        required: String,
-        /// Resolved dependency version.
-        found: String,
-    },
-    /// The declared dependencies close a cycle, which has no application order.
-    #[error("profile dependency cycle: {}", .cycle.join(" -> "))]
-    DependencyCycle {
-        /// The cycle as a closed path: the first id repeats as the last.
-        cycle: Vec<String>,
-    },
-    /// The running engine is outside a participating package's compatibility
-    /// range.
-    #[error(
-        "profile '{package}' requires compatible JIT '{required}', but the running engine is '{actual}'"
-    )]
-    IncompatibleEngine {
-        /// Package whose compatibility range rejected the engine.
-        package: String,
-        /// Authored engine range.
-        required: String,
-        /// Running engine version.
-        actual: String,
-    },
-    /// Two participating packages declare an incompatibility that applies to
-    /// the other package's version.
-    #[error(
-        "profile '{package}' is incompatible with profile '{other}' (requirement '{requirement}', other version '{other_version}')"
-    )]
-    IncompatiblePackages {
-        /// Package declaring the incompatibility.
-        package: String,
-        /// Participating package named by the declaration.
-        other: String,
-        /// Authored incompatible-package range.
-        requirement: String,
-        /// Version of the other package.
-        other_version: String,
-    },
-    /// Two different package images claim one profile identity during graph
-    /// construction.
-    #[error(
-        "profile id '{id}' resolves to different package images '{first_hash}' and '{second_hash}'"
-    )]
-    ConflictingPackageIdentity {
-        /// Profile identity with multiple images.
-        id: String,
-        /// First package digest.
-        first_hash: String,
-        /// Second package digest.
-        second_hash: String,
     },
 }
 
@@ -393,10 +300,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     /// Resolve every selector in occurrence order before any package is applied.
     ///
     /// A repeated selector reads its package once.
-    fn resolve_profile_selectors(
-        &self,
-        selectors: &[ProfileSelector],
-    ) -> Result<Vec<ProfilePackage>> {
+    fn resolve_profile_selectors(&self, selectors: &[PathBuf]) -> Result<Vec<ProfilePackage>> {
         #[cfg(test)]
         crate::profile::selection_probe::record(
             crate::profile::selection_probe::SelectionStage::SelectorResolution,
@@ -405,8 +309,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let mut read = BTreeMap::<PathBuf, ProfilePackage>::new();
         selectors
             .iter()
-            .map(|selector| {
-                let ProfileSelector::Path(location) = selector;
+            .map(|location| {
                 let directory = supplied_package_directory(location, &layout)?;
                 if let Some(package) = read.get(&directory) {
                     return Ok(package.clone());
@@ -478,7 +381,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 source: source_error,
             }
         })?;
-        let archive = pack_captured_package_archive(&package)?;
+        let archive = pack_package_archive(&package)?;
         let archive_bytes = archive.len() as u64;
         let warnings =
             self.publish_package_archive(&layout, invocation_dir, output, archive, publish)?;
@@ -486,7 +389,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             ProfilePackResult::new(vec![ProfilePackEntry {
                 id: package.model().id.to_string(),
                 version: package.model().version.clone(),
-                origin: ProfileOrigin::Directory(source.relative().clone()),
+                origin: source.relative().clone(),
                 package_hash: package.hashes().package.clone(),
                 source: source.repository_relative(),
                 archive: output.display().to_string(),
@@ -560,7 +463,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         Ok(ProfileAddResult::new(vec![ProfileAddEntry {
             id: tree.model().id.to_string(),
             version: tree.model().version.clone(),
-            origin: ProfileOrigin::Directory(destination.relative().clone()),
+            origin: destination.relative().clone(),
             package_hash: tree.hashes().package.clone(),
             archive: archive.display().to_string(),
             destination: destination.repository_relative(),
@@ -586,18 +489,18 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         &self,
         layout: &RepositoryLayout,
         destination: &VirtualPath,
-        tree: &CapturedPackageTree,
+        tree: &ProfilePackage,
         publish: bool,
     ) -> Result<Vec<ProfileTargetChange>> {
         let capture = PackageTreeCapture::new(
             destination.clone(),
             tree.files()
                 .iter()
-                .map(|(relative, file)| {
+                .map(|(relative, bytes)| {
                     Ok(CapturedTreeFile {
                         relative: RootRelativePath::parse(relative)?,
-                        bytes: file.bytes.clone(),
-                        mode: file.mode,
+                        bytes: bytes.clone(),
+                        mode: tree.model().file_mode(relative),
                     })
                 })
                 .collect::<Result<Vec<_>, RepositoryLayoutError>>()?,
@@ -708,7 +611,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     }
 
     /// Inspect every selected profile package in selector occurrence order.
-    pub fn show_profiles(&self, selectors: &[ProfileSelector]) -> Result<ProfileShowResult> {
+    pub fn show_profiles(&self, selectors: &[PathBuf]) -> Result<ProfileShowResult> {
         let layout = self.require_layout()?;
         let profiles = self
             .resolve_profile_selectors(selectors)?
@@ -746,7 +649,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     /// and a package that cannot be resolved or composed.
     pub fn select_profiles(
         &self,
-        selectors: &[ProfileSelector],
+        selectors: &[PathBuf],
         options: &ProfileVariableOptions,
     ) -> Result<ProfileSelection> {
         let roots = self.resolve_profile_selectors(selectors)?;
@@ -924,7 +827,11 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
 
         let engine = EngineVersion::running()
             .map_err(|source| anyhow::anyhow!("running JIT engine version is invalid: {source}"))?;
-        ResolvedProfileGraph::resolve(packages, selected_ids, &engine).map_err(profile_graph_error)
+        Ok(ResolvedProfileGraph::resolve(
+            packages,
+            selected_ids,
+            &engine,
+        )?)
     }
 
     /// Extend `packages` with dependencies in canonical id order.
@@ -950,7 +857,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 }
                 let package = self
                     .resolve_dependency_package_from(&declaring, &dependency.id)
-                    .map_err(|cause| ProfileDependencyError::UnresolvableDependency {
+                    .map_err(|cause| ProfileResolutionError::UnresolvableDependency {
                         package: id.to_string(),
                         dependency: dependency.id.to_string(),
                         cause,
@@ -977,12 +884,12 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         declaring: &ProfilePackage,
         dependency: &ProfileId,
     ) -> Result<ProfilePackage> {
-        let ProfilePackageSource::Directory(directory) = declaring.source();
         let not_found = || -> anyhow::Error {
             crate::errors::NotFoundError::new(format!("Profile not found: {dependency}")).into()
         };
-        let Some(location) = directory
-            .parent()
+        let Some(location) = declaring
+            .directory()
+            .and_then(Path::parent)
             .map(|parent| parent.join(dependency.as_str()))
         else {
             return Err(not_found());
@@ -1220,82 +1127,22 @@ fn insert_candidate_package(
                     existing.hashes().package.clone(),
                 )
             };
-            return Err(ProfileDependencyError::ConflictingPackageIdentity {
+            return Err(ProfileGraphError::ConflictingPackageIdentity {
                 id: id.to_string(),
                 first_hash,
                 second_hash,
             }
             .into());
         }
-        if package_source_key(&package) < package_source_key(existing) {
+        // A stable choice between byte-identical copies; package bytes and graph
+        // claims remain the semantic identity.
+        if package.directory() < existing.directory() {
             packages.insert(id, package);
         }
         return Ok(());
     }
     packages.insert(id, package);
     Ok(())
-}
-
-/// Stable source spelling used only to choose between byte-identical package
-/// copies. Package bytes and graph claims remain the semantic identity.
-fn package_source_key(package: &ProfilePackage) -> String {
-    match package.source() {
-        ProfilePackageSource::Directory(path) => path.to_string_lossy().into_owned(),
-    }
-}
-
-/// Convert the pure graph's typed refusal into the command-layer dependency
-/// error vocabulary, retaining every package named by the failed claim.
-fn profile_graph_error(error: ProfileGraphError) -> anyhow::Error {
-    match error {
-        ProfileGraphError::MissingDependency {
-            package,
-            dependency,
-        } => ProfileDependencyError::UnresolvableDependency {
-            package: package.clone(),
-            dependency: dependency.clone(),
-            cause: anyhow::anyhow!("profile graph is missing participating package '{dependency}'"),
-        }
-        .into(),
-        ProfileGraphError::DependencyVersionMismatch {
-            package,
-            dependency,
-            required,
-            found,
-        } => ProfileDependencyError::DependencyVersionMismatch {
-            package,
-            dependency,
-            required,
-            found,
-        }
-        .into(),
-        ProfileGraphError::DependencyCycle { cycle } => {
-            ProfileDependencyError::DependencyCycle { cycle }.into()
-        }
-        ProfileGraphError::IncompatibleEngine {
-            package,
-            required,
-            actual,
-        } => ProfileDependencyError::IncompatibleEngine {
-            package,
-            required,
-            actual,
-        }
-        .into(),
-        ProfileGraphError::IncompatiblePackages {
-            package,
-            other,
-            requirement,
-            other_version,
-        } => ProfileDependencyError::IncompatiblePackages {
-            package,
-            other,
-            requirement,
-            other_version,
-        }
-        .into(),
-        other => anyhow::anyhow!(other),
-    }
 }
 
 /// How many package-model byte budgets one package-tree capture may read.
@@ -1464,19 +1311,24 @@ fn read_archive_bytes(invocation_dir: &Path, archive: &Path) -> Result<Vec<u8>> 
 
 /// The worktree-relative origin a package's own bytes came through.
 ///
-/// The location is taken from the source the package recorded while reading
+/// The location is taken from the directory the package recorded while reading
 /// itself, never from a path supplied beside it. A directory that resolves
 /// outside the worktree is refused, because a report names a package by a
 /// location that does not depend on machine state. The selected data root is
 /// not a worktree location even when it nests inside one, so a package placed
 /// under it is refused by the same rule.
-fn package_origin(package: &ProfilePackage, layout: &RepositoryLayout) -> Result<ProfileOrigin> {
-    let ProfilePackageSource::Directory(directory) = package.source();
+fn package_origin(package: &ProfilePackage, layout: &RepositoryLayout) -> Result<RootRelativePath> {
+    let Some(directory) = package.directory() else {
+        anyhow::bail!(
+            "profile '{}' was not read from a directory, so it names no origin",
+            package.model().id
+        );
+    };
     layout
         .classify_and_canonicalize(directory)
         .ok()
         .filter(|path| path.root_class() == RepositoryRootClass::Worktree)
-        .map(|path| ProfileOrigin::Directory(path.relative().clone()))
+        .map(|path| path.relative().clone())
         .ok_or_else(|| {
             ProfileApplyError::PackageOutsideWorktree {
                 path: directory.display().to_string(),
@@ -1698,7 +1550,7 @@ mod tests {
     /// Apply `selectors` the way `jit profile apply` does.
     fn apply_selected(
         executor: &CommandExecutor<JsonFileStorage>,
-        selectors: &[ProfileSelector],
+        selectors: &[PathBuf],
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
         executor
@@ -1709,7 +1561,7 @@ mod tests {
     /// Resolve `selector` to the one package it names.
     fn resolved_selector(
         executor: &CommandExecutor<JsonFileStorage>,
-        selector: &ProfileSelector,
+        selector: &PathBuf,
     ) -> Result<ProfilePackage> {
         executor
             .resolve_profile_selectors(std::slice::from_ref(selector))
@@ -1748,7 +1600,7 @@ mod tests {
     /// Rehearse `selectors` the way `jit profile apply --dry-run` does.
     fn plan_selected(
         executor: &CommandExecutor<JsonFileStorage>,
-        selectors: &[ProfileSelector],
+        selectors: &[PathBuf],
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
         executor
@@ -1759,7 +1611,7 @@ mod tests {
     /// Report `selectors` the way `jit profile diff` does.
     fn diff_selected(
         executor: &CommandExecutor<JsonFileStorage>,
-        selectors: &[ProfileSelector],
+        selectors: &[PathBuf],
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
         executor
@@ -1768,9 +1620,11 @@ mod tests {
     }
 
     /// Select a package through the worktree location it was read from.
-    fn package_selector(package: &ProfilePackage) -> ProfileSelector {
-        let ProfilePackageSource::Directory(path) = package.source();
-        ProfileSelector::path(path.clone())
+    fn package_selector(package: &ProfilePackage) -> PathBuf {
+        package
+            .directory()
+            .expect("the fixture package was read from a directory")
+            .to_path_buf()
     }
 
     /// The profile ids this repository's audit log records as applied, in the
@@ -1999,13 +1853,13 @@ mod tests {
         let executor = file_executor(temp.path()).unwrap();
         let supplied = package_read_from(&temp, "vendor/supplied");
 
-        let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
+        let selector = temp.path().join("vendor/supplied");
         let resolved = resolved_selector(&executor, &selector).unwrap();
 
         assert_eq!(resolved.hashes(), supplied.hashes());
         assert_eq!(
             package_origin(&resolved, &executor.require_layout().unwrap()).unwrap(),
-            ProfileOrigin::Directory(RootRelativePath::parse("vendor/supplied").unwrap())
+            RootRelativePath::parse("vendor/supplied").unwrap()
         );
     }
 
@@ -2150,17 +2004,15 @@ mod tests {
     #[test]
     fn test_profile_selector_parse_reads_a_bare_directory_path() {
         assert_eq!(
-            "packages/workflow".parse::<ProfileSelector>(),
-            Ok(ProfileSelector::path("packages/workflow"))
+            parse_profile_selector("packages/workflow"),
+            Ok(PathBuf::from("packages/workflow"))
         );
     }
 
     #[test]
     fn test_profile_selector_parse_refuses_a_retired_tag_naming_the_bare_path_form() {
         for selector in ["id:workflow", "path:packages/workflow", "path:"] {
-            let error = selector
-                .parse::<ProfileSelector>()
-                .expect_err("a tagged selector is refused");
+            let error = parse_profile_selector(selector).expect_err("a tagged selector is refused");
             assert!(
                 matches!(&error, ProfileSelectorError::TaggedSelector { selector: given } if given == selector),
                 "{error}"
@@ -2175,7 +2027,7 @@ mod tests {
     #[test]
     fn test_profile_selector_parse_refuses_an_empty_path() {
         assert_eq!(
-            "".parse::<ProfileSelector>(),
+            parse_profile_selector(""),
             Err(ProfileSelectorError::EmptyPath)
         );
     }
@@ -2185,7 +2037,7 @@ mod tests {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let package = package_read_from(&temp, "vendor/supplied");
-        let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
+        let selector = temp.path().join("vendor/supplied");
         let resolved = resolved_selector(&executor, &selector).unwrap();
         assert_eq!(resolved.model().id, package.model().id);
     }
@@ -2195,7 +2047,7 @@ mod tests {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
 
-        let selector = ProfileSelector::path(temp.path().join("vendor/absent"));
+        let selector = temp.path().join("vendor/absent");
         let error = resolved_selector(&executor, &selector).unwrap_err();
 
         assert!(
@@ -2263,7 +2115,7 @@ mod tests {
 
         // The reported location resolves, from the worktree root alone, back to
         // the directory whose bytes were applied.
-        let ProfileOrigin::Directory(location) = &applied.requested().unwrap().origin;
+        let location = &applied.requested().unwrap().origin;
         assert_eq!(
             ProfilePackage::from_directory(&temp.path().join(location.as_path()))
                 .expect("the reported location names a readable package")
@@ -2290,11 +2142,11 @@ mod tests {
 
         assert_eq!(
             first_applied.requested().unwrap().origin,
-            ProfileOrigin::Directory(RootRelativePath::parse("vendor/first").unwrap())
+            RootRelativePath::parse("vendor/first").unwrap()
         );
         assert_eq!(
             second_applied.requested().unwrap().origin,
-            ProfileOrigin::Directory(RootRelativePath::parse("packages/second/tree").unwrap())
+            RootRelativePath::parse("packages/second/tree").unwrap()
         );
     }
 
@@ -3029,7 +2881,7 @@ template = true
         let storage = executor.storage().clone();
         package_read_from(&temp, FIXTURE_LOCATION);
         let before = storage.read_events().unwrap();
-        let selector = ProfileSelector::path(FIXTURE_LOCATION);
+        let selector = PathBuf::from(FIXTURE_LOCATION);
 
         let result = plan_selected(
             &executor,
@@ -3506,8 +3358,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::DependencyCycle { cycle })
+                error.downcast_ref::<ProfileGraphError>(),
+                Some(ProfileGraphError::DependencyCycle { cycle })
                     if cycle.first() == cycle.last()
                         && cycle.iter().any(|id| id == "base")
                         && cycle.iter().any(|id| id == "workflow")
@@ -3533,8 +3385,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::UnresolvableDependency { package, dependency, .. })
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableDependency { package, dependency, .. })
                     if package == "workflow" && dependency == "absent-base"
             ),
             "the refusal must name both packages: {error:#}"
@@ -3576,8 +3428,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::DependencyVersionMismatch {
+                error.downcast_ref::<ProfileGraphError>(),
+                Some(ProfileGraphError::DependencyVersionMismatch {
                     package,
                     dependency,
                     ..
@@ -3608,8 +3460,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::IncompatibleEngine { package, .. })
+                error.downcast_ref::<ProfileGraphError>(),
+                Some(ProfileGraphError::IncompatibleEngine { package, .. })
                     if package == "future"
             ),
             "the incompatible package must be named: {error:#}"
@@ -3738,8 +3590,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::UnresolvableDependency { package, dependency, .. })
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableDependency { package, dependency, .. })
                     if package == "workflow" && dependency == "base"
             ),
             "the refusal must name both packages: {error:#}"
@@ -3787,8 +3639,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::UnresolvableDependency { package, dependency, .. })
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableDependency { package, dependency, .. })
                     if package == "workflow" && dependency == "base"
             ),
             "{error:#}"
@@ -3810,8 +3662,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::UnresolvableDependency { dependency, .. })
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableDependency { dependency, .. })
                     if dependency == "base"
             ),
             "{error:#}"
@@ -4432,7 +4284,7 @@ template = true
     fn dependent_selection(
         temp: &TempDir,
         executor: &CommandExecutor<JsonFileStorage>,
-    ) -> (ProfileSelector, usize) {
+    ) -> (PathBuf, usize) {
         package_declaring(temp, "vendor/base", "base", &[]);
         let root = package_declaring(temp, "vendor/workflow", "workflow", &["base"]);
         let closure = selected_closure(executor, &root).unwrap().len();
@@ -4445,15 +4297,15 @@ template = true
         let executor = file_executor(temp.path()).unwrap();
         let (absolute, closure) = dependent_selection(&temp, &executor);
         let selectors = vec![
-            ProfileSelector::path("vendor/workflow"),
+            PathBuf::from("vendor/workflow"),
             absolute,
-            ProfileSelector::path("vendor/./workflow/"),
+            PathBuf::from("vendor/./workflow/"),
         ];
         #[cfg(unix)]
         let selectors = {
             std::os::unix::fs::symlink("vendor", temp.path().join("alias")).unwrap();
             let mut selectors = selectors;
-            selectors.push(ProfileSelector::path("alias/workflow"));
+            selectors.push(PathBuf::from("alias/workflow"));
             selectors
         };
         let (planned, stages) = selection_probe::observe(|| {
@@ -4472,10 +4324,7 @@ template = true
         for spelling in ["vendor/../vendor/workflow", "vendor/workflow/../workflow"] {
             for location in [PathBuf::from(spelling), temp.path().join(spelling)] {
                 let (result, stages) = selection_probe::observe(|| {
-                    executor.select_profiles(
-                        &[ProfileSelector::path(location)],
-                        &ProfileVariableOptions::default(),
-                    )
+                    executor.select_profiles(&[location], &ProfileVariableOptions::default())
                 });
 
                 let error = result.err().expect("parent traversal must remain rejected");
@@ -4498,7 +4347,7 @@ template = true
         std::os::unix::fs::symlink("workflow", temp.path().join("vendor/alias")).unwrap();
 
         let result = executor.select_profiles(
-            &[selector, ProfileSelector::path("vendor/alias")],
+            &[selector, PathBuf::from("vendor/alias")],
             &ProfileVariableOptions::default(),
         );
 
@@ -4524,7 +4373,7 @@ template = true
         std::os::unix::fs::symlink(outside.path(), temp.path().join("outside")).unwrap();
 
         let result = executor.select_profiles(
-            &[ProfileSelector::path("outside/vendor/workflow")],
+            &[PathBuf::from("outside/vendor/workflow")],
             &ProfileVariableOptions::default(),
         );
 

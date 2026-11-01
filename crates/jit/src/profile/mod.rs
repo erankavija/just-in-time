@@ -47,17 +47,14 @@ pub use manifest::{
     LIVE_ASSET_SOURCE_PREFIX, MANIFEST_FILE_NAME,
 };
 pub use package::{
-    PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,
+    PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes,
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
-pub(crate) use package_archive::pack_captured_package_archive;
 pub use package_archive::{
     pack_package_archive, read_package_archive, PackageArchiveError,
     MAX_PROFILE_PACKAGE_ARCHIVE_BYTES, MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES,
 };
-pub use package_capture::{
-    capture_package_tree, CapturedFile, CapturedPackageTree, PackageCaptureError,
-};
+pub use package_capture::{capture_package_tree, PackageCaptureError};
 pub use variables::{
     resolve_package, resolve_variables, ProfileVariableAssignment, ResolvedProfileContent,
     ResolvedVariable, ResolvedVariables, VariableError, VariableInputs, VariableSource,

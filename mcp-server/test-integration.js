@@ -97,20 +97,21 @@ function sourcesPackageFromRepository(text) {
   return /\bpackages?\b/i.test(text) && /\brepositor(?:y|ies)\b/i.test(text);
 }
 
-// Find tagged profile-origin shapes after the bridge has flattened the CLI
-// schema. Requiring both `source` and `location` keeps unrelated source fields
-// outside this lifecycle contract.
-function profileOriginSourceEnums(value) {
+// Find profile-origin schemas after the bridge has flattened the CLI schema.
+// Requiring `package_hash` or `status` beside `origin` keeps unrelated origin
+// fields outside this lifecycle contract.
+function profileOriginSchemas(value) {
   if (Array.isArray(value)) {
-    return value.flatMap(profileOriginSourceEnums);
+    return value.flatMap(profileOriginSchemas);
   }
   if (value === null || typeof value !== 'object') {
     return [];
   }
-  const local = value.properties?.source?.enum && value.properties?.location
-    ? [value.properties.source.enum]
+  const properties = value.properties;
+  const local = properties?.origin && (properties?.package_hash || properties?.status)
+    ? [properties.origin]
     : [];
-  return [...local, ...Object.values(value).flatMap(profileOriginSourceEnums)];
+  return [...local, ...Object.values(value).flatMap(profileOriginSchemas)];
 }
 
 // The checked-in profile-package fixture the profile tools are exercised over.
@@ -446,19 +447,19 @@ async function main() {
       }
     });
 
-    await runTest('structured tools/list exposes only directory profile origins', async () => {
+    await runTest('structured tools/list publishes profile origins as directory paths', async () => {
       const structured = new MCPTester('structured');
       try {
         await structured.start();
         const listed = await structured.request('tools/list');
-        const profileOriginEnums = listed.result.tools
+        const origins = listed.result.tools
           .filter(tool => tool.name.startsWith('jit_profile_'))
-          .flatMap(tool => profileOriginSourceEnums(tool.outputSchema));
-        assert.ok(profileOriginEnums.length > 0,
+          .flatMap(tool => profileOriginSchemas(tool.outputSchema));
+        assert.ok(origins.length > 0,
           'flattened profile output schemas should expose the generated profile origin contract');
-        for (const sources of profileOriginEnums) {
-          assert.deepStrictEqual(sources, ['directory'],
-            'flattened profile output origins must expose only the repository-directory source');
+        for (const origin of origins) {
+          assert.strictEqual(origin.type, 'string',
+            'a flattened profile output origin must be the directory path string');
         }
       } finally {
         await structured.stop();
@@ -619,10 +620,7 @@ async function main() {
         });
         assert.strictEqual(shown.profiles.length, 1);
         assert.strictEqual(shown.profiles[0].manifest.id, 'workflow');
-        assert.deepStrictEqual(shown.profiles[0].origin, {
-          source: 'directory',
-          location: workflowLocation,
-        });
+        assert.strictEqual(shown.profiles[0].origin, workflowLocation);
 
         const repeatedShown = await profileCall('jit_profile_show', {
           profile: [workflowLocation, workflowLocation],

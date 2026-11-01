@@ -412,7 +412,6 @@ fn git_events_pattern(relative: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::ProfileSelector;
     use crate::profile::ProfileApplicationStatus;
     use crate::profile::ProfilePackage;
     use crate::repository_state::{Contribution, MapEntryTarget};
@@ -501,7 +500,7 @@ mod tests {
         fn initialize_selected(
             &self,
             repo_dir: &Path,
-            selectors: &[ProfileSelector],
+            selectors: &[PathBuf],
         ) -> Result<FreshInitResult> {
             let selection = self.select_profiles(selectors, &Default::default())?;
             self.initialize_fresh_repository(repo_dir, Some(&selection))
@@ -706,10 +705,7 @@ mod tests {
 
         let result = file_executor(repo.path())
             .unwrap()
-            .initialize_selected(
-                repo.path(),
-                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
-            )
+            .initialize_selected(repo.path(), &[repo.path().join("packages/workflow")])
             .unwrap();
 
         // One initialization, both packages, the dependency first.
@@ -754,10 +750,7 @@ mod tests {
 
         let result = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(repo.path(), storage.root()).unwrap())
-            .initialize_selected(
-                repo.path(),
-                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
-            )
+            .initialize_selected(repo.path(), &[repo.path().join("packages/workflow")])
             .unwrap();
 
         assert_eq!(publications.count(), 1);
@@ -796,8 +789,8 @@ mod tests {
             .initialize_selected(
                 repo.path(),
                 &[
-                    ProfileSelector::path(repo.path().join("packages/base")),
-                    ProfileSelector::path(repo.path().join("packages/workflow")),
+                    repo.path().join("packages/base"),
+                    repo.path().join("packages/workflow"),
                 ],
             )
             .unwrap_err();
@@ -824,10 +817,7 @@ mod tests {
             .unwrap()
             .initialize_selected(
                 repo.path(),
-                &[
-                    ProfileSelector::path(&location),
-                    ProfileSelector::path(&location),
-                ],
+                &[PathBuf::from(&location), PathBuf::from(&location)],
             )
             .unwrap();
 
@@ -868,7 +858,7 @@ mod tests {
         let closure = crate::test_utils::selected_closure(&executor, &workflow).unwrap();
 
         let result = executor
-            .initialize_selected(repo.path(), &[ProfileSelector::path(&location)])
+            .initialize_selected(repo.path(), &[PathBuf::from(&location)])
             .unwrap();
 
         let ids = closure
@@ -919,10 +909,7 @@ mod tests {
             .unwrap();
 
         let result = executor
-            .initialize_selected(
-                repo.path(),
-                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
-            )
+            .initialize_selected(repo.path(), &[repo.path().join("packages/workflow")])
             .unwrap();
 
         assert_eq!(
@@ -986,10 +973,7 @@ mod tests {
 
         let error = file_executor(repo.path())
             .unwrap()
-            .initialize_selected(
-                repo.path(),
-                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
-            )
+            .initialize_selected(repo.path(), &[repo.path().join("packages/workflow")])
             .unwrap_err();
 
         let message = format!("{error:#}");
@@ -1009,8 +993,9 @@ mod tests {
         let result = executor
             .initialize_selected(
                 repo.path(),
-                &[ProfileSelector::path(
-                    crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
+                &[crate::test_utils::stage_repository_packages(
+                    repo.path(),
+                    "jit-dogfood",
                 )],
             )
             .unwrap();
@@ -1067,7 +1052,7 @@ mod tests {
         let again = reinit
             .initialize_selected(
                 repo.path(),
-                &[ProfileSelector::path(format!(
+                &[PathBuf::from(format!(
                     "{}/jit-dogfood",
                     crate::test_utils::PROFILE_PACKAGE_SOURCES
                 ))],
@@ -1098,10 +1083,7 @@ mod tests {
 
         let repaired = file_executor(repo.path())
             .unwrap()
-            .initialize_selected(
-                repo.path(),
-                &[ProfileSelector::path("packages/jit-default")],
-            )
+            .initialize_selected(repo.path(), &[PathBuf::from("packages/jit-default")])
             .unwrap();
 
         assert_eq!(
@@ -1118,10 +1100,7 @@ mod tests {
 
         let again = file_executor(repo.path())
             .unwrap()
-            .initialize_selected(
-                repo.path(),
-                &[ProfileSelector::path("packages/jit-default")],
-            )
+            .initialize_selected(repo.path(), &[PathBuf::from("packages/jit-default")])
             .unwrap();
         assert_eq!(
             again.profile.unwrap().requested().unwrap().status,
@@ -1297,10 +1276,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                 thread::spawn(move || {
                     let executor = file_executor(repo.path()).unwrap();
                     barrier.wait();
-                    executor.initialize_selected(
-                        repo.path(),
-                        &[ProfileSelector::path(location.as_path())],
-                    )
+                    executor.initialize_selected(repo.path(), &[PathBuf::from(location.as_path())])
                 })
             })
             .collect::<Vec<_>>();
@@ -1351,7 +1327,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         )
         .unwrap()
         .len();
-        let selectors = [ProfileSelector::path(location)];
+        let selectors = [location];
 
         let (initialized, stages) = crate::profile::selection_probe::observe(|| {
             executor.initialize_selected(repo.path(), &selectors)

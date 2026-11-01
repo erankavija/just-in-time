@@ -21,7 +21,9 @@ use jit::cli::{
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, ProfileCommands,
     ProjectCommands,
 };
-use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
+use jit::commands::{
+    parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
+};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -466,12 +468,11 @@ fn invalid_argument(message: String, json: bool) -> anyhow::Error {
 }
 
 /// Parse the one ordered selector stream accepted by profile commands.
-fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<ProfileSelector>> {
+fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<PathBuf>> {
     values
         .iter()
         .map(|value| {
-            value
-                .parse::<ProfileSelector>()
+            parse_profile_selector(value)
                 .map_err(|error| invalid_argument(format!("{error}"), json))
         })
         .collect()
@@ -607,7 +608,7 @@ fn print_profile_decision(
 fn print_profile_heading(
     id: &str,
     version: &str,
-    origin: &jit::domain::ProfileOrigin,
+    origin: &jit::repository_state::RootRelativePath,
     status: &str,
 ) {
     println!(
@@ -688,9 +689,8 @@ fn render_profile_difference(
 
 /// Render a package origin for human output, naming the directory a package
 /// read from the repository came from.
-fn profile_origin_label(origin: &jit::domain::ProfileOrigin) -> String {
-    let jit::domain::ProfileOrigin::Directory(location) = origin;
-    format!("directory {}", location.as_path().display())
+fn profile_origin_label(origin: &jit::repository_state::RootRelativePath) -> String {
+    format!("directory {}", origin.as_path().display())
 }
 
 fn profile_result<T>(result: anyhow::Result<T>, json: bool) -> anyhow::Result<T> {

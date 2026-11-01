@@ -6,7 +6,7 @@
 //! `storage::redo_conformance` (`@/inv/orthogonal-tests`). The lifecycle
 //! fixture below is shared with the concurrency suite beside it.
 
-use jit::commands::{CommandExecutor, ProfileSelector};
+use jit::commands::CommandExecutor;
 use jit::profile::ProfileApplicationStatus;
 use jit::storage::{
     discover_repository_layout, JsonFileStorage, MutationInterruptionInjector, MutationPoint,
@@ -91,8 +91,8 @@ impl MutationInterruptionInjector for PublicationCounter {
     }
 }
 
-pub(super) fn selector() -> ProfileSelector {
-    ProfileSelector::path(PathBuf::from(PACKAGE_LOCATION))
+pub(super) fn selector() -> PathBuf {
+    PathBuf::from(PACKAGE_LOCATION)
 }
 
 pub(super) fn executor_with_interruptions(

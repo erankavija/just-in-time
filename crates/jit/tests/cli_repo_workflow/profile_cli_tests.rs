@@ -170,10 +170,7 @@ fn test_profile_show_works_without_repository() {
     assert_eq!(show["profiles"].as_array().unwrap().len(), 1);
     assert_eq!(show["profiles"][0]["manifest"]["id"], "jit-dogfood");
     assert!(show["profiles"][0].get("applied").is_none());
-    assert_eq!(
-        show["profiles"][0]["origin"],
-        serde_json::json!({ "source": "directory", "location": location })
-    );
+    assert_eq!(show["profiles"][0]["origin"], serde_json::json!(location));
     assert!(show["profiles"][0]["package_hash"].as_str().unwrap().len() >= 64);
     assert!(!repo.root().join(".jit").exists());
 }
@@ -323,10 +320,7 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
     // Nothing but the supplied location holds a package declaring this
     // profile, so reporting it at all is that location having been read.
     assert_eq!(show["profiles"][0]["manifest"]["id"], FIXTURE_PROFILE);
-    assert_eq!(
-        show["profiles"][0]["origin"],
-        serde_json::json!({ "source": "directory", "location": location })
-    );
+    assert_eq!(show["profiles"][0]["origin"], serde_json::json!(location));
 }
 
 #[test]
@@ -776,7 +770,7 @@ fn test_init_profile_applies_the_package_a_supplied_location_holds() {
     assert!(repo.root().join("docs/profile.txt").is_file());
     assert_eq!(
         requested_profile(&json(&init)["profile"])["origin"],
-        serde_json::json!({ "source": "directory", "location": location })
+        serde_json::json!(location)
     );
 }
 
@@ -845,11 +839,11 @@ fn test_init_profile_resolves_a_declared_dependency_beside_the_declaring_package
     // directory it was read from, and the named package published its asset.
     assert_eq!(
         applied["profiles"][0]["origin"],
-        serde_json::json!({ "source": "directory", "location": dependency })
+        serde_json::json!(dependency)
     );
     assert_eq!(
         requested_profile(applied)["origin"],
-        serde_json::json!({ "source": "directory", "location": location })
+        serde_json::json!(location)
     );
     assert!(repo.root().join("docs/profile.txt").is_file());
 
@@ -1406,7 +1400,7 @@ fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writi
     let add = json(&add);
     let added = only_profile(&add);
     assert_eq!(added["status"], "would_apply");
-    assert_eq!(added["origin"]["location"], "packages/added");
+    assert_eq!(added["origin"], "packages/added");
     assert!(added["targets"]
         .as_array()
         .is_some_and(|targets| !targets.is_empty()
@@ -1558,8 +1552,8 @@ fn test_profile_pack_packs_every_shipped_package_from_a_repository_holding_it() 
             .expect("the shipped archive reads back");
         if id == "jit-dogfood" {
             assert!(
-                tree.files()
-                    .contains_key("assets/live/.agents/skills/jit-breakdown/SKILL.md"),
+                tree.source_bytes("assets/live/.agents/skills/jit-breakdown/SKILL.md")
+                    .is_some(),
                 "the dogfood archive omitted a declared live consumer"
             );
         }

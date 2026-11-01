@@ -5,12 +5,9 @@
 #![cfg(any(test, feature = "test-support"))]
 
 use crate::commands::CommandExecutor;
-use crate::commands::ProfileSelector;
 use crate::config::ItemKindConfig;
 use crate::domain::{identity::IssueId, DocumentReference};
-use crate::profile::{
-    capture_package_tree, CapturedFile, CapturedPackageTree, ProfilePackage, ProfilePackageModel,
-};
+use crate::profile::{capture_package_tree, ProfilePackage, ProfilePackageModel};
 use crate::repository_state::{Contribution, MapEntryTarget};
 use crate::repository_state::{FileMode, RepositoryEntry, VirtualPath};
 #[cfg(any(test, feature = "test-support"))]
@@ -197,7 +194,7 @@ const PROFILED_REPOSITORY_FIXTURES: [ProfiledRepositoryFixtureSpec; 2] = [
 /// What one fixture profile's entry is built from, captured once per process.
 struct ProfiledRepositoryFixtureInputs {
     key: String,
-    packages: BTreeMap<String, CapturedPackageTree>,
+    packages: BTreeMap<String, ProfilePackage>,
 }
 
 static DIRECT_PROFILED_REPOSITORY_FIXTURES: Mutex<
@@ -311,10 +308,14 @@ fn profiled_repository_fixture_inputs(id: &str) -> Result<ProfiledRepositoryFixt
     let packages = capture_profile_package_closure(id)?;
     let key = profiled_repository_fixture_key(
         &package_closure_sha256(packages.iter().flat_map(|(package_id, package)| {
-            package
-                .files()
-                .iter()
-                .map(move |(relative, file)| (package_id.as_str(), relative.as_str(), file))
+            package.files().iter().map(move |(relative, bytes)| {
+                (
+                    package_id.as_str(),
+                    relative.as_str(),
+                    package.model().file_mode(relative),
+                    bytes.as_slice(),
+                )
+            })
         })),
         CRATE_SOURCE_SHA256,
     );
@@ -331,7 +332,7 @@ fn initialize_profiled_repository_fixture(
     repository: &Path,
     id: &str,
     package_directory: &Path,
-    packages: &BTreeMap<String, CapturedPackageTree>,
+    packages: &BTreeMap<String, ProfilePackage>,
 ) -> Result<()> {
     let package_root = repository.join(package_directory);
     packages.iter().try_for_each(|(package_id, package)| {
@@ -348,7 +349,7 @@ fn initialize_profiled_repository_fixture(
     let layout = storage.repository_layout();
     let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
     let selection = executor.select_profiles(
-        &[ProfileSelector::path(&selected)],
+        &[PathBuf::from(&selected)],
         &crate::commands::ProfileVariableOptions::default(),
     )?;
     executor.initialize_fresh_repository(repository, Some(&selection))?;
@@ -374,7 +375,7 @@ fn write_repository_entries(storage: &InMemoryStorage, layout: &RepositoryLayout
         })
 }
 
-fn capture_profile_package_closure(id: &str) -> Result<BTreeMap<String, CapturedPackageTree>> {
+fn capture_profile_package_closure(id: &str) -> Result<BTreeMap<String, ProfilePackage>> {
     let checkout = repository_checkout();
     let layout = discover_repository_layout(&checkout, checkout.join(".jit"))?;
     let published = published_package_ids();
@@ -401,23 +402,26 @@ fn capture_profile_package_closure(id: &str) -> Result<BTreeMap<String, Captured
     Ok(packages)
 }
 
-/// Digest of a captured package closure, one `(package id, package-relative path, file)` per file.
+/// Digest of a captured package closure, one `(package id, package-relative path, mode, bytes)`
+/// per file.
 fn package_closure_sha256<'a>(
-    files: impl IntoIterator<Item = (&'a str, &'a str, &'a CapturedFile)>,
+    files: impl IntoIterator<Item = (&'a str, &'a str, FileMode, &'a [u8])>,
 ) -> String {
     let mut hasher = Sha256::new();
-    files.into_iter().for_each(|(package_id, relative, file)| {
-        hash_field(&mut hasher, package_id.as_bytes());
-        hash_field(&mut hasher, relative.as_bytes());
-        hash_field(
-            &mut hasher,
-            match file.mode {
-                FileMode::Regular => b"regular",
-                FileMode::Executable => b"executable",
-            },
-        );
-        hash_field(&mut hasher, &file.bytes);
-    });
+    files
+        .into_iter()
+        .for_each(|(package_id, relative, mode, bytes)| {
+            hash_field(&mut hasher, package_id.as_bytes());
+            hash_field(&mut hasher, relative.as_bytes());
+            hash_field(
+                &mut hasher,
+                match mode {
+                    FileMode::Regular => b"regular",
+                    FileMode::Executable => b"executable",
+                },
+            );
+            hash_field(&mut hasher, bytes);
+        });
     format!("{:x}", hasher.finalize())
 }
 
@@ -638,12 +642,12 @@ fn validate_keyed_fixture(entry: &Path, expected_key: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_captured_package(package: &CapturedPackageTree, destination: &Path) -> Result<()> {
-    package.files().iter().try_for_each(|(relative, file)| {
+fn write_captured_package(package: &ProfilePackage, destination: &Path) -> Result<()> {
+    package.files().iter().try_for_each(|(relative, bytes)| {
         let path = destination.join(relative);
         fs::create_dir_all(path.parent().unwrap_or(destination))?;
-        fs::write(&path, &file.bytes)?;
-        set_captured_mode(&path, file.mode)
+        fs::write(&path, bytes)?;
+        set_captured_mode(&path, package.model().file_mode(relative))
     })
 }
 
@@ -1063,12 +1067,7 @@ pub fn capture_repository_package(id: &str, destination: &Path) -> Result<Profil
     if fs::symlink_metadata(destination).is_ok() {
         fs::remove_dir_all(destination)?;
     }
-    for (relative, file) in captured.files() {
-        let path = destination.join(relative);
-        fs::create_dir_all(path.parent().unwrap_or(destination))?;
-        fs::write(&path, &file.bytes)?;
-        set_captured_mode(&path, file.mode)?;
-    }
+    write_captured_package(&captured, destination)?;
     Ok(ProfilePackage::from_directory(destination)?)
 }
 
@@ -1311,7 +1310,7 @@ pub fn profile_package_fixture(name: &str) -> PathBuf {
 /// apply` does.
 pub fn apply_selected_packages<S: IssueStore + crate::storage::RepositoryStateStore>(
     executor: &CommandExecutor<S>,
-    selectors: &[crate::commands::ProfileSelector],
+    selectors: &[PathBuf],
 ) -> Result<crate::profile::ProfileComposedApplyResult> {
     executor
         .select_profiles(
@@ -1342,9 +1341,11 @@ pub fn transition_issue<S: IssueStore + crate::storage::RepositoryStateStore>(
 }
 
 /// The selector naming the directory `package` was read from.
-fn selector_of(package: &crate::profile::ProfilePackage) -> crate::commands::ProfileSelector {
-    let crate::profile::ProfilePackageSource::Directory(path) = package.source();
-    crate::commands::ProfileSelector::path(path.clone())
+fn selector_of(package: &crate::profile::ProfilePackage) -> PathBuf {
+    package
+        .directory()
+        .expect("the selector names a package read from a directory")
+        .to_path_buf()
 }
 
 /// Apply `package` and the packages it depends on.
@@ -1710,9 +1711,7 @@ mod tests {
                 .with_layout(discover_repository_layout(&reference, &jit_root).unwrap());
             let selection = executor
                 .select_profiles(
-                    &[ProfileSelector::path(
-                        reference.join(package_directory).join(spec.id),
-                    )],
+                    &[reference.join(package_directory).join(spec.id)],
                     &crate::commands::ProfileVariableOptions::default(),
                 )
                 .unwrap();
@@ -2160,15 +2159,25 @@ mod tests {
         let mut files = packages
             .iter()
             .flat_map(|(package_id, package)| {
-                package.files().iter().map(move |(relative, file)| {
-                    (package_id.clone(), relative.clone(), file.clone())
+                package.files().iter().map(move |(relative, bytes)| {
+                    (
+                        package_id.clone(),
+                        relative.clone(),
+                        package.model().file_mode(relative),
+                        bytes.clone(),
+                    )
                 })
             })
             .collect::<Vec<_>>();
-        let key = |files: &[(String, String, CapturedFile)]| {
+        let key = |files: &[(String, String, FileMode, Vec<u8>)]| {
             profiled_repository_fixture_key(
-                &package_closure_sha256(files.iter().map(|(package_id, relative, file)| {
-                    (package_id.as_str(), relative.as_str(), file)
+                &package_closure_sha256(files.iter().map(|(package_id, relative, mode, bytes)| {
+                    (
+                        package_id.as_str(),
+                        relative.as_str(),
+                        *mode,
+                        bytes.as_slice(),
+                    )
                 })),
                 CRATE_SOURCE_SHA256,
             )
@@ -2182,7 +2191,7 @@ mod tests {
             "the fixture must key on this closure and the compiled crate source"
         );
 
-        files[0].2.bytes[0] ^= 1;
+        files[0].3[0] ^= 1;
         assert_ne!(key(&files), captured);
     }
 

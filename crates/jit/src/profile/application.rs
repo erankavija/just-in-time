@@ -1,7 +1,7 @@
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
-use crate::domain::ProfileOrigin;
 use crate::profile::ProfilePackageModel;
 use crate::repository_state::FileMode;
+use crate::repository_state::RootRelativePath;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -54,8 +54,8 @@ pub struct ProfileApplyResult {
     pub id: String,
     /// Semantic package version.
     pub version: String,
-    /// Where the package bytes were read from.
-    pub origin: ProfileOrigin,
+    /// Worktree-relative directory the package bytes were read from.
+    pub origin: RootRelativePath,
     /// What this run found or did for this profile.
     pub status: ProfileApplicationStatus,
     /// The targets this profile decides, sorted by path. An observation that
@@ -146,8 +146,8 @@ pub struct ProfileShowEntry {
     pub version: String,
     /// Canonical package model produced from the immutable manifest bytes.
     pub manifest: ProfilePackageModel,
-    /// Package discovery origin.
-    pub origin: ProfileOrigin,
+    /// Worktree-relative directory the package bytes were read from.
+    pub origin: RootRelativePath,
     /// Hash of the complete canonical package.
     pub package_hash: String,
     /// Per-target package hashes.
@@ -243,8 +243,8 @@ pub struct ProfilePackEntry {
     pub id: String,
     /// Semantic version the packed manifest declares.
     pub version: String,
-    /// Where the package bytes were read from.
-    pub origin: ProfileOrigin,
+    /// Worktree-relative directory the package bytes were read from.
+    pub origin: RootRelativePath,
     /// Identity digest of the packed package.
     pub package_hash: String,
     /// Repository-relative package directory that was packed.
@@ -275,8 +275,9 @@ pub struct ProfileAddEntry {
     pub id: String,
     /// Semantic version the added manifest declares.
     pub version: String,
-    /// Where the package will be readable after publication.
-    pub origin: ProfileOrigin,
+    /// Worktree-relative directory the package will be readable at after
+    /// publication.
+    pub origin: RootRelativePath,
     /// Identity digest recomputed from the added content.
     pub package_hash: String,
     /// Path the archive was read from, as the invocation named it.

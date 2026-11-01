@@ -652,7 +652,8 @@ Each repeatable `--profile` selector is a package directory path.
 Human output summarizes each package's identity, compatibility, hashes,
 and contribution and asset counts. JSON returns the
 count-wrapped `ProfileShowResult` collection `{"count": N, "profiles": [...]}`;
-each entry carries `id`, `version`, the complete parsed manifest, `origin`, `package_hash`,
+each entry carries `id`, `version`, the complete parsed manifest, `origin` (the package's
+worktree-relative directory path), `package_hash`,
 `target_hashes`, `file_count`, and `byte_size`. Entries preserve every `--profile`
 occurrence in order, including repeated selectors. `show` does not compare the
 package with current target bytes; use `jit profile apply --profile <DIR>

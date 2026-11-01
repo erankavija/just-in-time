@@ -4,7 +4,7 @@ use std::fmt;
 
 use crate::domain::identity::{is_lowercase_kebab, ProfileId};
 use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
-use crate::repository_state::Contribution;
+use crate::repository_state::{Contribution, FileMode};
 
 /// The only manifest filename recognized at the root of a profile package.
 pub const MANIFEST_FILE_NAME: &str = "manifest.toml";
@@ -102,6 +102,22 @@ pub struct ProfilePackageModel {
     /// Repository roots the package's live assets are drawn from.
     #[serde(default, rename = "live-source")]
     pub live_sources: Vec<LiveSourceDeclaration>,
+}
+
+impl ProfilePackageModel {
+    /// The mode a package file is published with: its declaration decides, and
+    /// every file no declaration marks executable is regular.
+    pub fn file_mode(&self, source: &str) -> FileMode {
+        if self
+            .assets
+            .iter()
+            .any(|asset| asset.executable && asset.source == source)
+        {
+            FileMode::Executable
+        } else {
+            FileMode::Regular
+        }
+    }
 }
 
 /// A package dependency and the version requirement it declares.
