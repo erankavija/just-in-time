@@ -159,7 +159,7 @@ pub fn coverage_credit_namespaces<'a>(
             Assertion::LabelCoverage { config } => Some(config.satisfies_namespace().to_string()),
             Assertion::CriteriaToCheck {
                 check_namespace, ..
-            } => check_namespace.clone(),
+            } => Some(check_namespace.clone()),
             _ => None,
         })
         .collect()
@@ -570,15 +570,13 @@ fn evaluate_one(
             criteria_section,
             marker,
             id_pattern,
-            gate_prefix,
             check_namespace,
         } => evaluate_criteria_to_check(
             rule,
             criteria_section,
             marker.as_deref(),
             id_pattern,
-            gate_prefix.as_deref(),
-            check_namespace.as_deref(),
+            check_namespace,
             firing_issues,
             context.repo_default_format,
             context.plan_content,
@@ -1290,15 +1288,7 @@ fn evaluate_gate_recency(
 /// Evaluate a `criteria-to-check` rule.
 ///
 /// Every criterion id extracted from the configured section of a matching issue
-/// must map to a verifiable check. "Checked" means the issue has EITHER:
-///
-/// - a `gates_required` entry equal to `"<gate_prefix><id>"` (when `gate_prefix`
-///   is configured), OR
-/// - a label `"<check_namespace>:<id>"` (when `check_namespace` is configured).
-///
-/// Either mechanism alone satisfies the criterion. At least one mechanism must be
-/// configured (enforced at load by the `RawCriteriaToCheck::into_assertion`
-/// validator).
+/// must map to a check label naming that issue and criterion.
 ///
 /// # Config
 ///
@@ -1308,14 +1298,8 @@ fn evaluate_gate_recency(
 ///   contribute criterion ids.
 /// - `id_pattern` (default [`crate::declarations::rules::DEFAULT_CRITERION_ID_PATTERN`]): extracts the
 ///   criterion id from an item's text.
-/// - `gate_prefix` (optional): prefix for gate keys. A criterion `id` is
-///   gate-checked when `"<gate_prefix><id>"` is in `gates_required`.
-/// - `check_namespace` (optional): label namespace. A criterion `id` is
-///   label-checked when the issue carries `"<check_namespace>:<own-short-id>/<id>"`.
-///
-/// The finding message names exactly the missing mechanism(s). When only one
-/// mechanism is configured, the message names only that one; when both are
-/// configured, the message names both.
+/// - `check_namespace`: required label namespace. A criterion `id` is checked
+///   when the issue carries `"<check_namespace>:<own-short-id>/<id>"`.
 ///
 /// One finding per unmapped criterion per matching issue. A malformed config
 /// yields a single `config-error` finding.
@@ -1325,8 +1309,7 @@ fn evaluate_criteria_to_check(
     criteria_section: &str,
     marker: Option<&str>,
     id_pattern: &IdPattern,
-    gate_prefix: Option<&str>,
-    check_namespace: Option<&str>,
+    check_namespace: &str,
     issues: &[Issue],
     repo_default_format: ContentFormat,
     plan_content: &HashMap<IssueId, String>,
@@ -1347,18 +1330,14 @@ fn evaluate_criteria_to_check(
                 Err(err) => return vec![config_error(rule, err.to_string())],
             };
             ids.into_iter()
-                .filter(|id| !criterion_is_checked(issue, id, gate_prefix, check_namespace))
+                .filter(|id| !criterion_is_checked(issue, id, check_namespace))
                 .map(|id| {
-                    let missing = describe_missing(
-                        id.as_str(),
-                        &issue.short_id(),
-                        gate_prefix,
-                        check_namespace,
-                    );
+                    let expected_label =
+                        format!("{check_namespace}:{}/{}", issue.short_id(), id.as_str());
                     issue_finding(
                         rule,
                         &issue.id,
-                        format!("criterion '{id}' has no verification: {missing}"),
+                        format!("criterion '{id}' has no check: expected label '{expected_label}'"),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -1366,60 +1345,13 @@ fn evaluate_criteria_to_check(
         .collect()
 }
 
-/// Whether criterion `id` is considered "checked" on `issue`.
-///
-/// A criterion is checked when EITHER the issue has a `gates_required` entry
-/// equal to `"<gate_prefix><id>"` (gate-checked) OR the issue carries a label
-/// naming its own criterion, `"<check_namespace>:<own-short-id>/<id>"`
-/// (label-checked). Either mechanism alone satisfies.
-fn criterion_is_checked(
-    issue: &Issue,
-    id: &str,
-    gate_prefix: Option<&str>,
-    check_namespace: Option<&str>,
-) -> bool {
-    let gate_checked = gate_prefix
-        .map(|prefix| {
-            let gate_key = format!("{prefix}{id}");
-            issue.gates_required.iter().any(|g| g == &gate_key)
-        })
-        .unwrap_or(false);
-
-    // The criterion lives on `issue` itself, so the label must name this issue.
-    let label_checked = check_namespace
-        .map(|ns| {
-            let scope = issue.short_id();
-            issue
-                .labels
-                .iter()
-                .any(|l| label_credits_id(l, ns, id, &scope))
-        })
-        .unwrap_or(false);
-
-    gate_checked || label_checked
-}
-
-/// Build the "expected …" clause of an unmapped-criterion finding, naming only
-/// the configured mechanism(s). `scope` is the criterion owner's short id.
-///
-/// - Both configured: `expected gate '<gate_prefix><id>' or label '<ns>:<scope>/<id>'`
-/// - Only gate:       `expected gate '<gate_prefix><id>'`
-/// - Only label:      `expected label '<ns>:<scope>/<id>'`
-fn describe_missing(
-    id: &str,
-    scope: &str,
-    gate_prefix: Option<&str>,
-    check_namespace: Option<&str>,
-) -> String {
-    match (gate_prefix, check_namespace) {
-        (Some(prefix), Some(ns)) => {
-            format!("expected gate '{prefix}{id}' or label '{ns}:{scope}/{id}'")
-        }
-        (Some(prefix), None) => format!("expected gate '{prefix}{id}'"),
-        (None, Some(ns)) => format!("expected label '{ns}:{scope}/{id}'"),
-        // At-least-one is enforced at load; this arm is unreachable in practice.
-        (None, None) => "expected a verification mechanism (none configured)".to_string(),
-    }
+/// Whether criterion `id` has a check label naming its owning issue.
+fn criterion_is_checked(issue: &Issue, id: &str, check_namespace: &str) -> bool {
+    let scope = issue.short_id();
+    issue
+        .labels
+        .iter()
+        .any(|label| label_credits_id(label, check_namespace, id, &scope))
 }
 
 // ---------------------------------------------------------------------------
@@ -3139,11 +3071,11 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     }
 
     #[test]
-    fn test_criteria_to_check_gate_mapped_id_passes() {
-        // A criterion satisfied via a gates_required entry must produce no finding.
-        let rule = ctc_rule("gate-prefix = \"verify:\"");
+    fn test_criteria_to_check_gate_requirement_does_not_cover_criterion() {
+        // Required gates do not cover criteria; the rule requires a check label.
+        let rule = ctc_rule("check-namespace = \"checks\"");
         let mut initiative = initiative_with_sc(&["[hard] REQ-01: do the thing"]);
-        initiative.gates_required = vec!["verify:REQ-01".to_string()];
+        initiative.gates_required = vec!["manual-review".to_string()];
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3153,10 +3085,11 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
             fixed_now(),
             &HashMap::new(),
         );
-        assert!(
-            findings.is_empty(),
-            "gate-mapped criterion must produce no finding: {findings:?}"
-        );
+        assert_eq!(findings.len(), 1, "a gate alone must not cover a criterion");
+        assert!(findings[0]
+            .finding
+            .message
+            .contains("expected label 'checks:"));
     }
 
     #[test]
@@ -3209,7 +3142,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     #[test]
     fn test_criteria_to_check_unmapped_id_reports_finding() {
         // An unmapped criterion must be reported with its id in the message.
-        let rule = ctc_rule("gate-prefix = \"verify:\", check-namespace = \"checks\"");
+        let rule = ctc_rule("check-namespace = \"checks\"");
         let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         let id = initiative.id.clone();
         let short = initiative.short_id();
@@ -3230,10 +3163,6 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
             "finding must name the criterion id: {msg}"
         );
         assert!(
-            msg.contains("verify:REQ-01"),
-            "finding must name the expected gate: {msg}"
-        );
-        assert!(
             msg.contains(&format!("checks:{short}/REQ-01")),
             "finding must name the expected label: {msg}"
         );
@@ -3242,7 +3171,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     #[test]
     fn test_criteria_to_check_marker_filtering() {
         // Only [hard] items are required when marker = "[hard]".
-        let rule = ctc_rule("marker = \"[hard]\", gate-prefix = \"verify:\"");
+        let rule = ctc_rule("marker = \"[hard]\", check-namespace = \"checks\"");
         let initiative = initiative_with_sc(&[
             "[hard] REQ-01: must do",
             "[aspirational] REQ-02: nice to have",
@@ -3275,34 +3204,8 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     }
 
     #[test]
-    fn test_criteria_to_check_only_gate_mechanism_message() {
-        // When only gate-prefix is configured the finding names only the gate.
-        let rule = ctc_rule("gate-prefix = \"verify:\"");
-        let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[initiative],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert_eq!(findings.len(), 1);
-        let msg = &findings[0].finding.message;
-        assert!(
-            msg.contains("verify:REQ-01"),
-            "gate-only finding must name the gate: {msg}"
-        );
-        assert!(
-            !msg.contains("or label"),
-            "gate-only finding must not mention label: {msg}"
-        );
-    }
-
-    #[test]
-    fn test_criteria_to_check_only_label_mechanism_message() {
-        // When only check-namespace is configured the finding names only the label.
+    fn test_criteria_to_check_unchecked_message_names_check_label() {
+        // An unchecked criterion names the required issue-scoped check label.
         let rule = ctc_rule("check-namespace = \"checks\"");
         let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         let short = initiative.short_id();
@@ -3318,50 +3221,27 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         assert_eq!(findings.len(), 1);
         let msg = &findings[0].finding.message;
         assert!(
-            msg.contains(&format!("checks:{short}/REQ-01")),
-            "label-only finding must name the label: {msg}"
+            msg.contains(&format!(
+                "criterion 'REQ-01' has no check: expected label 'checks:{short}/REQ-01'"
+            )),
+            "finding must name only the expected check label: {msg}"
         );
-        assert!(
-            !msg.contains("or gate"),
-            "label-only finding must not mention gate: {msg}"
-        );
-    }
-
-    #[test]
-    fn test_criteria_to_check_missing_both_mechanisms_is_config_error() {
-        // At least one of gate-prefix / check-namespace is required.
-        // The loader enforces this; we verify it surfaces as a load error.
-        let toml = "[[rules]]\nname = \"bad\"\n\
-                   assert = { criteria-to-check = {} }\n";
-        let err = RuleSet::parse(toml, None, []).unwrap_err();
-        match err {
-            crate::declarations::rules::RuleConfigError::InvalidAssertion { rule, message } => {
-                assert_eq!(rule, "bad");
-                assert!(
-                    message.contains("gate-prefix") && message.contains("check-namespace"),
-                    "error must name both missing fields: {message}"
-                );
-            }
-            other => panic!("expected InvalidAssertion, got {other:?}"),
-        }
     }
 
     #[test]
     fn test_criteria_to_check_stays_per_issue_ignores_children() {
-        // criteria-to-check maps a criterion to the SAME issue's gate/label and
-        // must NOT traverse children. A child carrying the mapping does not
+        // criteria-to-check maps a criterion to the SAME issue's check label and
+        // must NOT traverse children. A child carrying the label does not
         // satisfy the parent's criterion -> the parent still reports.
-        let rule = ctc_rule("gate-prefix = \"verify:\", check-namespace = \"checks\"");
+        let rule = ctc_rule("check-namespace = \"checks\"");
         let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         // A dependent child carries the would-be mapping; per-issue semantics
         // mean this is irrelevant to the initiative.
-        let mut child = typed_issue(
-            "child",
-            4,
-            &[&format!("checks:{}/REQ-01", initiative.short_id())],
-        );
+        let mut child = typed_issue("child", 4, &[]);
         child.dependencies = vec![initiative.id.clone()];
-        child.gates_required = vec!["verify:REQ-01".to_string()];
+        child
+            .labels
+            .push(format!("checks:{}/REQ-01", initiative.short_id()));
         let initiative_id = initiative.id.clone();
 
         let rules = vec![&rule];
@@ -3376,7 +3256,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         assert_eq!(
             findings.len(),
             1,
-            "criteria-to-check is per-issue; a child mapping must not cover: {findings:?}"
+            "criteria-to-check is per-issue; a child label must not cover: {findings:?}"
         );
         assert_eq!(findings[0].issue_id.as_ref(), Some(&initiative_id));
         assert!(findings[0].finding.message.contains("REQ-01"));
@@ -3936,7 +3816,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         // Build `criteria-to-check` with the inline triple from the declared kind's
         // expansion (section + marker + id-pattern all explicit) and assert match.
         let ctc = ctc_rule(&format!(
-            "gate-prefix = \"verify:\", \
+            "check-namespace = \"checks\", \
              criteria-section = \"{kind_section}\", \
              marker = \"{}\", \
              id-pattern = '{kind_pattern}'",

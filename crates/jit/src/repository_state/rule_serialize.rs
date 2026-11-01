@@ -349,12 +349,14 @@ fn render_assertion(
             criteria_section,
             marker,
             id_pattern,
-            gate_prefix,
             check_namespace,
         } => {
-            // Emit only fields that differ from their defaults so the round-trip
-            // is stable (a reload with defaults applied produces the same output).
-            let mut parts: Vec<String> = Vec::new();
+            // Emit the required namespace and only non-default optional fields,
+            // keeping the serialized rule canonical after a reload.
+            let mut parts = vec![format!(
+                "check-namespace = {}",
+                toml_basic_string(check_namespace)
+            )];
             if criteria_section != "success_criteria" {
                 parts.push(format!(
                     "criteria-section = {}",
@@ -369,12 +371,6 @@ fn render_assertion(
                     "id-pattern = {}",
                     toml_literal_string(id_pattern.as_str())
                 ));
-            }
-            if let Some(prefix) = gate_prefix {
-                parts.push(format!("gate-prefix = {}", toml_basic_string(prefix)));
-            }
-            if let Some(ns) = check_namespace {
-                parts.push(format!("check-namespace = {}", toml_basic_string(ns)));
             }
             format!("{{ criteria-to-check = {{ {} }} }}", parts.join(", "))
         }
@@ -754,30 +750,31 @@ assert = {{ require-section = {{ heading = "Goals" }} }}
 
     #[test]
     fn test_round_trip_criteria_to_check() {
-        // The criteria-to-check kind round-trips all its optional fields.
+        // The criteria-to-check kind round-trips its required label namespace
+        // and optional criterion selectors.
         let toml = test_toml(&format!(
             r#"
 [[rules]]
-name = "ctc-both"
+name = "ctc-marked"
 when = {{ type = "__strategic_type__" }}
 severity = "{error}"
 enforce = true
-assert = {{ criteria-to-check = {{ marker = "[hard]", gate-prefix = "verify:", check-namespace = "checks" }} }}
+assert = {{ criteria-to-check = {{ marker = "[hard]", check-namespace = "checks" }} }}
 
 [[rules]]
-name = "ctc-gate-only"
+name = "ctc-default-selectors"
 severity = "{warn}"
-assert = {{ criteria-to-check = {{ gate-prefix = "verify:" }} }}
+assert = {{ criteria-to-check = {{ check-namespace = "checks" }} }}
 
 [[rules]]
-name = "ctc-label-only"
+name = "ctc-custom-pattern"
 severity = "{warn}"
 assert = {{ criteria-to-check = {{ check-namespace = "checks", id-pattern = "SC-[0-9]+" }} }}
 
 [[rules]]
 name = "ctc-custom-section"
 severity = "{warn}"
-assert = {{ criteria-to-check = {{ criteria-section = "acceptance_criteria", gate-prefix = "gate:" }} }}
+assert = {{ criteria-to-check = {{ criteria-section = "acceptance_criteria", check-namespace = "checks" }} }}
 "#,
             error = Severity::Error,
             warn = Severity::Warn,
