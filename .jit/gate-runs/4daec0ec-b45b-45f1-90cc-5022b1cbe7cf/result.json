@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "72b9f4c4283b09c03e1822f4c165032eb0636806",
+  "completed_at": "2026-11-01T19:55:13.259992072Z",
+  "duration_ms": 54774,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The surviving profile interface is accurately documented with no issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "79dc28d7-b552-4227-bb4c-24894863874c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4daec0ec-b45b-45f1-90cc-5022b1cbe7cf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T19:54:18.484993893Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task; reviewed its three reachable `jit:79dc28d7` commits individually. The documentation change and current CLI schema agree: profile commands are `show`, `diff`, `apply`, `pack`, and `add`, with path selectors and shared apply/diff result shape. Uncommitted files were not attributed.\n\nDocumentation impact: complete and accurate within the affected reference and MCP documentation. No issue-impact defects found.\n\nFindings: none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The surviving profile interface is accurately documented with no issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
