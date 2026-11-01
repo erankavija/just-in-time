@@ -280,10 +280,7 @@ async fn get_graph<S: IssueStore>(
             labels: issue.labels.clone(),
             blocked: issue.is_blocked(&issue_map),
             type_name: jit::labels::type_label_value(&issue.labels).map(str::to_string),
-            hierarchy: resolution
-                .get(issue.id.as_str())
-                .cloned()
-                .unwrap_or_default(),
+            hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
         })
         .collect();
 

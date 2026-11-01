@@ -115,8 +115,7 @@ fn test_children_line_matches_issue_status() {
     assert_eq!(child_line, status_out.trim_end());
 }
 
-/// JSON carries the container header, an envelope `count`, and one compact
-/// status object per child.
+/// JSON carries the container header and one compact status object per child.
 #[test]
 fn test_children_json_envelope_with_container_header() {
     let temp = JitCli::initialised().unwrap();
@@ -129,7 +128,6 @@ fn test_children_json_envelope_with_container_header() {
     assert!(json["container"]["state"].is_string());
 
     let issues = json["issues"].as_array().unwrap();
-    assert_eq!(json["count"].as_u64().unwrap() as usize, issues.len());
     assert_eq!(issues.len(), 4);
     // Compact status shape on every entry: short_id/state/gates/
     // unmet_dependencies/title (the same projection as `issue status`).
@@ -264,7 +262,7 @@ fn test_progress_json_counts_mixed_states() {
 }
 
 /// `by_state` enumerates every lifecycle state, unpopulated states present with
-/// count 0 (stable, complete shape). `count` equals the number of buckets.
+/// count 0 (stable, complete shape).
 #[test]
 fn test_progress_json_enumerates_all_states_with_zero() {
     let temp = JitCli::initialised().unwrap();
@@ -275,7 +273,6 @@ fn test_progress_json_enumerates_all_states_with_zero() {
 
     // Seven lifecycle states, always present.
     assert_eq!(by_state.len(), 7);
-    assert_eq!(json["count"].as_u64().unwrap() as usize, by_state.len());
 
     let count_for = |name: &str| -> u64 {
         by_state
