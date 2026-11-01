@@ -1,6 +1,6 @@
 //! Verify field projection and multi-id support for `jit issue show`:
 //! - `--field <name>` prints a single top-level field as plain text
-//! - `--fields a,b` prints those fields as a single compact JSON object
+//! - `--fields a --fields b` prints those fields as a single compact JSON object
 //! - multiple ids with `--json` return the list envelope `{count, issues}`
 //! - unknown fields and mutually-exclusive / multi-id projection combos error
 
@@ -72,7 +72,9 @@ fn test_fields_prints_compact_json_object() {
         .unwrap();
 
     let text = temp
-        .run(["issue", "show", &id, "--fields", "state,title"])
+        .run([
+            "issue", "show", &id, "--fields", "state", "--fields", "title",
+        ])
         .unwrap();
     let trimmed = text.trim();
     // Compact (no spaces after separators), single object.
@@ -140,7 +142,9 @@ fn test_unknown_field_in_fields_list_errors() {
         .unwrap();
 
     let assert = temp
-        .command(["issue", "show", &id, "--fields", "state,bogus", "--json"])
+        .command([
+            "issue", "show", &id, "--fields", "state", "--fields", "bogus", "--json",
+        ])
         .assert()
         .failure();
     let json: serde_json::Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();

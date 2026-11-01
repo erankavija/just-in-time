@@ -375,9 +375,7 @@ Both accept `--json` and emit the list envelope:
 jit issue update <id> --label "epic:auth"
 # If already present, no error (idempotent)
 
-# Add multiple labels atomically (comma-separated)
-jit issue update <id> --label epic:auth,component:backend
-# Or use repeated flags
+# Add multiple labels atomically (repeat the flag)
 jit issue update <id> --label epic:auth --label component:backend
 # All or nothing - if any invalid, none added
 
@@ -392,7 +390,7 @@ jit issue update <id> --type bug
 ```
 
 `--label` has the alias `--add-label` and the short form `-l`. Both `--label` and
-`--remove-label` are repeatable and accept comma-separated values. Removing a label
+`--remove-label` are repeatable, one label per flag. Removing a label
 the issue lacks fails and removes nothing.
 
 ---

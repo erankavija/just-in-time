@@ -634,13 +634,13 @@ pub enum IssueCommands {
 
         /// Gate keys from registry to require (e.g., 'tests', 'code-review').
         /// Gates are quality checkpoints that must pass before issue completion.
-        /// Use comma-separated (--gate tests,clippy) or multiple flags (--gate tests --gate clippy).
+        /// Repeat the flag for several gates (--gate tests --gate clippy).
         /// Gates must be defined in registry first with 'jit gate define'.
-        #[arg(short, long, value_delimiter = ',')]
+        #[arg(short, long)]
         gate: Vec<String>,
 
         /// Labels (format: namespace:value, repeatable)
-        #[arg(short, long, value_delimiter = ',')]
+        #[arg(short, long)]
         label: Vec<String>,
 
         /// Content format of the description body, selecting the parser used to
@@ -756,7 +756,7 @@ pub enum IssueCommands {
     /// Field projection (single id only):
     ///   --field <name>   print one top-level field as plain text (arrays/objects
     ///                    fall back to compact JSON for that field)
-    ///   --fields a,b,c   print those fields as one compact JSON object
+    ///   --fields <name>  (repeatable) print those fields as one compact JSON object
     ///
     /// Pass two or more ids with `--json` to get the list envelope
     /// `{"count": N, "issues": [...]}` with issue objects in argument order.
@@ -764,7 +764,7 @@ pub enum IssueCommands {
     ///
     /// Examples:
     ///   jit issue show abc123 --field state          # -> ready
-    ///   jit issue show abc123 --fields state,title    # -> {"state":"ready",...}
+    ///   jit issue show abc123 --fields state --fields title    # -> {"state":"ready",...}
     ///   jit issue show abc123 def456 --json           # -> {"count":2,"issues":[...]}
     Show {
         /// Issue id(s). Two or more ids with `--json` produce the
@@ -784,9 +784,9 @@ pub enum IssueCommands {
         #[arg(long, value_name = "NAME", conflicts_with = "fields")]
         field: Option<String>,
 
-        /// Print the named comma-separated top-level fields as one compact JSON
+        /// Print the named top-level fields (repeatable) as one compact JSON
         /// object (`{"a":...,"b":...}`). Requires a single id.
-        #[arg(long, value_name = "A,B,C", value_delimiter = ',')]
+        #[arg(long, value_name = "NAME")]
         fields: Vec<String>,
     },
 
@@ -953,19 +953,19 @@ pub enum IssueCommands {
         issue_type: Option<String>,
 
         /// Add label(s) (format: namespace:value, repeatable)
-        #[arg(short, long, value_delimiter = ',', visible_alias = "add-label")]
+        #[arg(short, long, visible_alias = "add-label")]
         label: Vec<String>,
 
         /// Remove label(s) (repeatable)
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long)]
         remove_label: Vec<String>,
 
         /// Add gate(s) to issue (gate keys from registry, repeatable)
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long)]
         add_gate: Vec<String>,
 
         /// Remove gate(s) from issue (repeatable)
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long)]
         remove_gate: Vec<String>,
 
         /// Set assignee (format: type:identifier)
@@ -1660,7 +1660,7 @@ pub enum PresetCommands {
         no_postcheck: bool,
 
         /// Exclude specific gates (repeatable)
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long)]
         except: Vec<String>,
     },
 

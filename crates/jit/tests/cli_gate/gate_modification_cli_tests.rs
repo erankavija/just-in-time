@@ -105,14 +105,22 @@ fn test_add_multiple_gates_multiple_flags() {
 }
 
 #[test]
-fn test_add_multiple_gates_comma_separated() {
+fn test_add_multiple_gates_repeated_flags() {
     let temp = JitCli::initialised().unwrap();
     define_titled_gate(&temp, "tests", "Run tests");
     define_titled_gate(&temp, "clippy", "Run clippy");
     let id = create_titled_issue(&temp, "Test issue");
 
     let output = temp
-        .command(["issue", "update", &id, "--add-gate", "tests,clippy"])
+        .command([
+            "issue",
+            "update",
+            &id,
+            "--add-gate",
+            "tests",
+            "--add-gate",
+            "clippy",
+        ])
         .output()
         .unwrap();
 
@@ -135,7 +143,7 @@ fn test_remove_gate() {
     define_titled_gate(&temp, "clippy", "Run clippy");
     // Create issue with gates
     let id = temp
-        .create_issue(["-t", "Test issue", "--gate", "tests,clippy"])
+        .create_issue(["-t", "Test issue", "--gate", "tests", "--gate", "clippy"])
         .unwrap();
 
     // Remove one gate
@@ -174,7 +182,9 @@ fn test_add_and_remove_gates_combined() {
             "update",
             &id,
             "--add-gate",
-            "clippy,fmt",
+            "clippy",
+            "--add-gate",
+            "fmt",
             "--remove-gate",
             "tests",
         ])

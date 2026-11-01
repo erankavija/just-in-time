@@ -329,7 +329,7 @@ fn test_status_rejects_field_projection_flags() {
         .create_issue(["--title", "X", "--description", "Body"])
         .unwrap();
 
-    for flag in [["--field", "state"], ["--fields", "state,title"]] {
+    for flag in [["--field", "state"], ["--fields", "state"]] {
         let assert = temp
             .command(["issue", "status", &id])
             .args(flag)

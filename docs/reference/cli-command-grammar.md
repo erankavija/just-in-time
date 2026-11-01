@@ -97,15 +97,16 @@ Canonical rules:
   `jit dep add <from> <to>...`, `jit issue show <id>...`,
   `jit gate preset apply <name> [<id>...]` (its id list is optional; zero ids
   applies the preset to nothing).
-- **A list modifier is a repeatable/comma-joined flag.** Where a list tunes the
-  verb rather than naming its subjects, it is a flag that accepts both repetition
-  and comma-separation: `--label a:b --label c:d` or `--label a:b,c:d`. This
-  governs `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`,
-  and `--except`.
+- **A list modifier is a repeated flag.** Where a list tunes the verb rather
+  than naming its subjects, it is a flag repeated once per value:
+  `--label a:b --label c:d`. A value is taken whole, so a comma inside it is
+  part of the value and fails that value's own validation. This governs
+  `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`,
+  `--except`, and `--fields`.
 
 The positional-list-versus-flag-list split is the canonical reason
 `jit gate add abc tests clippy` (subjects) reads differently from
-`jit issue create --gate tests,clippy` (modifier): the first names the gates the
+`jit issue create --gate tests --gate clippy` (modifier): the first names the gates the
 verb attaches; the second tunes a create.
 
 ---
