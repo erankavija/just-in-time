@@ -87,7 +87,7 @@ fn test_validate_repository_detects_invalid_claims_index() {
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(4));
+    assert!(!output.status.success());
     let combined = format!(
         "{}{}",
         String::from_utf8_lossy(&output.stderr),

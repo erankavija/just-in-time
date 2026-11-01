@@ -450,7 +450,7 @@ fn test_validate_whole_repo_json_includes_graph_error_findings_and_exits_nonzero
 }
 
 #[test]
-fn test_validate_retains_rule_findings_with_integrity_failure_and_exit_four() {
+fn test_validate_retains_rule_findings_with_integrity_failure() {
     let cli = JitCli::with_repository(
         profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
@@ -463,14 +463,14 @@ fn test_validate_retains_rule_findings_with_integrity_failure_and_exit_four() {
 
     cli.command(["validate"])
         .assert()
-        .code(4)
+        .failure()
         .stdout(predicate::str::contains("[epic-needs-component]"))
         .stdout(predicate::str::contains("does not exist"));
 
     let output = cli
         .command(["validate", "--json"])
         .assert()
-        .code(4)
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -708,8 +708,7 @@ fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application(
             "--json",
         ])
         .assert()
-        .failure()
-        .code(1);
+        .failure();
     let failed_json: Value = serde_json::from_slice(&failed.get_output().stdout).unwrap();
     let findings = failed_json["error"]["details"]["findings"]
         .as_array()
@@ -750,8 +749,7 @@ fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
         let assert = cli
             .command(["validate", id, "--rule", rule, "--json"])
             .assert()
-            .failure()
-            .code(1);
+            .failure();
         let json: Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
         let findings = json["error"]["details"]["findings"].as_array().unwrap();
         assert!(
@@ -766,7 +764,6 @@ fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
     cli.command(["validate", "--rule", "epic-criteria-covered"])
         .assert()
         .failure()
-        .code(2)
         .stderr(predicate::str::contains("requires a positional issue id"));
 }
 
@@ -796,8 +793,7 @@ fn test_validate_rule_cli_reports_missing_selected_container() {
             "--json",
         ])
         .assert()
-        .failure()
-        .code(1);
+        .failure();
     let json: Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
     let findings = json["error"]["details"]["findings"].as_array().unwrap();
     assert!(findings.iter().any(|finding| {

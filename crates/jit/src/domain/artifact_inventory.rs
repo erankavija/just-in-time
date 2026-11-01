@@ -302,10 +302,6 @@ fn resolved_subtree_members(
 ) -> BTreeSet<IssueId> {
     let issue_refs = issues.iter().collect::<Vec<_>>();
     let resolution = resolve_hierarchy(&issue_refs, hierarchy);
-    let issue_ids: BTreeMap<_, _> = issues
-        .iter()
-        .map(|issue| (issue.id.as_str(), &issue.id))
-        .collect();
     let mut members = BTreeSet::new();
     let mut pending = vec![root.clone()];
 
@@ -313,12 +309,7 @@ fn resolved_subtree_members(
         if !members.insert(id.clone()) {
             continue;
         }
-        pending.extend(
-            resolution
-                .children(id.as_str())
-                .iter()
-                .filter_map(|node| issue_ids.get(node.as_str()).copied().cloned()),
-        );
+        pending.extend(resolution.children(&id).iter().cloned());
     }
     members
 }

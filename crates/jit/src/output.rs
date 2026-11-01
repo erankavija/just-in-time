@@ -1609,8 +1609,8 @@ pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
 ///     type_name: Some("epic".into()),
 ///     hierarchy: NodeHierarchy {
 ///         parent: None,
-///         children: vec![task_id.to_string()],
-///         cluster: Some(epic_id.to_string()),
+///         children: vec![task_id.clone()],
+///         cluster: Some(epic_id.clone()),
 ///         rank: 1,
 ///     },
 /// };
@@ -1659,9 +1659,9 @@ pub struct HierarchyNodeView {
 ///         title: "A task".into(),
 ///         type_name: Some("task".into()),
 ///         hierarchy: NodeHierarchy {
-///             parent: Some(epic_id.to_string()),
+///             parent: Some(epic_id.clone()),
 ///             children: vec![],
-///             cluster: Some(epic_id.to_string()),
+///             cluster: Some(epic_id.clone()),
 ///             rank: 0,
 ///         },
 ///     }],

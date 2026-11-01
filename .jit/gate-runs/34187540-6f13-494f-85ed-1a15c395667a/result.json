@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "086f080e6e0958908b05237712a96f2ef45c6322",
+  "completed_at": "2026-10-31T23:20:22.876677731Z",
+  "duration_ms": 184569,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_item_validate/project_render_cli_tests.rs",
+        "id": "F1",
+        "line": 143,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c780514e/requirement/REQ-01",
+          "@/invariant/orthogonal-tests",
+          "@/invariant/semantic-test-assertions"
+        ],
+        "severity": "high",
+        "summary": "project render --json still asserts projection-owned exit code 4 despite already checking VALIDATION_FAILED."
+      }
+    ],
+    "summary": "One scoped test still re-proves a projection-owned numeric exit code.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "134ee921-9f52-4ec5-80f0-28791fd0e59d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "34187540-6f13-494f-85ed-1a15c395667a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-31T23:17:18.307546021Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3431 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19440-d20a-7d92-af6d-4b0c986f72e6\n--------\nuser\n--- 3418 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c7c36008c, 0a5f81cb1, c25ce771d (merge parent diffs inspected)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/c780514e/requirement/REQ-01 (.jit issue source); @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/essential-code-prose (.jit/invariants.toml); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (reused, 2026-10-31T23:17:17Z); code-review pending\nTruncation recovery: reread bounded projection-suite ranges and performed a focused current assertion sweep\n\n1. **F1 — blocking, issue-impact:** [`project_render_cli_tests.rs:143`](crates/jit/tests/cli_item_validate/project_render_cli_tests.rs:143) still asserts `Some(4)` for `project render --json`. The exit-code projection suite owns the wildcard `*`/4 binding and verifies complete coverage, while this test already preserves its error-class evidence with `VALIDATION_FAILED` at line 151. This leaves REQ-01 unmet by re-proving a projection-owned numeric exit code. References: `@/issue/c780514e/requirement/REQ-01`, `@/invariant/orthogonal-tests`, `@/invariant/semantic-test-assertions`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One scoped test still re-proves a projection-owned numeric exit code.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"project render --json still asserts projection-owned exit code 4 despite already checking VALIDATION_FAILED.\",\"file\":\"crates/jit/tests/cli_item_validate/project_render_cli_tests.rs\",\"line\":143,\"references\":[\"@/issue/c780514e/requirement/REQ-01\",\"@/invariant/orthogonal-tests\",\"@/invariant/semantic-test-assertions\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
