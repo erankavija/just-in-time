@@ -22,6 +22,7 @@
     "6bd02fa4-c44e-49f4-a729-59eae4edf400",
     "7208e568-cef2-4ab0-a2e5-5c85b7882fba",
     "7801f623-3865-4ee2-8891-16652e443faf",
+    "7984d807-acb1-4c61-bc6d-fa7c2f3a52d0",
     "8b6285a6-8958-4ccd-a9fd-477743f98e8d",
     "8d959c96-0fa7-4a0f-980a-88ddf42a9ab8",
     "8da3f7f5-3551-4111-a68a-4d4d4b093617",
@@ -75,5 +76,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Tests run on shared fixtures and guards",
-  "updated_at": "2026-11-01T08:03:34.110981375Z"
+  "updated_at": "2026-11-01T08:30:44.481280965Z"
 }
