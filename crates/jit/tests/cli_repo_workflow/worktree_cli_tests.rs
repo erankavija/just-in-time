@@ -414,6 +414,75 @@ fn test_validate_json_output() {
     assert_eq!(json["valid"], true);
 }
 
+fn seed_origin_main(cli: &JitCli, commit: &str) -> String {
+    cli.git(["update-ref", "refs/remotes/origin/main", commit])
+        .unwrap();
+    cli.git(["rev-parse", "origin/main"])
+        .unwrap()
+        .trim()
+        .to_string()
+}
+
+#[test]
+fn test_git_guards_act_on_the_repository_they_serve_rather_than_the_working_directory() {
+    let up_to_date = JitCli::initialised().unwrap();
+    up_to_date.init_git().unwrap().commit("base").unwrap();
+    seed_origin_main(&up_to_date, "HEAD");
+
+    let diverged = JitCli::initialised().unwrap();
+    diverged.init_git().unwrap().commit("base").unwrap();
+    let ahead = diverged
+        .git(["commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "ahead"])
+        .unwrap();
+    let ahead = seed_origin_main(&diverged, ahead.trim());
+
+    let without_git = JitCli::initialised().unwrap();
+    let outside_git = JitCli::uninitialised().unwrap();
+
+    let data_root = |target: &JitCli| [("JIT_DATA_DIR", target.root().join(".jit"))];
+    let define = |key: &'static str| {
+        [
+            "gate",
+            "define",
+            key,
+            "--title",
+            "t",
+            "--description",
+            "d",
+            "--mode",
+            "manual",
+        ]
+    };
+
+    // A diverged working directory must not refuse a repository that is up to date.
+    diverged
+        .command_with_env(define("wrong-refusal"), data_root(&up_to_date))
+        .assert()
+        .success();
+    // A working directory outside git must not bypass the guard of a diverged repository.
+    outside_git
+        .command_with_env(define("bypass"), data_root(&diverged))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("origin/main"));
+    // A repository without git has no history to guard (`@/charter/D-4`), and a
+    // diverged working directory does not lend it one.
+    diverged
+        .command_with_env(define("git-absent"), data_root(&without_git))
+        .assert()
+        .success();
+
+    diverged
+        .command_with_env(["validate", "--branch-drift"], data_root(&up_to_date))
+        .assert()
+        .success();
+    outside_git
+        .command_with_env(["validate", "--branch-drift"], data_root(&diverged))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(ahead));
+}
+
 #[test]
 fn test_validate_branch_drift_accepts_a_branch_that_matches_origin_main() {
     let cli = JitCli::initialised().unwrap();

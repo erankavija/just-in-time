@@ -36,9 +36,6 @@ impl TestHarness {
     }
 
     fn from_storage(storage: InMemoryStorage) -> Self {
-        // Disable worktree divergence checks in tests
-        crate::test_mode::enable();
-
         // Product initialization seeds the repository and the store's own
         // canonical layout, so session-backed mutations (e.g. the validate-fix
         // path) can open the in-memory mutation session.

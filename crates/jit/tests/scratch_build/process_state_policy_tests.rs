@@ -70,8 +70,7 @@ fn test_workspace_never_mutates_process_state() {
     assert!(
         violations.is_empty(),
         "pass the value explicitly (`Command::env`, `Command::current_dir`, a parameter) instead \
-         of changing the process environment or working directory; JIT_TEST_MODE through \
-         jit::test_mode::enable:\n{}",
+         of changing the process environment or working directory:\n{}",
         violations.join("\n")
     );
 }
