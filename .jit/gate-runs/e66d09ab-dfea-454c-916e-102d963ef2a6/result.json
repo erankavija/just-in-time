@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b0ce9a1163dd1363406bb925b69f01bb82238478",
+  "completed_at": "2026-11-01T14:04:38.126920335Z",
+  "duration_ms": 274928,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 1086,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8"
+        ],
+        "severity": "medium",
+        "summary": "The dirty-target refusal runs only after profile application opens its mutation session, contrary to the issue requirement that it be a pre-session read check."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F2",
+        "line": 1392,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-21"
+        ],
+        "severity": "medium",
+        "summary": "The new target check re-probes Git checkout layout per root instead of using facts detected once for the invocation."
+      }
+    ],
+    "summary": "The dirty-target check is inside the mutation session and re-detects Git layout instead of using invocation-scoped facts.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5f82e09a-2b31-4f51-acf3-7d4c87501ab2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e66d09ab-dfea-454c-916e-102d963ef2a6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T14:00:03.198060181Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12980 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19769-004b-7a12-ba79-c29244521b45\n--------\nuser\n--- 12967 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b0ce9a116, 64975563e, 8de95229a (`jit:5f82e09a`)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; issue descriptions\nResolved items: @/charter/D-4, @/charter/D-8, @/charter/D-21, @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/issue/3d9a0ce3/requirement/REQ-04, @/issue/f4d9502a/requirement/REQ-10\nGate evidence: cargo-ci passed, exit 0, 2026-11-01T13:57:45.638976409+00:00\nTruncation recovery: re-read affected patches, policy sources, merge deltas, session boundaries, and Git-probe paths in bounded calls after two broad reads truncated\n\n1. **F1 — blocking, issue-impact, medium:** The dirty-target refusal occurs after the mutation session is opened. `publish_profile_selection` opens the session at `crates/jit/src/commands/profile.rs:1086`, while the refusal check runs inside that closure at line 1338. This conflicts with the issue’s required read check before opening a mutation session.\n\n2. **F2 — blocking, issue-impact, medium:** Each applicable root is reprobed with `WorktreePaths::detect_from` at `crates/jit/src/commands/profile.rs:1392`, which invokes Git layout detection again (and can do so separately for worktree and data roots). This violates the D-21 requirement that repository layout facts are detected once per invocation and passed down.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The dirty-target check is inside the mutation session and re-detects Git layout instead of using invocation-scoped facts.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The dirty-target refusal runs only after profile application opens its mutation session, contrary to the issue requirement that it be a pre-session read check.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":1086,\"references\":[\"@/charter/D-8\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new target check re-probes Git checkout layout per root instead of using facts detected once for the invocation.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":1392,\"references\":[\"@/charter/D-21\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

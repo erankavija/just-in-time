@@ -7,6 +7,7 @@
   ],
   "description": "Add the git module's query for the commits that touched one path, backed by one `git log` process.\n\n## Background\n\n- Document history walks the whole history from `HEAD` in libgit2 (`get_file_history`, `crates/jit/src/commands/document.rs:864-914`), so its cost grows with project history (`@/charter/D-19`).\n- `git log -z --format=… -- <path>` lists the commits touching a path newest first, applies git's default history simplification, and can use commit-graph filters.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::file_history(path)` runs one `git log` over the path and returns commits newest first with full id, author name, commit time and message.\n- [hard] REQ-02: The behaviour suite covers an added, a changed and a deleted path, a merge identical to one parent, a message with newlines, and counts one process per query.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-01T14:05:18.621291811Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Path history query in the git module",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-01T14:05:18.621291811Z"
 }
