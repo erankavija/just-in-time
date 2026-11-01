@@ -699,7 +699,7 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
     );
     let resolves_before = store.resolve_calls();
 
-    let (_, warnings) = executor
+    executor
         .apply_template_with(
             &plan_template(&taxonomy),
             &container,
@@ -708,10 +708,6 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
         )
         .unwrap();
 
-    assert!(
-        !warnings.is_empty(),
-        "warn mode must exercise lease preflight"
-    );
     assert_eq!(store.resolve_calls(), resolves_before);
     assert_eq!(store.active_sessions.load(Ordering::SeqCst), 0);
 }

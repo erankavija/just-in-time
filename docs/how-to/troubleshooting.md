@@ -113,9 +113,9 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 ### Lease Expired During Work
 
-**Symptom:** A `jit` write refuses with no active lease, or another agent claimed your issue.
+**Symptom:** A `jit` write refuses because another agent holds a lease on your issue.
 
-**Cause:** Your lease expired before the write.
+**Cause:** Your lease expired, and another agent claimed the issue.
 
 **Prevention:**
 - Use longer TTL: `jit claim acquire <issue> --ttl 3600`

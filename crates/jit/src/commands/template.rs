@@ -186,11 +186,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                     captured.config.enforcement_mode(),
                 )
             };
-            let warnings = template_lease_warnings(
+            let warnings = super::refuse_foreign_leases_read(
                 self.require_worktree_paths()?,
                 lease_mode,
                 &lease_targets,
-            )?;
+            )?
+            .into_iter()
+            .map(|(_, warning)| warning)
+            .collect::<Vec<_>>();
 
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(image) =
@@ -265,45 +268,6 @@ fn existing_template_lease_targets(issues: &[Issue], targets: &[IssueId]) -> Vec
         .filter(|id| existing.contains(id))
         .cloned()
         .collect()
-}
-
-fn template_lease_warnings(
-    paths: &crate::storage::WorktreePaths,
-    mode: crate::config::EnforcementMode,
-    targets: &[IssueId],
-) -> Result<Vec<String>> {
-    use crate::agent_config::resolve_agent_id;
-    use crate::config::EnforcementMode;
-    use crate::storage::claim_coordinator::ClaimsIndex;
-
-    if mode == EnforcementMode::Off {
-        return Ok(Vec::new());
-    }
-    let claims = ClaimsIndex::load(paths)?;
-    let agent = resolve_agent_id(None).ok();
-    let now = chrono::Utc::now();
-    let mut warnings = Vec::new();
-    for id in targets {
-        let active = claims.leases.iter().any(|lease| {
-            lease.issue_id == *id
-                && lease.expires_at.is_none_or(|expires| expires > now)
-                && !lease.is_stale(now)
-                && agent
-                    .as_ref()
-                    .is_none_or(|agent_id| lease.agent_id == *agent_id)
-        });
-        if active {
-            continue;
-        }
-        let message =
-            format!("No active lease for issue {id}.\nAcquire lease with: jit claim acquire {id}");
-        match mode {
-            EnforcementMode::Warn => warnings.push(message),
-            EnforcementMode::Strict => return Err(anyhow!(message)),
-            EnforcementMode::Off => unreachable!(),
-        }
-    }
-    Ok(warnings)
 }
 
 struct DerivedTemplateApply {

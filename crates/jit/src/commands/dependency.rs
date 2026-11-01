@@ -203,16 +203,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
-        let warnings = self.refuse_foreign_leases(std::slice::from_ref(issue_id))?;
+        let warnings = self.refuse_foreign_lease(issue_id)?;
         match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
             issue_id: issue_id.clone(),
             dependency_ids: dep_ids.to_vec(),
             policy,
         })? {
-            CapturedDependencyOutcome::Batch(result) => Ok(DependenciesAddResult {
-                warnings: warnings.into_iter().map(|(_, warning)| warning).collect(),
-                ..result
-            }),
+            CapturedDependencyOutcome::Batch(result) => {
+                Ok(DependenciesAddResult { warnings, ..result })
+            }
             _ => unreachable!("batch dependency request returns a batch outcome"),
         }
     }
@@ -277,7 +276,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let lease_warnings = if enforce_lease {
                 let config = crate::repository_state::assemble_config(&image)?;
-                captured_lease_warnings(
+                refuse_foreign_leases_held(
                     config.enforcement_mode(),
                     std::slice::from_ref(
                         expected_source
@@ -387,7 +386,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 else {
                     unreachable!("removal coordinator receives only removals");
                 };
-                captured_lease_warnings(
+                refuse_foreign_leases_held(
                     config.enforcement_mode(),
                     std::slice::from_ref(resolved_id),
                     claims_guard.as_ref(),
@@ -442,17 +441,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Ok(DependenciesRemoveResult::default());
         }
-        let warnings = self.refuse_foreign_leases(std::slice::from_ref(issue_id))?;
+        let warnings = self.refuse_foreign_lease(issue_id)?;
         match self.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveBatch {
                 issue_id: issue_id.clone(),
                 dependency_ids: dep_ids.to_vec(),
             },
         )? {
-            CapturedDependencyOutcome::RemovedBatch(result) => Ok(DependenciesRemoveResult {
-                warnings: warnings.into_iter().map(|(_, warning)| warning).collect(),
-                ..result
-            }),
+            CapturedDependencyOutcome::RemovedBatch(result) => {
+                Ok(DependenciesRemoveResult { warnings, ..result })
+            }
             _ => unreachable!("batch removal returns a batch-removal outcome"),
         }
     }

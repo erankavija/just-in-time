@@ -1403,18 +1403,24 @@ fn test_config_show_reports_the_lease_enforcement_mode_issue_update_applies() {
         fs::write(&config_path, config).unwrap();
         let home = cli.root().join("isolated-home");
         let home = home.to_str().unwrap();
-        let jit = |args: &[&str]| {
+        let jit_as = |agent: &str, args: &[&str]| {
             cli.command_with_env(
                 args,
                 [
                     ("HOME", home),
                     ("JIT_ENFORCE_LEASES", env_mode),
-                    ("JIT_AGENT_ID", "agent:enforcement-probe"),
+                    ("JIT_AGENT_ID", agent),
                 ],
             )
             .output()
             .unwrap()
         };
+        let jit = |args: &[&str]| jit_as("agent:enforcement-probe", args);
+        let holder = jit_as(
+            "agent:holder",
+            &["claim", "acquire", &issue_id, "--ttl", "600"],
+        );
+        assert!(holder.status.success(), "claim acquire failed: {holder:?}");
 
         let show = jit(&["config", "show", "--json"]);
         assert!(show.status.success(), "config show failed: {show:?}");
@@ -1426,7 +1432,7 @@ fn test_config_show_reports_the_lease_enforcement_mode_issue_update_applies() {
             !update.status.success(),
             reported_strict,
             "section {worktree_section:?}, JIT_ENFORCE_LEASES={env_mode}: config show \
-             reported {} but a lease-less update {}: {}",
+             reported {} but an update of another agent's leased issue {}: {}",
             reported["worktree"]["enforce_leases"],
             if update.status.success() {
                 "succeeded"

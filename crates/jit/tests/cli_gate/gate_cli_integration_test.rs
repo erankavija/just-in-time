@@ -250,14 +250,29 @@ fn test_gate_evaluate_stderr_failure_suggests_run_history_view() {
     );
 }
 
+/// Commit the repository and lease `issue_id` to `agent:holder`.
+fn lease_to_another_agent(temp: &JitCli, issue_id: &str) {
+    temp.init_git().unwrap().commit("base").unwrap();
+    temp.command_with_env(
+        ["claim", "acquire", issue_id, "--ttl", "600"],
+        [("JIT_AGENT_ID", "agent:holder")],
+    )
+    .assert()
+    .success();
+}
+
 #[test]
 fn test_gate_evaluate_json_failure_includes_lease_warnings() {
     let temp = JitCli::initialised().unwrap();
     let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 1");
     enable_warn_leases(&temp);
+    lease_to_another_agent(&temp, &issue_id);
 
     let output = temp
-        .command(["gate", "evaluate", &issue_id, "test-gate", "--json"])
+        .command_with_env(
+            ["gate", "evaluate", &issue_id, "test-gate", "--json"],
+            [("JIT_AGENT_ID", "agent:evaluator")],
+        )
         .assert()
         .failure()
         .get_output()
@@ -268,9 +283,10 @@ fn test_gate_evaluate_json_failure_includes_lease_warnings() {
     assert_eq!(json["error"]["code"], "GATE_FAILED");
     let warnings = json["error"]["details"]["warnings"].as_array().unwrap();
     assert!(
-        warnings
-            .iter()
-            .any(|warning| warning.as_str().unwrap().contains("No active lease")),
+        warnings.iter().any(|warning| warning
+            .as_str()
+            .unwrap()
+            .contains("is leased by agent:holder")),
         "expected lease warning in JSON details: {json}"
     );
 }
@@ -280,12 +296,17 @@ fn test_gate_evaluate_human_failure_prints_lease_warnings() {
     let temp = JitCli::initialised().unwrap();
     let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 1");
     enable_warn_leases(&temp);
+    lease_to_another_agent(&temp, &issue_id);
 
-    temp.command(["gate", "evaluate", &issue_id, "test-gate"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("Warning: No active lease"))
-        .stderr(predicate::str::contains("Gate 'test-gate' failed"));
+    temp.command_with_env(
+        ["gate", "evaluate", &issue_id, "test-gate"],
+        [("JIT_AGENT_ID", "agent:evaluator")],
+    )
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("Warning:"))
+    .stderr(predicate::str::contains("is leased by agent:holder"))
+    .stderr(predicate::str::contains("Gate 'test-gate' failed"));
 }
 
 #[test]

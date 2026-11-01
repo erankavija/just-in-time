@@ -1,5 +1,6 @@
-//! What another agent's active lease stops in `strict` mode: every CLI leaf is
-//! classified here, so a new command cannot silently miss the check.
+//! The one lease rule: in `strict` mode another agent's active lease refuses a
+//! write, and no lease lets it through. Every CLI leaf is classified here, so a new
+//! command cannot silently miss the check.
 
 use clap::CommandFactory;
 use jit::cli::Cli;
@@ -16,7 +17,8 @@ const OTHER: &str = "agent:other";
 
 /// How a CLI leaf relates to an issue record another agent has leased.
 enum Coverage {
-    /// Refuses; `{x}`, `{y}` and `{z}` expand to the fixture's issues.
+    /// Refuses on another agent's lease and succeeds with none; `{x}`, `{y}`, `{z}`
+    /// and `{w}` expand to the fixture's issues.
     Refuses(&'static [&'static str]),
     /// Writes the record by a reason [`EXEMPT_PATHS`] proves.
     Exempt,
@@ -60,7 +62,7 @@ const LEAVES: &[(&str, Coverage)] = &[
     ("doc show", NoRecord),
     ("events query", NoRecord),
     ("events tail", NoRecord),
-    ("gate add", Refuses(&["gate", "add", "{x}", "manual"])),
+    ("gate add", Refuses(&["gate", "add", "{x}", "unused"])),
     ("gate define", NoRecord),
     (
         "gate evaluate",
@@ -76,7 +78,7 @@ const LEAVES: &[(&str, Coverage)] = &[
     ),
     (
         "gate fail",
-        Refuses(&["gate", "fail", "{x}", "auto", "--by", OTHER]),
+        Refuses(&["gate", "fail", "{w}", "manual", "--by", OTHER]),
     ),
     ("gate list", NoRecord),
     (
@@ -102,7 +104,7 @@ const LEAVES: &[(&str, Coverage)] = &[
     ("issue assign", Refuses(&["issue", "assign", "{x}", OTHER])),
     ("issue batch-create", NoRecord),
     ("issue children", NoRecord),
-    ("issue claim", Refuses(&["issue", "claim", "{x}", OTHER])),
+    ("issue claim", Refuses(&["issue", "claim", "{w}", OTHER])),
     (
         "issue claim-next",
         Refuses(&[
@@ -110,7 +112,7 @@ const LEAVES: &[(&str, Coverage)] = &[
             "claim-next",
             OTHER,
             "--filter",
-            "state:in_progress",
+            "priority:critical",
         ]),
     ),
     ("issue create", NoRecord),
@@ -213,11 +215,12 @@ struct Repo {
     x: String,
     y: String,
     z: String,
+    w: String,
 }
 
 impl Repo {
     /// A strict repository where [`OWNER`] leases `x`, which depends on `z` and
-    /// links `docs/a.md`; `y` is free.
+    /// links `docs/a.md`, and `w`, ready and the only critical issue; `y` is free.
     fn new() -> Self {
         let cli = JitCli::uninitialised().unwrap();
         cli.init_git().unwrap();
@@ -231,7 +234,8 @@ impl Repo {
                 "[[template]]\nname = \"plan\"\napplies_to = [\"task\"]\n\n",
                 "  [[template.anchors]]\n  name = \"container\"\n\n",
                 "  [[template.nodes]]\n  role = \"planning\"\n  type = \"task\"\n",
-                "  description = \"Plan {container.title}.\"\n",
+                "  description = \"Plan {container.title}.\"\n\n",
+                "  [[template.anchor_edges]]\n  from = \"container\"\n  to = \"planning\"\n",
             ),
         )
         .unwrap();
@@ -240,6 +244,7 @@ impl Repo {
             x: String::new(),
             y: String::new(),
             z: String::new(),
+            w: String::new(),
         };
         repo.append_config(
             "\n[worktree]\nenforce_leases = \"off\"\nwrite_policy = \"allow\"\n\
@@ -249,6 +254,7 @@ impl Repo {
         repo.x = repo.create("Leased");
         repo.y = repo.create("Free");
         repo.z = repo.create("Blocker");
+        repo.w = repo.create("Critical");
         for args in [
             vec![
                 "gate",
@@ -280,16 +286,55 @@ impl Repo {
             ],
             vec!["gate", "add", &repo.y, "manual"],
             vec!["gate", "preset", "create", &repo.y, "seeded"],
+            vec![
+                "gate",
+                "define",
+                "unused",
+                "--title",
+                "U",
+                "--description",
+                "d",
+                "--stage",
+                "postcheck",
+                "--mode",
+                "manual",
+            ],
             vec!["gate", "add", &repo.x, "auto"],
+            vec!["gate", "add", &repo.w, "manual"],
             vec!["dep", "add", &repo.x, &repo.z],
             vec!["doc", "add", &repo.x, "docs/a.md"],
+            vec!["issue", "update", &repo.w, "--priority", "critical"],
+            vec![
+                "issue",
+                "update",
+                &repo.x,
+                "--label",
+                "type:task",
+                "--force",
+            ],
         ] {
             repo.owner(&args);
         }
-        repo.make_strict();
+        repo.set_mode("strict");
         repo.cli.commit("seed").unwrap();
         repo.owner(&["claim", "acquire", &repo.x, "--ttl", "600"]);
+        repo.owner(&["claim", "acquire", &repo.w, "--ttl", "600"]);
+        repo.owner(&["issue", "unassign", &repo.x]);
+        repo.owner(&["issue", "unassign", &repo.w]);
         repo
+    }
+
+    fn release_leases(&self) {
+        self.owner(&["claim", "release", &self.x]);
+        self.owner(&["claim", "release", &self.w]);
+    }
+
+    /// Every issue record and the event log, as they stand.
+    fn snapshot(&self) -> (Vec<String>, usize) {
+        let records = [&self.x, &self.y, &self.z, &self.w]
+            .map(|id| self.raw_record(id))
+            .to_vec();
+        (records, self.events().len())
     }
 
     fn append_config(&self, section: &str) {
@@ -298,14 +343,18 @@ impl Repo {
         std::fs::write(path, config + section).unwrap();
     }
 
-    fn make_strict(&self) {
+    fn set_mode(&self, mode: &str) {
         let path = self.cli.root().join(".jit/config.toml");
         let config = std::fs::read_to_string(&path).unwrap();
-        std::fs::write(
-            path,
-            config.replace("enforce_leases = \"off\"", "enforce_leases = \"strict\""),
-        )
-        .unwrap();
+        let declared = config
+            .lines()
+            .map(|line| match line.starts_with("enforce_leases") {
+                true => format!("enforce_leases = \"{mode}\""),
+                false => line.to_owned(),
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        std::fs::write(path, declared + "\n").unwrap();
     }
 
     fn create(&self, title: &str) -> String {
@@ -339,6 +388,7 @@ impl Repo {
                 "{x}" => self.x.clone(),
                 "{y}" => self.y.clone(),
                 "{z}" => self.z.clone(),
+                "{w}" => self.w.clone(),
                 other => other.to_owned(),
             })
             .collect()
@@ -393,6 +443,7 @@ fn assert_ok(output: &Output) {
 
 fn release_records_the_acting_identity_and_reason() {
     let repo = Repo::new();
+    repo.owner(&["issue", "assign", &repo.x, OWNER]);
 
     assert_ok(&repo.other(&["issue", "release", &repo.x, "lease lapsed"]));
 
@@ -523,7 +574,7 @@ fn clap_leaves(command: &clap::Command, prefix: &str) -> Vec<String> {
 }
 
 #[test]
-fn test_strict_lease_every_cli_leaf_is_classified_and_refusals_change_nothing() {
+fn test_strict_lease_every_cli_leaf_is_classified_and_only_another_agents_lease_refuses() {
     let classified = LEAVES
         .iter()
         .map(|(leaf, _)| (*leaf).to_owned())
@@ -536,24 +587,24 @@ fn test_strict_lease_every_cli_leaf_is_classified_and_refusals_change_nothing() 
     for (leaf, coverage) in LEAVES {
         let Refuses(argv) = coverage else { continue };
         let repo = Repo::new();
-        let before = repo.raw_record(&repo.x);
-        let events_before = repo.events().len();
+        let argv = repo.expand(argv);
+        let argv = argv.iter().map(String::as_str).collect::<Vec<_>>();
+        let before = repo.snapshot();
 
-        let output = repo.other(
-            &repo
-                .expand(argv)
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>(),
-        );
+        let refused = repo.other(&argv);
 
-        assert!(!output.status.success(), "{leaf} must refuse");
-        assert_eq!(repo.raw_record(&repo.x), before, "{leaf} wrote the record");
-        assert_eq!(
-            repo.events().len(),
-            events_before,
-            "{leaf} appended an event"
+        assert!(!refused.status.success(), "{leaf} must refuse");
+        assert!(
+            stderr(&refused).contains(OWNER),
+            "{leaf} refused for another reason: {}",
+            stderr(&refused)
         );
+        assert_eq!(repo.snapshot(), before, "{leaf} changed something");
+
+        repo.release_leases();
+        let unleased = repo.other(&argv);
+
+        assert_ok(&unleased);
     }
 }
 
@@ -585,25 +636,56 @@ fn test_strict_lease_filtered_update_refuses_whole_operation_naming_leased_issue
 }
 
 #[test]
-fn test_strict_lease_new_checks_allow_an_unleased_issue_and_the_holder() {
+fn test_strict_lease_holder_writes_its_own_leased_issue() {
     let repo = Repo::new();
 
-    assert_ok(&repo.other(&["dep", "add", &repo.y, &repo.z]));
-    assert_ok(&repo.other(&["doc", "add", &repo.y, "docs/b.md"]));
     assert_ok(&repo.run(OWNER, &["dep", "rm", &repo.x, &repo.z]));
-    assert_ok(&repo.run(OWNER, &["doc", "remove", &repo.x, "docs/a.md"]));
+}
+
+#[test]
+fn test_strict_lease_refusal_precedes_the_external_precheck() {
+    let repo = Repo::new();
+    repo.owner(&[
+        "gate",
+        "define",
+        "precheck",
+        "--title",
+        "P",
+        "--description",
+        "d",
+        "--stage",
+        "precheck",
+        "--mode",
+        "auto",
+        "--checker-command",
+        "touch precheck-ran",
+    ]);
+    repo.owner(&["gate", "add", &repo.w, "precheck"]);
+    repo.owner(&["issue", "update", &repo.w, "--state", "ready"]);
+    let marker = repo.cli.root().join("precheck-ran");
+    let enter = ["issue", "claim", &repo.w, OTHER];
+
+    let refused = repo.other(&enter);
+
+    assert!(stderr(&refused).contains(OWNER), "{}", stderr(&refused));
+    assert!(!marker.exists(), "the checker ran before the refusal");
+    repo.release_leases();
+    assert_ok(&repo.other(&enter));
+    assert!(marker.exists());
+}
+
+#[test]
+fn test_off_mode_another_agents_lease_refuses_nothing() {
+    let repo = Repo::new();
+    repo.set_mode("off");
+
+    assert_ok(&repo.other(&["issue", "update", &repo.x, "--priority", "high"]));
 }
 
 #[test]
 fn test_warn_mode_dep_add_warns_and_writes() {
     let repo = Repo::new();
-    let path = repo.cli.root().join(".jit/config.toml");
-    let config = std::fs::read_to_string(&path).unwrap();
-    std::fs::write(
-        &path,
-        config.replace("enforce_leases = \"strict\"", "enforce_leases = \"warn\""),
-    )
-    .unwrap();
+    repo.set_mode("warn");
 
     let output = repo.other(&["dep", "add", &repo.x, &repo.y]);
 

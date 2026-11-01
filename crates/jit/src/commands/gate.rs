@@ -694,10 +694,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
+        let warnings = self.refuse_foreign_lease(&full_id)?;
 
         let CapturedIssueMutationOutcome::GatesAdded {
             added,
@@ -738,10 +735,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
+        let warnings = self.refuse_foreign_lease(&full_id)?;
 
         let CapturedIssueMutationOutcome::GatesRemoved { removed, not_found } = self
             .publish_captured_issue_mutation(CapturedIssueMutation::RemoveGates {
@@ -799,10 +793,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
+        let mut warnings = self.refuse_foreign_lease(&full_id)?;
 
         let issue = self.storage.load_issue(&full_id)?;
 
@@ -959,10 +950,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = issue_id.clone();
 
         // Collect warnings instead of printing
-        let mut warnings = Vec::new();
-        if let Some(warning) = self.require_active_lease(&full_id)? {
-            warnings.push(warning);
-        }
+        let warnings = self.refuse_foreign_lease(&full_id)?;
 
         let issue = self.storage.load_issue(&full_id)?;
 
@@ -1290,7 +1278,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             if target != expected_target || mode != expected_mode {
                 return Ok(AttemptOutcome::Retry);
             }
-            let warnings = super::captured_lease_warnings(
+            let warnings = super::refuse_foreign_leases_held(
                 mode,
                 std::slice::from_ref(&target),
                 claims_guard.as_ref(),
