@@ -26,7 +26,7 @@ fn test_create_dependency_free_issue_stamps_first_ready() {
 
 /// A precise chokepoint check: an issue that has NEVER been Ready (forced into
 /// Backlog with the stamp cleared) gets `first_ready_at` set the first time
-/// `update_issue_state` lands it in Ready.
+/// a state update lands it in Ready.
 #[test]
 fn test_backlog_to_ready_transition_stamps_first_ready() {
     let h = TestHarness::new();
@@ -39,10 +39,7 @@ fn test_backlog_to_ready_transition_stamps_first_ready() {
     issue.first_ready_at = None;
     jit::test_harness::seed_memory_issue(&h.storage, &issue);
 
-    h.executor
-        .issues()
-        .update_issue_state(&id, State::Ready)
-        .unwrap();
+    jit::test_utils::transition_issue(&h.executor, &id, State::Ready).unwrap();
 
     let after = h.get_issue(&id);
     assert_eq!(after.state, State::Ready);
@@ -97,10 +94,7 @@ fn test_done_transition_stamps_done_at() {
     let id = h.create_ready_issue("Finishable");
     assert!(h.get_issue(&id).done_at.is_none());
 
-    h.executor
-        .issues()
-        .update_issue_state(&id, State::Done)
-        .unwrap();
+    jit::test_utils::transition_issue(&h.executor, &id, State::Done).unwrap();
 
     let issue = h.get_issue(&id);
     assert_eq!(issue.state, State::Done);

@@ -25,6 +25,7 @@ const REFUSES: &[(&str, &str)] = &[
     ("doc remove", "doc remove {x} docs/a.md"),
     ("claim acquire", "claim acquire {x} --ttl 60"),
     ("gate remove", "gate remove auto"),
+    ("gate update", "gate update auto --title Renamed"),
     ("gate add", "gate add {x} unused"),
     ("gate evaluate", "gate evaluate {x} auto"),
     ("gate evaluate-all", "gate evaluate-all {x}"),
@@ -66,7 +67,6 @@ const NO_RECORD_WRITERS: &[(&str, &str, &str)] = &[
         "gate define extra --title E --description d --stage postcheck --mode manual",
     ),
     ("gate preset create", OTHER, "gate preset create {y} second"),
-    ("gate update", OTHER, "gate update auto --title Renamed"),
     ("hooks install", OTHER, "hooks install"),
     ("init", OTHER, "init"),
     (

@@ -871,13 +871,6 @@ fn ensure_claim_available(
 
 #[derive(Clone)]
 enum CapturedLifecycleMutation {
-    State {
-        issue_id: IssueId,
-        target: State,
-        force: bool,
-        divert_unpassed_gates: bool,
-        enforce_lease: bool,
-    },
     Claim {
         issue_id: IssueId,
         assignee: crate::domain::Assignee,
@@ -904,8 +897,7 @@ enum CapturedLifecycleMutation {
 impl CapturedLifecycleMutation {
     fn issue_id(&self) -> &IssueId {
         match self {
-            Self::State { issue_id, .. }
-            | Self::Claim { issue_id, .. }
+            Self::Claim { issue_id, .. }
             | Self::Release { issue_id, .. }
             | Self::AutoReady { issue_id }
             | Self::AutoBacklog { issue_id }
@@ -915,14 +907,7 @@ impl CapturedLifecycleMutation {
 }
 
 fn lifecycle_requires_prechecks(request: &CapturedLifecycleMutation, issue: &Issue) -> bool {
-    issue.state == State::Ready
-        && matches!(
-            request,
-            CapturedLifecycleMutation::State {
-                target: State::InProgress,
-                ..
-            } | CapturedLifecycleMutation::Claim { .. }
-        )
+    issue.state == State::Ready && matches!(request, CapturedLifecycleMutation::Claim { .. })
 }
 
 /// The full base a precheck-running lifecycle transition reads before taking
@@ -932,12 +917,10 @@ struct PrecheckPreflight {
     image: crate::repository_state::RepositoryImage,
     issue: Issue,
     registry: crate::declarations::GateRegistry,
-    lease_mode: crate::config::EnforcementMode,
 }
 
 struct CapturedLifecycleOutcome {
     changed: bool,
-    warnings: Vec<String>,
     storage_warnings: Vec<crate::storage::StorageWarning>,
 }
 
@@ -2831,26 +2814,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.publish_captured_field_update(request)
     }
 
-    fn publish_captured_state_transition(
-        &self,
-        issue_id: &IssueId,
-        target: State,
-        force: bool,
-        divert_unpassed_gates: bool,
-        enforce_lease: bool,
-    ) -> Result<CapturedLifecycleOutcome>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::State {
-            issue_id: issue_id.clone(),
-            target,
-            force,
-            divert_unpassed_gates,
-            enforce_lease,
-        })
-    }
-
     fn publish_captured_claim(
         &self,
         issue_id: &IssueId,
@@ -2916,15 +2879,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let context = production_mutation_context();
         let mut cached_precheck = None::<CachedPrecheckExecution>;
-        let enforce_lease = matches!(
-            &request,
-            CapturedLifecycleMutation::State {
-                enforce_lease: true,
-                ..
-            }
-        );
-        let coordinate_claims =
-            enforce_lease || matches!(request, CapturedLifecycleMutation::Claim { .. });
+        let coordinate_claims = matches!(request, CapturedLifecycleMutation::Claim { .. });
         with_mutation_attempts("lifecycle mutation", || {
             let (expected_target, expected_precheck_required, precheck) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
@@ -2948,7 +2903,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                             crate::storage::IssueNotFoundError::new(light.target.id.clone())
                         })?;
                     let declarations = crate::repository_state::declarations_from_image(&image)?;
-                    let lease_mode = declarations.config().enforcement_mode();
                     let registry = declarations.gates;
                     // A precheck validating the whole repository runs over
                     // the validation base.
@@ -2970,23 +2924,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                         image,
                         issue,
                         registry,
-                        lease_mode,
                     })
                 } else {
                     None
                 };
                 (light.target.id, should_precheck, precheck)
             };
-            if let (true, Some(precheck)) = (coordinate_claims, &precheck) {
+            if let (true, Some(_)) = (coordinate_claims, &precheck) {
                 // Refuse before running prechecks; the held guard repeats this.
                 let preliminary_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
-                if enforce_lease {
-                    refuse_foreign_leases_held(
-                        precheck.lease_mode,
-                        std::slice::from_ref(&expected_target),
-                        preliminary_guard.as_ref(),
-                    )?;
-                }
                 if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
                     ensure_claim_available(preliminary_guard.as_ref(), &expected_target, assignee)?;
                 }
@@ -3045,7 +2991,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .cloned()
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(expected_target.clone()))?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
-            let lease_mode = declarations.config().enforcement_mode();
             let current_precheck_required = lifecycle_requires_prechecks(&request, &issue);
             if current_precheck_required != expected_precheck_required {
                 return Ok(AttemptOutcome::Retry);
@@ -3070,15 +3015,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     run.evaluation_stability = GateEvaluationStability::InputsMoved;
                 });
             }
-            let mut external_warnings = if enforce_lease {
-                refuse_foreign_leases_held(
-                    lease_mode,
-                    std::slice::from_ref(&expected_target),
-                    claims_guard.as_ref(),
-                )?
-            } else {
-                Vec::new()
-            };
             let storage_warnings = claims_guard
                 .as_ref()
                 .map_or_else(Vec::new, |guard| guard.warnings());
@@ -3146,13 +3082,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Err(error);
             }
             let prechecks_changed = !precheck_runs.is_empty();
-            let (target, force, divert) = match &request {
-                CapturedLifecycleMutation::State {
-                    target,
-                    force,
-                    divert_unpassed_gates,
-                    ..
-                } => (*target, *force, *divert_unpassed_gates),
+            let target = match &request {
                 CapturedLifecycleMutation::Claim { assignee, .. } => {
                     if let Some(existing) = &issue.assignee {
                         if existing != assignee {
@@ -3165,7 +3095,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                         if issue.state == State::InProgress {
                             return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                                 changed: false,
-                                warnings: Vec::new(),
                                 storage_warnings,
                             }));
                         }
@@ -3185,35 +3114,28 @@ impl<S: IssueStore> CommandExecutor<S> {
                             .into());
                         }
                     }
-                    (
-                        if issue.state == State::Ready {
-                            State::InProgress
-                        } else {
-                            issue.state
-                        },
-                        false,
-                        false,
-                    )
+                    if issue.state == State::Ready {
+                        State::InProgress
+                    } else {
+                        issue.state
+                    }
                 }
-                CapturedLifecycleMutation::Release { .. } => (
+                CapturedLifecycleMutation::Release { .. } => {
                     if issue.state == State::InProgress {
                         State::Ready
                     } else {
                         issue.state
-                    },
-                    false,
-                    false,
-                ),
+                    }
+                }
                 CapturedLifecycleMutation::AutoReady { .. } => {
                     let resolved = crate::domain::queries::build_issue_map(&issues);
                     if !issue.should_auto_transition_to_ready(&resolved) {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                             changed: false,
-                            warnings: Vec::new(),
                             storage_warnings,
                         }));
                     }
-                    (State::Ready, false, false)
+                    State::Ready
                 }
                 CapturedLifecycleMutation::AutoBacklog { .. } => {
                     let resolved = crate::domain::queries::build_issue_map(&issues);
@@ -3222,60 +3144,31 @@ impl<S: IssueStore> CommandExecutor<S> {
                     {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                             changed: false,
-                            warnings: Vec::new(),
                             storage_warnings,
                         }));
                     }
-                    (State::Backlog, false, false)
+                    State::Backlog
                 }
                 CapturedLifecycleMutation::AutoDone { .. } => {
                     if !issue.should_auto_transition_to_done() {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                             changed: false,
-                            warnings: Vec::new(),
                             storage_warnings,
                         }));
                     }
-                    (State::Done, false, false)
+                    State::Done
                 }
             };
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = declarations.config();
-            let mut after_apply_error = None;
-            let effective_target = if divert && target == State::Done && issue.has_unpassed_gates()
-            {
-                let blockers = issue::blocking_dependencies(
-                    &issue,
-                    &crate::domain::queries::build_issue_map(&issues),
-                );
-                if !blockers.is_empty() {
-                    return Err(crate::errors::TransitionBlockedError::dependencies(
-                        issue.id.clone(),
-                        target,
-                        issue.state,
-                        blockers,
-                    )
-                    .into());
-                }
-                after_apply_error = Some(crate::errors::TransitionBlockedError::gates(
-                    issue.id.clone(),
-                    State::Done,
-                    State::Gated,
-                    unpassed_gate_blockers(&issue, &declarations.gates),
-                ));
-                State::Gated
-            } else {
-                target
-            };
             let plan_content = validate::plan_content_with_issues(&image, &issues, &issues)?;
-            let (mut warnings, mut events, mut update, blocked) = if issue.state == effective_target
-            {
+            let (mut warnings, mut events, mut update, blocked) = if issue.state == target {
                 (Vec::new(), Vec::new(), None, None)
             } else {
                 match derive_state_transition(
                     issue.clone(),
-                    effective_target,
-                    force,
+                    target,
+                    false,
                     CapturedTransitionEvidence {
                         issues: &issues,
                         declarations: &declarations,
@@ -3299,7 +3192,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             if prechecks_changed && update.is_none() {
                 update = Some(issue.clone());
             }
-            warnings.append(&mut external_warnings);
             if blocked.is_none() {
                 let record = update.as_mut().unwrap_or(&mut issue);
                 match &request {
@@ -3359,25 +3251,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
                 .collect::<Vec<_>>();
             if intents.is_empty() {
-                return match after_apply_error {
-                    Some(error) => Err(error.into()),
-                    None => Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                        changed,
-                        warnings,
-                        storage_warnings,
-                    })),
-                };
+                return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
+                    changed,
+                    storage_warnings,
+                }));
             }
             let plan = finalize(&layout, &image, &context, &intents)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
-            if let Some(error) = blocked.or(after_apply_error) {
+            if let Some(error) = blocked {
                 return Err(error.with_warnings(std::mem::take(&mut warnings)).into());
             }
             Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                 changed,
-                warnings,
                 storage_warnings,
             }))
         })

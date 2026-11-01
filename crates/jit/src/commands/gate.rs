@@ -1144,7 +1144,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// automated mode must have a configured checker (and an exec checker must
     /// have a non-empty command), while a manual gate carries no checker.
     ///
-    /// Returns the updated [`GateDefinition`] so callers can render it.
+    /// Refuses when another agent leases an issue that requires the gate.
+    /// Returns the updated [`GateDefinition`] and the `warn`-mode lease warnings.
     ///
     /// # Examples
     ///
@@ -1170,7 +1171,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     .unwrap();
     ///
     /// // Update only the title; every other field is preserved.
-    /// let updated = executor
+    /// let (updated, _warnings) = executor
     ///     .update_gate(
     ///         &"tests".parse().unwrap(),
     ///         GateUpdate {
@@ -1182,19 +1183,40 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// assert_eq!(updated.title, "All Tests Pass");
     /// assert_eq!(updated.description, "Desc");
     /// ```
-    pub fn update_gate(&self, key: &GateKey, update: GateUpdate) -> Result<GateDefinition>
+    pub fn update_gate(
+        &self,
+        key: &GateKey,
+        update: GateUpdate,
+    ) -> Result<(GateDefinition, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main (mirrors define_gate).
         crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
+        let warnings = self.refuse_foreign_leases_on_gate_users(key)?;
         match self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Update {
             key: key.clone(),
             update,
         })? {
-            CapturedGateRegistryOutcome::Updated(updated) => Ok(*updated),
+            CapturedGateRegistryOutcome::Updated(updated) => Ok((*updated, warnings)),
             _ => unreachable!("update request has one outcome"),
         }
+    }
+
+    /// [`Self::refuse_foreign_leases`] over the issues requiring `key`.
+    fn refuse_foreign_leases_on_gate_users(&self, key: &GateKey) -> Result<Vec<String>> {
+        let requiring = self
+            .storage
+            .list_issues()?
+            .into_iter()
+            .filter(|issue| issue.gates_required.contains(key))
+            .map(|issue| issue.id)
+            .collect::<Vec<_>>();
+        Ok(self
+            .refuse_foreign_leases(&requiring)?
+            .into_iter()
+            .map(|(_, warning)| warning)
+            .collect())
     }
 
     /// Remove a gate definition, refusing when another agent leases an issue that
@@ -1206,18 +1228,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Global operation - enforce common history with main
         crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
 
-        let requiring = self
-            .storage
-            .list_issues()?
-            .into_iter()
-            .filter(|issue| issue.gates_required.contains(key))
-            .map(|issue| issue.id)
-            .collect::<Vec<_>>();
-        let warnings = self.refuse_foreign_leases(&requiring)?;
+        let warnings = self.refuse_foreign_leases_on_gate_users(key)?;
         self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Remove {
             key: key.clone(),
         })?;
-        Ok(warnings.into_iter().map(|(_, warning)| warning).collect())
+        Ok(warnings)
     }
 
     pub fn show_gate_definition(&self, key: &GateKey) -> Result<GateDefinition> {
