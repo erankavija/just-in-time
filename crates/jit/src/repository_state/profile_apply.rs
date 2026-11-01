@@ -1087,7 +1087,7 @@ fn compose_profile_contributions(
             ContributionOutcome::Agreed(contribution) => {
                 decisions.insert(
                     contribution.identity.clone(),
-                    contribution_disposition(base, &contribution.identity)?,
+                    contribution_disposition(base, &contribution)?,
                 );
                 definitions.push(contribution);
             }
@@ -1099,18 +1099,16 @@ fn compose_profile_contributions(
     })
 }
 
-/// What publishing one agreed definition does to the registry.
-///
-/// A registry render publishes a declaration only where the registry has none
-/// under its identity ([`render_composed_contribution`]), so an absent
-/// declaration is created and a held one is left unchanged, whatever it says.
+/// What publishing one agreed definition does to the registry
+/// ([`render_composed_contribution`]).
 fn contribution_disposition(
     base: &RepositoryImage,
-    identity: &ContributionIdentity,
+    contribution: &ComposedContribution,
 ) -> Result<ProfileTargetDisposition, RepositoryStateError> {
-    Ok(match repository_definition(base, identity)? {
+    Ok(match repository_definition(base, &contribution.identity)? {
         None => ProfileTargetDisposition::Create,
-        Some(_) => ProfileTargetDisposition::Unchanged,
+        Some(held) if held == contribution.definition => ProfileTargetDisposition::Unchanged,
+        Some(_) => ProfileTargetDisposition::Update,
     })
 }
 
@@ -1190,22 +1188,27 @@ fn repository_definition(
 /// The declaration one semantic identity addresses inside a registry's authored
 /// text, if that registry declares it.
 ///
-/// This is where a registry's text answers an identity, and it is deliberately
-/// separate from where the text comes from: composition reads it out of a
-/// captured image.
-///
 /// # Errors
 ///
 /// Returns [`RepositoryStateError`] when `text` is not the UTF-8 TOML document
 /// its registry is read from, or when the declaration the identity addresses is
 /// not the shape its target describes.
-pub(crate) fn contribution_in_registry(
+fn contribution_in_registry(
     identity: &ContributionIdentity,
     text: &[u8],
 ) -> Result<Option<Contribution>, RepositoryStateError> {
     let registry = identity.registry.path().repository_relative();
     let document = MergeDocument::load(&registry, Some((text.to_vec(), FileMode::Regular)))?;
-    let semantic = semantic_document(&registry, &document.document)?;
+    contribution_in_document(identity, &registry, &document.document)
+}
+
+/// The declaration one semantic identity addresses inside a parsed registry.
+fn contribution_in_document(
+    identity: &ContributionIdentity,
+    registry: &str,
+    document: &DocumentMut,
+) -> Result<Option<Contribution>, RepositoryStateError> {
+    let semantic = semantic_document(registry, document)?;
     match &identity.target {
         ContributionIdentityTarget::Scalar { target } => {
             let (table, key) = target.config_path();
@@ -1213,7 +1216,7 @@ pub(crate) fn contribution_in_registry(
                 return Ok(None);
             };
             let value = value.as_str().ok_or_else(|| {
-                profile_registry_error(&registry, ProfileRegistryParseError::ScalarTargetNotString)
+                profile_registry_error(registry, ProfileRegistryParseError::ScalarTargetNotString)
             })?;
             Ok(Some(Contribution::Scalar {
                 target: *target,
@@ -1236,11 +1239,11 @@ pub(crate) fn contribution_in_registry(
                 return Ok(None);
             };
             let values = values.as_array().ok_or_else(|| {
-                profile_registry_error(&registry, ProfileRegistryParseError::SetTargetNotArray)
+                profile_registry_error(registry, ProfileRegistryParseError::SetTargetNotArray)
             })?;
             if values.iter().any(|value| !value.is_string()) {
                 return Err(profile_registry_error(
-                    &registry,
+                    registry,
                     ProfileRegistryParseError::SetTargetNonStringMember,
                 ));
             }
@@ -1258,21 +1261,38 @@ pub(crate) fn contribution_in_registry(
             };
             let entries = entries.as_array().ok_or_else(|| {
                 profile_registry_error(
-                    &registry,
+                    registry,
                     ProfileRegistryParseError::NotArrayOfTables {
                         key: target.array_name().to_string(),
                     },
                 )
             })?;
-            Ok(entries
+            let field = target.identity_field();
+            let identities = entries
                 .iter()
-                .find(|entry| {
-                    entry
-                        .get(target.identity_field())
-                        .and_then(JsonValue::as_str)
-                        == Some(name.as_str())
+                .map(|entry| {
+                    entry.get(field).and_then(JsonValue::as_str).ok_or_else(|| {
+                        profile_registry_error(
+                            registry,
+                            ProfileRegistryParseError::MissingIdentity {
+                                field: field.to_string(),
+                            },
+                        )
+                    })
                 })
-                .cloned()
+                .collect::<Result<Vec<_>, _>>()?;
+            if identities.iter().collect::<BTreeSet<_>>().len() != identities.len() {
+                return Err(profile_registry_error(
+                    registry,
+                    ProfileRegistryParseError::DuplicateIdentity {
+                        field: field.to_string(),
+                    },
+                ));
+            }
+            Ok(identities
+                .iter()
+                .position(|actual| *actual == name)
+                .map(|index| entries[index].clone())
                 .map(|value| Contribution::KeyedArray {
                     target: *target,
                     identity: name.clone(),
@@ -1290,7 +1310,7 @@ pub(crate) fn contribution_in_registry(
                     })
                     .map_err(|error| {
                         profile_registry_error(
-                            &registry,
+                            registry,
                             ProfileRegistryParseError::ProjectionDefinition(error.to_string()),
                         )
                     })
@@ -1353,89 +1373,76 @@ fn profile_registry_error(target: &str, source: ProfileRegistryParseError) -> Re
     .into()
 }
 
+/// Write `contribution` as the whole entry under its identity.
+///
+/// A registry already holding exactly this value keeps its bytes, so reapplying
+/// a package does not reformat authored text.
 fn render_composed_contribution(
     registry: &str,
     document: &mut DocumentMut,
     contribution: &Contribution,
 ) -> Result<(), RepositoryStateError> {
-    let semantic = semantic_document(registry, document)?;
-    let context = ContributionRenderContext { registry };
+    let identity = contribution.semantic_identity();
+    if contribution_in_document(&identity, registry, document)?.as_ref() == Some(contribution) {
+        return Ok(());
+    }
     match contribution {
-        Contribution::Scalar { target, value } => {
-            merge_scalar(&context, document, &semantic, *target, value)
-        }
+        Contribution::Scalar { target, value } => render_scalar(registry, document, *target, value),
         Contribution::MapEntry {
             target,
             identity,
             value,
-        } => merge_map_entry(&context, document, &semantic, *target, identity, value),
+        } => render_map_entry(registry, document, *target, identity, value),
         Contribution::SetString { target, value } => {
-            merge_set_string(registry, document, &semantic, *target, value)
+            render_set_string(registry, document, *target, value)
         }
         Contribution::KeyedArray {
             target,
             identity,
             value,
-        } => merge_keyed_array(&context, document, *target, identity, value),
+        } => render_keyed_array(registry, document, *target, identity, value),
         Contribution::Projection { name, value } => {
-            merge_projection(&context, document, &semantic, name, value)
+            render_projection(registry, document, name, value)
         }
     }
 }
 
-/// The registry receiving an already-composed contribution.
-struct ContributionRenderContext<'a> {
-    registry: &'a str,
-}
-
-fn merge_scalar(
-    context: &ContributionRenderContext<'_>,
+fn render_scalar(
+    registry: &str,
     document: &mut DocumentMut,
-    semantic: &JsonValue,
     target: ScalarTarget,
     candidate: &str,
 ) -> Result<(), RepositoryStateError> {
     let (table, key) = target.config_path();
-    if semantic
-        .get(table)
-        .and_then(|table| table.get(key))
-        .is_some()
-    {
-        return Ok(());
-    }
-    ensure_table(document.as_table_mut(), table, context.registry)?.insert(key, candidate.into());
+    ensure_table(document.as_table_mut(), table, registry)?.insert(key, candidate.into());
     Ok(())
 }
 
-fn merge_map_entry(
-    context: &ContributionRenderContext<'_>,
+fn render_map_entry(
+    registry: &str,
     document: &mut DocumentMut,
-    semantic: &JsonValue,
     target: MapEntryTarget,
     identity: &str,
     candidate: &JsonValue,
 ) -> Result<(), RepositoryStateError> {
-    if semantic_map_entry(semantic, target.table_path(), identity).is_some() {
-        return Ok(());
-    }
     match target {
         MapEntryTarget::TypeHierarchyTypes => {
             ensure_inline_table(
-                ensure_table(document.as_table_mut(), "type_hierarchy", context.registry)?,
+                ensure_table(document.as_table_mut(), "type_hierarchy", registry)?,
                 "types",
-                context.registry,
+                registry,
             )?
-            .insert(identity, json_to_edit_value(candidate, context.registry)?);
+            .insert(identity, json_to_edit_value(candidate, registry)?);
         }
         MapEntryTarget::LabelAssociations => {
             ensure_table(
-                ensure_table(document.as_table_mut(), "type_hierarchy", context.registry)?,
+                ensure_table(document.as_table_mut(), "type_hierarchy", registry)?,
                 "label_associations",
-                context.registry,
+                registry,
             )?
             .insert(
                 identity,
-                Item::Value(json_to_edit_value(candidate, context.registry)?),
+                Item::Value(json_to_edit_value(candidate, registry)?),
             );
         }
         MapEntryTarget::Namespaces | MapEntryTarget::ItemKinds => {
@@ -1444,9 +1451,10 @@ fn merge_map_entry(
             } else {
                 "item_kinds"
             };
-            ensure_table(document.as_table_mut(), root, context.registry)?.insert(
+            replace_table_entry(
+                ensure_table(document.as_table_mut(), root, registry)?,
                 identity,
-                Item::Table(json_object_to_table(candidate, context.registry)?),
+                json_object_to_table(candidate, registry)?,
             );
         }
     }
@@ -1464,29 +1472,14 @@ fn semantic_map_entry<'a>(
         .get(identity)
 }
 
-fn merge_set_string(
+/// A set member's identity is its value, so only an absent member reaches here.
+fn render_set_string(
     registry: &str,
     document: &mut DocumentMut,
-    semantic: &JsonValue,
     target: SetStringTarget,
     candidate: &str,
 ) -> Result<(), RepositoryStateError> {
     let (table, key) = target.config_path();
-    let values = semantic.get(table).and_then(|table| table.get(key));
-    if let Some(values) = values {
-        let values = values.as_array().ok_or_else(|| {
-            profile_registry_error(registry, ProfileRegistryParseError::SetTargetNotArray)
-        })?;
-        if values.iter().any(|value| !value.is_string()) {
-            return Err(profile_registry_error(
-                registry,
-                ProfileRegistryParseError::SetTargetNonStringMember,
-            ));
-        }
-        if values.iter().any(|value| value.as_str() == Some(candidate)) {
-            return Ok(());
-        }
-    }
     ensure_array(
         ensure_table(document.as_table_mut(), table, registry)?,
         key,
@@ -1496,46 +1489,24 @@ fn merge_set_string(
     Ok(())
 }
 
-fn merge_keyed_array(
-    context: &ContributionRenderContext<'_>,
+fn render_keyed_array(
+    registry: &str,
     document: &mut DocumentMut,
     target: KeyedArrayTarget,
     identity: &str,
     candidate: &JsonValue,
 ) -> Result<(), RepositoryStateError> {
     let field = target.identity_field();
-    let (array, preserved_comment) = ensure_array_of_tables(
-        document.as_table_mut(),
-        target.array_name(),
-        context.registry,
-    )?;
-    let mut identities = BTreeSet::new();
-    let mut existing = false;
-    for table in array.iter() {
-        let Some(actual) = table.get(field).and_then(Item::as_str) else {
-            return Err(profile_registry_error(
-                context.registry,
-                ProfileRegistryParseError::MissingIdentity {
-                    field: field.to_string(),
-                },
-            ));
-        };
-        if !identities.insert(actual.to_string()) {
-            return Err(profile_registry_error(
-                context.registry,
-                ProfileRegistryParseError::DuplicateIdentity {
-                    field: field.to_string(),
-                },
-            ));
-        }
-        if actual == identity {
-            existing = true;
-        }
-    }
-    if existing {
+    let (array, preserved_comment) =
+        ensure_array_of_tables(document.as_table_mut(), target.array_name(), registry)?;
+    let mut table = json_object_to_table(candidate, registry)?;
+    let held = array
+        .iter()
+        .position(|entry| entry.get(field).and_then(Item::as_str) == Some(identity));
+    if let Some(prior) = held.and_then(|index| array.get_mut(index)) {
+        *prior = in_place_of(prior, table);
         return Ok(());
     }
-    let mut table = json_object_to_table(candidate, context.registry)?;
     if let Some(comment) = preserved_comment {
         table.decor_mut().set_prefix(comment);
     }
@@ -1543,26 +1514,37 @@ fn merge_keyed_array(
     Ok(())
 }
 
-fn merge_projection(
-    context: &ContributionRenderContext<'_>,
+fn render_projection(
+    registry: &str,
     document: &mut DocumentMut,
-    semantic: &JsonValue,
     name: &str,
     candidate: &CompleteProjectionConfig,
 ) -> Result<(), RepositoryStateError> {
     let candidate = serde_json::to_value(candidate).expect("projection config serializes");
-    if semantic
-        .get("projection")
-        .and_then(|projections| projections.get(name))
-        .is_some()
-    {
-        return Ok(());
-    }
-    ensure_table(document.as_table_mut(), "projection", context.registry)?.insert(
+    replace_table_entry(
+        ensure_table(document.as_table_mut(), "projection", registry)?,
         name,
-        Item::Table(json_object_to_table(&candidate, context.registry)?),
+        json_object_to_table(&candidate, registry)?,
     );
     Ok(())
+}
+
+fn replace_table_entry(parent: &mut Table, key: &str, replacement: Table) {
+    let replacement = match parent.get(key).and_then(Item::as_table) {
+        Some(prior) => in_place_of(prior, replacement),
+        None => replacement,
+    };
+    parent.insert(key, Item::Table(replacement));
+}
+
+/// `replacement` at the document position and with the surrounding comments of
+/// `prior`, so replacing an entry moves no other entry's text.
+fn in_place_of(prior: &Table, mut replacement: Table) -> Table {
+    *replacement.decor_mut() = prior.decor().clone();
+    if let Some(position) = prior.position() {
+        replacement.set_position(position);
+    }
+    replacement
 }
 
 fn semantic_document(
@@ -1837,18 +1819,22 @@ mod tests {
     }
 
     /// Render one contribution that has already passed semantic composition.
-    fn merge_authored_contribution(
+    fn render_contribution(
         document: &mut DocumentMut,
         contribution: &Contribution,
     ) -> Result<(), RepositoryStateError> {
-        render_composed_contribution(".jit/config.toml", document, contribution)
+        render_composed_contribution(
+            &contribution.registry_path().repository_relative(),
+            document,
+            contribution,
+        )
     }
 
     fn namespace_contribution(identity: &str, description: &str) -> Contribution {
         Contribution::MapEntry {
             target: MapEntryTarget::Namespaces,
             identity: identity.to_string(),
-            value: serde_json::json!({ "description": description }),
+            value: serde_json::json!({ "description": description, "unique": false }),
         }
     }
 
@@ -2034,7 +2020,7 @@ mod tests {
     }
 
     /// The repository is never a conflict party: a registry already declaring
-    /// the identity differently keeps its entry and the decision is no conflict.
+    /// the identity differently is updated to the package's value.
     #[test]
     fn test_compose_profile_targets_never_contests_a_differing_registry_declaration() {
         let (image, layout) = image_holding(
@@ -2056,7 +2042,15 @@ mod tests {
             composition
                 .contribution_decisions
                 .get(&contribution.semantic_identity()),
-            Some(&ProfileTargetDisposition::Unchanged)
+            Some(&ProfileTargetDisposition::Update)
+        );
+        assert_eq!(
+            contribution_in_registry(
+                &contribution.semantic_identity(),
+                &composition.targets[&VirtualPath::CONFIG].0,
+            )
+            .unwrap(),
+            Some(contribution)
         );
     }
 
@@ -2292,8 +2286,7 @@ mod tests {
             (ScalarTarget::ValidationStrictness, "strict".to_string()),
             (ScalarTarget::ValidationDefaultType, "work-item".to_string()),
         ] {
-            merge_authored_contribution(&mut document, &Contribution::Scalar { target, value })
-                .unwrap();
+            render_contribution(&mut document, &Contribution::Scalar { target, value }).unwrap();
         }
 
         let json: JsonValue = toml_edit::de::from_str(&document.to_string()).unwrap();
@@ -2321,7 +2314,7 @@ mod tests {
                 "workspace/active",
             ),
         ] {
-            merge_authored_contribution(
+            render_contribution(
                 &mut document,
                 &Contribution::SetString {
                     target,
@@ -2346,19 +2339,188 @@ mod tests {
         );
     }
 
+    /// One package value per contribution kind beside the registry text it
+    /// lands on: a differing prior entry under its identity carrying a field the
+    /// package does not declare, and the text of an entry it does not contribute.
+    fn differing_registry_entries() -> Vec<(&'static str, &'static str, Contribution)> {
+        let map_entry = |target, value| Contribution::MapEntry {
+            target,
+            identity: "shared".to_string(),
+            value,
+        };
+        let keyed = |target, field: &str| Contribution::KeyedArray {
+            target,
+            identity: "shared".to_string(),
+            value: serde_json::json!({ field: "shared", "description": "Package." }),
+        };
+        vec![
+            (
+                "[validation]\nstrictness = \"loose\" # sibling\ndefault_type = \"task\"\n",
+                "strictness = \"loose\" # sibling\n",
+                Contribution::Scalar {
+                    target: ScalarTarget::ValidationDefaultType,
+                    value: "story".to_string(),
+                },
+            ),
+            (
+                "[type_hierarchy]\ntypes = { sibling = 1, shared = 2 }\n",
+                "sibling = 1",
+                map_entry(MapEntryTarget::TypeHierarchyTypes, serde_json::json!(3)),
+            ),
+            (
+                "[type_hierarchy.label_associations]\nsibling   = \"s\"\nshared = \"held\"\n",
+                "sibling   = \"s\"\n",
+                map_entry(MapEntryTarget::LabelAssociations, serde_json::json!("new")),
+            ),
+            (
+                "[namespaces.sibling] # sibling\ndescription   = \"S\"\n\n\
+                 [namespaces.shared]\ndescription = \"Held.\"\nunique = false\n",
+                "[namespaces.sibling] # sibling\ndescription   = \"S\"\n",
+                map_entry(
+                    MapEntryTarget::Namespaces,
+                    serde_json::json!({ "description": "Package." }),
+                ),
+            ),
+            (
+                "[item_kinds.shared]\nsource = \"held\"\nextra = true\n\n\
+                 [item_kinds.sibling] # sibling\nsource   = \"s\"\n",
+                "[item_kinds.sibling] # sibling\nsource   = \"s\"\n",
+                map_entry(
+                    MapEntryTarget::ItemKinds,
+                    serde_json::json!({ "source": "package" }),
+                ),
+            ),
+            (
+                "[[gates]]\nkey = \"sibling\" # sibling\n\n\
+                 [[gates]]\nkey = \"shared\"\ndescription = \"Held.\"\nextra = true\n",
+                "[[gates]]\nkey = \"sibling\" # sibling\n",
+                keyed(KeyedArrayTarget::Gates, "key"),
+            ),
+            (
+                "[[invariants]]\nid = \"shared\"\nextra = true\n\n\
+                 [[invariants]]\nid = \"sibling\" # sibling\n",
+                "[[invariants]]\nid = \"sibling\" # sibling\n",
+                keyed(KeyedArrayTarget::Invariants, "id"),
+            ),
+            (
+                "[[rules]]\nname = \"shared\"\nextra = true\n\n\
+                 [[rules]]\nname = \"sibling\" # sibling\n",
+                "[[rules]]\nname = \"sibling\" # sibling\n",
+                keyed(KeyedArrayTarget::Rules, "name"),
+            ),
+            (
+                "[[template]]\nname = \"shared\"\nextra = true\n\n\
+                 [[template]]\nname = \"sibling\" # sibling\n",
+                "[[template]]\nname = \"sibling\" # sibling\n",
+                keyed(KeyedArrayTarget::Templates, "name"),
+            ),
+            (
+                "[projection.sibling] # sibling\ntarget   = \"S.md\"\n\n\
+                 [projection.shared]\nkind = \"invariant\"\nmode = \"region\"\n\
+                 target = \"HELD.md\"\nstyle = \"id-anchor\"\n",
+                "[projection.sibling] # sibling\ntarget   = \"S.md\"\n",
+                Contribution::Projection {
+                    name: "shared".to_string(),
+                    value: serde_json::from_value(serde_json::json!({
+                        "kind": "rule",
+                        "mode": "separate-file",
+                        "target": "SHARED.md",
+                        "style": "full",
+                    }))
+                    .unwrap(),
+                },
+            ),
+        ]
+    }
+
     #[test]
-    fn test_scalar_renderer_preserves_an_existing_composed_definition() {
-        let mut document = "[validation]\ndefault_type = \"task\"\n"
+    fn test_render_composed_contribution_replaces_the_whole_entry_for_each_kind() {
+        for (authored, _, contribution) in differing_registry_entries() {
+            let mut document = authored.parse::<DocumentMut>().unwrap();
+            render_contribution(&mut document, &contribution).unwrap();
+            assert_eq!(
+                contribution_in_registry(
+                    &contribution.semantic_identity(),
+                    document.to_string().as_bytes(),
+                )
+                .unwrap(),
+                Some(contribution),
+                "rendered over {authored}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_render_composed_contribution_keeps_the_bytes_of_entries_it_does_not_contribute() {
+        for (authored, sibling, contribution) in differing_registry_entries() {
+            let mut document = authored.parse::<DocumentMut>().unwrap();
+            render_contribution(&mut document, &contribution).unwrap();
+            assert!(
+                document.to_string().contains(sibling),
+                "{sibling:?} lost from {document}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_render_composed_contribution_appends_an_absent_set_member_beside_held_members() {
+        let mut document = "[type_hierarchy]\nstrategic_types = [ \"epic\" ] # held\n"
             .parse::<DocumentMut>()
             .unwrap();
-        let contribution = Contribution::Scalar {
-            target: ScalarTarget::ValidationDefaultType,
-            value: "task".to_string(),
-        };
-        merge_authored_contribution(&mut document, &contribution).unwrap();
+        render_contribution(
+            &mut document,
+            &Contribution::SetString {
+                target: SetStringTarget::StrategicTypes,
+                value: "milestone".to_string(),
+            },
+        )
+        .unwrap();
+        let json: JsonValue = toml_edit::de::from_str(&document.to_string()).unwrap();
         assert_eq!(
-            document["validation"]["default_type"].as_str(),
-            Some("task")
+            json["type_hierarchy"]["strategic_types"],
+            serde_json::json!(["epic", "milestone"])
+        );
+    }
+
+    /// Reapplication must not reformat authored text that already says the same.
+    #[test]
+    fn test_render_composed_contribution_keeps_the_bytes_of_an_exact_entry() {
+        let authored =
+            "[namespaces.shared] # authored\ndescription   =   \"Same.\"\nunique = false\n";
+        let mut document = authored.parse::<DocumentMut>().unwrap();
+        render_contribution(&mut document, &namespace_contribution("shared", "Same.")).unwrap();
+        assert_eq!(document.to_string(), authored);
+    }
+
+    #[test]
+    fn test_contribution_disposition_compares_the_package_value_with_the_held_entry() {
+        let (image, _) = image_holding(
+            b"[namespaces.shared]\ndescription = \"Held.\"\nunique = false\n",
+            &[],
+        );
+        let disposition = |identity: &str, description: &str| {
+            let definition = namespace_contribution(identity, description);
+            contribution_disposition(
+                &image,
+                &ComposedContribution {
+                    identity: definition.semantic_identity(),
+                    definition,
+                    owners: Vec::new(),
+                },
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            disposition("absent", "New."),
+            ProfileTargetDisposition::Create
+        );
+        assert_eq!(
+            disposition("shared", "Held."),
+            ProfileTargetDisposition::Unchanged
+        );
+        assert_eq!(
+            disposition("shared", "New."),
+            ProfileTargetDisposition::Update
         );
     }
 

@@ -34,6 +34,7 @@ use super::image::{
 };
 use super::mutation::{finalize_audit_append, fresh_index_bytes, MutationContext, MutationError};
 use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
+use super::profile_apply::ProfileTargetDecision;
 use super::rule_serialize::serialize_ruleset;
 use super::MaterializationDerivation;
 use super::RepositoryStateError;
@@ -831,19 +832,6 @@ fn derive_profile_application_candidate(
         contested_assets,
     )
     .map_err(rule_materialization_error)?;
-    // The composition already decided every target this profile participates in.
-    // Publication reads those decisions rather than re-deriving them, so what a
-    // difference report states and what this candidate writes are one answer.
-    let targets = composed
-        .decisions
-        .iter()
-        .map(|(path, decision)| ProfileTargetMaterialization {
-            owner: profile.id.clone(),
-            path: path.clone(),
-            disposition: decision.disposition.clone(),
-            mode: decision.mode,
-        })
-        .collect::<Vec<_>>();
     let contributions = composed
         .contribution_decisions
         .iter()
@@ -895,9 +883,56 @@ fn derive_profile_application_candidate(
     let mut all = directory_actions(base, &actions, &[])?;
     all.extend(actions);
     let delta = RepositoryDelta::new(base.layout(), all)?;
+    // The delta decides every file this candidate writes, the derived ones
+    // included, so what a report states and what is written are one answer. What
+    // the delta leaves out keeps the composition's decision.
+    let mut decisions = composed.decisions;
+    for action in delta.file_writes() {
+        let path = action.path();
+        let conflicted = matches!(
+            decisions.get(path),
+            Some(decision) if matches!(decision.disposition, ProfileTargetDisposition::Conflict(_))
+        );
+        if !conflicted {
+            decisions.insert(path.clone(), written_file_decision(base, action)?);
+        }
+    }
+    let targets = decisions
+        .into_iter()
+        .map(|(path, decision)| ProfileTargetMaterialization {
+            owner: profile.id.clone(),
+            path,
+            disposition: decision.disposition,
+            mode: decision.mode,
+        })
+        .collect();
     Ok(MaterializationDerivation::new(delta)
         .with_profile_targets(targets)
         .with_profile_contributions(contributions))
+}
+
+/// What one of [`RepositoryDelta::file_writes`] does to its file.
+fn written_file_decision(
+    base: &RepositoryImage,
+    action: &RepositoryAction,
+) -> Result<ProfileTargetDecision, InitializationError> {
+    let held = !matches!(base.entry(action.path())?, RepositoryEntry::Absent);
+    Ok(match action {
+        RepositoryAction::WriteFile { mode, .. } | RepositoryAction::SetMode { mode, .. } => {
+            ProfileTargetDecision {
+                disposition: if held {
+                    ProfileTargetDisposition::Update
+                } else {
+                    ProfileTargetDisposition::Create
+                },
+                mode: *mode,
+            }
+        }
+        _ => ProfileTargetDecision {
+            disposition: ProfileTargetDisposition::Remove,
+            mode: FileMode::Regular,
+        },
+    })
 }
 
 /// Compose one profile selection and record its aggregate lifecycle outcome.

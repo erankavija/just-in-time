@@ -129,6 +129,7 @@ pub(crate) fn profile_plan_entry(
         status,
         targets,
         contributions,
+        refusal: None,
     }
 }
 
@@ -198,6 +199,7 @@ fn target_action(disposition: &ProfileTargetDisposition) -> ProfileTargetAction 
         ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
         ProfileTargetDisposition::Create => ProfileTargetAction::Create,
         ProfileTargetDisposition::Update => ProfileTargetAction::Update,
+        ProfileTargetDisposition::Remove => ProfileTargetAction::Remove,
         ProfileTargetDisposition::Conflict(_) => ProfileTargetAction::Conflict,
     }
 }

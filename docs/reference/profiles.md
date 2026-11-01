@@ -297,14 +297,16 @@ Commands](cli-commands.md#profile-commands).
 
 Use `jit profile diff` before a change to see every target and semantic
 declaration a selection would create, update, leave unchanged, or conflict on. An
-existing declaration whose value differs reports as `unchanged`, because
-publication keeps the repository's entry.
+existing declaration whose value differs reports as `update`, because
+publication replaces the whole entry under its identity with the package's value.
 
 Start with a rehearsal for any mutation. `--dry-run` runs the same planning and
 validation as its corresponding `apply`, `pack`, or `add` command, but writes no target or lifecycle
-event. Unlike a rehearsal, `jit profile diff` reports all conflicts so an
-operator can identify each conflicting target or declaration and the packages
-defining it.
+event, so it fails where the command would, including on final validation of
+the proposed repository. Unlike a rehearsal, `jit profile diff` reports all
+conflicts so an operator can identify each conflicting target or declaration and
+the packages defining it, and states a final-validation refusal, such as a
+configured projection left stale.
 
 A refused publication's `PROFILE_CONFLICT` error carries
 `error.details.conflicts[]` in the [standard `--json` error

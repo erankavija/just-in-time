@@ -868,6 +868,20 @@ pub fn setup_test_repo_with_config(
     Ok((temp, executor))
 }
 
+/// Configuration fragment projecting the gate registry to `docs/gates.md`.
+pub const GATE_PROJECTION_CONFIG: &str = "\n[item_kinds.gate]\nsection = \"success_criteria\"\n\
+id-pattern = \"[a-z][a-z0-9-]*\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\n\
+scope = \"project\"\nsource = { toml = \".jit/gates.toml\", table = \"gates\", \
+id-field = \"key\", text-field = \"description\" }\nsource-of-truth = \"registry-first\"\n\n\
+[projection.gates]\nkind = \"gate\"\nmode = \"separate-file\"\n\
+target = \"docs/gates.md\"\nstyle = \"id-anchor\"\n";
+
+/// Package-manifest fragment declaring a gate, which leaves a rendered
+/// [`GATE_PROJECTION_CONFIG`] projection stale.
+pub const NEW_GATE_CONTRIBUTION: &str = "\n[[contribution]]\nkind = \"keyed-array\"\n\
+target = \"gates\"\nidentity = \"new-gate\"\nvalue = { version = 1, key = \"new-gate\", \
+title = \"New\", description = \"New gate\", stage = \"postcheck\", mode = \"manual\" }\n";
+
 /// A temporary directory holding exactly `files`, each a worktree-relative path
 /// (parents created) with its contents.
 ///

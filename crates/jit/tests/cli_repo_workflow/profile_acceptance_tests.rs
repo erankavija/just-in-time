@@ -871,6 +871,7 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             "contributions",
             "id",
             "origin",
+            "refusal",
             "status",
             "targets",
             "version",
@@ -1138,6 +1139,50 @@ fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
         snapshot_tree(repo.root()),
         before,
         "the report writes nothing"
+    );
+}
+
+/// A final-validation refusal fails the repository check and reaches the
+/// report's reader, in both output forms.
+#[test]
+fn test_profile_diff_exits_on_a_final_validation_refusal_it_still_reports() {
+    let repo = JitCli::uninitialised().unwrap();
+    seed_unapplied_planner(&repo);
+    let config = repo.root().join(".jit/config.toml");
+    let authored = fs::read_to_string(&config).expect("read the configuration");
+    fs::write(
+        &config,
+        format!("{authored}{}", jit::test_utils::GATE_PROJECTION_CONFIG),
+    )
+    .expect("configure a gate projection");
+    success_json(&repo, &["project", "render", "--json"]);
+    let manifest = repo
+        .root()
+        .join("packages/planner")
+        .join(jit::profile::MANIFEST_FILE_NAME);
+    let declared = fs::read_to_string(&manifest).expect("read the package manifest");
+    fs::write(
+        &manifest,
+        format!("{declared}{}", jit::test_utils::NEW_GATE_CONTRIBUTION),
+    )
+    .expect("declare a gate the projection would have to render");
+
+    let (status, report) = profile_difference(&repo, &["packages/planner"]);
+    let human = jit_with_path(
+        &repo,
+        &["profile", "diff", "--profile", "packages/planner"],
+        None,
+    );
+
+    assert!(!status.success(), "{report}");
+    let refusal = report["profiles"][0]["refusal"]
+        .as_str()
+        .unwrap_or_else(|| panic!("the report states the refusal: {report}"));
+    assert!(refusal.contains("docs/gates.md"), "{refusal}");
+    assert!(!human.status.success());
+    assert!(
+        String::from_utf8_lossy(&human.stdout).contains(refusal.lines().last().unwrap()),
+        "{human:?}"
     );
 }
 
