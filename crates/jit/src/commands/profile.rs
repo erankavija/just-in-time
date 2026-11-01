@@ -2,14 +2,13 @@ use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::identity::ProfileId;
 use crate::domain::{ProfileLifecycleOperation, ProfileOrigin};
 use crate::profile::{
-    build_profile_claims_from_resolved, capture_package_tree, pack_captured_package_archive,
-    read_package_archive, resolve_package, CapturedPackageTree, EngineVersion, PackageCaptureError,
-    ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileComposedApplyResult, ProfileGraphError, ProfilePackEntry, ProfilePackResult,
-    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfileShowEntry, ProfileShowResult,
-    ProfileTargetAction, ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName,
-    ResolvedProfileContent, ResolvedProfileGraph, VariableInputs,
-    MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
+    build_profile_claims_from_resolved, capture_package_tree, pack_package_archive,
+    read_package_archive, resolve_package, EngineVersion, PackageCaptureError, ProfileAddEntry,
+    ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
+    ProfileGraphError, ProfilePackEntry, ProfilePackResult, ProfilePackage, ProfilePackageError,
+    ProfilePackageSource, ProfileShowEntry, ProfileShowResult, ProfileTargetAction,
+    ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent,
+    ResolvedProfileGraph, VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
 use crate::profile::{profile_run_entry, ProfileRunMode};
 use crate::repository_state::{
@@ -404,7 +403,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 source: source_error,
             }
         })?;
-        let archive = pack_captured_package_archive(&package)?;
+        let archive = pack_package_archive(&package)?;
         let archive_bytes = archive.len() as u64;
         let warnings =
             self.publish_package_archive(&layout, invocation_dir, output, archive, publish)?;
@@ -512,18 +511,18 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         &self,
         layout: &RepositoryLayout,
         destination: &VirtualPath,
-        tree: &CapturedPackageTree,
+        tree: &ProfilePackage,
         publish: bool,
     ) -> Result<Vec<ProfileTargetChange>> {
         let capture = PackageTreeCapture::new(
             destination.clone(),
             tree.files()
                 .iter()
-                .map(|(relative, file)| {
+                .map(|(relative, bytes)| {
                     Ok(CapturedTreeFile {
                         relative: RootRelativePath::parse(relative)?,
-                        bytes: file.bytes.clone(),
-                        mode: file.mode,
+                        bytes: bytes.clone(),
+                        mode: tree.model().file_mode(relative),
                     })
                 })
                 .collect::<Result<Vec<_>, RepositoryLayoutError>>()?,
@@ -907,12 +906,12 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         declaring: &ProfilePackage,
         dependency: &ProfileId,
     ) -> Result<ProfilePackage> {
-        let ProfilePackageSource::Directory(directory) = declaring.source();
         let not_found = || -> anyhow::Error {
             crate::errors::NotFoundError::new(format!("Profile not found: {dependency}")).into()
         };
-        let Some(location) = directory
-            .parent()
+        let Some(location) = declaring
+            .source()
+            .and_then(|ProfilePackageSource::Directory(directory)| directory.parent())
             .map(|parent| parent.join(dependency.as_str()))
         else {
             return Err(not_found());
@@ -1168,10 +1167,10 @@ fn insert_candidate_package(
 
 /// Stable source spelling used only to choose between byte-identical package
 /// copies. Package bytes and graph claims remain the semantic identity.
-fn package_source_key(package: &ProfilePackage) -> String {
-    match package.source() {
-        ProfilePackageSource::Directory(path) => path.to_string_lossy().into_owned(),
-    }
+fn package_source_key(package: &ProfilePackage) -> Option<String> {
+    package
+        .source()
+        .map(|ProfilePackageSource::Directory(path)| path.to_string_lossy().into_owned())
 }
 
 /// How many package-model byte budgets one package-tree capture may read.
@@ -1347,7 +1346,12 @@ fn read_archive_bytes(invocation_dir: &Path, archive: &Path) -> Result<Vec<u8>> 
 /// not a worktree location even when it nests inside one, so a package placed
 /// under it is refused by the same rule.
 fn package_origin(package: &ProfilePackage, layout: &RepositoryLayout) -> Result<ProfileOrigin> {
-    let ProfilePackageSource::Directory(directory) = package.source();
+    let Some(ProfilePackageSource::Directory(directory)) = package.source() else {
+        anyhow::bail!(
+            "profile '{}' was not read from a directory, so it names no origin",
+            package.model().id
+        );
+    };
     layout
         .classify_and_canonicalize(directory)
         .ok()
@@ -1645,7 +1649,9 @@ mod tests {
 
     /// Select a package through the worktree location it was read from.
     fn package_selector(package: &ProfilePackage) -> ProfileSelector {
-        let ProfilePackageSource::Directory(path) = package.source();
+        let Some(ProfilePackageSource::Directory(path)) = package.source() else {
+            panic!("the fixture package was read from a directory");
+        };
         ProfileSelector::path(path.clone())
     }
 

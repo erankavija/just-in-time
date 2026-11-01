@@ -1558,8 +1558,8 @@ fn test_profile_pack_packs_every_shipped_package_from_a_repository_holding_it() 
             .expect("the shipped archive reads back");
         if id == "jit-dogfood" {
             assert!(
-                tree.files()
-                    .contains_key("assets/live/.agents/skills/jit-breakdown/SKILL.md"),
+                tree.source_bytes("assets/live/.agents/skills/jit-breakdown/SKILL.md")
+                    .is_some(),
                 "the dogfood archive omitted a declared live consumer"
             );
         }

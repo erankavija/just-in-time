@@ -49,18 +49,19 @@ pub enum ProfilePackageSource {
 
 /// A validated immutable package owning the bytes it validated.
 ///
-/// A package comes from a directory tree on disk
-/// ([`from_directory`](Self::from_directory)), owns the bytes it read, and runs
-/// one validation over one path-to-bytes map, so packages built from identical
-/// content are indistinguishable in manifest, package hash, and target digests.
-/// They differ in exactly one observable: the [`source`](Self::source) each
-/// records for the bytes it admitted.
+/// Reading a directory ([`from_directory`](Self::from_directory)), capturing
+/// from repository files ([`capture_package_tree`](super::capture_package_tree))
+/// and extracting an archive ([`read_package_archive`](super::read_package_archive))
+/// run one validation over one path-to-bytes map, so packages built from
+/// identical content are indistinguishable in manifest, package hash, and
+/// target digests. They differ in exactly one observable: the
+/// [`source`](Self::source) a directory read records.
 #[derive(Debug, Clone)]
 pub struct ProfilePackage {
     model: ProfilePackageModel,
     files: BTreeMap<String, Vec<u8>>,
     hashes: ProfilePackageHashes,
-    source: ProfilePackageSource,
+    source: Option<ProfilePackageSource>,
 }
 
 impl ProfilePackage {
@@ -85,7 +86,7 @@ impl ProfilePackage {
         Self::from_files_with_modes(
             contents.files,
             contents.executable_sources,
-            ProfilePackageSource::Directory(contents.root),
+            Some(ProfilePackageSource::Directory(contents.root)),
         )
     }
 
@@ -115,41 +116,11 @@ impl ProfilePackage {
     /// roots. A returned manifest therefore declares only safe relative paths,
     /// which is what lets a caller join one onto a directory. The cross-check
     /// against the files a package actually holds needs those files and stays
-    /// with [`validate_content`](Self::validate_content).
+    /// with [`from_files_with_modes`](Self::from_files_with_modes).
     pub(crate) fn parse_manifest(
         manifest_bytes: &[u8],
     ) -> Result<ProfilePackageModel, ProfilePackageError> {
         Self::read_manifest(manifest_bytes)
-    }
-
-    /// Validate one package's complete content and derive its identity.
-    ///
-    /// The single validation every route to a package runs: reading a
-    /// directory, and capturing a tree from the repository files a manifest
-    /// declares. `executable_sources` names the sources whose bytes came from a
-    /// file carrying executable permission, so a source whose declaration did
-    /// not is refused here rather than by each caller.
-    ///
-    /// # Errors
-    ///
-    /// Every [`ProfilePackageError`] a package's own content can produce:
-    /// bounds, an absent or invalid manifest, a declared source the content
-    /// lacks, content the manifest does not declare, an undeclared executable,
-    /// and an unresolvable variable reference.
-    pub(crate) fn validate_content(
-        files: &BTreeMap<String, Vec<u8>>,
-        executable_sources: &BTreeSet<String>,
-    ) -> Result<(ProfilePackageModel, ProfilePackageHashes), ProfilePackageError> {
-        validate_package_bounds(files)?;
-        let manifest_bytes = files
-            .get(MANIFEST_FILE_NAME)
-            .ok_or(ProfilePackageError::MissingManifest)?;
-        let model = Self::read_manifest(manifest_bytes)?;
-
-        validate_declared_content(&model, files, executable_sources)?;
-        validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
-        let hashes = compute_hashes(&model, files, manifest_bytes)?;
-        Ok((model, hashes))
     }
 
     fn read_manifest(manifest_bytes: &[u8]) -> Result<ProfilePackageModel, ProfilePackageError> {
@@ -173,15 +144,36 @@ impl ProfilePackage {
         files: BTreeMap<String, Vec<u8>>,
         source: ProfilePackageSource,
     ) -> Result<Self, ProfilePackageError> {
-        Self::from_files_with_modes(files, BTreeSet::new(), source)
+        Self::from_files_with_modes(files, BTreeSet::new(), Some(source))
     }
 
-    fn from_files_with_modes(
+    /// Validate one package's complete content and derive its identity.
+    ///
+    /// The single validation every route to a package runs. `executable_sources`
+    /// names the sources whose bytes came from a file carrying executable
+    /// permission, so a source whose declaration did not is refused here rather
+    /// than by each caller.
+    ///
+    /// # Errors
+    ///
+    /// Every [`ProfilePackageError`] a package's own content can produce:
+    /// bounds, an absent or invalid manifest, a declared source the content
+    /// lacks, content the manifest does not declare, an undeclared executable,
+    /// and an unresolvable variable reference.
+    pub(super) fn from_files_with_modes(
         files: BTreeMap<String, Vec<u8>>,
         executable_sources: BTreeSet<String>,
-        source: ProfilePackageSource,
+        source: Option<ProfilePackageSource>,
     ) -> Result<Self, ProfilePackageError> {
-        let (model, hashes) = Self::validate_content(&files, &executable_sources)?;
+        validate_package_bounds(&files)?;
+        let manifest_bytes = files
+            .get(MANIFEST_FILE_NAME)
+            .ok_or(ProfilePackageError::MissingManifest)?;
+        let model = Self::read_manifest(manifest_bytes)?;
+
+        validate_declared_content(&model, &files, &executable_sources)?;
+        validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
+        let hashes = compute_hashes(&model, &files, manifest_bytes)?;
         Ok(Self {
             model,
             files,
@@ -195,9 +187,10 @@ impl ProfilePackage {
         &self.model
     }
 
-    /// Where this package's validated bytes were read from.
-    pub fn source(&self) -> &ProfilePackageSource {
-        &self.source
+    /// The directory this package's validated bytes were read from. A package
+    /// captured from repository files or extracted from an archive has none.
+    pub fn source(&self) -> Option<&ProfilePackageSource> {
+        self.source.as_ref()
     }
 
     /// Owned bytes for a declared package-relative source.
@@ -1830,11 +1823,15 @@ name = "NAME"
         assert_eq!(first_package.hashes(), second_package.hashes());
         assert_eq!(
             first_package.source(),
-            &ProfilePackageSource::Directory(fs::canonicalize(&first).unwrap())
+            Some(&ProfilePackageSource::Directory(
+                fs::canonicalize(&first).unwrap()
+            ))
         );
         assert_eq!(
             second_package.source(),
-            &ProfilePackageSource::Directory(fs::canonicalize(&second).unwrap())
+            Some(&ProfilePackageSource::Directory(
+                fs::canonicalize(&second).unwrap()
+            ))
         );
         assert_ne!(first_package.source(), second_package.source());
     }
@@ -1853,7 +1850,7 @@ name = "NAME"
             ProfilePackage::from_directory(&indirect)
                 .expect("valid package tree")
                 .source(),
-            &ProfilePackageSource::Directory(resolved)
+            Some(&ProfilePackageSource::Directory(resolved))
         );
     }
 
