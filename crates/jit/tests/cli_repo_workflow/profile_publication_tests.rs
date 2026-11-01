@@ -136,10 +136,11 @@ fn write_package(repository: &Path, version: &str) {
 /// beside it, and answer the state before 2.0.0 is applied.
 pub(super) fn prepare_changed_profile(repository: &JitCli) -> LifecycleState {
     write_package(repository.root(), "1.0.0");
-    let initial = file_executor(repository.root())
-        .unwrap()
-        .apply_profile(&[selector()])
-        .unwrap();
+    let initial = jit::test_utils::apply_selected_packages(
+        &file_executor(repository.root()).unwrap(),
+        &[selector()],
+    )
+    .unwrap();
     assert_eq!(
         initial.requested().unwrap().status,
         ProfileApplicationStatus::Applied
@@ -165,7 +166,7 @@ fn test_profile_apply_publishes_its_change_through_the_shared_mutation_session()
     let publications = Arc::new(PublicationCounter::default());
     let executor = executor_with_interruptions(repository.root(), publications.clone());
 
-    let applied = executor.apply_profile(&[selector()]).unwrap();
+    let applied = jit::test_utils::apply_selected_packages(&executor, &[selector()]).unwrap();
 
     assert_eq!(
         applied.requested().unwrap().status,
@@ -191,7 +192,7 @@ fn test_profile_apply_publishes_its_change_through_the_shared_mutation_session()
         Some(b"newly added content\n".to_vec())
     );
 
-    let repeated = executor.apply_profile(&[selector()]).unwrap();
+    let repeated = jit::test_utils::apply_selected_packages(&executor, &[selector()]).unwrap();
 
     assert_eq!(
         repeated.requested().unwrap().status,

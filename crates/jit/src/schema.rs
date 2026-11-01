@@ -487,13 +487,9 @@ impl CommandSchema {
                 Some(schema_to_value::<crate::profile::ProfileShowResult>()),
                 "ProfileShowResult",
             ),
-            // The difference report is the decision a publication would act on,
-            // so it answers in the preview shape the lifecycle rehearsals do,
-            // with the conflict outcomes a rehearsal fails on instead of
-            // reporting.
-            "profile_diff" => (
-                Some(schema_to_value::<crate::profile::ProfilePlanResult>()),
-                "ProfilePlanResult",
+            "profile_diff" | "profile_apply" => (
+                Some(schema_to_value::<crate::profile::ProfileComposedApplyResult>()),
+                "ProfileComposedApplyResult",
             ),
             "profile_pack" => (
                 Some(schema_to_value::<crate::profile::ProfilePackResult>()),
@@ -503,23 +499,6 @@ impl CommandSchema {
                 Some(schema_to_value::<crate::profile::ProfileAddResult>()),
                 "ProfileAddResult",
             ),
-            "profile_apply" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<crate::profile::ProfileComposedApplyResult>(),
-                        schema_to_value::<crate::profile::ProfilePlanResult>(),
-                    ],
-                    "description": "Normal execution returns ProfileComposedApplyResult, \
-                        per aggregate selection observation. With --dry-run, returns the count-wrapped \
-                        ProfilePlanResult of non-mutating ProfilePlanEntry values. Every \
-                        rehearsal carries the entries its run reports: dependency-only closure \
-                        members before the selected roots, then one entry per root occurrence. \
-                        An entry that \
-                        publishes nothing reports status unchanged and carries no target or \
-                        declaration decisions."
-                });
-                (Some(union), "ProfileComposedApplyResult")
-            }
 
             // Issue commands
             //
@@ -961,7 +940,7 @@ impl CommandSchema {
             row(
                 "*",
                 10,
-                "The repository's on-disk format is newer than this binary, or a \
+                "The repository's on-disk format is not the one this binary accepts, or a \
                  filesystem/subprocess I/O operation failed.",
                 false,
             ),

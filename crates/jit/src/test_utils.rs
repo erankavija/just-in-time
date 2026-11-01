@@ -1315,6 +1315,53 @@ pub fn profile_package_fixture(name: &str) -> PathBuf {
 /// composition authors one. One rewrite serves them all
 /// (`@/invariant/shared-test-contracts`), and renaming the asset targets after
 /// the id is what keeps two authored packages from publishing the same file.
+/// Apply what `selectors` name, with no variable inputs, the way `jit profile
+/// apply` does.
+pub fn apply_selected_packages<S: IssueStore + crate::storage::RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    selectors: &[crate::commands::ProfileSelector],
+) -> Result<crate::profile::ProfileComposedApplyResult> {
+    executor
+        .select_profiles(
+            selectors,
+            &crate::commands::ProfileVariableOptions::default(),
+        )
+        .and_then(|selection| executor.apply_profiles(&selection))
+}
+
+/// The selector naming the directory `package` was read from.
+fn selector_of(package: &crate::profile::ProfilePackage) -> crate::commands::ProfileSelector {
+    let crate::profile::ProfilePackageSource::Directory(path) = package.source();
+    crate::commands::ProfileSelector::path(path.clone())
+}
+
+/// Apply `package` and the packages it depends on.
+pub fn apply_package<S: IssueStore + crate::storage::RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    package: &crate::profile::ProfilePackage,
+) -> Result<crate::profile::ProfileComposedApplyResult> {
+    apply_selected_packages(executor, &[selector_of(package)])
+}
+
+/// The packages selecting `package` reaches, dependency first.
+pub fn selected_closure<S: IssueStore + crate::storage::RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    package: &crate::profile::ProfilePackage,
+) -> Result<Vec<crate::profile::ProfilePackage>> {
+    executor
+        .select_profiles(
+            &[selector_of(package)],
+            &crate::commands::ProfileVariableOptions::default(),
+        )
+        .map(|selection| {
+            selection
+                .members()
+                .iter()
+                .map(|member| member.package().clone())
+                .collect()
+        })
+}
+
 pub fn write_package_declaring(
     source: &Path,
     root: &Path,

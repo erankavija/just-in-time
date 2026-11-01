@@ -22,6 +22,14 @@ pub enum EventLogError {
         /// One-based physical line number.
         line: usize,
     },
+    /// A record's tag is outside the current vocabulary.
+    #[error("unknown event tag '{tag}' on line {line}")]
+    UnknownTag {
+        /// One-based physical line number.
+        line: usize,
+        /// The tag the record carries.
+        tag: String,
+    },
     /// A current-vocabulary record does not match its typed event shape.
     #[error("invalid known event on line {line}: {source}")]
     InvalidKnownEvent {
@@ -33,7 +41,7 @@ pub enum EventLogError {
     },
 }
 
-/// Parse current-vocabulary events while retaining retired/unknown records.
+/// Parse the event log, whose every record carries a current-vocabulary tag.
 ///
 /// Invalid JSON is rejected except for exactly one physical line immediately
 /// followed by a valid [`EventBody::ProfileLifecycle`] whose
@@ -64,14 +72,18 @@ pub fn parse_known_events(contents: &str) -> Result<Vec<Event>, EventLogError> {
         else {
             return Err(EventLogError::MissingType { line: offset + 1 });
         };
-        if EventTag::ALL.iter().any(|known| known.as_str() == tag) {
-            events.push(serde_json::from_value(value).map_err(|source| {
-                EventLogError::InvalidKnownEvent {
-                    line: offset + 1,
-                    source,
-                }
-            })?);
+        if !EventTag::ALL.iter().any(|known| known.as_str() == tag) {
+            return Err(EventLogError::UnknownTag {
+                line: offset + 1,
+                tag: tag.to_owned(),
+            });
         }
+        events.push(serde_json::from_value(value).map_err(|source| {
+            EventLogError::InvalidKnownEvent {
+                line: offset + 1,
+                source,
+            }
+        })?);
     }
     Ok(events)
 }

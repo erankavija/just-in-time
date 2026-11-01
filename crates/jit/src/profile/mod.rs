@@ -27,18 +27,18 @@ mod wire;
 #[cfg(any(test, feature = "test-support"))]
 pub mod registry_region;
 
-pub(crate) use application::SelectionObservation;
+pub(crate) use application::ProfileRunMode;
 pub use application::{
     ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
     ProfileCollection, ProfileComposedApplyResult, ProfileContributionChange, ProfilePackEntry,
-    ProfilePackResult, ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry,
-    ProfileShowResult, ProfileTargetAction, ProfileTargetChange, ProfilesKey,
+    ProfilePackResult, ProfileShowEntry, ProfileShowResult, ProfileTargetAction,
+    ProfileTargetChange, ProfilesKey,
 };
 pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_resolved_contribution_claims,
     ProfileClaimError,
 };
-pub(crate) use difference::{ensure_publishable_targets, profile_plan_entry};
+pub(crate) use difference::{ensure_publishable_targets, profile_run_entry};
 pub use graph::{EngineVersion, ProfileGraphError, ResolvedProfileGraph};
 pub use manifest::{
     profile_package_model_schema, AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration,

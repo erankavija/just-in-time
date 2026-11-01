@@ -162,16 +162,16 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         return ErrorCode::ClaimRequiresGit;
     }
 
-    // A repository whose on-disk format is newer than this binary supports is an
-    // external-dependency failure (exit 10): the binary, not the repository, is
-    // out of date, and the fix is upgrading jit — the same family as the git and
+    // A repository whose on-disk format this binary does not accept is an
+    // external-dependency failure (exit 10): the binary and the repository
+    // disagree, and the fix is the matching jit — the same family as the git and
     // filesystem dependency failures, and deliberately NOT NotFound (3), which
     // would misread as "repository/resource missing".
     if error
-        .downcast_ref::<crate::storage::RepositoryFormatTooNewError>()
+        .downcast_ref::<crate::storage::RepositoryFormatUnsupportedError>()
         .is_some()
     {
-        return ErrorCode::RepositoryFormatTooNew;
+        return ErrorCode::RepositoryFormatUnsupported;
     }
 
     // Stored-record decoding stays typed across the library/binary boundary.
@@ -183,7 +183,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         use crate::repository_state::RepositoryIndexError;
         return match index_error {
             RepositoryIndexError::Parse(_) => ErrorCode::ParseError,
-            RepositoryIndexError::UnsupportedVersion { .. } => ErrorCode::RepositoryFormatTooNew,
+            RepositoryIndexError::UnsupportedVersion { .. } => {
+                ErrorCode::RepositoryFormatUnsupported
+            }
             RepositoryIndexError::DuplicateDeleted(_)
             | RepositoryIndexError::IssueFileName(_)
             | RepositoryIndexError::IssuesListingNotCaptured => ErrorCode::ValidationFailed,
@@ -662,7 +664,7 @@ mod exit_code_projection_tests {
                 "*",
             ),
             (
-                crate::storage::RepositoryFormatTooNewError::new(9999, 1).into(),
+                crate::storage::RepositoryFormatUnsupportedError::new(9999, 1).into(),
                 10,
                 "*",
             ),
@@ -805,8 +807,8 @@ mod exit_code_projection_tests {
                 ErrorCode::PermissionDenied,
             ),
             (
-                crate::storage::RepositoryFormatTooNewError::new(9999, 1).into(),
-                ErrorCode::RepositoryFormatTooNew,
+                crate::storage::RepositoryFormatUnsupportedError::new(9999, 1).into(),
+                ErrorCode::RepositoryFormatUnsupported,
             ),
             (
                 anyhow::anyhow!("untyped repair failure"),

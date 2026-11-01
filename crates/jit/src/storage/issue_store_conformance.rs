@@ -497,23 +497,22 @@ fn test_load_gate_registry_reads_the_declared_gates_and_none_when_absent<B: Back
         .is_empty());
 }
 
-fn test_read_events_skips_retired_tags_and_rejects_malformed_known_records<B: Backend>() {
+fn test_read_events_rejects_unknown_tags_and_malformed_records<B: Backend>() {
     let (first, second) = (issue_created("first"), issue_created("second"));
-    let retired = concat!(
-        "{\"type\":\"retired_",
-        "event\",\"id\":\"historical\",\"timestamp\":\"2025-01-01T00:00:00Z\"}"
-    );
     let logs = [
-        Some(format!(
-            "{retired}\n{}\n{retired}\n{}\n",
-            event_line(&first),
-            event_line(&second)
-        )),
+        Some(format!("{}\n{}\n", event_line(&first), event_line(&second))),
+        Some("{\"type\":\"retired_event\"}\n".to_string()),
         Some("{\"type\":\"issue_created\"}\n".to_string()),
         Some("{not-json}\n".to_string()),
         None,
     ];
-    let expected = [Some(vec![first, second]), None, None, Some(Vec::new())];
+    let expected = [
+        Some(vec![first, second]),
+        None,
+        None,
+        None,
+        Some(Vec::new()),
+    ];
 
     for (log, expected) in logs.into_iter().zip(expected) {
         let seed = log
@@ -1223,7 +1222,7 @@ conformance_suite!(
         test_load_issue_rejects_a_non_canonical_stored_id_naming_the_record,
         test_list_issues_is_empty_before_any_issue_is_published,
         test_load_gate_registry_reads_the_declared_gates_and_none_when_absent,
-        test_read_events_skips_retired_tags_and_rejects_malformed_known_records,
+        test_read_events_rejects_unknown_tags_and_malformed_records,
         test_read_artifact_archive_events_keeps_only_archive_executions,
         test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found,
         test_list_gate_runs_for_issue_lists_only_that_issues_runs,

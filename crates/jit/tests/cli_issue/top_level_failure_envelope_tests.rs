@@ -268,7 +268,7 @@ fn test_startup_repository_not_found_without_json_leaves_stdout_empty() {
 }
 
 #[test]
-fn test_startup_repository_format_too_new_json_emits_envelope() {
+fn test_startup_repository_format_unsupported_json_emits_envelope() {
     let cli = JitCli::initialised().unwrap();
     let index_path = cli.root().join(".jit").join("index.json");
     let mut index: serde_json::Value =
@@ -280,10 +280,10 @@ fn test_startup_repository_format_too_new_json_emits_envelope() {
 
     assert!(!output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .expect("format-too-new failure should emit JSON on stdout under --json");
-    assert_eq!(json["error"]["code"], "REPOSITORY_FORMAT_TOO_NEW");
+        .expect("unsupported-format failure should emit JSON on stdout under --json");
+    assert_eq!(json["error"]["code"], "REPOSITORY_FORMAT_UNSUPPORTED");
     assert!(json["error"]["message"]
         .as_str()
         .unwrap()
-        .contains("newer than this jit"));
+        .contains("not the version this binary"));
 }

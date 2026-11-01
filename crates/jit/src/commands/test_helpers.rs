@@ -108,7 +108,7 @@ impl crate::storage::RepositoryMutationSession for LimitedCaptureSession {
     }
 }
 
-/// Seed one issue record and its active index membership without invoking a
+/// Seed one issue record without invoking a
 /// product mutation path. Lifecycle timestamps are preserved verbatim.
 pub(crate) fn seed_issue(storage: &InMemoryStorage, issue: Issue) {
     storage.seed_issue_fixture(&issue);

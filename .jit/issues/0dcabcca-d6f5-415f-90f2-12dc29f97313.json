@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5fa00332-2f1a-413b-9a61-481e3fac4724",
+      "status": "failed",
+      "updated_at": "2026-11-01T15:47:14.786540483Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0dcabcca-d6f5-415f-90f2-12dc29f97313",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Let the dependent package win a key both packages declare",
-  "updated_at": "2026-11-01T15:07:30.083018804Z"
+  "updated_at": "2026-11-01T15:47:14.786540483Z"
 }

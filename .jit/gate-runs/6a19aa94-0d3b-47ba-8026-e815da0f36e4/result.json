@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a492e2d1deb1fcc1e7ad9d02d5b577532a086e53",
+  "completed_at": "2026-11-01T15:39:53.104407837Z",
+  "duration_ms": 303310,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/aeafc378-3073-4b32-be1b-53a05b656168.json",
+        "id": "F1",
+        "line": 7,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "REQ-04 net-line accounting omits the later attributable a492e2d1 fix and no longer reflects the shipped land.sh and test totals."
+      }
+    ],
+    "summary": "The required net-line report is stale after the attributed follow-up fix.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "aeafc378-3073-4b32-be1b-53a05b656168",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6a19aa94-0d3b-47ba-8026-e815da0f36e4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T15:34:49.794205604Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4617 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a197bf-fae4-7e33-8928-e315445079fd\n--------\nuser\n--- 4604 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 8103e370, b5b621755, 59f359cfa, 0ea91b1a7, 9267b2161, a492e2d1  \nPolicy sources: AGENTS.md  \nResolved items: @/charter/D-1, @/charter/D-4, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence, @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)  \nGate evidence: cargo-ci passed (exit 0, 2026-11-01T15:09:30Z); code-review failed (exit 1, prior result at 0ea91b1a7)  \nTruncation recovery: narrowed the merge to parent-relative path lists, read the complete landing scripts and tests, and inspected individual attributable patches and current affected files  \n\n1. **F1 — blocking, issue-impact, medium.** REQ-04’s net-line report is stale after the attributed follow-up. The issue record reports `land.sh` +45 and tests +346 from only `b5b621755` and `59f359cfa`, but `a492e2d1` changes the script by -4 net lines and its shell test by +12 net lines. The current shipped totals are therefore different, leaving the required accounting incomplete. `.jit/issues/aeafc378-3073-4b32-be1b-53a05b656168.json:7`\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required net-line report is stale after the attributed follow-up fix.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-04 net-line accounting omits the later attributable a492e2d1 fix and no longer reflects the shipped land.sh and test totals.\",\"file\":\".jit/issues/aeafc378-3073-4b32-be1b-53a05b656168.json\",\"line\":7}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

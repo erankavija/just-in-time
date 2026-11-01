@@ -16,7 +16,7 @@ use crate::repository_state::{
 };
 use crate::storage::{
     FileLocker, GateRunNotFoundError, IssueNotFoundError, IssueStore, RecoveryDispatchReport,
-    RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError, RepositoryMutationSession,
+    RepoWriteGuard, RepoWriteLock, RepositoryFormatUnsupportedError, RepositoryMutationSession,
     RepositoryNotFoundError, RepositoryStateStore, RepositoryStateStoreError, WorktreePaths,
 };
 use anyhow::{anyhow, Context, Result};
@@ -334,13 +334,23 @@ mod artifact_location_tests {
     }
 }
 
+/// The tombstones of the index at `path`; an absent index holds none.
+fn read_tombstones(path: &Path) -> Result<Vec<IssueId>> {
+    match fs::read(path) {
+        Ok(bytes) => Ok(parse_repository_index(&bytes)?.deleted_ids),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(error) => {
+            Err(error).with_context(|| format!("Failed to read file: {}", path.display()))
+        }
+    }
+}
+
 /// Merge one store's files and tombstones into `membership`, earlier sources winning.
 fn merge_store_membership(
     index: &Path,
     issues: &Path,
     membership: &mut BTreeMap<IssueId, bool>,
 ) -> Result<()> {
-    let read_failure = |path: &Path| format!("Failed to read file: {}", path.display());
     let names = match fs::read_dir(issues) {
         Ok(entries) => entries
             .map(|entry| {
@@ -351,17 +361,14 @@ fn merge_store_membership(
             })
             .collect::<Result<Vec<_>>>()?,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-        Err(error) => return Err(error).with_context(|| read_failure(issues)),
-    };
-    let deleted = match fs::read(index) {
-        Ok(bytes) => parse_repository_index(&bytes)?.deleted_ids,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-        Err(error) => return Err(error).with_context(|| read_failure(index)),
+        Err(error) => {
+            return Err(error).with_context(|| format!("Failed to read file: {}", issues.display()))
+        }
     };
     crate::repository_state::listed_issue_ids(&names)?
         .into_iter()
         .map(|id| (id, true))
-        .chain(deleted.into_iter().map(|id| (id, false)))
+        .chain(read_tombstones(index)?.into_iter().map(|id| (id, false)))
         .for_each(|(id, is_active)| {
             membership.entry(id).or_insert(is_active);
         });
@@ -373,7 +380,7 @@ pub(crate) fn parse_repository_index(bytes: &[u8]) -> Result<Index> {
     match RepositoryIndex::parse(bytes) {
         Ok(index) => Ok(index),
         Err(RepositoryIndexError::UnsupportedVersion { found, supported }) => {
-            Err(RepositoryFormatTooNewError::new(found, supported).into())
+            Err(RepositoryFormatUnsupportedError::new(found, supported).into())
         }
         Err(error) => Err(anyhow!(error)),
     }
@@ -720,12 +727,8 @@ impl JsonFileStorage {
             );
         }
 
-        // Fail fast at startup when the on-disk format is newer than this binary
-        // supports. `validate()` runs for every non-init command, so routing the
-        // version check through it (via the shared typed index codec) guards even
-        // commands that never load the index themselves — e.g. `jit gate list`,
-        // which reads `gates.toml` directly — rather than letting them misread
-        // newer data (jit:def64ac4).
+        // `validate()` runs for every non-init command, so this version check guards
+        // even commands that never load the index themselves (jit:def64ac4).
         self.load_index()?;
 
         Ok(())
@@ -820,14 +823,18 @@ impl JsonFileStorage {
 
     /// Load an issue from the main worktree's `.jit/` directory.
     ///
-    /// Returns `Ok(Some(issue))` when found, `Ok(None)` when the issue is
-    /// absent or this worktree setup does not have an accessible main worktree
-    /// (not in git, already in main worktree, non-standard layout), and `Err`
-    /// for genuine I/O or parse failures on a file that does exist.
+    /// Returns `Ok(Some(issue))` when found, `Ok(None)` when this store's tombstone
+    /// hides it, when the issue is absent, or when this worktree setup does not have
+    /// an accessible main worktree (not in git, already in main worktree,
+    /// non-standard layout), and `Err` for genuine I/O or parse failures on a file
+    /// that does exist.
     fn load_issue_from_main_worktree(&self, id: &IssueId) -> Result<Option<Issue>> {
         let Some(layout) = self.primary_layout()? else {
             return Ok(None);
         };
+        if read_tombstones(&self.resolve_virtual_path(&VirtualPath::INDEX)?)?.contains(id) {
+            return Ok(None);
+        }
         let main_issue_path = layout.resolve(&VirtualPath::issue_record(id))?;
 
         if !main_issue_path.exists() {
@@ -2230,7 +2237,6 @@ mod tests {
             configure_test_layout(&secondary_storage, &secondary_path, &secondary_jit);
             seed_index_preimage(&secondary_storage, &Index::default());
 
-            // Aggregated index should include main worktree issue
             let aggregated = secondary_storage.load_aggregated_issue_ids().unwrap();
             assert!(aggregated.contains(&issue_id));
         }
@@ -2380,6 +2386,11 @@ mod tests {
             assert!(linked
                 .resolve_issue_id(&IssueIdPrefix::from(&issue.id))
                 .is_err());
+            assert!(linked.load_issue(&issue.id).is_err());
+            assert!(matches!(
+                linked.load_issue_or_not_found(&issue.id),
+                Err(crate::storage::PathReadError::NotFound(_))
+            ));
         }
 
         #[test]
@@ -2554,10 +2565,8 @@ mod tests {
     /// Repository-format compatibility guard (issue def64ac4).
     mod format_compat_tests {
         use super::*;
-        use crate::storage::RepositoryFormatTooNewError;
+        use crate::storage::RepositoryFormatUnsupportedError;
 
-        // REQ-01: the constant is the single authoritative marker — a new index is
-        // stamped with SUPPORTED_INDEX_SCHEMA_VERSION.
         #[test]
         fn test_new_index_is_stamped_with_supported_version() {
             assert_eq!(
@@ -2572,9 +2581,6 @@ mod tests {
             );
         }
 
-        // REQ-02: a repo whose format version exceeds the binary's support refuses
-        // to load, via a typed error naming BOTH versions on a single line, rather
-        // than a file-read/parse error.
         #[test]
         fn test_newer_repo_format_refused_on_direct_load() {
             let temp_dir = TempDir::new().unwrap();
@@ -2592,8 +2598,8 @@ mod tests {
                 .load_index()
                 .expect_err("newer format must be refused");
             let typed = err
-                .downcast_ref::<RepositoryFormatTooNewError>()
-                .expect("must be the typed format-too-new error, not a parse/read error");
+                .downcast_ref::<RepositoryFormatUnsupportedError>()
+                .expect("must be the typed format error, not a parse/read error");
             assert_eq!(typed.repository_version(), newer);
             assert_eq!(typed.supported_version(), SUPPORTED_INDEX_SCHEMA_VERSION);
 
@@ -2610,7 +2616,7 @@ mod tests {
         }
 
         // REQ-02 (consistency): the aggregated read path (used by list/status) also
-        // surfaces the format-too-new error instead of swallowing it.
+        // surfaces the format error instead of swallowing it.
         #[test]
         fn test_newer_repo_format_refused_on_aggregated_read() {
             let temp_dir = TempDir::new().unwrap();
@@ -2627,7 +2633,9 @@ mod tests {
             let err = storage
                 .list_issues()
                 .expect_err("aggregated read must be refused");
-            assert!(err.downcast_ref::<RepositoryFormatTooNewError>().is_some());
+            assert!(err
+                .downcast_ref::<RepositoryFormatUnsupportedError>()
+                .is_some());
         }
 
         #[test]
@@ -2635,7 +2643,7 @@ mod tests {
             let id = crate::test_utils::issue_id(1);
             let cases = [
                 (
-                    serde_json::json!({"schema_version": 2, "deleted_ids": [id, id]}).to_string(),
+                    serde_json::json!({"schema_version": SUPPORTED_INDEX_SCHEMA_VERSION, "deleted_ids": [id, id]}).to_string(),
                     format!("duplicate deleted issue id '{id}'"),
                 ),
                 (
@@ -2681,10 +2689,8 @@ mod tests {
             assert!(storage.list_issues().is_ok());
         }
 
-        // REQ-03: a repo whose version is LESS than the binary's support also
-        // operates normally.
         #[test]
-        fn test_older_version_operates_normally() {
+        fn test_older_repo_format_refused_on_direct_load() {
             let temp_dir = TempDir::new().unwrap();
             let older = SUPPORTED_INDEX_SCHEMA_VERSION - 1;
             let data = temp_dir.path().join(".jit");
@@ -2695,9 +2701,13 @@ mod tests {
             let index_path = data_layout.resolve(&VirtualPath::INDEX).unwrap();
             let raw = format!("{{\n  \"schema_version\": {older},\n  \"deleted_ids\": []\n}}");
             fs::write(&index_path, raw).unwrap();
-            let index = storage.load_index().expect("older format must still load");
-            assert_eq!(index.schema_version, older);
-            assert!(storage.list_issues().is_ok());
+            let err = storage
+                .load_index()
+                .expect_err("older format must be refused");
+            let typed = err
+                .downcast_ref::<RepositoryFormatUnsupportedError>()
+                .expect("must be the typed format error");
+            assert_eq!(typed.repository_version(), older);
         }
     }
 }
