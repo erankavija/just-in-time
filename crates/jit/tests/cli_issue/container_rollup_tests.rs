@@ -45,8 +45,7 @@ fn container_with_children(cli: &JitCli) -> (String, Vec<String>) {
         .unwrap();
     cli.run(["issue", "update", &wip, "--state", "in_progress"])
         .unwrap();
-    cli.run(["issue", "update", &rejected, "--state", "rejected"])
-        .unwrap();
+    cli.run(["issue", "reject", &rejected]).unwrap();
     (epic, vec![done, wip, rejected, ready])
 }
 

@@ -255,15 +255,9 @@ fn test_selected_rule_ignores_historical_rejected_bracket_target() {
     // The historical target is rejected and its breakdown is unrelated to the
     // selected gate application. Both issues remain in the repository image so
     // the checker must prove subject isolation rather than relying on omission.
-    cli.command([
-        "issue",
-        "update",
-        &historical_container,
-        "--state",
-        "rejected",
-    ])
-    .assert()
-    .success();
+    cli.command(["issue", "reject", &historical_container])
+        .assert()
+        .success();
 
     cli.command(["gate", "evaluate", &selected_breakdown, "coverage-preview"])
         .assert()

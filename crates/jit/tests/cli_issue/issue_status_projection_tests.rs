@@ -212,8 +212,7 @@ fn test_status_unmet_follows_readiness_semantics() {
     // on either), so only the open dep remains unmet.
     temp.run(["issue", "update", &done_dep, "--state", "done"])
         .unwrap();
-    temp.run(["issue", "update", &rejected_dep, "--state", "rejected"])
-        .unwrap();
+    temp.run(["issue", "reject", &rejected_dep]).unwrap();
 
     let out = temp
         .run(["issue", "status", &main, "--json"])
