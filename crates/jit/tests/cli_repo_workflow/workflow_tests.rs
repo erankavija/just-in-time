@@ -174,7 +174,7 @@ fn test_workflow_gates() {
 
     // Create issue with both gates
     let id = cli
-        .create_issue(["-t", "Feature", "--gate", "review,tests"])
+        .create_issue(["-t", "Feature", "--gate", "review", "--gate", "tests"])
         .unwrap();
 
     // Issue should NOT be blocked (gates don't block ready state)

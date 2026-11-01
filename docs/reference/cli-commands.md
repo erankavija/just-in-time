@@ -460,18 +460,13 @@ it from a client; the generation model in brief:
 
 ### Multi-Value Arguments
 
-**Flagged arguments** (e.g., `--label`, `--gate`) support **both** comma-separated and repeated flags:
+**Flagged arguments** (e.g., `--label`, `--gate`) take one value per repetition of the flag:
 
 ```bash
-# Comma-separated (compact)
-jit issue create --title "Task" --label epic:auth,type:task,component:core
-
-# Repeated flags (explicit)
 jit issue create --title "Task" --label epic:auth --label type:task --label component:core
-
-# Mixed (also works)
-jit issue create --title "Task" --label epic:auth,type:task --label component:core
 ```
+
+A comma is part of the value, so `--label epic:auth,type:task` names one malformed label and is refused.
 
 **Applies to:** `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`, `--except`, `--fields`
 
@@ -899,8 +894,8 @@ jit issue create --title <TITLE> [OPTIONS]
 | `--description-file <PATH>` | Read the issue body from `PATH`, or from standard input when `PATH` is `-`; content is stored verbatim, including trailing newlines. Mutually exclusive with `--description`. |
 | `-p`, `--priority <PRIORITY>` | `low`, `normal` (default), `high`, or `critical`. |
 | `--type <KIND>` | Issue type, written as a `type:<kind>` label. Must be declared in `[type_hierarchy]` in `config.toml`. Long-only, because `-t` is `--title`. |
-| `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable and comma-separated. Keys are persisted as given without a registry lookup; `jit validate` later flags any that no gate defines. |
-| `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable and comma-separated. |
+| `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable. Keys are persisted as given without a registry lookup; `jit validate` later flags any that no gate defines. |
+| `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable. |
 | `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to the default content format in [Runtime Defaults](runtime-defaults.md). `html`/`xml` require the matching cargo feature. |
 | `--force` | Bypass blocking (`enforce = true`) rule failures and record each bypass as an event. Warnings never block, so they are unaffected. |
 | `--orphan` | Suppress the workflow profile's `orphan-leaf` hint for an issue deliberately created without a container. |
@@ -946,9 +941,9 @@ jit issue update --filter <QUERY> [OPTIONS]
 | `-p`, `--priority <PRIORITY>` | `low`, `normal`, `high`, or `critical`. |
 | `-s`, `--state <STATE>` | Requested lifecycle state. |
 | `--type <KIND>` | Replace the issue's `type:*` label with `type:<kind>`. Long-only. |
-| `-l`, `--label <LABEL>` | Add labels (alias `--add-label`). Repeatable and comma-separated; adds to the existing set. |
-| `--remove-label <LABEL>` | Remove labels. Repeatable and comma-separated. Single-issue mode fails, removing nothing, when the issue lacks any named label; a stored label containing a comma therefore cannot be named. |
-| `--add-gate <GATE>` | Require additional registered gates. Repeatable and comma-separated. |
+| `-l`, `--label <LABEL>` | Add labels (alias `--add-label`). Repeatable; adds to the existing set. |
+| `--remove-label <LABEL>` | Remove labels. Repeatable. Single-issue mode fails, removing nothing, when the issue lacks any named label. |
+| `--add-gate <GATE>` | Require additional registered gates. Repeatable. |
 | `--remove-gate <GATE>` | Drop gates from the issue's requirements. |
 | `--assignee <ASSIGNEE>` | Set the assignee, in `type:identifier` form. |
 | `--unassign` | Clear the assignee. |
@@ -1182,7 +1177,7 @@ jit issue show abc123 --field state          # -> ready
 jit issue show abc123 --field title          # -> Implement login
 
 # Project several fields as one COMPACT JSON object (requested key order preserved)
-jit issue show abc123 --fields state,title   # -> {"state":"ready","title":"Implement login"}
+jit issue show abc123 --fields state --fields title   # -> {"state":"ready","title":"Implement login"}
 
 # Show multiple issues as the list envelope (argument order preserved)
 jit issue show abc123 def456 --json          # -> {"count":2,"issues":[ {...}, {...} ]}
@@ -1206,7 +1201,7 @@ projection rules and their current members in
 - `--field <name>` prints the field as plain text: string fields print raw
   (unquoted), scalar fields (number/bool/null) print their value, and
   array/object fields fall back to compact JSON for that field.
-- `--fields a,b,c` prints `{"a":...,"b":...,"c":...}` as a single compact JSON
+- `--fields a --fields b --fields c` prints `{"a":...,"b":...,"c":...}` as a single compact JSON
   object, keeping the requested order.
 - An unknown field name (or any unknown name in `--fields`) is a usage error
   (exit code `2`).

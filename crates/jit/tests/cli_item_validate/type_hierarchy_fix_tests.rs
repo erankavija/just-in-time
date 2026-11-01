@@ -60,30 +60,6 @@ fn test_fix_unknown_type_no_suggestion() {
 }
 
 #[test]
-fn test_remove_label_naming_a_comma_bearing_label_fails_and_removes_nothing() {
-    let cli = JitCli::initialised().unwrap();
-    let id = cli.create_issue(["--title", "Prose label"]).unwrap();
-    let label = "resolution:not needed, see x";
-    let path = cli.root().join(format!(".jit/issues/{id}.json"));
-    let mut record: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    record["labels"] = serde_json::json!([label, "component:core"]);
-    std::fs::write(&path, serde_json::to_string(&record).unwrap()).unwrap();
-
-    let output = cli
-        .command(["issue", "update", &id, "--remove-label", label])
-        .output()
-        .unwrap();
-
-    assert!(!output.status.success());
-    let issue = cli.run_json(["issue", "show", &id]).unwrap();
-    assert_eq!(
-        issue["labels"],
-        serde_json::json!([label, "component:core"])
-    );
-}
-
-#[test]
 fn test_fix_and_validate_agree_on_a_malformed_label_until_it_is_removed() {
     let cli = JitCli::initialised().unwrap();
     let id = cli.create_issue(["--title", "Prose label"]).unwrap();
