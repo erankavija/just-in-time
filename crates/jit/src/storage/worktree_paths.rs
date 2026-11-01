@@ -20,6 +20,9 @@ pub struct WorktreePaths {
     pub local_jit: PathBuf,
     /// Shared control plane: <common_dir>/jit
     pub shared_jit: PathBuf,
+    /// Top level of the checkout holding the worktree root when the selected
+    /// data root lies outside every checkout and outside the worktree root.
+    pub relocated_worktree_checkout: Option<PathBuf>,
 }
 
 impl WorktreePaths {
@@ -60,9 +63,16 @@ impl WorktreePaths {
         selected_data_root: Option<&Path>,
     ) -> Result<Self> {
         let Some(probed) = Git::default().probe(current)? else {
+            let relocated_worktree_checkout = selected_data_root
+                .filter(|data_root| !data_root.starts_with(non_git_root))
+                .map(|_| Git::default().probe(non_git_root))
+                .transpose()?
+                .flatten()
+                .map(|checkout| checkout.worktree_root);
             let worktree_root = non_git_root.to_path_buf();
             let dot_git = worktree_root.join(".git");
             return Ok(Self {
+                relocated_worktree_checkout,
                 git_repository: false,
                 common_dir: dot_git.clone(),
                 local_jit: selected_data_root
@@ -88,6 +98,7 @@ impl WorktreePaths {
             worktree_root,
             local_jit,
             shared_jit,
+            relocated_worktree_checkout: None,
         })
     }
 
@@ -103,6 +114,16 @@ impl WorktreePaths {
             .then(|| GitCheckout::new(Git::default(), self.worktree_root.clone()))
     }
 
+    /// Return the checkout holding the paths a mutation writes: this checkout,
+    /// or the worktree's own when the data root lies outside every checkout.
+    pub fn write_checkout(&self) -> Option<GitCheckout> {
+        self.git().or_else(|| {
+            self.relocated_worktree_checkout
+                .clone()
+                .map(|root| GitCheckout::new(Git::default(), root))
+        })
+    }
+
     /// Project this repository authority onto one worktree reported by Git.
     ///
     /// This derives per-worktree identity paths without running a second
@@ -116,6 +137,7 @@ impl WorktreePaths {
             worktree_root,
             local_jit,
             shared_jit: self.shared_jit.clone(),
+            relocated_worktree_checkout: self.relocated_worktree_checkout.clone(),
         }
     }
 
@@ -240,6 +262,42 @@ mod tests {
     }
 
     #[test]
+    fn test_detect_for_data_root_outside_every_checkout_records_the_worktree_checkout() {
+        let dir = tempfile::tempdir().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(dir.path().join("repo"));
+        let store = tempfile::tempdir().unwrap();
+        let data_root = store.path().join("store");
+
+        let paths = WorktreePaths::detect_for_data_root(&data_root, repository.root()).unwrap();
+
+        assert!(!paths.is_git_repository());
+        assert_eq!(paths.git(), None);
+        let top_level = repository.root().canonicalize().unwrap();
+        assert_eq!(
+            paths.write_checkout().unwrap().worktree_root(),
+            top_level.as_path()
+        );
+    }
+
+    #[test]
+    fn test_detect_for_data_root_records_no_relocated_checkout_otherwise() {
+        let dir = tempfile::tempdir().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(dir.path().join("repo"));
+        let no_git = tempfile::tempdir().unwrap();
+
+        let in_checkout =
+            WorktreePaths::detect_for_data_root(&repository.root().join(".jit"), no_git.path())
+                .unwrap();
+        let without_git =
+            WorktreePaths::detect_for_data_root(&no_git.path().join(".jit"), no_git.path())
+                .unwrap();
+
+        assert_eq!(in_checkout.write_checkout(), in_checkout.git());
+        assert_eq!(in_checkout.relocated_worktree_checkout, None);
+        assert_eq!(without_git.write_checkout(), None);
+    }
+
+    #[test]
     fn test_detect_in_main_worktree() {
         let paths = WorktreePaths::detect_from(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
 
@@ -260,22 +318,11 @@ mod tests {
 
     #[test]
     fn test_is_worktree_detection() {
-        let main_paths = WorktreePaths {
-            git_repository: true,
-            common_dir: PathBuf::from("/repo/.git"),
-            worktree_root: PathBuf::from("/repo"),
-            local_jit: PathBuf::from("/repo/.jit"),
-            shared_jit: PathBuf::from("/repo/.git/jit"),
-        };
+        let main_paths = crate::test_utils::primary_checkout_paths("/repo");
         assert!(!main_paths.is_worktree());
 
-        let secondary_paths = WorktreePaths {
-            git_repository: true,
-            common_dir: PathBuf::from("/repo/.git"),
-            worktree_root: PathBuf::from("/worktrees/feature-a"),
-            local_jit: PathBuf::from("/worktrees/feature-a/.jit"),
-            shared_jit: PathBuf::from("/repo/.git/jit"),
-        };
+        let secondary_paths =
+            crate::test_utils::linked_checkout_paths("/repo", "/worktrees/feature-a");
         assert!(secondary_paths.is_worktree());
         assert_eq!(
             secondary_paths.primary_worktree_root().unwrap(),
@@ -292,13 +339,7 @@ mod tests {
 
     #[test]
     fn test_git_pairs_default_executable_with_worktree_root_only_for_git_checkout() {
-        let checkout = WorktreePaths {
-            git_repository: true,
-            common_dir: PathBuf::from("/repo/.git"),
-            worktree_root: PathBuf::from("/repo"),
-            local_jit: PathBuf::from("/repo/.jit"),
-            shared_jit: PathBuf::from("/repo/.git/jit"),
-        };
+        let checkout = crate::test_utils::primary_checkout_paths("/repo");
         let outside = WorktreePaths {
             git_repository: false,
             ..checkout.clone()

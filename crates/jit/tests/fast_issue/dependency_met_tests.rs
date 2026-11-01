@@ -9,7 +9,7 @@ use jit::output::IssueShowResponse;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
-/// Reject an issue outright, the way `jit issue update --state rejected` does.
+/// Reject an issue outright, the way `jit issue reject` does.
 fn reject(h: &TestHarness, id: &IssueId) {
     h.executor
         .issues()

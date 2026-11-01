@@ -943,6 +943,7 @@ pub enum IssueCommands {
         #[arg(short, long)]
         priority: Option<String>,
 
+        /// Target state (`rejected` is set by `jit issue reject`)
         #[arg(short, long)]
         state: Option<String>,
 
@@ -1033,7 +1034,7 @@ pub enum IssueCommands {
         id: String,
     },
 
-    /// Reject an issue (convenience for --state rejected)
+    /// Reject an issue; the only command form that sets state `rejected`
     Reject {
         /// Issue ID
         id: String,

@@ -222,7 +222,7 @@ When a sub-agent's output fails review:
 3. **If MAX_REWORK_ATTEMPTS exceeded:** Escalate per `references/escalation-policy.md`.
    - Present to the invoker: the original issue, review failures from each attempt, current code state.
    - Offer options: provide guidance (resets counter), take over manually, or reject the issue.
-   - If rejected: `jit issue update <id> --state rejected --reason "<reason>"`. Continue to next issue.
+   - If rejected: `jit issue reject <id> --reason "<reason>"`. Continue to next issue.
 
 ## Section 9: Escalation
 

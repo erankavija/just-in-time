@@ -387,8 +387,7 @@ fn test_configured_archive_document_and_container_cli_are_exact_deterministic_an
         cli.run(["doc", "add", &id, path, "--skip-scan", "--json"])
             .unwrap();
     }
-    cli.run(["issue", "update", &id, "--state", "rejected", "--json"])
-        .unwrap();
+    cli.run(["issue", "reject", &id, "--json"]).unwrap();
     let before = snapshot_files(cli.root());
 
     for (args, target_kind) in [
@@ -475,7 +474,7 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
         ])
         .unwrap();
     container_cli
-        .run(["issue", "update", &id, "--state", "rejected", "--json"])
+        .run(["issue", "reject", &id, "--json"])
         .unwrap();
     let result = container_cli
         .run_json(["archive", "container", &id, "--execute"])
@@ -629,22 +628,17 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
         "--json",
     ])
     .unwrap();
-    cli.run([
-        "issue", "update", &evaluated, "--state", "rejected", "--json",
-    ])
-    .unwrap();
+    cli.run(["issue", "reject", &evaluated, "--json"]).unwrap();
     let empty = cli
         .create_issue(["--title", "Zero-document container", "--type", "epic"])
         .unwrap();
-    cli.run(["issue", "update", &empty, "--state", "rejected", "--json"])
-        .unwrap();
+    cli.run(["issue", "reject", &empty, "--json"]).unwrap();
     cli.create_issue(["--title", "Active container", "--type", "epic"])
         .unwrap();
     let leaf = cli
         .create_issue(["--title", "Terminal leaf", "--type", "task"])
         .unwrap();
-    cli.run(["issue", "update", &leaf, "--state", "rejected", "--json"])
-        .unwrap();
+    cli.run(["issue", "reject", &leaf, "--json"]).unwrap();
 
     set_documentation_policy(
         &cli,
@@ -780,8 +774,7 @@ fn test_archive_candidates_cli_reports_directory_root_but_skips_directory_link_t
     ] {
         cli.run(["doc", "add", id, path, "--skip-scan", "--json"])
             .unwrap();
-        cli.run(["issue", "update", id, "--state", "rejected", "--json"])
-            .unwrap();
+        cli.run(["issue", "reject", id, "--json"]).unwrap();
     }
     let before = snapshot_tree(cli.root());
 
@@ -876,7 +869,7 @@ fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutatio
         let id = cli
             .create_issue(["--title", "Candidate", "--type", "epic"])
             .unwrap();
-        cli.run(["issue", "update", &id, "--state", "rejected", "--json"]).unwrap();
+        cli.run(["issue", "reject", &id, "--json"]).unwrap();
         // Each variant is a complete configuration: the declared hierarchy that
         // makes the rejected epic a container, plus the documentation-policy
         // state under test.
@@ -927,8 +920,7 @@ fn test_container_archive_slug_is_consistent_and_frozen_by_marker() {
         .unwrap();
     cli.run(["doc", "add", &id, "fixtures/root.md", "--skip-scan"])
         .unwrap();
-    cli.run(["issue", "update", &id, "--state", "rejected"])
-        .unwrap();
+    cli.run(["issue", "reject", &id]).unwrap();
 
     let expected_root = format!("archive/{}-artifact-archival", &id[..8]);
     let before_preview = snapshot_tree(cli.root());
@@ -1197,8 +1189,7 @@ fn seed_presentation_deck(cli: &JitCli, managed: bool, terminal: bool) -> (Strin
     cli.run(["doc", "add", &id, &deck_path, "--skip-scan"])
         .unwrap();
     if terminal {
-        cli.run(["issue", "update", &id, "--state", "rejected"])
-            .unwrap();
+        cli.run(["issue", "reject", &id]).unwrap();
     }
     (id, deck_path)
 }
@@ -1520,8 +1511,7 @@ fn terminal_container_with_documents(cli: &JitCli, documents: &[&str]) -> String
         cli.run(["doc", "add", &container, *path, "--skip-scan"])
             .unwrap();
     }
-    cli.run(["issue", "update", &container, "--state", "rejected"])
-        .unwrap();
+    cli.run(["issue", "reject", &container]).unwrap();
     container
 }
 

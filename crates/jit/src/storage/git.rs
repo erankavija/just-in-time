@@ -129,6 +129,11 @@ impl GitCheckout {
         Self { git, worktree_root }
     }
 
+    /// The checkout's top level, which [`Self::dirty_paths`] reports relative to.
+    pub fn worktree_root(&self) -> &Path {
+        &self.worktree_root
+    }
+
     /// Repository-relative paths that differ from `HEAD`: modified, staged,
     /// deleted, renamed (both names) or untracked, with ignored files
     /// excluded. One git process.

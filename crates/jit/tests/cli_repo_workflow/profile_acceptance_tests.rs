@@ -110,7 +110,7 @@ fn normalized_events(repo: &Path) -> Vec<Value> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum SnapshotEntry {
+pub(super) enum SnapshotEntry {
     Directory,
     File { bytes: Vec<u8>, executable: bool },
 }
@@ -145,7 +145,21 @@ fn is_executable(_metadata: &fs::Metadata) -> bool {
 }
 
 fn snapshot_tree(root: &Path) -> BTreeMap<String, SnapshotEntry> {
-    fn visit(root: &Path, current: &Path, entries: &mut BTreeMap<String, SnapshotEntry>) {
+    snapshot_tree_excluding(root, is_machine_local_path)
+}
+
+/// Every directory and file under `root`, skipping relative paths `excluded`
+/// names and everything below them.
+pub(super) fn snapshot_tree_excluding(
+    root: &Path,
+    excluded: fn(&str) -> bool,
+) -> BTreeMap<String, SnapshotEntry> {
+    fn visit(
+        root: &Path,
+        current: &Path,
+        excluded: fn(&str) -> bool,
+        entries: &mut BTreeMap<String, SnapshotEntry>,
+    ) {
         let mut children = fs::read_dir(current)
             .expect("read repository directory")
             .collect::<Result<Vec<_>, _>>()
@@ -155,13 +169,13 @@ fn snapshot_tree(root: &Path) -> BTreeMap<String, SnapshotEntry> {
         for child in children {
             let path = child.path();
             let relative = normalized_path(path.strip_prefix(root).expect("repository-relative"));
-            if is_machine_local_path(&relative) {
+            if excluded(&relative) {
                 continue;
             }
             let metadata = child.metadata().expect("read repository metadata");
             if metadata.is_dir() {
                 entries.insert(relative, SnapshotEntry::Directory);
-                visit(root, &path, entries);
+                visit(root, &path, excluded, entries);
             } else {
                 entries.insert(
                     relative,
@@ -175,7 +189,7 @@ fn snapshot_tree(root: &Path) -> BTreeMap<String, SnapshotEntry> {
     }
 
     let mut entries = BTreeMap::new();
-    visit(root, root, &mut entries);
+    visit(root, root, excluded, &mut entries);
     entries
 }
 

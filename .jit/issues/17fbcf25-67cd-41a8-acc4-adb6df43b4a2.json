@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T14:46:33.794682986Z",
+  "context": {},
+  "created_at": "2026-11-01T14:46:32.965250606Z",
+  "dependencies": [],
+  "description": "Remove the lease check from the git hooks. Leases are enforced when a mutation is written, so the hook is a second check of the same rule at the wrong moment (`@/charter/D-18`, `@/charter/D-20`).\n\n## Background\n\nTesting `aeafc378` with the real pre-commit hook in a strict repository showed the check refuses another session's leased record and also the lead's own closed issue after its lease is released, so a lead's sync commit fails routinely there. The same test found the hook reads an omitted `enforce_leases` key as `off` while `jit config` reports `strict`.\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/hooks/pre-commit` and `scripts/hooks/pre-push` no longer check issue leases. Lease enforcement stays at mutation time, with its existing tests. `jq` and agent-identity handling go with it where nothing else needs them.\n- [hard] REQ-02: A strict repository's sync commit passes the real hook, with other sessions' records and the lead's own closed issue in it.\n- [hard] REQ-03: Whatever remains of the hook, such as the global-config divergence check, gets the enforcement mode from `jit`, so the hook and `jit config` cannot disagree, and an omitted key means the same in both. If nothing remaining needs the mode, drop it.\n- [hard] REQ-04: Docs for `enforce_leases`, `scripts/hooks/README.md`, the hooks command and error text state the new scope, including the limit that a hand edit of a record is no longer caught at commit. Net lines are reported and negative.\n\n## Notes\n\n- If the hook enforces something mutation-time checks do not cover, beyond hand edits, stop and report it to the epic's invoker.\n- 627fdcc4 is to be rejected once this lands, since it rewrites a check that no longer exists, unless its other criteria still apply to something.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T14:46:32.965250606Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "17fbcf25-67cd-41a8-acc4-adb6df43b4a2",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "per:@/charter/D-18",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Remove the lease check from the git hooks",
+  "updated_at": "2026-11-01T14:46:33.794682986Z"
+}

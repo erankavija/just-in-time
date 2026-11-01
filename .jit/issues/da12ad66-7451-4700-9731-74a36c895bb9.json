@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-21T00:59:08.407843500Z",
   "context": {},
   "created_at": "2026-10-15T11:05:37.998980678Z",
@@ -15,7 +15,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2c55a366-bb10-4fa6-917f-1437e7d83d22",
+      "status": "failed",
+      "updated_at": "2026-11-01T14:43:40.967326219Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "da12ad66-7451-4700-9731-74a36c895bb9",
   "labels": [
     "type:task",
@@ -24,7 +31,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Give issue rejection one command form",
-  "updated_at": "2026-11-01T14:17:18.572646827Z"
+  "updated_at": "2026-11-01T14:43:40.967326219Z"
 }

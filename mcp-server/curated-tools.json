@@ -87,7 +87,7 @@
     "jit_rdeps": "Top-level alias of graph rdeps.",
     "jit_item_resolve": "Alias of item show; one spelling per operation.",
     "jit_issue_search": "search covers issues and documents in one call.",
-    "jit_issue_delete": "Destructive; unwanted work is rejected or archived through issue update.",
+    "jit_issue_delete": "Destructive; unwanted work is rejected through issue reject or archived through issue update.",
     "jit_issue_assign": "Assignment without workflow semantics; claim and release carry those.",
     "jit_issue_unassign": "Assignment without workflow semantics; claim and release carry those.",
     "jit_claim_status": "Lease outcome is returned by acquire and renew; standalone inspection is a lead-side view.",
