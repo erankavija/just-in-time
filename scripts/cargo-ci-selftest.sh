@@ -216,6 +216,56 @@ EOF
     test ! -e "$unexpected"
 }
 
+# CI's entry point runs the gate's suite steps and nothing else, and a failing
+# suite fails it.
+test_suite_mode_runs_only_the_suite_steps() {
+  local fixture="$scratch/suite-mode" log="$scratch/suite-mode/cargo.log"
+  local out="$scratch/suite-mode/out" rc
+  mkdir -p "$fixture/bin" "$fixture/repo"
+  cat >"$fixture/bin/cargo" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  --version) echo "$SELFTEST_CARGO_VERSION" ;;
+  "nextest --version") echo "cargo-nextest 0.9.133 (selftest fixture)" ;;
+  check*) ;;
+  "nextest run --workspace")
+    echo "$*" >>"$SELFTEST_CARGO_LOG"
+    echo "Summary [1s] 1 tests run: 1 passed, 0 skipped"
+    exit "$SELFTEST_SUITE_STATUS"
+    ;;
+  *)
+    echo "$*" >>"$SELFTEST_CARGO_LOG"
+    echo "test result: ok. 1 passed; 0 failed; 0 ignored"
+    ;;
+esac
+EOF
+  chmod +x "$fixture/bin/cargo"
+  suite_gate() { # suite_gate <nextest status>; sets rc
+    : >"$log"
+    (
+      cd "$fixture/repo" || exit 3
+      PATH="$fixture/bin:$PATH" \
+        SELFTEST_CARGO_VERSION="$real_cargo_version" \
+        SELFTEST_CARGO_LOG="$log" \
+        SELFTEST_SUITE_STATUS="$1" \
+        CARGO_CI_NO_LOCK=1 \
+        CARGO_CI_NO_SCCACHE=1 \
+        "$gate" --suite
+    ) >"$out" 2>&1
+    rc=$?
+  }
+
+  suite_gate 0
+  check "suite mode: a passing suite exits 0" test "$rc" -eq 0
+  check "suite mode: Cargo runs the pinned suite and the doctests, nothing else" \
+    test "$(cat "$log")" = "nextest run --workspace"$'\n'"test --doc --workspace"
+  check "suite mode: the excluded-tests step judges the run" \
+    grep -qF "✓ excluded-tests:" "$out"
+
+  suite_gate 1
+  check "suite mode: a failing suite fails the run" test "$rc" -eq 1
+}
+
 # The real wrapper must distinguish lock acquisition from every child status.
 test_build_lock_status_propagation() {
   local fixture="$scratch/build-lock" rc status
@@ -963,6 +1013,7 @@ run_test() { # run_test <function> [args...]
 echo
 echo "== wrong-nextest-version: the gate must fail before its first step =="
 run_test test_wrong_nextest_version_fails_fast
+run_test test_suite_mode_runs_only_the_suite_steps
 run_test test_classifier_exit_paths
 run_test test_build_lock_status_propagation
 run_test test_script_build_lock_wait
