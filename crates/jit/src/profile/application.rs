@@ -1,10 +1,12 @@
+use crate::domain::identity::ProfileId;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::profile::ProfilePackageModel;
 use crate::repository_state::FileMode;
 use crate::repository_state::RootRelativePath;
 use schemars::JsonSchema;
+use semver::Version;
 use serde::Serialize;
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 /// What one profile command's run found or did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
@@ -51,9 +53,10 @@ pub type ProfileCollection<T> = ListEnvelope<ProfilesKey, T>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileApplyResult {
     /// Stable profile identifier.
-    pub id: String,
+    pub id: ProfileId,
     /// Semantic package version.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: Version,
     /// Worktree-relative directory the package bytes were read from.
     pub origin: RootRelativePath,
     /// What this run found or did for this profile.
@@ -141,17 +144,18 @@ impl ProfileCollection<ProfileApplyResult> {
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct ProfileShowEntry {
     /// Stable profile identifier.
-    pub id: String,
+    pub id: ProfileId,
     /// Semantic package version.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: Version,
     /// Canonical package model produced from the immutable manifest bytes.
     pub manifest: ProfilePackageModel,
     /// Worktree-relative directory the package bytes were read from.
     pub origin: RootRelativePath,
     /// Hash of the complete canonical package.
     pub package_hash: String,
-    /// Per-target package hashes.
-    pub target_hashes: BTreeMap<String, String>,
+    /// Repository paths the package writes.
+    pub targets: BTreeSet<String>,
     /// Package file count, including `manifest.toml`.
     pub file_count: usize,
     /// Total package byte size.
@@ -240,9 +244,10 @@ pub struct ProfileContributionChange {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfilePackEntry {
     /// Stable identifier the packed manifest declares.
-    pub id: String,
+    pub id: ProfileId,
     /// Semantic version the packed manifest declares.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: Version,
     /// Worktree-relative directory the package bytes were read from.
     pub origin: RootRelativePath,
     /// Identity digest of the packed package.
@@ -272,9 +277,10 @@ pub type ProfilePackResult = ProfileCollection<ProfilePackEntry>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileAddEntry {
     /// Stable identifier the added manifest declares.
-    pub id: String,
+    pub id: ProfileId,
     /// Semantic version the added manifest declares.
-    pub version: String,
+    #[schemars(with = "String")]
+    pub version: Version,
     /// Worktree-relative directory the package will be readable at after
     /// publication.
     pub origin: RootRelativePath,

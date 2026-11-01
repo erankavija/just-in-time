@@ -870,13 +870,7 @@ fn derive_profile_application_candidate(
     push_file_actions(base, &files, &mut actions)?;
     let config_path = VirtualPath::CONFIG;
     let rules_path = VirtualPath::RULES;
-    if profile
-        .target_hashes
-        .contains_key(VirtualPath::CONFIG.repository_relative().as_str())
-        || profile
-            .target_hashes
-            .contains_key(VirtualPath::RULES.repository_relative().as_str())
-    {
+    if profile.owns_default_rule_authority() {
         let authority = authored_rule_overrides(base, &files, &config_path, &rules_path)?;
         compose_existing_default_rules(base, authority, &mut actions)?;
     }
@@ -1140,7 +1134,6 @@ fn push_file_actions(
 mod tests {
     use super::*;
     use crate::repository_state::{CapturedBytes, EntryIdentity};
-    use std::collections::BTreeMap;
 
     const LINE: &str = ".jit/events.jsonl merge=union";
 
@@ -1154,12 +1147,12 @@ mod tests {
     fn profile_input(id: &str) -> ProfileApplicationInput {
         ProfileApplicationInput {
             id: ProfileId::try_from(id).unwrap(),
-            version: "1.0.0".to_string(),
+            version: semver::Version::new(1, 0, 0),
             variables: serde_json::from_value(serde_json::json!({
                 "NAME": {"value": "value", "source": "set"}
             }))
             .unwrap(),
-            target_hashes: BTreeMap::new(),
+            targets: Default::default(),
             claims: crate::repository_state::ProfileClaims {
                 package_id: ProfileId::try_from(id).unwrap(),
                 contributions: Vec::new(),

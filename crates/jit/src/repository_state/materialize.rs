@@ -995,9 +995,9 @@ kind = "advisory"
             id: "identity-test"
                 .try_into()
                 .expect("test profile id is canonical"),
-            version: "1.0.0".into(),
+            version: semver::Version::new(1, 0, 0),
             variables: crate::profile::ResolvedVariables::default(),
-            target_hashes: BTreeMap::new(),
+            targets: Default::default(),
             claims: ProfileClaims {
                 package_id: ProfileId::try_from("identity-test").unwrap(),
                 contributions: Vec::new(),

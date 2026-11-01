@@ -932,7 +932,6 @@ wire_vocabulary! {
         /// non-primary checkout whose write stance refuses one.
         LinkedCheckoutWriteRefused = "LINKED_CHECKOUT_WRITE_REFUSED",
         /// No resolution route found the requested profile.
-        ProfileNotFound = "PROFILE_NOT_FOUND",
         /// Profile planning or final-state validation rejected the operation.
         ProfileConflict = "PROFILE_CONFLICT",
         /// A profile application was refused because a path it writes differs
@@ -999,7 +998,6 @@ impl ErrorCode {
         match self {
             ErrorCode::IssueNotFound
             | ErrorCode::GateNotFound
-            | ErrorCode::ProfileNotFound
             | ErrorCode::RepositoryNotFound
             | ErrorCode::DependencyError
             | ErrorCode::GateCheckError
@@ -1082,7 +1080,6 @@ impl ErrorCode {
             ErrorCode::LinkedCheckoutWriteRefused => {
                 "The linked checkout's write stance refuses state-mutating commands."
             }
-            ErrorCode::ProfileNotFound => "No resolution route found the requested profile.",
             ErrorCode::ProfileConflict => {
                 "Profile planning found packages being applied that define one target or \
                  declaration differently."
@@ -3608,7 +3605,6 @@ mod tests {
                 ErrorCode::LinkedCheckoutWriteRefused,
                 ExitCode::InvalidArgument,
             ),
-            (ErrorCode::ProfileNotFound, ExitCode::NotFound),
             (ErrorCode::ProfileConflict, ExitCode::ValidationFailed),
             (
                 ErrorCode::ProfileUncommittedTargets,

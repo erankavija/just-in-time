@@ -606,8 +606,8 @@ fn print_profile_decision(
 /// Render one profile identity and operation outcome in the family-wide human
 /// heading shape.
 fn print_profile_heading(
-    id: &str,
-    version: &str,
+    id: &jit::domain::identity::ProfileId,
+    version: &semver::Version,
     origin: &jit::repository_state::RootRelativePath,
     status: &str,
 ) {
@@ -1864,7 +1864,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                     "Files: {} ({} bytes)",
                                     result.file_count, result.byte_size
                                 );
-                                println!("Targets: {}", result.target_hashes.len());
+                                println!("Targets:");
+                                result
+                                    .targets
+                                    .iter()
+                                    .for_each(|target| println!("  {target}"));
                             }
                         }
                     }

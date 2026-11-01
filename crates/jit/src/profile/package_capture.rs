@@ -628,8 +628,8 @@ target = "docs/guide.md"
             read_package_archive(&pack_package_archive(&packed).expect("the package packs"))
                 .expect("the archive extracts");
 
-        assert_eq!(applied.hashes().package, packed.hashes().package);
-        assert_eq!(added.hashes().package, packed.hashes().package);
+        assert_eq!(applied.package_hash(), packed.package_hash());
+        assert_eq!(added.package_hash(), packed.package_hash());
     }
 
     /// The mode a source is judged against is the mode of the very object whose
@@ -673,7 +673,7 @@ target = "docs/guide.md"
             after.files()["assets/live/docs/guide.md"],
             "the mode decision moved without the bytes moving with it"
         );
-        assert_eq!(before.hashes().package, after.hashes().package);
+        assert_eq!(before.package_hash(), after.package_hash());
     }
 
     /// A repository file carrying executable permission its declaration did not
@@ -809,8 +809,7 @@ target = "docs/guide.md"
 
         let first = fixture.capture().expect("the synthetic package captures");
         let repeated = fixture.capture().expect("the same sources capture again");
-        assert_eq!(first.hashes().package, repeated.hashes().package);
-        assert_eq!(first.hashes().targets, repeated.hashes().targets);
+        assert_eq!(first.package_hash(), repeated.package_hash());
 
         fs::write(
             fixture.worktree.join("docs/guide.md"),
@@ -820,8 +819,8 @@ target = "docs/guide.md"
         let edited = fixture.capture().expect("the edited package captures");
 
         assert_ne!(
-            first.hashes().package,
-            edited.hashes().package,
+            first.package_hash(),
+            edited.package_hash(),
             "an edit to an owned repository file left the package identity unchanged"
         );
         assert_eq!(

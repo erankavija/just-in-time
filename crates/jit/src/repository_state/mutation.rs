@@ -29,7 +29,6 @@ use crate::domain::{
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::cell::Cell;
 
@@ -539,12 +538,12 @@ pub(crate) fn captured_gate_run_ids(image: &RepositoryImage) -> Option<Vec<GateR
 
 /// Serialize an issue to its exact on-disk bytes (pretty, no trailing newline).
 pub fn serialize_issue(issue: &Issue) -> Result<Vec<u8>, MutationError> {
-    canonical_json(issue, true)
+    Ok(canonical_json(issue, true)?)
 }
 
 /// Serialize a gate-run result to its exact on-disk bytes.
 pub fn serialize_gate_run(result: &GateRunResult) -> Result<Vec<u8>, MutationError> {
-    canonical_json(result, true)
+    Ok(canonical_json(result, true)?)
 }
 
 /// Serialize a fresh (empty) index to its exact on-disk bytes.
@@ -560,34 +559,22 @@ pub fn fresh_index_bytes() -> Result<Vec<u8>, MutationError> {
 
 /// Serialize one event to its exact single-line JSONL representation (no newline).
 pub fn serialize_event(event: &Event) -> Result<Vec<u8>, MutationError> {
-    canonical_json(event, false)
+    Ok(canonical_json(event, false)?)
 }
 
-/// Serialize typed repository state after recursively sorting every JSON object.
+/// Serialize typed repository state with every JSON object's keys sorted.
+///
+/// `to_value` does the sorting: `serde_json::Map` is a sorted map while the
+/// `preserve_order` feature is off, as its owning test pins.
 pub(crate) fn canonical_json<T: Serialize + ?Sized>(
     value: &T,
     pretty: bool,
-) -> Result<Vec<u8>, MutationError> {
-    let canonical = canonicalize_json(serde_json::to_value(value)?);
+) -> Result<Vec<u8>, serde_json::Error> {
+    let canonical = serde_json::to_value(value)?;
     if pretty {
-        Ok(serde_json::to_vec_pretty(&canonical)?)
+        serde_json::to_vec_pretty(&canonical)
     } else {
-        Ok(serde_json::to_vec(&canonical)?)
-    }
-}
-
-fn canonicalize_json(value: Value) -> Value {
-    match value {
-        Value::Array(values) => Value::Array(values.into_iter().map(canonicalize_json).collect()),
-        Value::Object(entries) => {
-            let mut entries = entries
-                .into_iter()
-                .map(|(key, value)| (key, canonicalize_json(value)))
-                .collect::<Vec<_>>();
-            entries.sort_by(|left, right| left.0.cmp(&right.0));
-            Value::Object(entries.into_iter().collect())
-        }
-        scalar => scalar,
+        serde_json::to_vec(&canonical)
     }
 }
 
@@ -1339,6 +1326,38 @@ mod tests {
             RepositoryRootEvidence::new("/repo/.jit", "data", true),
         )
         .unwrap()
+    }
+
+    /// Fails when `serde_json`'s `preserve_order` feature is enabled.
+    #[test]
+    fn test_canonical_json_sorts_keys_a_struct_declares_out_of_order() {
+        #[derive(Serialize)]
+        struct Inner {
+            second: u8,
+            first: u8,
+        }
+        #[derive(Serialize)]
+        struct Outer {
+            zeta: u8,
+            alpha: Inner,
+        }
+
+        let bytes = canonical_json(
+            &Outer {
+                zeta: 0,
+                alpha: Inner {
+                    second: 2,
+                    first: 1,
+                },
+            },
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(
+            String::from_utf8(bytes).unwrap(),
+            r#"{"alpha":{"first":1,"second":2},"zeta":0}"#
+        );
     }
 
     fn fixed_instant() -> DateTime<Utc> {
@@ -2730,7 +2749,7 @@ mod tests {
                 id: "example"
                     .try_into()
                     .expect("the profile marker has a canonical identifier"),
-                version: "1.0.0".to_string(),
+                version: semver::Version::new(1, 0, 0),
                 status: crate::domain::ProfileLifecycleStatus::Installed,
                 variables: Default::default(),
             }],

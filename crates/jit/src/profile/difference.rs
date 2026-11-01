@@ -103,7 +103,7 @@ fn profile_contribution_changes(
 pub(crate) fn profile_run_entry(
     plan: &MaterializationPlan,
     id: &ProfileId,
-    version: &str,
+    version: &semver::Version,
     origin: RootRelativePath,
     mode: ProfileRunMode,
 ) -> ProfileApplyResult {
@@ -122,8 +122,8 @@ pub(crate) fn profile_run_entry(
         (false, false, _) => ProfileApplicationStatus::Unchanged,
     };
     ProfileApplyResult {
-        id: id.to_string(),
-        version: version.to_string(),
+        id: id.clone(),
+        version: version.clone(),
         origin,
         status,
         targets,

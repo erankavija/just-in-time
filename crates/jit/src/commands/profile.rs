@@ -387,10 +387,10 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             self.publish_package_archive(&layout, invocation_dir, output, archive, publish)?;
         Ok((
             ProfilePackResult::new(vec![ProfilePackEntry {
-                id: package.model().id.to_string(),
+                id: package.model().id.clone(),
                 version: package.model().version.clone(),
                 origin: source.relative().clone(),
-                package_hash: package.hashes().package.clone(),
+                package_hash: package.package_hash().clone(),
                 source: source.repository_relative(),
                 archive: output.display().to_string(),
                 file_count: package.file_count(),
@@ -461,10 +461,10 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let tree = read_package_archive(&read_archive_bytes(invocation_dir, archive)?)?;
         let targets = self.publish_package_tree(&layout, &destination, &tree, publish)?;
         Ok(ProfileAddResult::new(vec![ProfileAddEntry {
-            id: tree.model().id.to_string(),
+            id: tree.model().id.clone(),
             version: tree.model().version.clone(),
             origin: destination.relative().clone(),
-            package_hash: tree.hashes().package.clone(),
+            package_hash: tree.package_hash().clone(),
             archive: archive.display().to_string(),
             destination: destination.repository_relative(),
             file_count: tree.file_count(),
@@ -629,12 +629,12 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         layout: &RepositoryLayout,
     ) -> Result<ProfileShowEntry> {
         Ok(ProfileShowEntry {
-            id: package.model().id.to_string(),
+            id: package.model().id.clone(),
             version: package.model().version.clone(),
             manifest: package.model().clone(),
             origin: package_origin(package, layout)?,
-            package_hash: package.hashes().package.clone(),
-            target_hashes: package.hashes().targets.clone(),
+            package_hash: package.package_hash().clone(),
+            targets: package.model().targets(),
             file_count: package.file_count(),
             byte_size: package.byte_size(),
         })
@@ -661,9 +661,9 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             .into_iter()
             .map(|package| {
                 let targets = package
-                    .hashes()
-                    .targets
-                    .keys()
+                    .model()
+                    .targets()
+                    .iter()
                     .map(|target| {
                         layout
                             .classify_repository_relative(target)
@@ -846,10 +846,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 .cloned()
                 .ok_or_else(|| anyhow::anyhow!("profile '{id}' left the graph being built"))?;
             let mut dependencies = declaring.model().dependencies.clone();
-            dependencies.sort_by(|left, right| {
-                left.id
-                    .cmp(&right.id)
-                    .then_with(|| left.version.cmp(&right.version))
+            dependencies.sort_by_cached_key(|dependency| {
+                (dependency.id.clone(), dependency.version.to_string())
             });
             for dependency in dependencies {
                 if packages.contains_key(&dependency.id) {
@@ -1114,17 +1112,16 @@ fn insert_candidate_package(
 ) -> Result<()> {
     let id = package.model().id.clone();
     if let Some(existing) = packages.get(&id) {
-        if existing.hashes().package != package.hashes().package {
-            let (first_hash, second_hash) = if existing.hashes().package < package.hashes().package
-            {
+        if existing.package_hash() != package.package_hash() {
+            let (first_hash, second_hash) = if existing.package_hash() < package.package_hash() {
                 (
-                    existing.hashes().package.clone(),
-                    package.hashes().package.clone(),
+                    existing.package_hash().clone(),
+                    package.package_hash().clone(),
                 )
             } else {
                 (
-                    package.hashes().package.clone(),
-                    existing.hashes().package.clone(),
+                    package.package_hash().clone(),
+                    existing.package_hash().clone(),
                 )
             };
             return Err(ProfileGraphError::ConflictingPackageIdentity {
@@ -1364,7 +1361,7 @@ pub(super) fn profile_application_input(
         id: metadata.id.clone(),
         version: metadata.version.clone(),
         variables: resolved.variables().clone(),
-        target_hashes: resolved.target_hashes()?,
+        targets: metadata.targets(),
         contribution_context: claims.contributions.clone(),
         claims,
     })
@@ -1856,7 +1853,7 @@ mod tests {
         let selector = temp.path().join("vendor/supplied");
         let resolved = resolved_selector(&executor, &selector).unwrap();
 
-        assert_eq!(resolved.hashes(), supplied.hashes());
+        assert_eq!(resolved.package_hash(), supplied.package_hash());
         assert_eq!(
             package_origin(&resolved, &executor.require_layout().unwrap()).unwrap(),
             RootRelativePath::parse("vendor/supplied").unwrap()
@@ -2119,8 +2116,8 @@ mod tests {
         assert_eq!(
             ProfilePackage::from_directory(&temp.path().join(location.as_path()))
                 .expect("the reported location names a readable package")
-                .hashes(),
-            package.hashes()
+                .package_hash(),
+            package.package_hash()
         );
     }
 
@@ -2135,7 +2132,7 @@ mod tests {
         let second_executor = file_executor(second_temp.path()).unwrap();
         let first = package_read_from(&first_temp, "vendor/first");
         let second = package_read_from(&second_temp, "packages/second/tree");
-        assert_eq!(first.hashes(), second.hashes());
+        assert_eq!(first.package_hash(), second.package_hash());
 
         let first_applied = apply_package(&first_executor, &first).unwrap();
         let second_applied = apply_package(&second_executor, &second).unwrap();
@@ -2268,14 +2265,14 @@ mod tests {
 
         // The address is over content: re-reading the same declarations
         // reproduces it, and the workflow package next to it does not share it.
-        assert_eq!(package.hashes(), repeated.hashes());
-        assert_ne!(package.hashes().package, workflow.hashes().package);
-        assert!(!package.hashes().package.is_empty());
+        assert_eq!(package.package_hash(), repeated.package_hash());
+        assert_ne!(package.package_hash(), workflow.package_hash());
+        assert!(!package.package_hash().is_empty());
         // One repository target, because every declaration writes the
         // configuration registry and the package publishes no file.
         assert_eq!(
-            package.hashes().targets.keys().collect::<Vec<_>>(),
-            vec![&".jit/config.toml".to_string()]
+            package.model().targets().into_iter().collect::<Vec<_>>(),
+            vec![".jit/config.toml".to_string()]
         );
     }
 
@@ -2358,9 +2355,9 @@ mod tests {
         // default rules and the schemas they reference — targets it names none
         // of, and whose drift it therefore has to reach without being told.
         assert!(package
-            .hashes()
-            .targets
-            .keys()
+            .model()
+            .targets()
+            .iter()
             .all(|target| !target.starts_with(".jit/schemas/")));
         let schemas = temp.path().join(".jit/schemas");
         let grammar = schemas.join("default-label-format.json");
@@ -2616,8 +2613,8 @@ mod tests {
                 .map(|profile| (profile.id.clone(), profile.status))
                 .collect::<Vec<_>>()
         };
-        let default_id = explicit_default.model().id.to_string();
-        let dogfood_id = explicit_dogfood.model().id.to_string();
+        let default_id = explicit_default.model().id.clone();
+        let dogfood_id = explicit_dogfood.model().id.clone();
         assert_eq!(
             published_by(&explicit_default_result),
             vec![(default_id.clone(), ProfileApplicationStatus::Applied)]
@@ -2964,7 +2961,7 @@ template = true
                 .collect::<Vec<_>>(),
             vec!["base", "workflow"]
         );
-        assert_eq!(applied.requested().unwrap().id, "workflow");
+        assert_eq!(applied.requested().unwrap().id.as_str(), "workflow");
         assert!(applied
             .items
             .iter()
@@ -3614,9 +3611,9 @@ template = true
         assert_eq!(
             closure
                 .iter()
-                .map(|package| package.hashes())
+                .map(|package| package.package_hash())
                 .collect::<Vec<_>>(),
-            vec![beside.hashes(), dependant.hashes()]
+            vec![beside.package_hash(), dependant.package_hash()]
         );
     }
 
@@ -3681,9 +3678,9 @@ template = true
         assert_eq!(
             closure
                 .iter()
-                .map(|package| package.hashes())
+                .map(|package| package.package_hash())
                 .collect::<Vec<_>>(),
-            vec![package.hashes()]
+            vec![package.package_hash()]
         );
     }
 
@@ -3698,7 +3695,7 @@ template = true
                 ProfileLifecycleOperation::Apply,
                 vec![crate::domain::ProfileLifecycleProfile {
                     id: "prior".try_into().unwrap(),
-                    version: "1.0.0".to_string(),
+                    version: semver::Version::new(1, 0, 0),
                     status: ProfileLifecycleStatus::Installed,
                     variables: Default::default(),
                 }],
@@ -3812,7 +3809,7 @@ template = true
         report
             .items
             .iter()
-            .find(|entry| entry.id == id)
+            .find(|entry| entry.id.as_str() == id)
             .unwrap_or_else(|| panic!("the report names profile {id}: {report:?}"))
             .clone()
     }

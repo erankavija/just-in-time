@@ -6,16 +6,13 @@ use crate::domain::repository_inputs::is_safe_relative_path;
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
 use cap_std::ambient_authority;
 use cap_std::fs::{Dir as CapDir, DirEntry as CapDirEntry};
-use semver::{Version, VersionReq};
-use serde::Serialize;
-use serde_json::{Map, Value};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-const TARGET_HASH_DOMAIN: &[u8] = b"jit-profile-target-v1\0";
 const PACKAGE_HASH_DOMAIN: &[u8] = b"jit-profile-package-v1\0";
 
 /// Maximum number of files, including the manifest, in one profile package.
@@ -27,29 +24,20 @@ pub const MAX_PROFILE_PACKAGE_BYTES: usize = 4 * 1024 * 1024;
 /// A lowercase hexadecimal SHA-256 digest.
 pub type PackageHash = String;
 
-/// Canonical package and per-repository-target hashes.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProfilePackageHashes {
-    /// Hash of the canonical manifest plus every declared package source.
-    pub package: PackageHash,
-    /// Hash of ordered operations and source bytes grouped by repository target.
-    pub targets: BTreeMap<String, PackageHash>,
-}
-
 /// A validated immutable package owning the bytes it validated.
 ///
 /// Reading a directory ([`from_directory`](Self::from_directory)), capturing
 /// from repository files ([`capture_package_tree`](super::capture_package_tree))
 /// and extracting an archive ([`read_package_archive`](super::read_package_archive))
 /// run one validation over one path-to-bytes map, so packages built from
-/// identical content are indistinguishable in manifest, package hash, and
-/// target digests. They differ in exactly one observable: the
+/// identical content are indistinguishable in manifest and package hash. They
+/// differ in exactly one observable: the
 /// [`directory`](Self::directory) a directory read records.
 #[derive(Debug, Clone)]
 pub struct ProfilePackage {
     model: ProfilePackageModel,
     files: BTreeMap<String, Vec<u8>>,
-    hashes: ProfilePackageHashes,
+    package_hash: PackageHash,
     directory: Option<PathBuf>,
 }
 
@@ -159,11 +147,11 @@ impl ProfilePackage {
 
         validate_declared_content(&model, &files, &executable_sources)?;
         validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
-        let hashes = compute_hashes(&model, &files, manifest_bytes)?;
+        let package_hash = compute_package_hash(&files, manifest_bytes);
         Ok(Self {
             model,
             files,
-            hashes,
+            package_hash,
             directory,
         })
     }
@@ -194,9 +182,9 @@ impl ProfilePackage {
         &self.files
     }
 
-    /// Canonical package and target hashes.
-    pub fn hashes(&self) -> &ProfilePackageHashes {
-        &self.hashes
+    /// Package identity: the hash of the authored manifest plus every package file.
+    pub fn package_hash(&self) -> &PackageHash {
+        &self.package_hash
     }
 
     /// Package file count, including `manifest.toml`.
@@ -214,7 +202,10 @@ impl ProfilePackage {
 #[derive(Debug, thiserror::Error)]
 pub enum ProfilePackageError {
     /// The package directory is absent or cannot be read.
-    #[error("cannot read profile package directory '{path}': {source}")]
+    #[error(
+        "cannot read profile package directory '{path}': {source}; \
+         a package is a directory holding {MANIFEST_FILE_NAME}"
+    )]
     UnreadableDirectory {
         /// Path whose read failed.
         path: String,
@@ -276,42 +267,6 @@ pub enum ProfilePackageError {
         /// Offending dependency entry.
         dependency: String,
     },
-    /// Invalid semantic package version.
-    #[error("invalid profile version '{value}': {source}")]
-    InvalidVersion {
-        /// Authored value.
-        value: String,
-        /// Semver parser error.
-        source: semver::Error,
-    },
-    /// Invalid compatible JIT version requirement.
-    #[error("invalid compatible JIT requirement '{value}': {source}")]
-    InvalidCompatibility {
-        /// Authored value.
-        value: String,
-        /// Semver parser error.
-        source: semver::Error,
-    },
-    /// Invalid semantic dependency requirement.
-    #[error("invalid dependency requirement for '{dependency}' '{value}': {source}")]
-    InvalidDependencyRequirement {
-        /// Dependency identity.
-        dependency: String,
-        /// Authored requirement.
-        value: String,
-        /// Underlying semver failure.
-        source: semver::Error,
-    },
-    /// Invalid semantic incompatibility requirement.
-    #[error("invalid incompatibility requirement for '{package}' '{value}': {source}")]
-    InvalidIncompatibilityRequirement {
-        /// Incompatible package identity.
-        package: String,
-        /// Authored requirement.
-        value: String,
-        /// Underlying semver failure.
-        source: semver::Error,
-    },
     /// Unsafe absolute, traversal, platform-prefix, or empty path.
     #[error("unsafe {field} path '{path}'")]
     UnsafePath {
@@ -364,9 +319,6 @@ pub enum ProfilePackageError {
         /// Root declared beneath it.
         inner: String,
     },
-    /// Canonical serialization unexpectedly failed.
-    #[error("failed to serialize canonical profile data: {0}")]
-    CanonicalSerialization(#[source] serde_json::Error),
     /// A variable declaration or bounded reference violates the package
     /// contract.
     #[error(transparent)]
@@ -606,35 +558,6 @@ fn validate_manifest_declarations(
             dependency: dependency.id.to_string(),
         });
     }
-    Version::parse(&manifest.version).map_err(|source| ProfilePackageError::InvalidVersion {
-        value: manifest.version.clone(),
-        source,
-    })?;
-    VersionReq::parse(&manifest.compatible_jit).map_err(|source| {
-        ProfilePackageError::InvalidCompatibility {
-            value: manifest.compatible_jit.clone(),
-            source,
-        }
-    })?;
-    for dependency in &manifest.dependencies {
-        VersionReq::parse(&dependency.version).map_err(|source| {
-            ProfilePackageError::InvalidDependencyRequirement {
-                dependency: dependency.id.to_string(),
-                value: dependency.version.clone(),
-                source,
-            }
-        })?;
-    }
-    for incompatibility in &manifest.incompatibilities {
-        VersionReq::parse(&incompatibility.version).map_err(|source| {
-            ProfilePackageError::InvalidIncompatibilityRequirement {
-                package: incompatibility.id.to_string(),
-                value: incompatibility.version.clone(),
-                source,
-            }
-        })?;
-    }
-
     let mut contribution_ids = BTreeSet::new();
     for (index, contribution) in manifest.contributions.iter().enumerate() {
         validate_contribution(index, contribution)?;
@@ -885,59 +808,8 @@ fn contribution_identity(contribution: &Contribution) -> String {
     )
 }
 
-fn compute_hashes(
-    manifest: &ProfilePackageModel,
-    files: &BTreeMap<String, Vec<u8>>,
-    manifest_bytes: &[u8],
-) -> Result<ProfilePackageHashes, ProfilePackageError> {
-    let mut target_frames: BTreeMap<String, Vec<Vec<u8>>> = BTreeMap::new();
-
-    for contribution in &manifest.contributions {
-        target_frames
-            .entry(contribution.registry().path().repository_relative())
-            .or_default()
-            .push(canonical_bytes(contribution)?);
-    }
-    for asset in &manifest.assets {
-        let mut frame = canonical_bytes(asset)?;
-        append_frame(
-            &mut frame,
-            files
-                .get(&asset.source)
-                .ok_or_else(|| ProfilePackageError::MissingContent(asset.source.clone()))?,
-        );
-        target_frames
-            .entry(asset.target.clone())
-            .or_default()
-            .push(frame);
-    }
-    for region in &manifest.regions {
-        let mut frame = canonical_bytes(region)?;
-        append_frame(
-            &mut frame,
-            files
-                .get(&region.source)
-                .ok_or_else(|| ProfilePackageError::MissingContent(region.source.clone()))?,
-        );
-        target_frames
-            .entry(region.target.clone())
-            .or_default()
-            .push(frame);
-    }
-
-    let targets = target_frames
-        .into_iter()
-        .map(|(target, frames)| {
-            let mut hasher = Sha256::new();
-            hasher.update(TARGET_HASH_DOMAIN);
-            hash_frame(&mut hasher, target.as_bytes());
-            frames
-                .iter()
-                .for_each(|frame| hash_frame(&mut hasher, frame));
-            (target, format!("{:x}", hasher.finalize()))
-        })
-        .collect();
-
+/// Hash the authored manifest bytes plus every other package file.
+fn compute_package_hash(files: &BTreeMap<String, Vec<u8>>, manifest_bytes: &[u8]) -> PackageHash {
     let mut package = Sha256::new();
     package.update(PACKAGE_HASH_DOMAIN);
     hash_frame(&mut package, manifest_bytes);
@@ -948,42 +820,7 @@ fn compute_hashes(
         hash_frame(&mut package, path.as_bytes());
         hash_frame(&mut package, contents);
     }
-
-    Ok(ProfilePackageHashes {
-        package: format!("{:x}", package.finalize()),
-        targets,
-    })
-}
-
-fn canonical_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, ProfilePackageError> {
-    let canonical = canonical_json(value)?;
-    serde_json::to_vec(&canonical).map_err(ProfilePackageError::CanonicalSerialization)
-}
-
-fn canonical_json<T: Serialize>(value: &T) -> Result<Value, ProfilePackageError> {
-    serde_json::to_value(value)
-        .map(canonicalize_value)
-        .map_err(ProfilePackageError::CanonicalSerialization)
-}
-
-fn canonicalize_value(value: Value) -> Value {
-    match value {
-        Value::Array(values) => Value::Array(values.into_iter().map(canonicalize_value).collect()),
-        Value::Object(values) => Value::Object(
-            values
-                .into_iter()
-                .map(|(key, value)| (key, canonicalize_value(value)))
-                .collect::<BTreeMap<_, _>>()
-                .into_iter()
-                .collect::<Map<_, _>>(),
-        ),
-        scalar => scalar,
-    }
-}
-
-fn append_frame(destination: &mut Vec<u8>, frame: &[u8]) {
-    destination.extend_from_slice(&(frame.len() as u64).to_be_bytes());
-    destination.extend_from_slice(frame);
+    format!("{:x}", package.finalize())
 }
 
 fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
@@ -1140,7 +977,7 @@ mod tests {
             package.model().dependencies,
             vec![ProfileDependencyRequirement {
                 id: ProfileId::try_from("jit-default").unwrap(),
-                version: "*".to_string(),
+                version: semver::VersionReq::STAR,
             }]
         );
 
@@ -1323,19 +1160,9 @@ value = "workspace/active"
     }
 
     #[test]
-    fn test_hashes_are_stable_grouped_by_target_and_cover_source_drift() {
+    fn test_package_hash_is_stable_and_covers_source_drift() {
         let first = package();
-        let second = package();
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        assert_eq!(first.hashes(), second.hashes());
-        assert_eq!(first.hashes().targets.len(), 7);
-        assert_eq!(
-            first.hashes().targets[".jit/config.toml"],
-            "0b22a166dff17fbf500cd9682ba0348b3219aac7582736f9df8371f592de4694"
-        );
-        assert!(first.hashes().targets.contains_key(".jit/gates.toml"));
-        assert!(first.hashes().targets.contains_key("AGENTS.md"));
-        assert!(first.hashes().targets.contains_key("bin/check.sh"));
+        assert_eq!(first.package_hash(), package().package_hash());
 
         let mut changed = first.files.clone();
         changed.insert(
@@ -1343,35 +1170,20 @@ value = "workspace/active"
             b"#!/bin/sh\nexit 1\n".to_vec(),
         );
         let changed = validated_package(changed).unwrap();
-        assert_ne!(first.hashes().package, changed.hashes().package);
-        assert_ne!(
-            first.hashes().targets["bin/check.sh"],
-            changed.hashes().targets["bin/check.sh"]
-        );
-        assert_eq!(
-            first.hashes().targets["docs/workflow.txt"],
-            changed.hashes().targets["docs/workflow.txt"]
-        );
-
-        let contribution = format!(
-            "[[contribution]]\nkind = \"map-entry\"\ntarget = \"type-hierarchy-types\"\nidentity = \"{}\"\nvalue = 1\n\n",
-            taxonomy.type_at_level(2)
-        );
-        let reordered_manifest = manifest_text().replacen(&contribution, "", 1) + &contribution;
-        let mut reordered = first.files.clone();
-        reordered.insert(
-            MANIFEST_FILE_NAME.to_string(),
-            reordered_manifest.into_bytes(),
-        );
-        let reordered = validated_package(reordered).unwrap();
-        assert_ne!(
-            first.hashes().targets[".jit/config.toml"],
-            reordered.hashes().targets[".jit/config.toml"]
-        );
+        assert_ne!(first.package_hash(), changed.package_hash());
     }
 
     #[test]
-    fn test_package_hash_covers_manifest_source_bytes_that_targets_ignore() {
+    fn test_model_targets_collect_contribution_registries_assets_and_regions() {
+        let targets = package().model().targets();
+
+        assert!(targets.contains(".jit/config.toml"));
+        assert!(targets.contains("bin/check.sh"));
+        assert!(targets.contains("AGENTS.md"));
+    }
+
+    #[test]
+    fn test_package_hash_covers_manifest_source_bytes_the_model_ignores() {
         let first = package();
         let mut reformatted = first.files.clone();
         reformatted.insert(
@@ -1381,8 +1193,7 @@ value = "workspace/active"
         let reformatted = validated_package(reformatted).unwrap();
 
         assert_eq!(first.model(), reformatted.model());
-        assert_ne!(first.hashes().package, reformatted.hashes().package);
-        assert_eq!(first.hashes().targets, reformatted.hashes().targets);
+        assert_ne!(first.package_hash(), reformatted.package_hash());
     }
 
     #[test]
@@ -1417,7 +1228,7 @@ template = true
             ),
         ]))
         .expect("the variable package is valid");
-        let package_hash = package.hashes().package.clone();
+        let package_hash = package.package_hash().clone();
         let first = resolve_package(
             &package,
             &VariableInputs {
@@ -1452,7 +1263,7 @@ template = true
         )
         .expect("the second value resolves");
 
-        assert_eq!(package.hashes().package, package_hash);
+        assert_eq!(package.package_hash(), &package_hash);
         assert_eq!(first, first_again);
         assert_eq!(
             first.variables().values()[&"NAME".try_into().unwrap()],
@@ -1471,11 +1282,6 @@ template = true
             Some(b"profile=second\n".as_slice())
         );
         assert_ne!(first.model(), second.model());
-        assert_ne!(
-            first.target_hashes().unwrap(),
-            second.target_hashes().unwrap(),
-            "resolved target fingerprints must change with resolved content"
-        );
     }
 
     #[test]
@@ -1597,23 +1403,13 @@ name = "NAME"
     }
 
     #[test]
-    fn test_validation_rejects_invalid_identity_version_and_compatibility() {
+    fn test_validation_rejects_invalid_identity_and_manifest_version() {
         let package = package();
         let cases = [
             (
                 "id = \"synthetic-workflow\"",
                 "id = \"Synthetic Workflow\"",
                 "invalid profile id",
-            ),
-            (
-                "version = \"1.2.3\"",
-                "version = \"01.2.3\"",
-                "invalid profile version",
-            ),
-            (
-                "compatible-jit = \">=0.2.0, <2.0.0\"",
-                "compatible-jit = \"not a requirement\"",
-                "invalid compatible JIT requirement",
             ),
             (
                 "manifest-version = 2",
@@ -1749,7 +1545,7 @@ name = "NAME"
     #[test]
     fn test_from_directory_reads_one_package_from_every_copy_of_one_authored_tree() {
         // A copy of the authored tree elsewhere on disk is the same package:
-        // the manifest, both hashes, the inventory, and every declared source's
+        // the manifest, the package hash, the inventory, and every declared source's
         // bytes agree with the package read from the checked-in tree.
         let authored = package();
         let temp = TempDir::new().unwrap();
@@ -1757,8 +1553,7 @@ name = "NAME"
             .expect("valid package tree");
 
         assert_eq!(copy.model(), authored.model());
-        assert_eq!(copy.hashes().package, authored.hashes().package);
-        assert_eq!(copy.hashes().targets, authored.hashes().targets);
+        assert_eq!(copy.package_hash(), authored.package_hash());
         assert_eq!(copy.file_count(), authored.file_count());
         assert_eq!(copy.byte_size(), authored.byte_size());
         assert!(copy
@@ -1775,7 +1570,7 @@ name = "NAME"
             let root = writable_package_tree(&temp);
             ProfilePackage::from_directory(&root).expect("valid package tree")
         };
-        assert_eq!(owned.hashes(), authored.hashes());
+        assert_eq!(owned.package_hash(), authored.package_hash());
         assert!(
             owned
                 .model()
@@ -1798,7 +1593,7 @@ name = "NAME"
         let first_package = ProfilePackage::from_directory(&first).expect("valid package tree");
         let second_package = ProfilePackage::from_directory(&second).expect("valid package tree");
 
-        assert_eq!(first_package.hashes(), second_package.hashes());
+        assert_eq!(first_package.package_hash(), second_package.package_hash());
         assert_eq!(
             first_package.directory(),
             Some(fs::canonicalize(&first).unwrap().as_path())

@@ -800,7 +800,7 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             "manifest",
             "origin",
             "package_hash",
-            "target_hashes",
+            "targets",
             "version",
         ])
     );

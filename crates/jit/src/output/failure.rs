@@ -449,13 +449,6 @@ pub fn validate_fix_json_error(error: &anyhow::Error) -> JsonError {
 pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
     use crate::repository_state::RepositoryStateError;
 
-    if error
-        .downcast_ref::<crate::errors::NotFoundError>()
-        .is_some()
-    {
-        return Ok(command_json_error(error, ErrorCode::ProfileNotFound)
-            .with_suggestion("Select a package with --profile DIR"));
-    }
     if let Some(crate::commands::ProfileApplyError::UncommittedTargets { paths }) =
         error.downcast_ref::<crate::commands::ProfileApplyError>()
     {
@@ -1072,20 +1065,9 @@ mod repository_state_classifier_tests {
     fn test_every_profile_graph_error_variant_classifies_as_profile_error_with_its_exit_status() {
         use crate::profile::ProfileGraphError as Graph;
 
-        let semver_error = || semver::Version::parse("not-semver").unwrap_err();
         let text = |value: &str| value.to_string();
         let variants = vec![
             Graph::SelectedPackageMissing { id: text("a") },
-            Graph::InvalidPackageVersion {
-                package: text("a"),
-                value: text("x"),
-                source: semver_error(),
-            },
-            Graph::InvalidEngineRequirement {
-                package: text("a"),
-                value: text("x"),
-                source: semver_error(),
-            },
             Graph::IncompatibleEngine {
                 package: text("a"),
                 required: text("x"),
@@ -1095,23 +1077,11 @@ mod repository_state_classifier_tests {
                 package: text("a"),
                 dependency: text("b"),
             },
-            Graph::InvalidDependencyRequirement {
-                package: text("a"),
-                dependency: text("b"),
-                value: text("x"),
-                source: semver_error(),
-            },
             Graph::DependencyVersionMismatch {
                 package: text("a"),
                 dependency: text("b"),
                 required: text("x"),
                 found: text("y"),
-            },
-            Graph::InvalidIncompatibilityRequirement {
-                package: text("a"),
-                other: text("b"),
-                value: text("x"),
-                source: semver_error(),
             },
             Graph::IncompatiblePackages {
                 package: text("a"),
@@ -1145,14 +1115,6 @@ mod repository_state_classifier_tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn test_profile_json_error_maps_not_found_before_variant_match() {
-        let error = anyhow::Error::new(crate::errors::NotFoundError::new("no such profile"));
-        let json = profile_json_error(&error).expect("a not-found error renders a JSON error");
-        assert_eq!(json.error.code, crate::output::ErrorCode::ProfileNotFound);
-        assert_eq!(json.exit_code().code(), 3);
     }
 }
 

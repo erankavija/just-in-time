@@ -308,8 +308,8 @@ pub fn pack_package_archive(package: &ProfilePackage) -> Result<Vec<u8>, Package
         archive: ArchiveMetadata {
             archive_version: ARCHIVE_VERSION,
             id: model.id.clone(),
-            version: model.version.clone(),
-            package_hash: package.hashes().package.clone(),
+            version: model.version.to_string(),
+            package_hash: package.package_hash().clone(),
         },
     })
     .map_err(PackageArchiveError::MetadataSerialization)?;
@@ -640,16 +640,16 @@ fn require_metadata_agreement(
             disagreement(
                 "version",
                 metadata.version.clone(),
-                tree.model().version.clone(),
+                tree.model().version.to_string(),
             )
         });
     if let Some(error) = mismatch {
         return Err(error);
     }
-    if metadata.package_hash != tree.hashes().package {
+    if metadata.package_hash != *tree.package_hash() {
         return Err(PackageArchiveError::IdentityMismatch {
             declared: metadata.package_hash.clone(),
-            computed: tree.hashes().package.clone(),
+            computed: tree.package_hash().clone(),
         });
     }
     Ok(())
@@ -794,8 +794,8 @@ mod tests {
         assert_eq!(tree.model().id, package.model().id);
         assert_eq!(tree.model().version, package.model().version);
         assert_eq!(
-            tree.hashes().package,
-            package.hashes().package,
+            tree.package_hash(),
+            package.package_hash(),
             "the recomputed identity differs from the packed package's own"
         );
         assert_eq!(
@@ -1113,7 +1113,7 @@ mod tests {
         admitted.push(directory_entry(DIRECTORY_MODE));
         let tree = read_package_archive(&archive_of(&admitted))
             .expect("a directory entry at the conventional mode is admitted");
-        assert_eq!(tree.hashes().package, package.hashes().package);
+        assert_eq!(tree.package_hash(), package.package_hash());
         assert_eq!(
             tree.file_count(),
             package.file_count(),
@@ -1184,7 +1184,7 @@ mod tests {
         );
 
         let tree = read_package_archive(&archive).expect("the read accepts what packing wrote");
-        assert_eq!(tree.hashes().package, package.hashes().package);
+        assert_eq!(tree.package_hash(), package.package_hash());
     }
 
     /// A file larger than a package archive may be is refused before it is

@@ -336,7 +336,7 @@ selectors. Lifecycle rehearsals and runs report the same ordered observations:
 dependency-only packages once before the selected roots, then every selected
 root occurrence in selector order. A repeated root's later observations are
 `unchanged` and carry no decisions. Each show entry carries the manifest, package
-identity, target hashes, and size. Showing a package does not re-verify current
+identity, target paths, and size. Showing a package does not re-verify current
 target bytes. Use
 `jit profile apply --profile packages/jit-dogfood --dry-run` for exact current-state
 verification of the named package and its dependency closure: it returns every
@@ -358,7 +358,7 @@ tools.
 The package is versioned independently from the JIT binary and declares its
 compatible JIT range in a TOML manifest. The manifest is the package inventory:
 run `jit profile show --profile packages/jit-dogfood --json` for the
-exact version, dependencies, contributions, assets, managed regions, hashes, and
+exact version, dependencies, contributions, assets, managed regions, package hash, and
 executable declarations the resolved package carries. It also declares the repository roots from which
 packaged live assets are drawn, so any repository file under a declared root
 that is neither claimed by a packaged asset nor matched by a declared exclusion
