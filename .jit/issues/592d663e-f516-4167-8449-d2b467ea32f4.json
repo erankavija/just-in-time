@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "34aea514-2214-414e-993f-ee149e3a4558",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:21:00.158323503Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "592d663e-f516-4167-8449-d2b467ea32f4",
   "labels": [
     "epic:semantic-types",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "A profile has one identity type",
-  "updated_at": "2026-11-01T04:50:35.832564354Z"
+  "updated_at": "2026-11-01T05:21:00.158323503Z"
 }
