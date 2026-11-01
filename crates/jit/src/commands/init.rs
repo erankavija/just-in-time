@@ -870,7 +870,7 @@ mod tests {
         // the two sides reach it by different routes.
         let location = crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood");
         let workflow = crate::profile::ProfilePackage::from_directory(&location).unwrap();
-        let closure = executor.resolve_profile_closure(&workflow).unwrap();
+        let closure = crate::test_utils::selected_closure(&executor, &workflow).unwrap();
 
         let result = executor
             .initialize_selected(repo.path(), &[ProfileSelector::path(&location)])
@@ -1350,10 +1350,12 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         );
         let executor = file_executor(repo.path()).unwrap();
         let location = repo.path().join("packages/workflow");
-        let closure = executor
-            .resolve_profile_closure(&ProfilePackage::from_directory(&location).unwrap())
-            .unwrap()
-            .len();
+        let closure = crate::test_utils::selected_closure(
+            &executor,
+            &ProfilePackage::from_directory(&location).unwrap(),
+        )
+        .unwrap()
+        .len();
         let selectors = [ProfileSelector::path(location)];
 
         let (initialized, stages) = crate::profile::selection_probe::observe(|| {

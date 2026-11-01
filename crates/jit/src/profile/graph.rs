@@ -1,9 +1,9 @@
 //! Deterministic resolution of a participating profile-package graph.
 //!
 //! Package loading is a command concern. This module receives the complete
-//! candidate set — selected packages, already-applied packages, and any
-//! dependencies loaded for them — and settles the graph without consulting
-//! the filesystem or choosing a winner from selector order.
+//! candidate set — selected packages and the dependencies loaded for them —
+//! and settles the graph without consulting the filesystem or choosing a winner
+//! from selector order.
 
 use super::ProfilePackage;
 use crate::domain::identity::ProfileId;
@@ -44,9 +44,8 @@ pub struct ResolvedProfileGraph {
 impl ResolvedProfileGraph {
     /// Resolve every supplied package and return a dependency-first order.
     ///
-    /// The supplied map must contain the selected packages, every applied
-    /// package that remains in the repository, and the dependency closure of
-    /// both. The resolver still verifies that closure, compatibility, and
+    /// The supplied map must contain the selected packages and their dependency
+    /// closure. The resolver still verifies that closure, compatibility, and
     /// incompatibility claims are all satisfied before returning.
     pub fn resolve(
         packages: BTreeMap<ProfileId, ProfilePackage>,
@@ -180,14 +179,6 @@ impl ResolvedProfileGraph {
         })
     }
 
-    /// Return all participating packages in canonical dependency-first order.
-    pub fn packages(&self) -> Vec<ProfilePackage> {
-        self.order
-            .iter()
-            .filter_map(|id| self.packages.get(id).cloned())
-            .collect()
-    }
-
     /// Each participating package's transitive dependencies.
     pub fn transitive_dependencies(&self) -> BTreeMap<ProfileId, BTreeSet<ProfileId>> {
         self.order.iter().fold(BTreeMap::new(), |mut closure, id| {
@@ -209,8 +200,7 @@ impl ResolvedProfileGraph {
     }
 
     /// Return the selected roots and their dependency closure in canonical
-    /// dependency-first order. Unselected applied packages are constraints,
-    /// not packages to publish again.
+    /// dependency-first order.
     pub fn selected_packages(&self) -> Vec<ProfilePackage> {
         let mut reachable = self.selected.clone();
         let mut pending = VecDeque::from_iter(self.selected.iter().cloned());
