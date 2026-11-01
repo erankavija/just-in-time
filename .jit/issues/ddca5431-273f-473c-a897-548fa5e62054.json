@@ -1,0 +1,25 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-01T10:25:11.246990434Z",
+  "dependencies": [],
+  "description": "Move a gated issue to done when `jit gate evaluate` passes its last gate, or stop saying it will.\n\n## Background\n\n`jit issue update <id> --state done` on an issue with unpassed gates moves it to `gated` and prints \"Issue automatically transitioned to 'gated' and will move to 'done' when all gates pass.\" (`crates/jit/src/errors.rs:918`). d2b7d19b stayed `gated` after `jit gate evaluate` passed its `cargo-ci` (2026-11-01T09:51:45Z) and then `code-review` (09:55:15Z) with `all_passed` true, and moved only on a further `jit issue update --state done`. `auto_transition_to_done` runs from `gate.rs:881` and `gate_check.rs:1560`, and the evaluate path did not reach it in this case. Found under c780514e.\n\n## Success Criteria\n\n- [hard] REQ-01: After `jit gate evaluate` passes the last unpassed gate of a gated issue, the issue is done, or the message at `errors.rs:918` states what the operator must do instead.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T10:25:11.246990434Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ddca5431-273f-473c-a897-548fa5e62054",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Passing a gated issue's last gate moves it to done, as the message says",
+  "updated_at": "2026-11-01T10:25:11.246990434Z"
+}
