@@ -33,7 +33,8 @@ set -uo pipefail
 # The exit-status classifier (0/1/75) is driven through `cargo-ci.sh --classify`
 # over synthetic step output and load samples, one assertion per exit path. A
 # compiler wrapper that cannot run exits 75 before any step, driven through
-# wrappers this self-test owns.
+# wrappers this self-test owns. The build-lock wait of the profiling and benchmark
+# scripts is driven against a lock it owns, in a repository it owns.
 #
 # The signature and stale-expect scenarios also assert that `cargo build
 # --workspace` SUCCEEDS on the same tree: that is the recorded reason a
@@ -48,7 +49,7 @@ set -uo pipefail
 #   1 — one or more assertions failed
 #   2 — environment error (missing tooling)
 
-for tool in git cargo jq; do
+for tool in git cargo jq python3 flock; do
   command -v "$tool" >/dev/null 2>&1 || {
     echo "selftest: '$tool' not on PATH" >&2
     exit 2
@@ -339,6 +340,126 @@ EOF
   focused_gate_from "$fixture/cwd" RUSTFLAGS=--selftest-invalid-flag
   check "a probe failure that outlives removing the wrappers is left to the steps" \
     test "$rc" -eq 0 -a "$(grep -c 'infrastructure fault' "$out")" -eq 0
+}
+
+# Each script that takes the build lock itself bounds and announces its wait, and
+# no Cargo build starts without the lock. Every run happens in a repository this
+# test owns with every output overridden, because the benchmarks write before they
+# lock. The flock shim hands over at the script's first attempt, so a lock arriving
+# after the script started is deterministic on either side of that attempt.
+test_script_build_lock_wait() {
+  local fixture="$scratch/script-lock" repo="$scratch/script-lock/repo" bound=0.01
+  local lock="$fixture/build.lock" cargo_ran="$fixture/cargo-ran"
+  local first_attempt="$fixture/first-attempt" proceed="$fixture/proceed"
+  local real_flock script name out rc lock_fd arrival_fd pid arrival_took_lock
+  real_flock=$(command -v flock)
+  mkdir -p "$fixture/bin" "$fixture/shim"
+  seed_base "$repo"
+  cat >"$fixture/bin/cargo" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "--version" ]; then
+  echo "cargo 1.90.0 (selftest fixture)"
+  exit 0
+fi
+printf '%s\n' "$*" >"$SELFTEST_CARGO_RAN"
+exit 97
+EOF
+  printf '#!/usr/bin/env bash\n' >"$fixture/bin/rg"
+  cat >"$fixture/shim/flock" <<'EOF'
+#!/usr/bin/env bash
+hand_over() {
+  : >"$SELFTEST_FIRST_ATTEMPT"
+  local waited=0
+  while [ ! -e "$SELFTEST_PROCEED" ] && [ "$waited" -lt 3000 ]; do
+    sleep 0.01
+    waited=$((waited + 1))
+  done
+}
+[ ! -e "$SELFTEST_FIRST_ATTEMPT" ] || exec "$SELFTEST_REAL_FLOCK" "$@"
+case "$SELFTEST_LOCK_ARRIVES" in
+  before-attempt)
+    hand_over
+    exec "$SELFTEST_REAL_FLOCK" "$@"
+    ;;
+  after-attempt)
+    rc=0
+    "$SELFTEST_REAL_FLOCK" "$@" || rc=$?
+    hand_over
+    exit "$rc"
+    ;;
+esac
+EOF
+  chmod +x "$fixture/bin/cargo" "$fixture/bin/rg" "$fixture/shim/flock"
+
+  run_script() { # run_script <script> <PATH-prefix> [VAR=value ...]
+    local path_prefix="$2" script_path="$1"
+    shift 2
+    (
+      cd "$repo" || exit 3
+      env -u PROFILE_TEST_SUITE_LOCKED -u SESSION_BENCH_BIN \
+        PATH="$path_prefix:$PATH" SELFTEST_CARGO_RAN="$cargo_ran" \
+        CARGO_CI_BUILD_LOCK="$lock" CARGO_CI_LOCK_TIMEOUT="$bound" \
+        PROFILE_TEST_SUITE_OUTPUT="$fixture/profile.json" \
+        SESSION_BENCH_OUT_DIR="$fixture/session-out" SESSION_BENCH_WORK_DIR="$fixture/session-work" \
+        SESSION_BENCH_TARGET_DIR="$fixture/session-target" \
+        BENCH_OUT_DIR="$fixture/bench-out" BENCH_TARGET_BASE="$fixture/bench-target" \
+        BENCH_PROBE_FILE=src/lib.rs "$@" "$script_path"
+    ) >"$out" 2>&1
+  }
+  # Runs <script> until its first flock attempt, takes the lock if it is free, and
+  # lets the script finish.
+  run_with_arriving_lock() { # run_with_arriving_lock <script> <before-attempt|after-attempt>
+    rm -f "$first_attempt" "$proceed"
+    run_script "$1" "$fixture/shim:$fixture/bin" SELFTEST_LOCK_ARRIVES="$2" \
+      SELFTEST_REAL_FLOCK="$real_flock" SELFTEST_FIRST_ATTEMPT="$first_attempt" \
+      SELFTEST_PROCEED="$proceed" &
+    pid=$!
+    while [ ! -e "$first_attempt" ] && kill -0 "$pid" 2>/dev/null; do
+      sleep 0.01
+    done
+    exec {arrival_fd}>"$lock"
+    arrival_took_lock=no
+    if flock -n "$arrival_fd"; then
+      arrival_took_lock=yes
+    fi
+    : >"$proceed"
+    wait "$pid"
+    rc=$?
+    exec {arrival_fd}>&-
+  }
+  wait_is_announced() { grep -F "waiting up to ${bound}s" "$out" | grep -qF "$lock"; }
+
+  echo
+  echo "== script build lock: the wait is bounded, announced and builds nothing =="
+  for script in profile-test-suite.sh benchmark-session-cost.sh benchmark-rust-build.sh; do
+    name=$script
+    script="$here/$script"
+    out="$fixture/$name.out"
+    rm -f "$cargo_ran"
+
+    exec {lock_fd}>"$lock"
+    flock "$lock_fd"
+    run_script "$script" "$fixture/bin"
+    rc=$?
+    exec {lock_fd}>&-
+    check "$name lock held throughout: the wait passing exits 2" test "$rc" -eq 2
+    check "$name lock held throughout: the wait names the lock and the bound" wait_is_announced
+    check "$name lock held throughout: the timeout names the lock and the bound" \
+      grep -qF "timed out after ${bound}s waiting for $lock" "$out"
+    check "$name lock held throughout: no Cargo build starts" test ! -e "$cargo_ran"
+    check "$name lock held throughout: the repository is unchanged" \
+      test -z "$(git -C "$repo" status --porcelain)"
+
+    run_with_arriving_lock "$script" before-attempt
+    check "$name lock arrives after the start: the wait is announced" wait_is_announced
+    check "$name lock arrives after the start: the wait passing exits 2" test "$rc" -eq 2
+    check "$name lock arrives after the start: no Cargo build starts" test ! -e "$cargo_ran"
+
+    run_with_arriving_lock "$script" after-attempt
+    check "$name lock free at the first attempt: that attempt holds it, so no wait goes silent" \
+      test "$arrival_took_lock" = no
+    git -C "$repo" clean -fdxq
+  done
 }
 
 # --- fixture construction ----------------------------------------------------
@@ -808,6 +929,7 @@ echo "== wrong-nextest-version: the gate must fail before its first step =="
 test_wrong_nextest_version_fails_fast
 test_classifier_exit_paths
 test_build_lock_status_propagation
+test_script_build_lock_wait
 test_unrunnable_compiler_wrapper
 
 run_scenario healthy "healthy_mainline" "healthy_worker" pass
