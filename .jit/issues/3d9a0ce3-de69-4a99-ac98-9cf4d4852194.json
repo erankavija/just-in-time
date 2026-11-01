@@ -70,6 +70,7 @@
       "path": "dev/active/3d9a0ce3-lead-friction/handoff.md"
     }
   ],
+  "done_at": "2026-11-01T20:36:11.650253791Z",
   "first_ready_at": "2026-10-15T11:05:36.732638299Z",
   "gates_required": [
     "repo-validate",
@@ -98,7 +99,7 @@
     "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Remove execution-lead friction in gate, document and profile workflows",
-  "updated_at": "2026-11-01T20:33:21.587483802Z"
+  "updated_at": "2026-11-01T20:36:11.650253791Z"
 }

@@ -22506,3 +22506,5 @@
 {"from":"backlog","id":"cb22b87c-e512-497e-a580-1b6a16d1092a","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T20:29:55.539190215Z","to":"ready","type":"issue_state_changed"}
 {"gate_key":"holistic-review","id":"79799fff-95cf-4e47-8b8b-56d13e4a0b84","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T20:33:21.587483802Z","type":"gate_passed","updated_by":"auto:executor"}
 {"fields":["description"],"id":"0c5debac-b8eb-49c6-ac41-a7cfbb97f5a5","issue_id":"1a6d25ac-88f1-402d-a3e0-8b89b1bb6455","timestamp":"2026-11-01T20:35:40.693535869Z","type":"issue_updated","updated_by":"issue-update"}
+{"from":"ready","id":"1cc92a07-649c-4399-b6ef-f2d0809e2acc","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T20:36:11.650253791Z","to":"done","type":"issue_state_changed"}
+{"id":"d8e68848-1974-43f8-8c80-6069a2a1172c","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T20:36:11.650253791Z","type":"issue_completed"}
