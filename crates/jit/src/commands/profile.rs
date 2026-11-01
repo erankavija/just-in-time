@@ -1335,7 +1335,11 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         if response == ProfileConflictResponse::Refuse {
             crate::profile::ensure_publishable_targets(&plan)
                 .map_err(RepositoryStateError::from)?;
-            ensure_committed_write_targets(&plan, &self.require_layout()?)?;
+            ensure_committed_write_targets(
+                &plan,
+                &self.require_layout()?,
+                self.require_worktree_paths()?,
+            )?;
         }
         Ok(Some(plan))
     }
@@ -1343,69 +1347,53 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
 
 /// Refuse `plan` when a path its delta writes differs from `HEAD`.
 ///
-/// Each root is classified on its own: a relocated data root can sit outside
-/// the checkout holding the worktree targets, or in another one.
+/// `paths` is the invocation's one git classification, so a repository whose
+/// data root lies outside every checkout has no git here.
+/// An event-log append is left out because it keeps every uncommitted line.
 fn ensure_committed_write_targets(
     plan: &MaterializationPlan,
     layout: &RepositoryLayout,
+    paths: &WorktreePaths,
 ) -> Result<()> {
-    let paths = [
-        (RepositoryRootClass::Worktree, layout.worktree_root()),
-        (RepositoryRootClass::Data, layout.data_root()),
-    ]
-    .into_iter()
-    .map(|(class, root)| uncommitted_write_targets(plan, class, root))
-    .collect::<Result<Vec<_>>>()?
-    .into_iter()
-    .flatten()
-    .collect::<BTreeSet<_>>();
-    if paths.is_empty() {
+    let Some(checkout) = paths.git() else {
         return Ok(());
-    }
-    Err(ProfileApplyError::UncommittedTargets {
-        paths: paths.into_iter().collect(),
-    }
-    .into())
-}
-
-/// Checkout-relative dirty paths among the ones `plan` writes under `root`,
-/// empty when no git checkout holds `root`.
-///
-/// An event-log append is left out because it keeps every uncommitted line.
-fn uncommitted_write_targets(
-    plan: &MaterializationPlan,
-    class: RepositoryRootClass,
-    root: &Path,
-) -> Result<Vec<String>> {
+    };
     let written = plan
         .delta()
         .actions()
         .iter()
         .filter(|action| !matches!(action, RepositoryAction::AppendEvents { .. }))
         .map(RepositoryAction::path)
-        .filter(|path| path.root_class() == class)
-        .map(|path| path.relative().as_path())
-        .collect::<BTreeSet<_>>();
+        .collect::<Vec<_>>();
     if written.is_empty() {
-        return Ok(Vec::new());
+        return Ok(());
     }
-    let paths = WorktreePaths::detect_from(root)?;
-    let Some(checkout) = paths.git() else {
-        return Ok(Vec::new());
-    };
     // Git reports paths from its physical top level.
-    let physical_root = root.canonicalize()?;
-    let offset = physical_root.strip_prefix(&paths.worktree_root)?;
-    Ok(checkout
+    let worktree_root = layout.worktree_root().canonicalize()?;
+    let data_root = layout.data_root().canonicalize()?;
+    let written = written
+        .into_iter()
+        .map(|path| {
+            match path.root_class() {
+                RepositoryRootClass::Worktree => &worktree_root,
+                RepositoryRootClass::Data => &data_root,
+            }
+            .join(path.relative().as_path())
+        })
+        .collect::<BTreeSet<_>>();
+    let uncommitted = checkout
         .dirty_paths()?
         .into_iter()
-        .filter(|dirty| {
-            dirty
-                .strip_prefix(offset)
-                .is_ok_and(|relative| written.contains(relative))
-        })
+        .filter(|dirty| written.contains(&paths.worktree_root.join(dirty)))
         .map(|dirty| dirty.display().to_string())
-        .collect())
+        .collect::<BTreeSet<_>>();
+    if uncommitted.is_empty() {
+        return Ok(());
+    }
+    Err(ProfileApplyError::UncommittedTargets {
+        paths: uncommitted.into_iter().collect(),
+    }
+    .into())
 }
 
 /// Insert one package image without allowing selector or dependency traversal
