@@ -22364,3 +22364,14 @@
 {"id":"d894f9cf-6f04-4405-abc2-b04f27439feb","issue_id":"0838348a-2fb7-4a57-a75c-c3a7f1252f42","timestamp":"2026-11-01T18:36:26.536698427Z","type":"issue_completed"}
 {"assignee":"agent:worker","id":"16a84eb5-4627-44c6-8eae-8a0b6dafec2a","issue_id":"d721ab14-a559-4435-90c1-4d342b2507a6","timestamp":"2026-11-01T18:40:51.971439343Z","type":"issue_claimed"}
 {"assignee":"agent:worker","id":"c6333888-0ec5-4e8e-86c3-dec7f096d79a","issue_id":"665bb4e1-093c-4589-9228-8d694701d2bf","timestamp":"2026-11-01T18:40:55.898200981Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"82501538-3c25-48f8-bdc2-8dae2d752a1a","issue_id":"9e703435-4257-45f1-8c19-d1478d4b77b7","timestamp":"2026-11-01T18:42:45.595721374Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"f4e62dfc-814e-42c2-ba3b-c20c7cf63bcc","issue_id":"d721ab14-a559-4435-90c1-4d342b2507a6","timestamp":"2026-11-01T18:43:13.646293059Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"8400afcc-2541-4f31-b35b-3f5a5df6748e","issue_id":"665bb4e1-093c-4589-9228-8d694701d2bf","timestamp":"2026-11-01T18:43:13.953597362Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"689bc4c5-4f4f-4295-a1ef-23ee2df5aa05","issue_id":"665bb4e1-093c-4589-9228-8d694701d2bf","timestamp":"2026-11-01T18:46:06.822751046Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"34f85433-cf3e-4b7b-bcbf-9f71299483c9","issue_id":"9e703435-4257-45f1-8c19-d1478d4b77b7","timestamp":"2026-11-01T18:46:09.614562644Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"e1fa8cba-fde1-4a51-9182-91815b02304b","issue_id":"c92f4011-1850-4998-a555-ca899ec45552","priority":"high","timestamp":"2026-11-01T18:46:25.307243693Z","title":"Keep default rules in force when rules.toml holds only custom rules","type":"issue_created"}
+{"fields":["dependencies"],"id":"90536f9e-2150-45e8-9ce9-fda04601fc46","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-01T18:46:25.820265397Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"code-review","id":"742fe458-f21a-47dd-9c93-790e7a2a63c8","issue_id":"d721ab14-a559-4435-90c1-4d342b2507a6","timestamp":"2026-11-01T18:46:44.683501863Z","type":"gate_passed","updated_by":"auto:executor"}
+{"assignee":"agent:checker-unify","id":"67e1d898-193f-499b-b1b1-b23c9a4eaf80","issue_id":"2a504b17-f54b-4f66-94cc-5d34defb9511","timestamp":"2026-11-01T18:46:45.374159268Z","type":"issue_claimed"}
+{"fields":["description"],"id":"0e32a24c-9210-4132-b471-88ed4b2315b5","issue_id":"2a504b17-f54b-4f66-94cc-5d34defb9511","timestamp":"2026-11-01T18:46:45.498693272Z","type":"issue_updated","updated_by":"issue-update"}
+{"assignee":"agent:worker","id":"2f9bbc52-c39b-4bed-9120-0cf69efbaf82","issue_id":"2a504b17-f54b-4f66-94cc-5d34defb9511","timestamp":"2026-11-01T18:46:45.581906037Z","type":"issue_claimed"}

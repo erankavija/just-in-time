@@ -12,7 +12,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a688784e-2a3f-4440-b069-16fa316731dc",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:43:13.953597362Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "51cb0349-4b5b-4f75-b97f-58ef9426a1ea",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:46:06.822751046Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "665bb4e1-093c-4589-9228-8d694701d2bf",
   "labels": [
     "type:task",
@@ -26,5 +39,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Derive registry target paths from one registry declaration",
-  "updated_at": "2026-11-01T18:40:55.898200981Z"
+  "updated_at": "2026-11-01T18:46:06.822751046Z"
 }

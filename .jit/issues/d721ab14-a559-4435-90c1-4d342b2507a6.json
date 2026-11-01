@@ -12,7 +12,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ae8c44dc-fbaf-4d80-b9c0-6067b4152595",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:43:13.646293059Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3e4b6ba2-1f41-4e93-a746-43166a42afbe",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:46:44.683501863Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d721ab14-a559-4435-90c1-4d342b2507a6",
   "labels": [
     "type:task",
@@ -26,5 +39,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Name profile conflict parties by package only",
-  "updated_at": "2026-11-01T18:40:51.971439343Z"
+  "updated_at": "2026-11-01T18:46:44.683501863Z"
 }

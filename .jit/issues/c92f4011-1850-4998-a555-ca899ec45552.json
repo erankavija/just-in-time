@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-01T18:46:25.307243693Z",
+  "dependencies": [],
+  "description": "A `rules.toml` holding only custom rules silently switches off every default rule, so a malformed label is written and `jit validate` still exits 0.\n\n## Background\n\nThe default rules (`label-format`, `namespace-registry`, `namespace-unique-<ns>`, `type-hierarchy-known`) apply in memory when `.jit/rules.toml` is absent. Once the file exists, only its rows apply. `docs/reference/labels.md` and `docs/reference/configuration.md` tell adopters to add allowed values, value patterns and required namespaces by authoring custom rules in `rules.toml`. A repository following that advice without copying the default rows loses all of them, with no finding.\n\nReproduction on a fresh `jit init` repository:\n\n```bash\nprintf '[[rules]]\\nname = \"custom\"\\nseverity = \"error\"\\nenforce = false\\nassert = { label-value-pattern = { namespace = \"priority\", regex = \"^(high|low)$\" } }\\n' > .jit/rules.toml\njit issue create --title x --description d --label BAD   # exit 0, label written\njit validate                                             # exit 0, \"Repository validation passed\"\n```\n\n`docs/reference/configuration.md` also says the next jit-driven config write, `jit config set` or re-init, writes the matching rows through to `rules.toml`. `jit config set validation.strictness loose` on that repository exits 0 and adds no row.\n\n## Success Criteria\n\n- [hard] REQ-01: On a repository whose `rules.toml` holds only custom rules, a label violating `label-format` is refused or reported exactly as on a repository holding the default rows, and `jit validate` does not exit 0 over it.\n- [hard] REQ-02: Removing a default row from `rules.toml` has one documented effect, and that effect is what the binary does.\n- [hard] REQ-03: `docs/reference/configuration.md` and `docs/reference/labels.md` state what a config write does to `rules.toml`, and `jit config set` does exactly that.\n- [hard] REQ-04: A test owns each of the behaviors above, on a repository built in storage the test owns.\n\n## Notes\n\n- Related: `jit validate --fix` refuses a `rules.toml` holding default rows whose schemas are absent (`captured image has no schemas/default-label-format.json`), while a custom-only file lets it write them. Converting `research` needed `--fix` with custom rows first, then the full file.\n- Exposure on 2026-11-01: none. gf2, mealie-fi, inflected-messages and just-in-time each hold every default row their config derives. `research` holds them since its format 3 commit `9c581bd`.\n- Reachable by following the shipped docs, so this decides what validation checks for an adopter.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T18:46:25.307243693Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "c92f4011-1850-4998-a555-ca899ec45552",
+  "labels": [
+    "type:bug",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "component:validation"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Keep default rules in force when rules.toml holds only custom rules",
+  "updated_at": "2026-11-01T18:46:25.307243693Z"
+}
