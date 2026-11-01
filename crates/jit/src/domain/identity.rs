@@ -392,6 +392,68 @@ impl fmt::Display for ProfileId {
     }
 }
 
+/// Error raised when a gate key is not a lowercase-kebab token.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error("invalid gate key '{input}'; expected lowercase-kebab")]
+pub struct InvalidGateKeyError {
+    input: String,
+}
+
+/// A lowercase-kebab gate key.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(try_from = "String", into = "String")]
+#[schemars(with = "String", description = "")]
+pub struct GateKey(String);
+
+impl GateKey {
+    /// Borrow the key.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for GateKey {
+    type Error = InvalidGateKeyError;
+
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        is_lowercase_kebab(input)
+            .then(|| Self(input.to_string()))
+            .ok_or_else(|| InvalidGateKeyError {
+                input: input.to_string(),
+            })
+    }
+}
+
+impl TryFrom<String> for GateKey {
+    type Error = InvalidGateKeyError;
+
+    fn try_from(input: String) -> Result<Self, Self::Error> {
+        Self::try_from(input.as_str())
+    }
+}
+
+impl FromStr for GateKey {
+    type Err = InvalidGateKeyError;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Self::try_from(input)
+    }
+}
+
+impl From<GateKey> for String {
+    fn from(key: GateKey) -> Self {
+        key.0
+    }
+}
+
+impl fmt::Display for GateKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 pub(crate) fn is_lowercase_kebab(value: &str) -> bool {
     let mut segments = value.split('-');
     segments.next().is_some_and(|first| {
@@ -460,6 +522,53 @@ mod tests {
                 "description": "Stable lowercase-kebab identifier used to name a profile package.",
                 "type": "string"
             })
+        );
+    }
+
+    #[test]
+    fn test_gate_key_round_trips_canonical_tokens_at_parse_boundaries() {
+        for input in ["a", "cargo-ci", "gate2", "code-review-2-extra"] {
+            let key = GateKey::try_from(input).unwrap();
+            assert_eq!(key.as_str(), input);
+            assert_eq!(key.to_string(), input);
+            assert_eq!(input.parse::<GateKey>().unwrap(), key);
+            assert_eq!(GateKey::try_from(input.to_string()).unwrap(), key);
+            let encoded = serde_json::to_value(&key).unwrap();
+            assert_eq!(encoded, json!(input));
+            assert_eq!(serde_json::from_value::<GateKey>(encoded).unwrap(), key);
+            assert_eq!(String::from(key), input);
+        }
+    }
+
+    #[test]
+    fn test_gate_key_rejects_non_kebab_tokens_naming_the_input() {
+        for input in [
+            "",
+            "2gate",
+            "-gate",
+            "gate-",
+            "gate--key",
+            "Gate",
+            "gate_key",
+            "gate.key",
+            "gate key",
+            " gate",
+            "gate\n",
+            "verify:REQ-01",
+        ] {
+            let error = GateKey::try_from(input).unwrap_err();
+            assert!(error.to_string().contains(&format!("'{input}'")));
+            assert!(input.parse::<GateKey>().is_err());
+            assert!(serde_json::from_value::<GateKey>(json!(input)).is_err());
+        }
+    }
+
+    #[test]
+    fn test_gate_key_json_schema_is_a_plain_string() {
+        let schema = GateKey::json_schema(&mut schemars::gen::SchemaGenerator::default());
+        assert_eq!(
+            serde_json::to_value(schema).unwrap(),
+            json!({"type": "string"})
         );
     }
 

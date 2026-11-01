@@ -1544,7 +1544,7 @@ jit gate define <KEY> --title <TITLE> --description <DESCRIPTION> [OPTIONS]
 ```
 
 **Arguments:**
-- `KEY` - Unique identifier (e.g., `tests`, `code-review`, `security-scan`)
+- `KEY` - Unique lowercase-kebab identifier (e.g., `tests`, `code-review`, `security-scan`); any other spelling is rejected with exit code `2`
 
 **Required Options:**
 - `--title <TITLE>` - Human-readable name

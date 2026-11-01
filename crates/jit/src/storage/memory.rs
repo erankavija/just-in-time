@@ -929,7 +929,7 @@ impl IssueStore for InMemoryStorage {
 
     fn find_reusable_gate_run(
         &self,
-        gate_key: &str,
+        gate_key: &crate::domain::identity::GateKey,
         digest: &crate::domain::repository_inputs::InputsDigest,
     ) -> Result<Option<GateRunResult>> {
         Ok(crate::domain::latest_gate_run(self.read_gate_runs(

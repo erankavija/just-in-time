@@ -936,7 +936,7 @@ pub(super) fn finalize_delta(
                 if let Some((run_id, _)) = gate_runs
                     .iter()
                     .rev()
-                    .find(|(_, run)| run.issue_id == updated.id && &run.gate_key == key)
+                    .find(|(_, run)| run.issue_id == updated.id && run.gate_key.as_str() == key)
                 {
                     state.run_id = Some(run_id.clone());
                 }
@@ -953,7 +953,7 @@ pub(super) fn finalize_delta(
                                 issue_id, gate_key, ..
                             },
                             GateStatus::Failed,
-                        ) => issue_id == &updated.id && gate_key == key,
+                        ) => issue_id == &updated.id && gate_key.as_str() == key,
                         _ => false,
                     },
                     _ => false,
@@ -1361,7 +1361,7 @@ fn event_identities(body: &EventBody) -> (Option<IssueId>, String) {
         | EventBody::GateRemoved { gate_key, .. }
         | EventBody::GateDefinitionCreated { gate_key, .. }
         | EventBody::GateDefinitionUpdated { gate_key, .. }
-        | EventBody::GateDefinitionRemoved { gate_key, .. } => (issue_id, gate_key.clone()),
+        | EventBody::GateDefinitionRemoved { gate_key, .. } => (issue_id, gate_key.to_string()),
         EventBody::IssueClaimed { assignee, .. } => (issue_id, assignee.to_string()),
         _ => (issue_id, String::new()),
     }
@@ -1949,7 +1949,7 @@ mod tests {
 
         let gate_run = GateRunResult::attestation(
             &crate::test_utils::issue_id(7),
-            "cargo-ci",
+            &"cargo-ci".parse().unwrap(),
             crate::declarations::GateStage::Postcheck,
             GateStatus::Passed,
             None,
@@ -1964,7 +1964,7 @@ mod tests {
         );
 
         let event = crate::test_utils::stamped_event(
-            EventBody::draft_gate_definition_created("cargo-ci".into()),
+            EventBody::draft_gate_definition_created("cargo-ci".parse().unwrap()),
             "event-1",
             fixed_instant(),
         );
@@ -2050,7 +2050,7 @@ mod tests {
                 let written = serialize_gate_run(&run).unwrap();
                 let raw = stored(&path);
                 let decoded: Value = serde_json::from_slice(&written).unwrap();
-                ["issue_id", "run_id"].iter().for_each(|field| {
+                ["issue_id", "run_id", "gate_key"].iter().for_each(|field| {
                     assert_eq!(decoded[field], raw[field], "{} {field}", path.display());
                 });
                 let keys = |value: &Value| {
@@ -2158,7 +2158,7 @@ mod tests {
             MutationIntent::RecordGateRun {
                 draft: Box::new(GateRunResult::attestation(
                     id,
-                    "review",
+                    &"review".parse().unwrap(),
                     crate::declarations::GateStage::Postcheck,
                     GateStatus::Passed,
                     None,
@@ -2406,7 +2406,9 @@ mod tests {
         let image = image_with(vec![(VirtualPath::EVENTS, RepositoryEntry::Absent)]);
         let intent = MutationIntent::RecordEvent {
             phase: 0,
-            event: Box::new(EventBody::draft_gate_definition_created("cargo-ci".into())),
+            event: Box::new(EventBody::draft_gate_definition_created(
+                "cargo-ci".parse().unwrap(),
+            )),
         };
         let context = ctx();
         let first = finalize(&layout(), &image, &context, std::slice::from_ref(&intent)).unwrap();
@@ -2418,7 +2420,7 @@ mod tests {
             "the same image and context produce byte-identical provenance plans"
         );
         let expected_event = crate::test_utils::stamped_event(
-            EventBody::draft_gate_definition_created("cargo-ci".into()),
+            EventBody::draft_gate_definition_created("cargo-ci".parse().unwrap()),
             IdAuthority::from_seed([7u8; 32]).uuid_at(0),
             fixed_instant(),
         );
@@ -2439,7 +2441,7 @@ mod tests {
         ]);
         let draft = GateRunResult::attestation(
             &crate::test_utils::issue_id(7),
-            "cargo-ci",
+            &"cargo-ci".parse().unwrap(),
             crate::declarations::GateStage::Postcheck,
             GateStatus::Passed,
             None,
@@ -2449,7 +2451,9 @@ mod tests {
         };
         let provenance = MutationIntent::RecordEvent {
             phase: 5,
-            event: Box::new(EventBody::draft_gate_definition_created("cargo-ci".into())),
+            event: Box::new(EventBody::draft_gate_definition_created(
+                "cargo-ci".parse().unwrap(),
+            )),
         };
         let intents = [intent, provenance];
         let context = ctx();
@@ -2481,7 +2485,7 @@ mod tests {
         assert_eq!(bytes, &serialize_gate_run(&expected).unwrap());
 
         let expected_event = crate::test_utils::stamped_event(
-            EventBody::draft_gate_definition_created("cargo-ci".into()),
+            EventBody::draft_gate_definition_created("cargo-ci".parse().unwrap()),
             IdAuthority::from_seed([7u8; 32]).uuid_at(1),
             fixed_instant(),
         );
@@ -2505,11 +2509,15 @@ mod tests {
             },
             MutationIntent::RecordEvent {
                 phase: 5,
-                event: Box::new(EventBody::draft_gate_definition_created("bbb".into())),
+                event: Box::new(EventBody::draft_gate_definition_created(
+                    "bbb".parse().unwrap(),
+                )),
             },
             MutationIntent::RecordEvent {
                 phase: 5,
-                event: Box::new(EventBody::draft_gate_definition_created("aaa".into())),
+                event: Box::new(EventBody::draft_gate_definition_created(
+                    "aaa".parse().unwrap(),
+                )),
             },
         ];
         let image = creation_image();
@@ -2533,10 +2541,10 @@ mod tests {
                 && events[0].timestamp() == fixed_instant()
                 && events[1].id() == ids.uuid_at(2)
                 && events[1].timestamp() == fixed_instant()
-                && first_key == "aaa"
+                && first_key.as_str() == "aaa"
                 && events[2].id() == ids.uuid_at(3)
                 && events[2].timestamp() == fixed_instant()
-                && second_key == "bbb"
+                && second_key.as_str() == "bbb"
         ), "events are canonically ordered before the finalizer allocates their identities: {events:?}");
     }
 
@@ -2872,7 +2880,7 @@ mod tests {
     #[test]
     fn test_finalize_appends_at_the_captured_log_length_reading_as_the_whole_log_composition() {
         let prior = serialize_event(&crate::test_utils::stamped_event(
-            EventBody::draft_gate_definition_created("prior".into()),
+            EventBody::draft_gate_definition_created("prior".parse().unwrap()),
             "e0",
             fixed_instant(),
         ))
@@ -2881,7 +2889,9 @@ mod tests {
         // A valid final line longer than the tail window, read back to its start.
         let long = serialize_event(&crate::test_utils::stamped_event(
             EventBody::draft_gate_definition_created(
-                "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize),
+                "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize)
+                    .parse()
+                    .unwrap(),
             ),
             "e1",
             fixed_instant(),
@@ -2891,7 +2901,9 @@ mod tests {
         let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_log));
         let record = MutationIntent::RecordEvent {
             phase: 0,
-            event: Box::new(EventBody::draft_gate_definition_created("cargo-ci".into())),
+            event: Box::new(EventBody::draft_gate_definition_created(
+                "cargo-ci".parse().unwrap(),
+            )),
         };
         let whole = |log: Vec<u8>| {
             let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&log))]);
@@ -2968,7 +2980,7 @@ mod tests {
         let long_torn = [torn_log().as_slice(), &vec![b'x'; 2 * window]].concat();
         let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_torn));
         for image in [torn_tail_image(), long_image] {
-            let event = EventBody::draft_gate_definition_created("cargo-ci".into());
+            let event = EventBody::draft_gate_definition_created("cargo-ci".parse().unwrap());
             let result = finalize(
                 &layout(),
                 &image,
@@ -3015,8 +3027,9 @@ mod tests {
 
     #[test]
     fn test_event_identities_repository_scoped_event_sorts_before_issue_scoped() {
-        let (repository_scoped, _) =
-            event_identities(&EventBody::draft_gate_definition_created("g".to_string()));
+        let (repository_scoped, _) = event_identities(&EventBody::draft_gate_definition_created(
+            "g".parse().unwrap(),
+        ));
         let (issue_scoped, _) = event_identities(&EventBody::draft_issue_deleted(
             crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0f0e_0d0c),
         ));

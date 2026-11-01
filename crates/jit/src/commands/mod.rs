@@ -1667,10 +1667,11 @@ fn apply_captured_issue_mutation(
             }
             let events = added
                 .iter()
-                .map(|key| {
+                .filter_map(|key| registry.gates.get(key))
+                .map(|gate| {
                     (
                         1,
-                        EventBody::draft_gate_added(issue.id.clone(), key.clone()),
+                        EventBody::draft_gate_added(issue.id.clone(), gate.key.clone()),
                     )
                 })
                 .collect();
@@ -1699,12 +1700,12 @@ fn apply_captured_issue_mutation(
             let events = removed
                 .iter()
                 .map(|key| {
-                    (
+                    Ok((
                         1,
-                        EventBody::draft_gate_removed(issue.id.clone(), key.clone()),
-                    )
+                        EventBody::draft_gate_removed(issue.id.clone(), key.parse()?),
+                    ))
                 })
-                .collect();
+                .collect::<Result<_>>()?;
             let changed = !removed.is_empty();
             (
                 CapturedIssueMutationOutcome::GatesRemoved { removed, not_found },
@@ -1749,16 +1750,16 @@ fn apply_captured_issue_mutation(
             issue.gates_status.insert(gate_key.clone(), replacement);
             let event = match status {
                 GateStatus::Passed => {
-                    EventBody::draft_gate_passed(issue.id.clone(), gate_key.clone(), by.clone())
+                    EventBody::draft_gate_passed(issue.id.clone(), gate.key.clone(), by.clone())
                 }
                 GateStatus::Failed => {
-                    EventBody::draft_gate_failed(issue.id.clone(), gate_key.clone(), by.clone())
+                    EventBody::draft_gate_failed(issue.id.clone(), gate.key.clone(), by.clone())
                 }
                 GateStatus::Pending => unreachable!("validated manual gate evidence status"),
             };
             gate_runs.push(crate::domain::GateRunResult::attestation(
                 &issue.id,
-                gate_key,
+                &gate.key,
                 gate.stage,
                 *status,
                 by.as_ref(),
@@ -2991,7 +2992,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let state = gate_check::gate_state_from_run(result);
                     let by = result.by.clone();
                     let status = state.status;
-                    issue.gates_status.insert(result.gate_key.clone(), state);
+                    issue
+                        .gates_status
+                        .insert(result.gate_key.to_string(), state);
                     precheck_events.push((
                         1,
                         if status == GateStatus::Passed {
@@ -3823,7 +3826,7 @@ mod tests {
             "auto-start".to_string(),
             GateDefinition {
                 version: 1,
-                key: "auto-start".to_string(),
+                key: "auto-start".parse().unwrap(),
                 title: "Auto start".to_string(),
                 description: String::new(),
                 stage: GateStage::Precheck,
@@ -3846,7 +3849,7 @@ mod tests {
             "manual-start".to_string(),
             GateDefinition {
                 version: 1,
-                key: "manual-start".to_string(),
+                key: "manual-start".parse().unwrap(),
                 title: "Manual start".to_string(),
                 description: String::new(),
                 stage: GateStage::Precheck,
@@ -3902,7 +3905,7 @@ mod tests {
         crate::domain::GateRunResult {
             schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
             run_id: "prior-run".to_string(),
-            gate_key: "auto-start".to_string(),
+            gate_key: "auto-start".parse().unwrap(),
             stage: crate::declarations::GateStage::Precheck,
             issue_id: issue_id.clone(),
             commit: None,
@@ -3978,7 +3981,7 @@ mod tests {
         use crate::declarations::{GateDefinition, GateMode, GateRegistry, GateStage};
         let definition = GateDefinition {
             version: 1,
-            key: key.to_string(),
+            key: key.parse().unwrap(),
             title: key.to_string(),
             description: String::new(),
             stage: GateStage::Postcheck,

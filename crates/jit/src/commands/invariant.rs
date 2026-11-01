@@ -74,7 +74,7 @@ mod tests {
                 (*key).to_string(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: (*key).to_string(),
+                    key: (*key).parse().unwrap(),
                     title: (*key).to_string(),
                     description: String::new(),
                     stage: crate::declarations::GateStage::Postcheck,

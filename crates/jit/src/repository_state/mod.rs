@@ -1296,7 +1296,7 @@ mod tests {
     fn gate_definition(key: &str) -> crate::declarations::GateDefinition {
         crate::declarations::GateDefinition {
             version: 1,
-            key: key.to_string(),
+            key: key.parse().unwrap(),
             title: key.to_string(),
             description: String::new(),
             stage: crate::declarations::GateStage::Postcheck,

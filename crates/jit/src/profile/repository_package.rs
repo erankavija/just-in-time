@@ -680,7 +680,7 @@ mod tests {
             "repo-validate",
         ] {
             let gate = declared_gate(&package, key);
-            assert_eq!(gate.key, key);
+            assert_eq!(gate.key.as_str(), key);
             assert!(
                 matches!(
                     gate.checker,

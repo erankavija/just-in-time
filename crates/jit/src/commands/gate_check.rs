@@ -5,6 +5,7 @@ use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
 use crate::domain::gate_findings::{
     FindingDisposition, FindingOrigin, FindingSeverity, GateFinding, GateFindings,
 };
+use crate::domain::identity::GateKey;
 use crate::domain::{
     Assignee, GateContext, GateEvaluationStability, GateRunResult, GateRunStatus, GateStatus,
 };
@@ -72,7 +73,6 @@ struct CapturedGateExecution<'a> {
     image: &'a crate::repository_state::RepositoryImage,
     issue: &'a Issue,
     issues: &'a [Issue],
-    gate_key: &'a str,
     gate: &'a crate::declarations::GateDefinition,
     runs: &'a [GateRunResult],
     prompt: Option<&'a str>,
@@ -686,7 +686,7 @@ fn label_target_report(
 /// The `error` run of a built-in checker that could not judge the repository,
 /// distinct from a `failed` verdict on its content.
 fn builtin_fault_run(
-    gate_key: &str,
+    gate_key: &GateKey,
     issue_id: &IssueId,
     stage: GateStage,
     command: &str,
@@ -699,7 +699,7 @@ fn builtin_fault_run(
         schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
         // Repository mutation finalization assigns the durable run identity.
         run_id: String::new(),
-        gate_key: gate_key.to_string(),
+        gate_key: gate_key.clone(),
         stage,
         issue_id: issue_id.clone(),
         commit: None,
@@ -947,7 +947,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let digest = self.declared_inputs_digest(gate)?;
         let reused = match (source, digest.as_ref()) {
             (VerdictSource::ReuseUnchangedInputs, Some(digest)) => {
-                self.storage.find_reusable_gate_run(gate_key, digest)?
+                self.storage.find_reusable_gate_run(&gate.key, digest)?
             }
             _ => None,
         };
@@ -957,7 +957,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 image: &image,
                 issue: &issue,
                 issues: &issues,
-                gate_key,
                 gate,
                 runs: &runs.results,
                 prompt: captured.prompt.as_deref(),
@@ -1004,9 +1003,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             let by = result.by.clone();
             final_issue.gates_status.insert(gate_key.to_string(), state);
             let event = if result.status == GateRunStatus::Passed {
-                EventBody::draft_gate_passed(target_id.clone(), gate_key.to_string(), by)
+                EventBody::draft_gate_passed(target_id.clone(), final_gate.key.clone(), by)
             } else {
-                EventBody::draft_gate_failed(target_id.clone(), gate_key.to_string(), by)
+                EventBody::draft_gate_failed(target_id.clone(), final_gate.key.clone(), by)
             };
             let intents = [
                 MutationIntent::UpdateIssue {
@@ -1064,7 +1063,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Execute a built-in checker against one exact repository image.
     fn execute_builtin_checker_with_repository_view(
         &self,
-        gate_key: &str,
+        gate_key: &GateKey,
         issue_id: &IssueId,
         stage: GateStage,
         checker: &crate::declarations::GateChecker,
@@ -1168,7 +1167,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
             // Repository mutation finalization assigns the durable run identity.
             run_id: String::new(),
-            gate_key: gate_key.to_string(),
+            gate_key: gate_key.clone(),
             stage,
             issue_id: issue_id.clone(),
             commit: None,
@@ -1278,7 +1277,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             enriched,
             input.runs,
         ))?;
-        omit_current_gate_projection(&mut issue_json, input.gate_key);
+        omit_current_gate_projection(&mut issue_json, input.gate.key.as_str());
         Ok(Some(GateContext {
             schema_version: 1,
             prompt,
@@ -1291,8 +1290,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             }),
             run_history: compact_run_history_for_context(
                 input.runs,
-                input.gate_key,
-                input.issue.gates_status.get(input.gate_key),
+                input.gate.key.as_str(),
+                input.issue.gates_status.get(input.gate.key.as_str()),
             ),
         }))
     }
@@ -1305,7 +1304,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .gate
             .checker
             .as_ref()
-            .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", input.gate_key))?;
+            .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", input.gate.key))?;
         let repo_root = self.checker_repo_root()?;
         let working_dir = match checker {
             crate::declarations::GateChecker::Exec {
@@ -1319,7 +1318,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             crate::declarations::GateChecker::Exec { .. } => {
                 self.storage.run_external_process(|| {
                     gate_execution::execute_gate_checker_with_context(
-                        input.gate_key,
+                        &input.gate.key,
                         &input.issue.id,
                         input.gate.stage,
                         checker,
@@ -1330,7 +1329,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 })
             }
             _ => self.execute_builtin_checker_with_repository_view(
-                input.gate_key,
+                &input.gate.key,
                 &input.issue.id,
                 input.gate.stage,
                 checker,
@@ -1462,7 +1461,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                         image,
                         issue: &projected_issue,
                         issues: &issues,
-                        gate_key,
                         gate,
                         runs: checker_history,
                         prompt: captured_prompts.get(gate_key).map(String::as_str),
@@ -1623,7 +1621,7 @@ mod tests {
             gate_key.to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: gate_key.to_string(),
+                key: gate_key.parse().unwrap(),
                 title: "Portable check".to_string(),
                 description: "Portable check".to_string(),
                 stage: GateStage::Postcheck,
@@ -1703,7 +1701,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             "unrelated-pending".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "unrelated-pending".to_string(),
+                key: "unrelated-pending".parse().unwrap(),
                 title: "Unrelated pending gate".to_string(),
                 description: "A deliberately unpassed unrelated gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -1726,7 +1724,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         GateRunResult {
             schema_version: GATE_RUN_SCHEMA_VERSION,
             run_id: run_id.to_string(),
-            gate_key: gate_key.to_string(),
+            gate_key: gate_key.parse().unwrap(),
             stage: GateStage::Postcheck,
             issue_id: crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725),
             commit: Some("abc123".to_string()),
@@ -1856,7 +1854,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             "test-gate".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "test-gate".to_string(),
+                key: "test-gate".parse().unwrap(),
                 title: "Test Gate".to_string(),
                 description: "Test gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -1928,7 +1926,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             .unwrap();
         assert!(
             runs.iter().any(|run| run.run_id == result.run_id
-                && run.gate_key == "durability-check"
+                && run.gate_key.as_str() == "durability-check"
                 && run.status == GateRunStatus::Passed),
             "the returned run must already be recorded: {runs:?}"
         );
@@ -1946,7 +1944,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
                 .any(|event| matches!(
                     event.body(),
                     crate::domain::EventBody::GatePassed { issue_id: subject, gate_key, .. }
-                        if subject == &issue_id && gate_key == "durability-check"
+                        if subject == &issue_id && gate_key.as_str() == "durability-check"
                 )),
             "the evaluation must already have logged its gate-passed event"
         );
@@ -2173,7 +2171,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 self.gate_key.clone(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: self.gate_key.clone(),
+                    key: self.gate_key.parse().unwrap(),
                     title: "Workspace check".to_string(),
                     description: "Workspace check".to_string(),
                     stage: GateStage::Postcheck,
@@ -2885,7 +2883,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap();
         let live = executor
             .execute_builtin_checker_with_repository_view(
-                "not-a-reserved-repository-key",
+                &"not-a-reserved-repository-key".parse().unwrap(),
                 &issue_id,
                 GateStage::Postcheck,
                 &GateChecker::RepositoryValidation,
@@ -2921,7 +2919,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let planned_image = executor.capture_validation_image_with(&overrides).unwrap();
         let planned = executor
             .execute_builtin_checker_with_repository_view(
-                "not-a-reserved-repository-key",
+                &"not-a-reserved-repository-key".parse().unwrap(),
                 &issue_id,
                 GateStage::Postcheck,
                 &GateChecker::RepositoryValidation,
@@ -2986,7 +2984,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         let result = executor
             .execute_builtin_checker_with_repository_view(
-                "not-a-reserved-repository-key",
+                &"not-a-reserved-repository-key".parse().unwrap(),
                 &issue_id,
                 GateStage::Postcheck,
                 &GateChecker::RepositoryValidation,
@@ -3319,7 +3317,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .unwrap();
             let result = executor
                 .execute_builtin_checker_with_repository_view(
-                    "not-a-reserved-repository-key",
+                    &"not-a-reserved-repository-key".parse().unwrap(),
                     &issue_id,
                     GateStage::Postcheck,
                     &checker,
@@ -3360,7 +3358,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "failing-gate".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "failing-gate".to_string(),
+                key: "failing-gate".parse().unwrap(),
                 title: "Failing Gate".to_string(),
                 description: "Gate that fails".to_string(),
                 stage: GateStage::Postcheck,
@@ -3411,7 +3409,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "manual-gate".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "manual-gate".to_string(),
+                key: "manual-gate".parse().unwrap(),
                 title: "Manual Gate".to_string(),
                 description: "Manual gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -3449,7 +3447,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "auto-gate".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "auto-gate".to_string(),
+                key: "auto-gate".parse().unwrap(),
                 title: "Auto".to_string(),
                 description: "Test".to_string(),
                 stage: GateStage::Postcheck,
@@ -3472,7 +3470,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "manual-gate".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "manual-gate".to_string(),
+                key: "manual-gate".parse().unwrap(),
                 title: "Manual".to_string(),
                 description: "Test".to_string(),
                 stage: GateStage::Postcheck,
@@ -3619,7 +3617,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(attested, 2, "every attestation is its own record");
         assert!(runs
             .iter()
-            .any(|run| run.gate_key == "tests" && run.origin.is_executed()));
+            .any(|run| run.gate_key.as_str() == "tests" && run.origin.is_executed()));
     }
 
     #[test]
@@ -3635,11 +3633,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             make_manual_gate("manual-pending"),
         ];
         for gate in &gates {
-            registry.gates.insert(gate.key.clone(), gate.clone());
+            registry.gates.insert(gate.key.to_string(), gate.clone());
         }
         seed_gate_registry(executor.storage(), &registry);
         let mut issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
-        issue.gates_required = gates.iter().map(|gate| gate.key.clone()).collect();
+        issue.gates_required = gates.iter().map(|gate| gate.key.to_string()).collect();
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
 
@@ -3661,7 +3659,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let (runs, not_run) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
         let latest: HashMap<_, _> = runs
             .iter()
-            .map(|run| (run.gate_key.clone(), run.clone()))
+            .map(|run| (run.gate_key.to_string(), run.clone()))
             .collect();
         let readiness = executor
             .get_required_gate_statuses_for_issue(&issue_id)
@@ -3763,7 +3761,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .iter()
             .map(|run| {
                 let state = super::gate_state_from_run(run);
-                (run.gate_key.clone(), state.status)
+                (run.gate_key.to_string(), state.status)
             })
             .collect::<Vec<_>>();
         assert_eq!(latest_status, readiness);
@@ -3780,7 +3778,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 key.to_string(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: key.to_string(),
+                    key: key.parse().unwrap(),
                     title: format!("Gate {}", key),
                     description: "Test".to_string(),
                     stage: GateStage::Postcheck,
@@ -3842,7 +3840,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let (results, not_run) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
 
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].gate_key, "gate-1");
+        assert_eq!(results[0].gate_key.as_str(), "gate-1");
         assert_eq!(not_run, vec!["gate-2".to_string()]);
     }
 
@@ -3856,7 +3854,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "precheck".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "precheck".to_string(),
+                key: "precheck".parse().unwrap(),
                 title: "Precheck".to_string(),
                 description: "Precheck".to_string(),
                 stage: GateStage::Precheck,
@@ -3879,7 +3877,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "postcheck-with-unsafe-prompt".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "postcheck-with-unsafe-prompt".to_string(),
+                key: "postcheck-with-unsafe-prompt".parse().unwrap(),
                 title: "Postcheck".to_string(),
                 description: "Must not enter precheck capture".to_string(),
                 stage: GateStage::Postcheck,
@@ -4052,7 +4050,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "precheck".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "precheck".to_string(),
+                key: "precheck".parse().unwrap(),
                 title: "Precheck".to_string(),
                 description: String::new(),
                 stage: GateStage::Precheck,
@@ -4097,7 +4095,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "precheck-fail".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "precheck-fail".to_string(),
+                key: "precheck-fail".parse().unwrap(),
                 title: "Precheck".to_string(),
                 description: "Precheck".to_string(),
                 stage: GateStage::Precheck,
@@ -4187,7 +4185,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key == "precheck-race")
+            .filter(|run| run.gate_key.as_str() == "precheck-race")
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -4240,7 +4238,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key == gate_key)
+            .filter(|run| run.gate_key.as_str() == gate_key)
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -4259,7 +4257,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "postcheck".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "postcheck".to_string(),
+                key: "postcheck".parse().unwrap(),
                 title: "Postcheck".to_string(),
                 description: "Postcheck".to_string(),
                 stage: GateStage::Postcheck,
@@ -4313,7 +4311,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "postcheck-fail".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "postcheck-fail".to_string(),
+                key: "postcheck-fail".parse().unwrap(),
                 title: "Postcheck".to_string(),
                 description: "Postcheck".to_string(),
                 stage: GateStage::Postcheck,
@@ -4374,7 +4372,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "postcheck".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "postcheck".to_string(),
+                key: "postcheck".parse().unwrap(),
                 title: "Postcheck".to_string(),
                 description: "Postcheck".to_string(),
                 stage: GateStage::Postcheck,
@@ -4442,7 +4440,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "postcheck".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "postcheck".to_string(),
+                key: "postcheck".parse().unwrap(),
                 title: "Postcheck".to_string(),
                 description: "Postcheck".to_string(),
                 stage: GateStage::Postcheck,
@@ -4503,7 +4501,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "review".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "review".to_string(),
+                key: "review".parse().unwrap(),
                 title: "Code Review".to_string(),
                 description: "AI-powered code review".to_string(),
                 stage: GateStage::Postcheck,
@@ -4578,7 +4576,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "review".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "review".to_string(),
+                key: "review".parse().unwrap(),
                 title: "Code Review".to_string(),
                 description: "AI review".to_string(),
                 stage: GateStage::Postcheck,
@@ -4650,7 +4648,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key == "prompt-race")
+            .filter(|run| run.gate_key.as_str() == "prompt-race")
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -4698,7 +4696,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key == "issue-race")
+            .filter(|run| run.gate_key.as_str() == "issue-race")
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -4756,7 +4754,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key == "dependency-race")
+            .filter(|run| run.gate_key.as_str() == "dependency-race")
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -4803,7 +4801,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .list_gate_runs_for_issue(&issue_id)
                 .unwrap()
                 .into_iter()
-                .filter(|run| run.gate_key == "gate-race")
+                .filter(|run| run.gate_key.as_str() == "gate-race")
                 .count(),
             1
         );
@@ -4812,7 +4810,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .find(|run| run.gate_key == "gate-race")
+            .find(|run| run.gate_key.as_str() == "gate-race")
             .unwrap();
         assert_eq!(
             run.evaluation_stability,
@@ -4933,7 +4931,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .find(|run| run.gate_key == "run-race")
+            .find(|run| run.gate_key.as_str() == "run-race")
             .unwrap();
         assert_eq!(
             run.evaluation_stability,
@@ -4972,7 +4970,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .find(|run| run.gate_key == "run-race")
+            .find(|run| run.gate_key.as_str() == "run-race")
             .unwrap();
         assert_eq!(
             run.evaluation_stability,
@@ -5007,7 +5005,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key == "apply-race")
+            .filter(|run| run.gate_key.as_str() == "apply-race")
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].run_id, result.run_id);
@@ -5032,7 +5030,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                             issue_id: event_issue,
                             gate_key,
                             ..
-                        } if event_issue == &issue_id && gate_key == "apply-race"
+                        } if event_issue == &issue_id && gate_key.as_str() == "apply-race"
                     )
                 })
                 .count(),
@@ -5074,7 +5072,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key == "single-record-race")
+            .filter(|run| run.gate_key.as_str() == "single-record-race")
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -5091,7 +5089,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     matches!(
                         event.body(),
                         crate::domain::EventBody::GatePassed { issue_id: event_issue, gate_key, .. }
-                            if event_issue == &issue_id && gate_key == "single-record-race"
+                            if event_issue == &issue_id && gate_key.as_str() == "single-record-race"
                     )
                 })
                 .count(),
@@ -5139,7 +5137,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .find(|run| run.gate_key == "failing-race")
+            .find(|run| run.gate_key.as_str() == "failing-race")
             .unwrap();
         assert_eq!(run.status, GateRunStatus::Failed);
         assert_eq!(
@@ -5166,7 +5164,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "review".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "review".to_string(),
+                key: "review".parse().unwrap(),
                 title: "Code Review".to_string(),
                 description: "Review".to_string(),
                 stage: GateStage::Postcheck,
@@ -5241,7 +5239,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "review".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "review".to_string(),
+                key: "review".parse().unwrap(),
                 title: "Review".to_string(),
                 description: "Review".to_string(),
                 stage: GateStage::Postcheck,
@@ -5287,7 +5285,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "review".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "review".to_string(),
+                key: "review".parse().unwrap(),
                 title: "Review".to_string(),
                 description: "Review".to_string(),
                 stage: GateStage::Postcheck,
@@ -5342,7 +5340,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "review".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "review".to_string(),
+                key: "review".parse().unwrap(),
                 title: "Review".to_string(),
                 description: "Review".to_string(),
                 stage: GateStage::Postcheck,
@@ -5388,7 +5386,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "test-gate".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "test-gate".to_string(),
+                key: "test-gate".parse().unwrap(),
                 title: "Test Gate".to_string(),
                 description: "Test gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -5434,7 +5432,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "test-gate".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "test-gate".to_string(),
+                key: "test-gate".parse().unwrap(),
                 title: "Test Gate".to_string(),
                 description: "Test gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -5497,7 +5495,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "test-gate".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "test-gate".to_string(),
+                key: "test-gate".parse().unwrap(),
                 title: "Test Gate".to_string(),
                 description: "Test gate".to_string(),
                 stage: GateStage::Postcheck,
@@ -5566,7 +5564,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "review".to_string(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: "review".to_string(),
+                key: "review".parse().unwrap(),
                 title: "Code Review".to_string(),
                 description: "Review".to_string(),
                 stage: GateStage::Postcheck,
@@ -5614,7 +5612,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 key.to_string(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: key.to_string(),
+                    key: key.parse().unwrap(),
                     title: format!("Gate {}", key),
                     description: format!("Priority {}", priority),
                     stage: GateStage::Postcheck,
@@ -5658,9 +5656,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         // Results should arrive in priority order: 10, 20, 30
         assert_eq!(results.len(), 3);
-        assert_eq!(results[0].gate_key, "gate-p10");
-        assert_eq!(results[1].gate_key, "gate-p20");
-        assert_eq!(results[2].gate_key, "gate-p30");
+        assert_eq!(results[0].gate_key.as_str(), "gate-p10");
+        assert_eq!(results[1].gate_key.as_str(), "gate-p20");
+        assert_eq!(results[2].gate_key.as_str(), "gate-p30");
     }
 
     #[test]
@@ -5674,7 +5672,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 key.to_string(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: key.to_string(),
+                    key: key.parse().unwrap(),
                     title: format!("Gate {}", key),
                     description: "Same priority".to_string(),
                     stage: GateStage::Postcheck,
@@ -5712,9 +5710,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         // Same-priority gates should maintain insertion order
         assert_eq!(results.len(), 3);
-        assert_eq!(results[0].gate_key, "alpha");
-        assert_eq!(results[1].gate_key, "beta");
-        assert_eq!(results[2].gate_key, "gamma");
+        assert_eq!(results[0].gate_key.as_str(), "alpha");
+        assert_eq!(results[1].gate_key.as_str(), "beta");
+        assert_eq!(results[2].gate_key.as_str(), "gamma");
     }
 
     #[test]
@@ -5736,7 +5734,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     fn make_auto_gate(key: &str, command: &str) -> crate::declarations::GateDefinition {
         crate::declarations::GateDefinition {
             version: 1,
-            key: key.to_string(),
+            key: key.parse().unwrap(),
             title: key.to_string(),
             description: String::new(),
             stage: GateStage::Postcheck,
@@ -5826,8 +5824,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap()
             .unwrap();
 
-        assert_eq!(last_a.gate_key, "gate-a");
-        assert_eq!(last_b.gate_key, "gate-b");
+        assert_eq!(last_a.gate_key.as_str(), "gate-a");
+        assert_eq!(last_b.gate_key.as_str(), "gate-b");
         assert_eq!(last_b.run_id, b_run.run_id);
         assert_ne!(last_a.run_id, last_b.run_id);
     }

@@ -503,7 +503,7 @@ mod exit_code_projection_tests {
         let result = GateRunResult {
             schema_version: 1,
             run_id: "run-1".to_string(),
-            gate_key: "tests".to_string(),
+            gate_key: "tests".parse().unwrap(),
             stage: GateStage::Precheck,
             issue_id: crate::test_utils::issue_id(85),
             commit: None,

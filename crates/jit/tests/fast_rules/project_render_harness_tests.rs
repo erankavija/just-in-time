@@ -44,7 +44,7 @@ assert = { require-label = { label = "type:*" } }
 fn manual_gate(key: &str, title: &str, description: &str) -> GateDefinition {
     GateDefinition {
         version: 1,
-        key: key.to_string(),
+        key: key.parse().unwrap(),
         title: title.to_string(),
         description: description.to_string(),
         stage: GateStage::Postcheck,

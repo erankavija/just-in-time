@@ -218,7 +218,7 @@ fn executed_run(
         origin: GateVerdictOrigin::Executed,
         ..GateRunResult::attestation(
             issue_id,
-            gate_key,
+            &gate_key.parse().unwrap(),
             GateStage::Postcheck,
             GateStatus::Passed,
             None,
@@ -249,7 +249,7 @@ fn ci_preset() -> GatePresetDefinition {
         name: "ci-checks".to_string(),
         description: "Continuous integration".to_string(),
         gates: vec![GateTemplate {
-            key: "review".to_string(),
+            key: "review".parse().unwrap(),
             title: "Review".to_string(),
             description: "A reviewer approves".to_string(),
             stage: GateStage::Postcheck,
@@ -462,7 +462,7 @@ fn test_list_issues_is_empty_before_any_issue_is_published<B: Backend>() {
 fn test_load_gate_registry_reads_the_declared_gates_and_none_when_absent<B: Backend>() {
     let gate = ci_preset().gates[0].to_gate();
     let registry = GateRegistry {
-        gates: [(gate.key.clone(), gate)].into_iter().collect(),
+        gates: [(gate.key.to_string(), gate)].into_iter().collect(),
     };
     let declared = Repository::<B>::seeded(&[(
         VirtualPath::GATES,
@@ -676,14 +676,14 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
     assert_eq!(
         repository
             .store
-            .find_reusable_gate_run("tests", &digest)
+            .find_reusable_gate_run(&"tests".parse().unwrap(), &digest)
             .unwrap(),
         Some(failed)
     );
     assert_eq!(
         repository
             .store
-            .find_reusable_gate_run("undeclared", &digest)
+            .find_reusable_gate_run(&"undeclared".parse().unwrap(), &digest)
             .unwrap(),
         None
     );

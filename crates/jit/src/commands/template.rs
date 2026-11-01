@@ -44,7 +44,7 @@ enum TemplateGateResolution {
     /// A registered gate preset and its captured definition.
     Preset(crate::gate_presets::GatePresetDefinition),
     /// A single gate key in the registry; attach that one gate via `add_gates`.
-    RegistryKey,
+    RegistryKey(crate::domain::identity::GateKey),
 }
 
 enum TemplateRequest<'a> {
@@ -1136,8 +1136,8 @@ fn resolve_captured_gate(
     if let Some(preset) = presets.get(name) {
         return Ok(TemplateGateResolution::Preset(preset.clone()));
     }
-    if registry.gates.contains_key(name) {
-        return Ok(TemplateGateResolution::RegistryKey);
+    if let Some(gate) = registry.gates.get(name) {
+        return Ok(TemplateGateResolution::RegistryKey(gate.key.clone()));
     }
     Err(anyhow!(
         "gate '{name}' is neither a registered gate preset nor a gate defined in the registry"
@@ -1163,29 +1163,33 @@ fn attach_captured_gates(
                     .into_iter()
                     .map(|template| {
                         let gate = template.to_gate();
-                        if !registry.gates.contains_key(&gate.key) {
+                        if !registry.gates.contains_key(gate.key.as_str()) {
                             events.push((
                                 0,
                                 EventBody::draft_gate_definition_created(gate.key.clone()),
                             ));
-                            registry.gates.insert(gate.key.clone(), gate.clone());
+                            registry.gates.insert(gate.key.to_string(), gate.clone());
                         }
                         gate.key
                     })
                     .collect::<Vec<_>>()
             }
-            TemplateGateResolution::RegistryKey => {
+            TemplateGateResolution::RegistryKey(key) => {
                 lease_targets.push(issue.id.clone());
-                vec![name.clone()]
+                vec![key]
             }
         };
         for key in keys {
-            if issue.gates_required.contains(&key) {
+            if issue
+                .gates_required
+                .iter()
+                .any(|required| required == key.as_str())
+            {
                 continue;
             }
-            issue.gates_required.push(key.clone());
+            issue.gates_required.push(key.to_string());
             issue.gates_status.insert(
-                key.clone(),
+                key.to_string(),
                 GateState {
                     status: GateStatus::Pending,
                     updated_by: None,

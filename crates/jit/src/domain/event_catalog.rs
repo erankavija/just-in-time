@@ -169,7 +169,8 @@ impl EventTag {
     /// until it is sampled here.
     pub fn sample(self) -> Event {
         let issue_id = IssueId::from_uuid(uuid::Uuid::from_u128(1));
-        let gate_key = "tests".to_string();
+        let gate_key: crate::domain::identity::GateKey =
+            "tests".parse().expect("`tests` is a well-formed gate key");
         let assignee: Assignee = "agent:worker-1"
             .parse()
             .expect("`agent:worker-1` is a well-formed assignee");

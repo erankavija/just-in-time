@@ -279,7 +279,8 @@ record's fields, and how an unset field is written are specified in
 ## Gate Registry
 
 `gates.toml` stores gate definitions as a `[[gates]]` array of tables. Each
-entry carries its own `key`, rather than being indexed as an object field:
+entry carries its own lowercase-kebab `key`, rather than being indexed as an
+object field; a registry holding any other spelling fails to load:
 
 ```toml
 [[gates]]

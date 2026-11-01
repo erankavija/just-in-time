@@ -933,7 +933,7 @@ mod tests {
                 key.to_string(),
                 GateDefinition {
                     version: 1,
-                    key: key.to_string(),
+                    key: key.parse().unwrap(),
                     title: key.to_string(),
                     description: String::new(),
                     stage: GateStage::Postcheck,
@@ -1215,7 +1215,7 @@ mod tests {
             "tdd-reminder".to_string(),
             GateDefinition {
                 version: 1,
-                key: "tdd-reminder".to_string(),
+                key: "tdd-reminder".parse().unwrap(),
                 title: "TDD Reminder".to_string(),
                 description: "Write tests first".to_string(),
                 stage: GateStage::Precheck,
@@ -1282,7 +1282,7 @@ mod tests {
             "tdd-reminder".to_string(),
             GateDefinition {
                 version: 1,
-                key: "tdd-reminder".to_string(),
+                key: "tdd-reminder".parse().unwrap(),
                 title: "TDD Reminder".to_string(),
                 description: "Write tests first".to_string(),
                 stage: GateStage::Precheck,
@@ -1549,7 +1549,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             "manual-start".to_string(),
             GateDefinition {
                 version: 1,
-                key: "manual-start".to_string(),
+                key: "manual-start".parse().unwrap(),
                 title: "Manual start".to_string(),
                 description: String::new(),
                 stage: GateStage::Precheck,
