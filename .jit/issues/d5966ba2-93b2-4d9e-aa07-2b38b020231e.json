@@ -32,11 +32,10 @@
     "type:task",
     "epic:lead-friction",
     "milestone:v1.0",
-    "component:core",
-    "satisfies:3d9a0ce3/REQ-03"
+    "component:core"
   ],
   "priority": "high",
   "state": "in_progress",
   "title": "Archive derived documents with their issue",
-  "updated_at": "2026-11-01T13:28:22.949468264Z"
+  "updated_at": "2026-11-01T13:30:58.383250187Z"
 }
