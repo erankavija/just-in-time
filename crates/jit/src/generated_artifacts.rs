@@ -2,7 +2,8 @@
 //! point that brings each one back into agreement with its source.
 //!
 //! Each artifact is committed, and each carries a drift assertion that fails
-//! when the committed bytes differ from what its source now renders. That
+//! when the committed bytes differ from what its source now renders; the
+//! template region's is the `package-drift` example, which a gate runs. That
 //! assertion makes drift visible; the entry point declared here repairs it. Both
 //! sides read the render named in [`ArtifactRender::InCrate`], so the repair and
 //! the assertion cannot disagree about what the artifact should hold.

@@ -11,8 +11,8 @@
 //! declarations, and read nothing from the filesystem. The package arrives as
 //! an argument, and the two callers supply the I/O around it —
 //! [`crate::generated_artifacts`] declares the render the `regenerate` example
-//! publishes the registry file through, and the repository package module's
-//! drift assertions read it. The module compiles only for the crate's own tests
+//! publishes the registry file through, and the `package-drift` example's
+//! check reads it. The module compiles only for the crate's own tests
 //! and dev-dependency-active builds those two need, so an adopter build carries
 //! none of it.
 
@@ -48,7 +48,7 @@ const TEMPLATE_ARRAY_PATH: &str = "template";
 pub const TEMPLATE_REGISTRY_PATH: VirtualPath = VirtualPath::TEMPLATES;
 
 /// The command that brings [`TEMPLATE_REGISTRY_PATH`] back into agreement with
-/// the package, named in the registry file and in the drift assertion's message.
+/// the package, named in the registry file and in the drift check's message.
 pub const TEMPLATE_REGION_GENERATOR: &str = "./scripts/generate-template-region.sh";
 
 /// A render of the generated template region that could not be produced.
