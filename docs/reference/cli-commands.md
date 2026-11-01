@@ -1603,7 +1603,8 @@ registry file. Only the fields you pass change; every other field keeps its
 current value. The gate KEY is the gate's identity and cannot be changed. This
 edits the registry definition only; per-issue gate status (`gates_status`) is
 left untouched. The registry change and its `gate_definition_updated` event
-publish as one redo record.
+publish as one redo record. Refuses when another agent leases an issue that
+requires the gate.
 
 **Usage:**
 ```bash
