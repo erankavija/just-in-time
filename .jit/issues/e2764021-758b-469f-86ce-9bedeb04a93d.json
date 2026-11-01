@@ -28,6 +28,7 @@
   ],
   "description": "Measure and report the build footprint after the test-topology changes against the figures before them.\n\n## Background\n\n`scripts/rust-build-budget.sh` enforces at most 12 integration targets, 2 GiB of active test executables and a 30 s suite duration (`dev/benchmarks/rust-build-budgets/README.md`). Before this work, the last passing gate run (`8e22dd96`, at commit `0896fc29b`) reported 10 of 12 integration targets and 14 active executables totalling 1,723,670,208 of 2,147,483,648 bytes.\n\n## Success Criteria\n\n- [hard] REQ-01: The build-footprint budget checker passes on the tree with these changes.\n- [hard] REQ-02: `dev/benchmarks/test-topology-c780514e/README.md` reports the integration-target count and the active test-executable count and bytes, before and after, with the commit and command of each measurement.\n",
   "documents": [],
+  "first_ready_at": "2026-11-01T09:55:29.344160589Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -46,7 +47,7 @@
     "enforces:@/invariant/bounded-rust-build-footprint"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Build-footprint figures before and after the epic are reported",
-  "updated_at": "2026-11-01T07:53:07.064154921Z"
+  "updated_at": "2026-11-01T09:55:29.344160589Z"
 }
