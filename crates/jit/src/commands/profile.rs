@@ -2707,7 +2707,6 @@ mod tests {
             fs::read(temp.path().join("docs/profile.txt")).unwrap(),
             package.source_bytes("assets/profile.txt").unwrap()
         );
-        assert!(!temp.path().join(".jit/profiles").exists());
         assert_eq!(storage.read_events().unwrap().len(), 1);
 
         let before = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
@@ -2728,10 +2727,7 @@ mod tests {
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
 
-        for (index, target) in [".jit/events.jsonl", ".jit/profiles", ".git/config"]
-            .into_iter()
-            .enumerate()
-        {
+        for (index, target) in [".jit/events.jsonl", ".git/config"].into_iter().enumerate() {
             let package = package_publishing(
                 &temp,
                 &format!("packages/reserved-{index}"),
@@ -2751,7 +2747,6 @@ mod tests {
         }
 
         assert!(storage.read_events().unwrap().is_empty());
-        assert!(!temp.path().join(".jit/profiles").exists());
     }
 
     #[test]

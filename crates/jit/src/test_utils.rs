@@ -1491,8 +1491,8 @@ pub fn write_package_tree_at_model_limits(root: &Path) -> PathBuf {
 /// declared parent, and return `root`.
 ///
 /// A test that applies a package must read it from inside the repository it is
-/// applied to, because profile application records the package's worktree-
-/// relative location.
+/// applied to, because a package is addressed by its worktree-relative
+/// location.
 pub fn copy_package_tree(source: &Path, root: &Path) -> PathBuf {
     fn copy(source: &Path, root: &Path) {
         fs::read_dir(source)

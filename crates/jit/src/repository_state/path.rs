@@ -369,8 +369,6 @@ mod identity {
         SERVER_PID: Data = "server.pid.json";
         /// Server output log under the data root.
         SERVER_LOG: Data = "server.log";
-        /// Applied-profile state directory under the data root (`.jit/profiles`).
-        PROFILES: Data = "profiles";
         /// Per-issue record directory under the data root (`.jit/issues`).
         ISSUES: Data = "issues";
         /// Recorded gate-run directory under the data root (`.jit/gate-runs`).
@@ -400,8 +398,6 @@ impl VirtualPath {
     /// Whether profile application must refuse this target as application-owned state.
     pub(crate) fn is_reserved_application_target(&self) -> bool {
         self == &Self::EVENTS
-            || (self.root_class() == RepositoryRootClass::Data
-                && Self::PROFILES.relative().contains(self.relative().as_str()))
             || (self.root_class() == RepositoryRootClass::Worktree
                 && self
                     .relative()
@@ -495,9 +491,8 @@ impl VirtualPath {
     /// a data-root identity renders under the logical `.jit/` prefix and every
     /// other identity renders worktree-relative. Both directions live beside the
     /// identity they convert so no consumer maintains its own `.jit` prefix
-    /// adapter — profile packages address targets, applied-profile claim
-    /// identities persist targets, and messages name paths in exactly this
-    /// spelling.
+    /// adapter — profile packages address targets and messages name paths in
+    /// exactly this spelling.
     pub fn repository_relative(&self) -> String {
         repository_relative_path(self.root_class(), self.relative())
     }
@@ -515,9 +510,8 @@ impl VirtualPath {
 ///
 /// [`VirtualPath::repository_relative`] is this rule applied to a canonical
 /// identity. A persisted target carries the same two components without having
-/// been re-guarded as an identity, so a consumer naming one — an applied-profile
-/// claim naming what it owns — spells it through this function rather than
-/// through a second `.jit/` prefix adapter.
+/// been re-guarded as an identity, so a consumer naming one spells it through
+/// this function rather than through a second `.jit/` prefix adapter.
 pub fn repository_relative_path(root: RepositoryRootClass, relative: &RootRelativePath) -> String {
     let relative = relative.as_str();
     match root {
@@ -1111,8 +1105,6 @@ mod tests {
     fn test_virtual_path_reserved_application_target_matches_owned_paths_by_component() {
         let reserved = [
             VirtualPath::data("events.jsonl").unwrap(),
-            VirtualPath::data("profiles").unwrap(),
-            VirtualPath::data("profiles/installed/package.json").unwrap(),
             VirtualPath::worktree(".git").unwrap(),
             VirtualPath::worktree("vendor/.git/config").unwrap(),
         ];
@@ -1122,7 +1114,8 @@ mod tests {
 
         let ordinary = [
             VirtualPath::data("events.jsonl.old").unwrap(),
-            VirtualPath::data("profiles-old/package.json").unwrap(),
+            VirtualPath::data("profiles").unwrap(),
+            VirtualPath::data("profiles/installed/package.json").unwrap(),
             VirtualPath::data("events.jsonl/child").unwrap(),
             VirtualPath::worktree(".gitignore").unwrap(),
             VirtualPath::worktree("vendor/git/config").unwrap(),
