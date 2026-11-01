@@ -778,9 +778,7 @@
       "cargo-ci",
       "code-review"
     ],
-    "depends_on": [
-      "profile-package-id-removal"
-    ],
+    "depends_on": [],
     "planning": {
       "outcome": "In a git repository apply refuses while a path it writes differs from HEAD; without git it proceeds.",
       "contract_refs": [

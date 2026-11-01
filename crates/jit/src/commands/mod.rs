@@ -87,6 +87,7 @@ pub use item::{ItemListResult, ItemShowResult};
 pub use profile::{
     ProfileApplyError, ProfileDependencyError, ProfileResolutionError, ProfileSelection,
     ProfileSelector, ProfileSelectorError, ProfileVariableOptions, SelectedProfile,
+    UNCOMMITTED_TARGETS_RESOLUTION,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use template::TemplateApplyResult;

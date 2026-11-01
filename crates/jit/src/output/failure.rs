@@ -86,6 +86,12 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     {
         return ErrorCode::ValidationFailed;
     }
+    if matches!(
+        error.downcast_ref::<crate::commands::ProfileApplyError>(),
+        Some(crate::commands::ProfileApplyError::UncommittedTargets { .. })
+    ) {
+        return ErrorCode::ProfileUncommittedTargets;
+    }
     if error
         .downcast_ref::<crate::profile::ProfileClaimError>()
         .is_some()
@@ -450,6 +456,18 @@ pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
     {
         return Ok(command_json_error(error, ErrorCode::ProfileNotFound)
             .with_suggestion("Select a package with --profile DIR"));
+    }
+    if let Some(crate::commands::ProfileApplyError::UncommittedTargets { paths }) =
+        error.downcast_ref::<crate::commands::ProfileApplyError>()
+    {
+        return Ok(
+            command_json_error(error, ErrorCode::ProfileUncommittedTargets).with_details(
+                serde_json::json!({
+                    "paths": paths,
+                    "resolution": crate::commands::UNCOMMITTED_TARGETS_RESOLUTION,
+                }),
+            ),
+        );
     }
     if error
         .downcast_ref::<crate::profile::ProfileClaimError>()

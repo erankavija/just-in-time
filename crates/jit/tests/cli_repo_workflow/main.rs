@@ -28,6 +28,7 @@ mod lock_contention_tests;
 mod profile_acceptance_tests;
 mod profile_cli_tests;
 mod profile_concurrency_tests;
+mod profile_dirty_target_tests;
 mod profile_no_git_lifecycle_tests;
 mod profile_publication_tests;
 mod project_config_tests;

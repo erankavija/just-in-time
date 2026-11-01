@@ -935,6 +935,9 @@ wire_vocabulary! {
         ProfileNotFound = "PROFILE_NOT_FOUND",
         /// Profile planning or final-state validation rejected the operation.
         ProfileConflict = "PROFILE_CONFLICT",
+        /// A profile application was refused because a path it writes differs
+        /// from `HEAD`.
+        ProfileUncommittedTargets = "PROFILE_UNCOMMITTED_TARGETS",
         /// A dependency command failed.
         DependencyError = "DEPENDENCY_ERROR",
         /// A gate command failed.
@@ -1010,7 +1013,8 @@ impl ErrorCode {
             | ErrorCode::ValidationFailed
             | ErrorCode::Blocked
             | ErrorCode::GateFailed
-            | ErrorCode::ProfileConflict => ExitCode::ValidationFailed,
+            | ErrorCode::ProfileConflict
+            | ErrorCode::ProfileUncommittedTargets => ExitCode::ValidationFailed,
             ErrorCode::InvalidArgument
             | ErrorCode::InvalidLabelPattern
             | ErrorCode::InvalidState
@@ -1082,6 +1086,10 @@ impl ErrorCode {
             ErrorCode::ProfileConflict => {
                 "Profile planning found packages being applied that define one target or \
                  declaration differently."
+            }
+            ErrorCode::ProfileUncommittedTargets => {
+                "A profile application would overwrite paths that differ from HEAD; committing \
+                 or discarding those changes lets it proceed."
             }
             ErrorCode::DependencyError => "A dependency command failed.",
             ErrorCode::GateError => "A gate command failed.",
@@ -3599,6 +3607,10 @@ mod tests {
             ),
             (ErrorCode::ProfileNotFound, ExitCode::NotFound),
             (ErrorCode::ProfileConflict, ExitCode::ValidationFailed),
+            (
+                ErrorCode::ProfileUncommittedTargets,
+                ExitCode::ValidationFailed,
+            ),
             (ErrorCode::DependencyError, ExitCode::NotFound),
             (ErrorCode::GateError, ExitCode::AlreadyExists),
             (ErrorCode::GateCheckError, ExitCode::NotFound),

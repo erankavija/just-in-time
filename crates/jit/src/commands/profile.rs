@@ -16,11 +16,11 @@ use crate::repository_state::{
     apply_overlay, classify_repository_export, derive_materialization,
     finalize_package_tree_capture, CaptureBudget, CapturedTreeFile, FileMode, MaterializationPlan,
     MaterializationRequest, MutationContext, PackageTreeCapture, ProfileApplicationInput,
-    ProfileContributionClaim, RepositoryEntry, RepositoryExportDestination, RepositoryExportIntent,
-    RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RepositoryStateError,
-    RootRelativePath, TreeFileDisposition, TreeFileOutcome, VirtualPath,
+    ProfileContributionClaim, RepositoryAction, RepositoryEntry, RepositoryExportDestination,
+    RepositoryExportIntent, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
+    RepositoryStateError, RootRelativePath, TreeFileDisposition, TreeFileOutcome, VirtualPath,
 };
-use crate::storage::{IssueStore, RepositoryMutationSession, RepositoryStateStore};
+use crate::storage::{IssueStore, RepositoryMutationSession, RepositoryStateStore, WorktreePaths};
 use crate::validation::repository::RepositoryValidationFailure;
 use anyhow::Result;
 use serde::Deserialize;
@@ -261,9 +261,22 @@ pub enum ProfileDependencyError {
     },
 }
 
+/// How an adopter clears [`ProfileApplyError::UncommittedTargets`].
+pub const UNCOMMITTED_TARGETS_RESOLUTION: &str =
+    "commit or discard those changes and the apply can proceed";
+
 /// Profile application conflict detected before anything is published.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileApplyError {
+    /// Paths the publication would write differ from `HEAD`.
+    #[error(
+        "profile application would overwrite uncommitted changes in {}; {UNCOMMITTED_TARGETS_RESOLUTION}",
+        .paths.join(", ")
+    )]
+    UncommittedTargets {
+        /// Each differing path, relative to the checkout holding it.
+        paths: Vec<String>,
+    },
     /// Final package and event overlay failed validation.
     #[error("final profile application validation failed: {0}")]
     FinalValidation(#[from] RepositoryValidationFailure),
@@ -1322,9 +1335,77 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         if response == ProfileConflictResponse::Refuse {
             crate::profile::ensure_publishable_targets(&plan)
                 .map_err(RepositoryStateError::from)?;
+            ensure_committed_write_targets(&plan, &self.require_layout()?)?;
         }
         Ok(Some(plan))
     }
+}
+
+/// Refuse `plan` when a path its delta writes differs from `HEAD`.
+///
+/// Each root is classified on its own: a relocated data root can sit outside
+/// the checkout holding the worktree targets, or in another one.
+fn ensure_committed_write_targets(
+    plan: &MaterializationPlan,
+    layout: &RepositoryLayout,
+) -> Result<()> {
+    let paths = [
+        (RepositoryRootClass::Worktree, layout.worktree_root()),
+        (RepositoryRootClass::Data, layout.data_root()),
+    ]
+    .into_iter()
+    .map(|(class, root)| uncommitted_write_targets(plan, class, root))
+    .collect::<Result<Vec<_>>>()?
+    .into_iter()
+    .flatten()
+    .collect::<BTreeSet<_>>();
+    if paths.is_empty() {
+        return Ok(());
+    }
+    Err(ProfileApplyError::UncommittedTargets {
+        paths: paths.into_iter().collect(),
+    }
+    .into())
+}
+
+/// Checkout-relative dirty paths among the ones `plan` writes under `root`,
+/// empty when no git checkout holds `root`.
+///
+/// An event-log append is left out because it keeps every uncommitted line.
+fn uncommitted_write_targets(
+    plan: &MaterializationPlan,
+    class: RepositoryRootClass,
+    root: &Path,
+) -> Result<Vec<String>> {
+    let written = plan
+        .delta()
+        .actions()
+        .iter()
+        .filter(|action| !matches!(action, RepositoryAction::AppendEvents { .. }))
+        .map(RepositoryAction::path)
+        .filter(|path| path.root_class() == class)
+        .map(|path| path.relative().as_path())
+        .collect::<BTreeSet<_>>();
+    if written.is_empty() {
+        return Ok(Vec::new());
+    }
+    let paths = WorktreePaths::detect_from(root)?;
+    let Some(checkout) = paths.git() else {
+        return Ok(Vec::new());
+    };
+    // Git reports paths from its physical top level.
+    let physical_root = root.canonicalize()?;
+    let offset = physical_root.strip_prefix(&paths.worktree_root)?;
+    Ok(checkout
+        .dirty_paths()?
+        .into_iter()
+        .filter(|dirty| {
+            dirty
+                .strip_prefix(offset)
+                .is_ok_and(|relative| written.contains(relative))
+        })
+        .map(|dirty| dirty.display().to_string())
+        .collect())
 }
 
 /// Insert one package image without allowing selector or dependency traversal

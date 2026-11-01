@@ -65,7 +65,7 @@ fn package_at<'a>(repo: &Path, location: &'a str) -> &'a str {
 
 /// Copy the fixture package and give it a distinct identity and target so a
 /// selector-order test can observe the complete occurrence stream.
-fn package_with_id<'a>(repo: &Path, location: &'a str, id: &str) -> &'a str {
+pub(super) fn package_with_id<'a>(repo: &Path, location: &'a str, id: &str) -> &'a str {
     package_at(repo, location);
     let manifest = repo.join(location).join("manifest.toml");
     let declared = fs::read_to_string(&manifest)
@@ -83,7 +83,7 @@ fn package_with_id<'a>(repo: &Path, location: &'a str, id: &str) -> &'a str {
 }
 
 /// Write a package with one semantic contribution and no content targets.
-fn package_with_shared_namespace<'a>(
+pub(super) fn package_with_shared_namespace<'a>(
     repo: &Path,
     location: &'a str,
     id: &str,

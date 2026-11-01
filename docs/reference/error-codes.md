@@ -32,6 +32,7 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `LINKED_CHECKOUT_WRITE_REFUSED` | The linked checkout's write stance refuses state-mutating commands. | `2` |
 | `PROFILE_NOT_FOUND` | No resolution route found the requested profile. | `3` |
 | `PROFILE_CONFLICT` | Profile planning found packages being applied that define one target or declaration differently. | `4` |
+| `PROFILE_UNCOMMITTED_TARGETS` | A profile application would overwrite paths that differ from HEAD; committing or discarding those changes lets it proceed. | `4` |
 | `DEPENDENCY_ERROR` | A dependency command failed. | `3` |
 | `GATE_ERROR` | A gate command failed. | `6` |
 | `GATE_CHECK_ERROR` | A gate-status check failed. | `3` |
