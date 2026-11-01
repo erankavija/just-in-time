@@ -22169,3 +22169,4 @@
 {"assignee":"agent:worker","id":"8a62e7ff-6999-4c68-9cc3-fb32a9de25aa","issue_id":"9c008d2d-decc-4845-b309-e01a42e98eda","timestamp":"2026-11-01T14:17:54.212467579Z","type":"issue_claimed"}
 {"from":"ready","id":"0531370c-7472-4027-9092-873b2f9538b0","issue_id":"c47d78c8-f74b-4659-9d48-e5cbb50b1bab","timestamp":"2026-11-01T14:17:54.536252532Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"389676df-d166-4922-ad35-335099eebf47","issue_id":"c47d78c8-f74b-4659-9d48-e5cbb50b1bab","timestamp":"2026-11-01T14:17:54.536252532Z","type":"issue_claimed"}
+{"fields":["description"],"id":"b57f1dff-61b4-46c6-b7cf-1dfd41bc742b","issue_id":"5f82e09a-2b31-4f51-acf3-7d4c87501ab2","timestamp":"2026-11-01T14:23:07.185435806Z","type":"issue_updated","updated_by":"issue-update"}
