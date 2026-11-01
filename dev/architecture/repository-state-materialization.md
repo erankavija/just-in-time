@@ -150,10 +150,10 @@ a plan whose preimages disagree with the session's image.
 graph. It matches on a `MaterializationRequest`, whose variants are the only ways
 to enter planning:
 
-- `SemanticMutation` — rebuild all declaration-owned state after a record change.
+- `SemanticMutation` — rebuild all state derived from declarations after a record change.
 - `RenderConfiguredProjections` — render the selected configured projections
   (`None` selects all).
-- `RepairDerivedState` — repair all declaration-owned derived state.
+- `RepairDerivedState` — repair all derived state.
 - `Initialize` — derive a fresh or missing-file repository scaffold.
 - `ApplyProfileSelection` — derive one complete profile-selection application
   over an existing repository.
@@ -181,7 +181,7 @@ flowchart TD
 
 ### The complete producer set
 
-`compose_complete` is the complete owned-materialization producer set: default
+`compose_complete` is the complete derived-materialization producer set: default
 rules and their schemas plus every configured projection, each derived from
 declared authority (`@/inv/single-source-prose`). A caller cannot invoke a subset
 — the intent selects the whole set. This is where the three intents differ in
@@ -192,9 +192,7 @@ scope while sharing the producer code:
 - `derive_project_render` scopes *which declared projections* participate; an
   out-of-scope projection contributes no action, leaving its target untouched. The
   scope is declaration scope, never a choice of producer family.
-- `derive_repair` runs `compose_complete` and then layers ownership-safe
-  composition of any profile claims its caller supplies; `jit validate --fix`
-  supplies none.
+- `derive_repair` is `derive_semantic_mutation` under the repair intent.
 
 Shared projection targets compose through the one `managed_document` primitive
 (`compose_managed_documents`), never last-writer-wins, so two projections into one
@@ -203,14 +201,13 @@ default-family spans, preserving authored content unconditionally. The engine
 reads type names, gate keys, projection targets, and templates from captured
 declarations, never from hardcoded domain assumptions (`@/inv/domain-agnostic`).
 
-### Repair derivation and ownership refusal
+### Repair derivation
 
-`derive_repair` is complete *and* ownership-safe per target: `rules.toml` splices
-only generated default spans, region projections splice only their managed region,
-and full-file projections replace only a target the declaration proves. When
-ownership cannot be proven — a duplicate rule name — repair refuses before publication with a typed
-`AmbiguousOwnershipError` rather than rewriting an authored boundary it cannot
-prove it owns.
+`derive_repair` composes each target without touching authored bytes: `rules.toml`
+splices only generated default spans, region projections splice only their managed
+region, and full-file projections replace only a target the declaration proves.
+When a target is ambiguous — a duplicate rule name — repair refuses before
+publication with a typed error rather than rewriting an authored boundary.
 
 `compare_materializations` is the read-only counterpart: it diffs a plan's
 expected actions against the same closed image and reports each
