@@ -201,8 +201,7 @@ Stores](#divergent-checkout-stores) below for that starting point.
 
 ```mermaid
 flowchart TD
-    local["1. Local .jit/<br/>Issues modified in this worktree"] --> head["2. Git HEAD<br/>Committed issues (canonical)"]
-    head --> main["3. Main .jit/<br/>Uncommitted issues from the main worktree"]
+    local["1. This checkout's .jit/<br/>Everything this checkout holds"] --> main["2. Primary checkout's .jit/<br/>Issues only the primary holds"]
 ```
 
 ### Reading Issues

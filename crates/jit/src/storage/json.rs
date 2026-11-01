@@ -26,7 +26,6 @@ use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -747,20 +746,14 @@ impl JsonFileStorage {
         parse_repository_index(&bytes)
     }
 
-    /// Load aggregated index from all sources (local + git + main worktree).
-    ///
-    /// This aggregates issue IDs from:
-    /// 1. Local .jit/index.json
-    /// 2. Git HEAD:.jit/index.json (if in git)
-    /// 3. Main worktree .jit/index.json (if in secondary worktree)
-    ///
-    /// Deduplicates IDs across sources.
+    /// Load the membership of this checkout's store layered over the primary
+    /// checkout's, deduplicating ids.
     fn load_aggregated_index(&self) -> Result<Index> {
         use std::collections::BTreeMap;
 
-        // The first source that mentions an id wins: local, then HEAD, then the
-        // main worktree. This mirrors issue loading and lets a local restore
-        // override a stale lower-priority tombstone (and vice versa).
+        // The first source that mentions an id wins: local, then the main
+        // worktree. This mirrors issue loading and lets a local restore override
+        // a stale lower-priority tombstone (and vice versa).
         let mut membership = BTreeMap::new();
 
         // Only a genuinely absent source may be skipped. Once index bytes exist,
@@ -784,7 +777,6 @@ impl JsonFileStorage {
             }
         };
 
-        // 1. Load local index
         let local = match fs::read(self.resolve_virtual_path(&VirtualPath::INDEX)?) {
             Ok(bytes) => Some(parse_repository_index(&bytes)?),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -792,10 +784,6 @@ impl JsonFileStorage {
         };
         merge_source(Ok(local), &mut membership)?;
 
-        // 2. Try loading index from git
-        merge_source(self.load_index_from_git(), &mut membership)?;
-
-        // 3. Try loading index from main worktree
         merge_source(self.load_index_from_main_worktree(), &mut membership)?;
 
         Ok(Index {
@@ -815,58 +803,13 @@ impl JsonFileStorage {
     /// chain cannot load is skipped rather than failing the read.
     fn read_indexed_issues(&self) -> Result<Vec<Issue>> {
         // Use aggregated index to see all issues across sources, then load
-        // through the fallback chain (`load_issue` handles local/git/main).
+        // through the fallback chain (`load_issue` handles local/main).
         Ok(self
             .load_aggregated_index()?
             .all_ids
             .iter()
             .filter_map(|id| self.load_issue(id).ok())
             .collect())
-    }
-
-    /// Load index from git HEAD.
-    fn load_index_from_git(&self) -> Result<Option<Index>> {
-        let layout = self.configured_layout()?;
-        let Some(data_relative) = layout.data_root().strip_prefix(layout.worktree_root()).ok()
-        else {
-            return Ok(None);
-        };
-        let repository = match git2::Repository::discover(layout.worktree_root()) {
-            Ok(repository) => repository,
-            Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
-            Err(error) => return Err(error).context("Failed to open git repository"),
-        };
-        let head = match repository.head() {
-            Ok(head) => head,
-            Err(error)
-                if matches!(
-                    error.code(),
-                    git2::ErrorCode::NotFound | git2::ErrorCode::UnbornBranch
-                ) =>
-            {
-                return Ok(None)
-            }
-            Err(error) => return Err(error).context("Failed to resolve git HEAD"),
-        };
-        let tree = head
-            .peel_to_tree()
-            .context("Failed to resolve the git HEAD tree")?;
-        let entry = match tree.get_path(&data_relative.join(VirtualPath::INDEX.relative().as_str()))
-        {
-            Ok(entry) => entry,
-            Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
-            Err(error) => return Err(error).context("Failed to resolve index from git HEAD"),
-        };
-        let object = entry
-            .to_object(&repository)
-            .context("Failed to load index object from git HEAD")?;
-        let blob = object
-            .as_blob()
-            .ok_or_else(|| anyhow!("git HEAD index path is not a file"))?;
-
-        parse_repository_index(blob.content())
-            .map(Some)
-            .context("Failed to parse index from git")
     }
 
     /// Load index from main worktree.
@@ -886,43 +829,6 @@ impl JsonFileStorage {
         parse_repository_index(&bytes).map(Some)
     }
 
-    /// Load an issue from git HEAD.
-    ///
-    /// This is used as a fallback when an issue doesn't exist in local storage
-    /// but may be committed in git (e.g., reading from a secondary worktree).
-    /// Load an issue from its selected data-root path in `HEAD`.
-    ///
-    /// Returns `Ok(Some(issue))` when found, `Ok(None)` when absent from git
-    /// (git ran successfully but reported the path is missing), and `Err` for
-    /// genuine failures (git not available, repo corrupt, parse error, etc.).
-    fn load_issue_from_git(&self, id: &IssueId) -> Result<Option<Issue>> {
-        let layout = self.configured_layout()?;
-        let issue_path = layout.resolve(&VirtualPath::issue_record(id))?;
-        let Ok(repository_relative) = issue_path.strip_prefix(layout.worktree_root()) else {
-            return Ok(None);
-        };
-        let git_path = format!("HEAD:{}", repository_relative.display());
-        let output = Command::new("git")
-            .arg("show")
-            .arg(&git_path)
-            .current_dir(layout.worktree_root())
-            .output()
-            .context("Failed to execute git command")?;
-
-        if !output.status.success() {
-            // git ran but the path is absent — structurally "not found".
-            return Ok(None);
-        }
-
-        let issue = serde_json::from_slice(&output.stdout)
-            .with_context(|| format!("Failed to parse issue record at {git_path}"))?;
-        Ok(Some(issue))
-    }
-
-    /// Load an issue from the main worktree's .jit/ directory.
-    ///
-    /// This is used when in a secondary worktree to read uncommitted issues
-    /// from the main worktree.
     /// Load an issue from the main worktree's `.jit/` directory.
     ///
     /// Returns `Ok(Some(issue))` when found, `Ok(None)` when the issue is
@@ -1193,16 +1099,7 @@ impl IssueStore for JsonFileStorage {
             return self.read_issue_record(&issue_path);
         }
 
-        // Fallback 1: Try reading from git HEAD.
-        // load_issue_from_git returns Ok(Some(issue)), Ok(None) (absent),
-        // or Err (git infrastructure failure).
-        match self.load_issue_from_git(id) {
-            Ok(Some(issue)) => return Ok(issue),
-            Ok(None) => {} // file absent from git; continue
-            Err(_) => {}   // git unavailable or broken; continue to next source
-        }
-
-        // Fallback 2: Try reading from main worktree (if in secondary)
+        // Fallback: try reading from main worktree (if in secondary)
         match self.load_issue_from_main_worktree(id) {
             Ok(Some(issue)) => return Ok(issue),
             Ok(None) => {} // absent from main worktree or not applicable; continue
@@ -1230,32 +1127,16 @@ impl IssueStore for JsonFileStorage {
             return self.load_issue(id).map_err(PathReadError::Other);
         }
 
-        // Local file is absent.  Try git and main-worktree fallbacks.
-        //
-        // load_issue_from_git now returns Ok(Some(issue)), Ok(None) (absent),
-        // or Err (infrastructure failure).  We can branch without string-matching:
-        //   Ok(Some(…)) → found, return it.
-        //   Ok(None)    → absent from git, continue to next source.
-        //   Err(…)      → git is broken or the object is corrupt → Other.
-        match self.load_issue_from_git(id) {
-            Ok(Some(issue)) => return Ok(issue),
-            Ok(None) => {} // absent from git; continue
-            Err(e) => return Err(PathReadError::Other(e)),
-        }
-
         // Main-worktree fallback (only meaningful in secondary-worktree setups).
-        // Now returns Ok(Option) so we can distinguish real I/O failures from
-        // "not applicable / not present".
         match self.load_issue_from_main_worktree(id) {
             Ok(Some(issue)) => return Ok(issue),
             Ok(None) => {} // absent or not applicable; fall through to NotFound
             Err(e) => return Err(PathReadError::Other(e)), // genuine I/O failure → 500
         }
 
-        Err(PathReadError::NotFound(format!(
-            "Issue {} not found in local storage, git, or main worktree",
-            id
-        )))
+        Err(PathReadError::NotFound(
+            IssueNotFoundError::across_sources(id).to_string(),
+        ))
     }
 
     fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<crate::domain::identity::IssueId> {
@@ -2273,58 +2154,7 @@ mod tests {
         }
 
         #[test]
-        fn test_load_issue_from_git_when_not_local() {
-            // Setup: Create git repo with committed issue
-            let (_temp_dir, storage, _taxonomy) =
-                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-            let repo_path = _temp_dir.path().to_path_buf();
-            crate::test_cli::init_git_repository(&repo_path).unwrap();
-            let jit_dir = repo_path.join(".jit");
-            let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
-
-            // Create an issue and commit it
-            let issue = crate::test_utils::fixture_issue(
-                "Committed Issue".to_string(),
-                "From git".to_string(),
-            );
-            let issue_id = issue.id.clone();
-            seed_issue_preimage(&storage, &issue);
-
-            // Commit to git
-            Command::new("git")
-                .args(["add", ".jit"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["commit", "-m", "Add issue"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            // Remove from local .jit (simulate reading from different worktree)
-            let issue_path = jit_dir_layout
-                .resolve(&VirtualPath::issue_record(&issue_id))
-                .unwrap();
-            fs::remove_file(&issue_path).unwrap();
-
-            // Update index to not include the issue
-            let index = Index {
-                schema_version: 2,
-                all_ids: vec![],
-                deleted_ids: vec![],
-            };
-            seed_index_preimage(&storage, &index);
-
-            // Should fall back to reading from git
-            let loaded = storage.load_issue(&issue_id).unwrap();
-            assert_eq!(loaded.title, "Committed Issue");
-            assert_eq!(loaded.description, "From git");
-        }
-
-        #[test]
-        fn test_load_issue_from_main_worktree_when_not_in_git() {
+        fn test_load_issue_from_main_worktree_when_not_local() {
             // Setup: Create git repo with main worktree
             let (_temp_dir, main_storage, _taxonomy) =
                 crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
@@ -2370,184 +2200,6 @@ mod tests {
             let loaded = secondary_storage.load_issue(&issue_id).unwrap();
             assert_eq!(loaded.title, "Main WT Issue");
             assert_eq!(loaded.description, "Uncommitted");
-        }
-
-        #[test]
-        fn test_load_aggregated_index_includes_git_issues() {
-            // Setup: Create git repo with committed issue
-            let (_temp_dir, storage, _taxonomy) =
-                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-            let repo_path = _temp_dir.path().to_path_buf();
-            crate::test_cli::init_git_repository(&repo_path).unwrap();
-            let jit_dir = repo_path.join(".jit");
-            let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
-
-            // Create and commit issue
-            let issue = crate::test_utils::fixture_issue(
-                "Committed Issue".to_string(),
-                "In git".to_string(),
-            );
-            let issue_id = issue.id.clone();
-            seed_issue_preimage(&storage, &issue);
-
-            Command::new("git")
-                .args(["add", ".jit"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["commit", "-m", "Add issue"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            // Remove from local index and storage (simulate fresh worktree)
-            let issue_path = jit_dir_layout
-                .resolve(&VirtualPath::issue_record(&issue_id))
-                .unwrap();
-            fs::remove_file(&issue_path).unwrap();
-
-            let index = Index {
-                schema_version: 2,
-                all_ids: vec![],
-                deleted_ids: vec![],
-            };
-            seed_index_preimage(&storage, &index);
-
-            // load_aggregated_index should find it in git
-            let aggregated = storage.load_aggregated_index().unwrap();
-            assert!(aggregated.all_ids.contains(&issue_id));
-        }
-
-        #[test]
-        fn test_load_aggregated_index_rejects_invalid_git_index() {
-            let (_temp_dir, storage, _taxonomy) =
-                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-            let repo_path = _temp_dir.path().to_path_buf();
-            crate::test_cli::init_git_repository(&repo_path).unwrap();
-            let jit_dir = repo_path.join(".jit");
-            let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
-
-            fs::write(
-                jit_dir_layout.resolve(&VirtualPath::INDEX).unwrap(),
-                b"{ invalid json",
-            )
-            .unwrap();
-            Command::new("git")
-                .args(["add", VirtualPath::INDEX.repository_relative().as_str()])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-            Command::new("git")
-                .args(["commit", "-m", "invalid index fixture"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            seed_index_preimage(&storage, &Index::default());
-            let error = storage
-                .load_aggregated_index()
-                .expect_err("a malformed fallback index must not be skipped");
-            assert!(error.to_string().contains("Failed to parse index from git"));
-        }
-
-        #[test]
-        fn test_local_membership_overrides_git_membership_in_both_states() {
-            let (_temp_dir, storage, _taxonomy) =
-                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-            let repo_path = _temp_dir.path().to_path_buf();
-            crate::test_cli::init_git_repository(&repo_path).unwrap();
-
-            seed_index_preimage(
-                &storage,
-                &Index {
-                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec![crate::test_utils::issue_id(171)],
-                    deleted_ids: vec![crate::test_utils::issue_id(172)],
-                },
-            );
-            let add = Command::new("git")
-                .args(["add", VirtualPath::INDEX.repository_relative().as_str()])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-            assert!(add.status.success());
-            let commit = Command::new("git")
-                .args(["commit", "-m", "record tombstone"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-            assert!(commit.status.success());
-
-            seed_index_preimage(
-                &storage,
-                &Index {
-                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec![crate::test_utils::issue_id(172)],
-                    deleted_ids: vec![crate::test_utils::issue_id(171)],
-                },
-            );
-
-            assert_eq!(
-                storage.load_aggregated_index().unwrap().all_ids,
-                vec![crate::test_utils::issue_id(172)]
-            );
-        }
-
-        #[test]
-        fn test_git_membership_overrides_main_worktree_in_both_states() {
-            let (_temp_dir, main_storage, _taxonomy) =
-                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-            let repo_path = _temp_dir.path().to_path_buf();
-            crate::test_cli::init_git_repository(&repo_path).unwrap();
-            seed_index_preimage(
-                &main_storage,
-                &Index {
-                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec![crate::test_utils::issue_id(173)],
-                    deleted_ids: vec![crate::test_utils::issue_id(174)],
-                },
-            );
-            let add = Command::new("git")
-                .args(["add", VirtualPath::INDEX.repository_relative().as_str()])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-            assert!(add.status.success());
-            let commit = Command::new("git")
-                .args(["commit", "-m", "record head membership"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-            assert!(commit.status.success());
-
-            let (_secondary_container, secondary_path) = add_secondary_worktree(&repo_path);
-            fs::remove_file(
-                crate::test_utils::repository_layout_for_data_root(&secondary_path.join(".jit"))
-                    .resolve(&VirtualPath::INDEX)
-                    .unwrap(),
-            )
-            .unwrap();
-            seed_index_preimage(
-                &main_storage,
-                &Index {
-                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
-                    all_ids: vec![crate::test_utils::issue_id(174)],
-                    deleted_ids: vec![crate::test_utils::issue_id(173)],
-                },
-            );
-
-            let secondary_storage = JsonFileStorage::new(secondary_path.join(".jit"));
-            configure_test_layout(
-                &secondary_storage,
-                &secondary_path,
-                &secondary_path.join(".jit"),
-            );
-            assert_eq!(
-                secondary_storage.load_aggregated_index().unwrap().all_ids,
-                vec![crate::test_utils::issue_id(173)]
-            );
         }
 
         #[test]
@@ -2646,116 +2298,132 @@ mod tests {
         }
 
         #[test]
-        fn test_load_aggregated_index_deduplicates() {
-            // Setup: Create git repo
-            let (_temp_dir, storage, _taxonomy) =
-                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-            let repo_path = _temp_dir.path().to_path_buf();
-            crate::test_cli::init_git_repository(&repo_path).unwrap();
+        fn test_committed_issue_deleted_locally_is_absent_from_every_read() {
+            use crate::domain::identity::IssueIdPrefix;
+            use std::str::FromStr;
 
-            // Create and commit issue
+            let (temp_dir, storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp_dir.path()).unwrap();
+            let issue =
+                crate::test_utils::fixture_issue("Committed".to_string(), "Test".to_string());
+            seed_issue_preimage(&storage, &issue);
+            commit_all(temp_dir.path());
+
+            fs::remove_file(
+                storage
+                    .path_layout()
+                    .unwrap()
+                    .resolve(&VirtualPath::issue_record(&issue.id))
+                    .unwrap(),
+            )
+            .unwrap();
+            let mut index = storage.load_index().unwrap();
+            index.mark_deleted(issue.id.clone());
+            seed_index_preimage(&storage, &index);
+
+            assert!(storage.load_issue(&issue.id).is_err());
+            assert!(matches!(
+                storage.load_issue_or_not_found(&issue.id),
+                Err(crate::storage::PathReadError::NotFound(_))
+            ));
+            for prefix in [issue.id.as_str(), &issue.id.as_str()[..8]] {
+                assert!(storage
+                    .resolve_issue_id(&IssueIdPrefix::from_str(prefix).unwrap())
+                    .is_err());
+            }
+            assert!(storage.list_issues().unwrap().is_empty());
+        }
+
+        fn linked_store(repo_path: &Path) -> (TempDir, JsonFileStorage) {
+            let (container, secondary_path) = add_secondary_worktree(repo_path);
+            let data = secondary_path.join(".jit");
+            let storage = JsonFileStorage::new(&data);
+            configure_test_layout(&storage, &secondary_path, &data);
+            (container, storage)
+        }
+
+        fn commit_all(repo_path: &Path) {
+            for args in [&["add", "."][..], &["commit", "-m", "seed"][..]] {
+                let output = Command::new("git")
+                    .args(args)
+                    .current_dir(repo_path)
+                    .output()
+                    .unwrap();
+                assert!(output.status.success(), "{output:?}");
+            }
+        }
+
+        #[test]
+        fn test_local_membership_overrides_main_worktree_in_both_states() {
+            let (temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp_dir.path()).unwrap();
+            commit_all(temp_dir.path());
+            let (_container, linked) = linked_store(temp_dir.path());
+            let (active_locally, deleted_locally) = (
+                crate::test_utils::issue_id(171),
+                crate::test_utils::issue_id(172),
+            );
+
+            seed_index_preimage(
+                &main_storage,
+                &Index {
+                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+                    all_ids: vec![deleted_locally.clone()],
+                    deleted_ids: vec![active_locally.clone()],
+                },
+            );
+            seed_index_preimage(
+                &linked,
+                &Index {
+                    schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+                    all_ids: vec![active_locally.clone()],
+                    deleted_ids: vec![deleted_locally],
+                },
+            );
+
+            assert_eq!(
+                linked.load_aggregated_index().unwrap().all_ids,
+                vec![active_locally]
+            );
+        }
+
+        #[test]
+        fn test_load_aggregated_index_deduplicates_an_issue_in_both_checkouts() {
+            let (temp_dir, main_storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+            crate::test_cli::init_git_repository(temp_dir.path()).unwrap();
             let issue =
                 crate::test_utils::fixture_issue("Duplicate Issue".to_string(), "Test".to_string());
-            let issue_id = issue.id.clone();
-            seed_issue_preimage(&storage, &issue);
+            seed_issue_preimage(&main_storage, &issue);
+            commit_all(temp_dir.path());
+            let (_container, linked) = linked_store(temp_dir.path());
 
-            Command::new("git")
-                .args(["add", ".jit"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["commit", "-m", "Add issue"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            // Issue is now in both local AND git
-            // Aggregated index should deduplicate
-            let aggregated = storage.load_aggregated_index().unwrap();
-            let count = aggregated
-                .all_ids
-                .iter()
-                .filter(|id| *id == &issue_id)
-                .count();
-            assert_eq!(count, 1, "Issue ID should appear exactly once");
+            assert_eq!(
+                linked.load_aggregated_index().unwrap().all_ids,
+                vec![issue.id]
+            );
         }
 
         #[test]
-        fn test_load_issue_prefers_local_over_git() {
-            // Setup: Create git repo with committed issue
-            let (_temp_dir, storage, _taxonomy) =
+        fn test_load_issue_prefers_local_over_main_worktree() {
+            let (temp_dir, main_storage, _taxonomy) =
                 crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-            let repo_path = _temp_dir.path().to_path_buf();
-            crate::test_cli::init_git_repository(&repo_path).unwrap();
-
-            // Create and commit an issue
+            crate::test_cli::init_git_repository(temp_dir.path()).unwrap();
             let mut issue =
                 crate::test_utils::fixture_issue("Original".to_string(), "Old version".to_string());
-            let issue_id = issue.id.clone();
-            seed_issue_preimage(&storage, &issue);
+            seed_issue_preimage(&main_storage, &issue);
+            commit_all(temp_dir.path());
+            let (_container, linked) = linked_store(temp_dir.path());
 
-            Command::new("git")
-                .args(["add", ".jit"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["commit", "-m", "Add issue"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            // Update issue locally (not committed)
             issue.title = "Updated Locally".to_string();
-            issue.description = "New version".to_string();
-            seed_issue_preimage(&storage, &issue);
+            seed_issue_preimage(&linked, &issue);
 
-            // Should prefer local version over git version
-            let loaded = storage.load_issue(&issue_id).unwrap();
-            assert_eq!(loaded.title, "Updated Locally");
-            assert_eq!(loaded.description, "New version");
-        }
-
-        #[test]
-        fn test_load_issue_from_git_handles_invalid_json() {
-            // Setup: Create git repo with invalid JSON committed
-            let (_temp_dir, _storage, _taxonomy) =
-                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-            let repo_path = _temp_dir.path().to_path_buf();
-            crate::test_cli::init_git_repository(&repo_path).unwrap();
-            let jit_dir = repo_path.join(".jit");
-            let jit_dir_layout = crate::test_utils::repository_layout_for_data_root(&jit_dir);
-            let storage = JsonFileStorage::new(&jit_dir);
-
-            // Create invalid JSON file
-            let issue_id = &crate::test_utils::issue_id(0x1111_1111_1111_1111_1111_1111_1111_1111);
-            let issue_path = jit_dir_layout
-                .resolve(&VirtualPath::issue_record(issue_id))
-                .unwrap();
-            fs::write(&issue_path, "{ invalid json }").unwrap();
-
-            // Commit it
-            Command::new("git")
-                .args(["add", ".jit"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            Command::new("git")
-                .args(["commit", "-m", "Add invalid issue"])
-                .current_dir(&repo_path)
-                .output()
-                .unwrap();
-
-            // Remove from local
-            fs::remove_file(&issue_path).unwrap();
-
-            // Should fail gracefully with parse error (not panic)
-            let result = storage.load_issue(issue_id);
-            assert!(result.is_err());
+            assert_eq!(
+                linked.load_issue(&issue.id).unwrap().title,
+                "Updated Locally"
+            );
         }
     }
 
