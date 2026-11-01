@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4376939f5b3cec332ce3afd6ec5f5319a6cf5bc6",
+  "completed_at": "2026-11-01T16:03:53.971282597Z",
+  "duration_ms": 158729,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/dependency.rs",
+        "id": "F1",
+        "line": 227,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Three maintained prose sites still describe index.json as the membership or discovery authority after membership moved to issue-file listings."
+      }
+    ],
+    "summary": "Repeated maintained prose still incorrectly describes index.json as the issue-membership authority.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c47d78c8-f74b-4659-9d48-e5cbb50b1bab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "214030af-89bb-4d22-890c-2a777c0f1406",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T16:01:15.241749584Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 23756 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a197d7-f849-7390-8fa9-d5648342d382\n--------\nuser\n--- 23743 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b6968e7c, 3c4db465, 7f274ebc, 8d5048a5, 45192912, eb1bad66, 7adb93dc, 4376939f (jit:c47d78c8); uncommitted JIT records excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md), @/charter/D-21 (dev/vision/9db27a3a-charter.md), @/invariant/canonical-cutover (.jit/invariants.toml), @/invariant/essential-code-prose (.jit/invariants.toml), @/invariant/single-source-prose (.jit/invariants.toml), @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T15:59:49Z); prior code-review passed (exit 0, run ccc36ea8)\nTruncation recovery: bounded per-path commit/merge-parent patches plus current source, test, documentation, and policy reads; unrelated merged profile and historical-record paths excluded\n\n1. F1 — blocking, issue-impact (medium): The membership-source cutover leaves three contradictory maintained prose sites: [dependency.rs:227](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/dependency.rs:227) says the index is the sole discovery authority; [mutation.rs:12](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mutation.rs:12) says it serializes index membership; and [repository-state-materialization.md:272](/home/vkaskivuo/Projects/just-in-time/dev/architecture/repository-state-materialization.md:272) says membership is derived from the index. Current behavior derives membership from issue-file listings and writes the index only for deletion tombstones. This repeated stale contract conflicts with @/invariant/essential-code-prose and @/invariant/single-source-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Repeated maintained prose still incorrectly describes index.json as the issue-membership authority.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Three maintained prose sites still describe index.json as the membership or discovery authority after membership moved to issue-file listings.\",\"file\":\"crates/jit/src/commands/dependency.rs\",\"line\":227,\"references\":[\"@/invariant/essential-code-prose\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

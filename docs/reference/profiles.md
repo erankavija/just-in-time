@@ -283,9 +283,10 @@ over the whole set before any of it is applied.
 
 When a package and a package it depends on, directly or transitively, declare
 one registry entry, asset target, or managed region, the dependent package's value
-is composed. Two packages with no dependency path between them that state one
-differently are refused, even when a third package depending on both restates
-it: neither holds authority over the other's declarations. The refusal is taken
+is composed, so a package depending on two others settles what they disagree on
+by stating a value. Two packages with no dependency path between them that state
+one differently, with no dependent stating a value over them, are refused:
+neither holds authority over the other's declarations. The refusal is taken
 from the same decision [`jit profile diff`](cli-commands.md#jit-profile-diff)
 reports, so it names the package being applied, the declaration or target it
 carries, and every package whose differing definition remains. Only the packages
