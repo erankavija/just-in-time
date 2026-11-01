@@ -16,8 +16,8 @@ use crate::domain::artifact_discovery::{
 };
 use crate::domain::artifact_execution::ArchiveExecutionResult;
 use crate::domain::artifact_inventory::{
-    inventory_explicit_roots, pinned_root_requests, ExplicitRootTarget, PinnedRootEvidence,
-    PinnedRootEvidenceMap,
+    inventory_explicit_roots, member_derived_documents, member_document_directories,
+    pinned_root_requests, ExplicitRootTarget, PinnedRootEvidence, PinnedRootEvidenceMap,
 };
 use crate::domain::artifact_plan::{
     normalize_artifact_path, ArchiveCandidates, ArtifactPlan, BlockerCode, PlanBlocker, PlanTarget,
@@ -27,6 +27,7 @@ use crate::domain::artifact_plan::{ArtifactAction, WarningCode};
 use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Event, EventBody, Issue};
+use crate::storage::artifact_planning::inspect_artifact_evidence;
 use crate::storage::{
     collect_artifact_classification_facts, discover_archive_artifacts,
     resolve_container_destination, validate_repo_relative_path, GitRevisionResolver, IssueStore,
@@ -246,6 +247,38 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
         let inventory =
             inventory_explicit_roots(&inventory_issues, &hierarchy, explicit_target, &pinned)?;
+        let inventory = match root_container_id.as_ref() {
+            Some(root) => {
+                let documentation = config.documentation.clone().unwrap_or_default();
+                let files = member_document_directories(
+                    &inventory_issues,
+                    &hierarchy,
+                    root,
+                    &documentation,
+                )
+                .into_iter()
+                .map(|directory| {
+                    match inspect_artifact_evidence(
+                        &self.storage,
+                        &directory,
+                        ArtifactListingScope::RecursiveFiles,
+                    )? {
+                        ArtifactEvidence::Directory { entries, .. } => Ok(entries),
+                        _ => Ok(Vec::new()),
+                    }
+                })
+                .collect::<Result<Vec<_>>>()?
+                .concat();
+                inventory.with_unlinked_roots(member_derived_documents(
+                    &inventory_issues,
+                    &hierarchy,
+                    root,
+                    &files,
+                    &documentation,
+                ))?
+            }
+            None => inventory,
+        };
         let archive_events = self.storage.read_artifact_archive_events()?;
         let (discovered, embedded_owners) = discover_archive_artifacts(
             &self.storage,
@@ -699,6 +732,33 @@ impl CommandExecutor<JsonFileStorage> {
             })
             .collect::<Result<_>>()?;
         let inventory = inventory_explicit_roots(&inventory_issues, &hierarchy, explicit, &pinned)?;
+        let inventory = match root_id.as_ref() {
+            Some(root) => {
+                let documentation = config.documentation.clone().unwrap_or_default();
+                let mut files = Vec::new();
+                for directory in
+                    member_document_directories(&inventory_issues, &hierarchy, root, &documentation)
+                {
+                    let Some(next) = capture_directory_tree(session, image, &directory)? else {
+                        return Ok(None);
+                    };
+                    image = next;
+                    if let ArtifactEvidence::Directory { entries, .. } =
+                        image_evidence(&image, &directory, ArtifactListingScope::RecursiveFiles)?
+                    {
+                        files.extend(entries);
+                    }
+                }
+                inventory.with_unlinked_roots(member_derived_documents(
+                    &inventory_issues,
+                    &hierarchy,
+                    root,
+                    &files,
+                    &documentation,
+                ))?
+            }
+            None => inventory,
+        };
         let roots = inventory
             .artifacts()
             .iter()
@@ -1940,6 +2000,60 @@ mod tests {
             assert!(repo.path().join(destination).exists());
             assert!(!repo.path().join(source).exists());
         });
+    }
+
+    #[test]
+    fn test_container_archive_moves_derived_documents_beside_linked_documents() {
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"workspace\"\nmanaged_paths = [\"workspace/active\"]\nissue_scoped_areas = [\"workspace/active\"]\npermanent_paths = []\narchive_root = \"workspace/archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let mut container = crate::test_utils::fixture_issue("Derived".into(), String::new());
+        container.state = State::Done;
+        container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
+        let owned = format!("workspace/active/{}", container.short_id());
+        let linked = format!("{owned}/linked.md");
+        let derived = format!("{owned}/nested/derived.md");
+        [&linked, &derived].iter().for_each(|source| {
+            let path = repo.path().join(source);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, source).unwrap();
+        });
+        container.documents = vec![document_reference(&linked)];
+        let id = container.id.clone();
+        seed_archive_issue_precondition(&executor.storage, container.clone());
+        let destination_root = format!("workspace/archive/{}", container.short_id());
+
+        let preview = executor.preview_archive_container(&id).unwrap();
+        for (source, destination) in [
+            (&linked, format!("{destination_root}/active/linked.md")),
+            (
+                &derived,
+                format!("{destination_root}/active/nested/derived.md"),
+            ),
+        ] {
+            let matching = preview
+                .artifacts()
+                .iter()
+                .filter(|artifact| artifact.source() == source.as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(matching.len(), 1, "{source} is listed once");
+            assert_eq!(matching[0].destination(), Some(destination.as_str()));
+        }
+
+        executor.execute_archive_container(&id).unwrap();
+        assert!(!repo.path().join(&derived).exists());
+        assert!(repo
+            .path()
+            .join(format!("{destination_root}/active/nested/derived.md"))
+            .exists());
+        assert_eq!(
+            executor.storage.load_issue(&id).unwrap().documents.len(),
+            1,
+            "a derived document never becomes a link"
+        );
     }
 
     #[cfg(unix)]
