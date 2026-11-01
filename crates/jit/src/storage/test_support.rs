@@ -162,6 +162,7 @@ impl InMemoryStorage {
             entries,
             data_root_exists,
             record: None,
+            commits: BTreeMap::new(),
         };
         Ok(())
     }
