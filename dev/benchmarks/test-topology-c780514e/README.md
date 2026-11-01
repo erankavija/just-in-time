@@ -119,8 +119,8 @@ kill $(jobs -p); rm -rf target/tmp/load?; git checkout -- crates/jit/src/lib.rs
 All figures below come from exclusive build windows on 2026-11-01, entered with
 `flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock` and
 `CARGO_INCREMENTAL=0`, except the footprint's first before row. Each run started at a one-minute
-load below 4.08. sccache was on: after runs used the `scripts/cargo-ci.sh` default, and
-before runs set `RUSTC_WRAPPER=sccache`, the value that default selects at that commit.
+load below 4.08. sccache was on, at the `scripts/cargo-ci.sh` default, for the after and before suite-clock runs;
+the before profile run set `RUSTC_WRAPPER=sccache`, the value that default selects.
 After is commit `3a1326070`, the tree with every child of this epic, from a clean checkout; before is
 commit `0896fc29b`. Both were measured in a seeded worktree with isolated build state.
 
