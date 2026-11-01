@@ -300,9 +300,18 @@ packages are selected in.
 Applying writes the composed value over an existing entry under the same
 identity, replacing the whole entry; fields the package does not state are
 dropped. A committed local edit to a declared entry or target is replaced by the
-next application, and git keeps the prior version. In a git repository an
-application refuses while a path it would write holds uncommitted changes
-([`PROFILE_UNCOMMITTED_TARGETS`](error-codes.md)).
+next application, and git keeps the prior version.
+
+In a git repository an application refuses while a path it would write differs
+from HEAD — modified, staged, or untracked — with
+[`PROFILE_UNCOMMITTED_TARGETS`](error-codes.md) naming each such path. Each
+written path is judged by the checkout that holds it, a path in no checkout is
+never refused, and dirty paths the application does not write do not matter.
+Commit or discard the named changes, then apply again; a refusal leaves the
+repository byte-identical. Without git, an application proceeds, so read
+[`jit profile diff`](cli-commands.md#jit-profile-diff) first. Profiled
+`jit init` over an absent data root is exempt, as it has no earlier content to
+protect.
 
 ## Inspect and rehearse
 
