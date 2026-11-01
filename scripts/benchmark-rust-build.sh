@@ -64,6 +64,8 @@ set -euo pipefail
 #                           (default crates/jit/src/lib.rs)
 #   CARGO_CI_BUILD_LOCK     lock path shared with cargo-ci.sh
 #                           (default ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock)
+#   CARGO_CI_LOCK_TIMEOUT   seconds to wait for that lock (default 1800);
+#                           the benchmark exits 2 when the wait passes
 #   BENCH_SKIP_SAMPLING=1   skip clean/rebuild sampling entirely and assemble
 #                           baseline.json directly from the
 #                           raw/{clean,rebuild}-samples.jsonl already present
@@ -100,6 +102,7 @@ INVENTORY_SAMPLE="${BENCH_INVENTORY_SAMPLE:-1}"
 PROBE_FILE="${BENCH_PROBE_FILE:-crates/jit/src/lib.rs}"
 PROBE_COMMENT="// jit-benchmark-rebuild-probe: reversible comment-only source touch (jit:4e22a20d)"
 BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
+LOCK_TIMEOUT="${CARGO_CI_LOCK_TIMEOUT:-1800}"
 
 # Resolve the real cargo binary. Mirrors scripts/cargo-ci.sh: some local setups
 # place a debugging shim at ~/.cargo/bin/cargo that exits 0 for every
@@ -190,8 +193,14 @@ acquire_lock() {
   }
   exec {LOCK_FD}>"$BUILD_LOCK"
   if ! flock -n "$LOCK_FD" 2>/dev/null; then
-    echo "[benchmark] waiting for exclusive build lock ($BUILD_LOCK): another Cargo build is in progress" >&2
-    flock "$LOCK_FD"
+    echo "[benchmark] waiting up to ${LOCK_TIMEOUT}s for exclusive build lock ($BUILD_LOCK): another Cargo build is in progress" >&2
+    local lock_status=0
+    flock -w "$LOCK_TIMEOUT" -E 75 "$LOCK_FD" || lock_status=$?
+    if [[ $lock_status -eq 75 ]]; then
+      echo "ERROR: timed out after ${LOCK_TIMEOUT}s waiting for $BUILD_LOCK" >&2
+      exit 2
+    fi
+    [[ $lock_status -eq 0 ]] || exit "$lock_status"
   fi
 }
 release_lock() {
