@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "doc-review": {
-      "run_id": "7626cfa3-6f1f-4171-9d3b-71e02079410f",
+      "run_id": "3953ad53-57ba-421e-94d2-9a9944fdf395",
       "status": "failed",
-      "updated_at": "2026-11-01T18:55:59.059323831Z",
+      "updated_at": "2026-11-01T18:59:13.493350176Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "run_id": "c555fa27-7c0f-4d74-ab7a-7000b5f48257",
+      "run_id": "b60db2f9-03a0-4e07-8d4c-2997f41b54ad",
       "status": "passed",
-      "updated_at": "2026-11-01T18:53:10.629138549Z",
+      "updated_at": "2026-11-01T18:57:32.602117765Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Rewrite the profiles reference around apply-once",
-  "updated_at": "2026-11-01T18:55:59.059323831Z"
+  "updated_at": "2026-11-01T18:59:13.493350176Z"
 }
