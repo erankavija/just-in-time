@@ -8,23 +8,23 @@
 # Usage: land.sh <branch>
 set -euo pipefail
 
-SYNC_MESSAGE='chore(jit): sync tracker'
-# Everything under .jit except its machine-local runtime state.
-TRACKER=(.jit ':(exclude,glob).jit/.*.lock' ':(exclude).jit/tmp'
-    ':(exclude).jit/worktree.json' ':(exclude).jit/server.log' ':(exclude).jit/server.pid.json')
-
 refuse() { echo "land: $*" >&2; exit 1; }
 
+# Runs only inside `jit worktree exec`: its text reaches the locked child through
+# `bash -c`, so the script has no entry that reaches it without the lock.
 land() { # branch
     local foreign conflicts
+    # Everything under .jit except its machine-local runtime state.
+    local tracker=(.jit ':(exclude,glob).jit/.*.lock' ':(exclude).jit/tmp'
+        ':(exclude).jit/worktree.json' ':(exclude).jit/server.log' ':(exclude).jit/server.pid.json')
     git rev-parse --verify --quiet --end-of-options "$1^{commit}" > /dev/null ||
         refuse "'$1' names no commit"
     foreign="$(git status --short -uall -- . ':(exclude).jit' ':(exclude,glob)**/.jit-bootstrap.lock')"
     [[ -z "$foreign" ]] || refuse "uncommitted changes outside .jit:"$'\n'"$foreign"
-    if [[ -n "$(git status --short -uall -- "${TRACKER[@]}")" ]]; then
-        git ls-files -z --modified --deleted --others --exclude-standard -- "${TRACKER[@]}" |
+    if [[ -n "$(git status --short -uall -- "${tracker[@]}")" ]]; then
+        git ls-files -z --modified --deleted --others --exclude-standard -- "${tracker[@]}" |
             git add --pathspec-from-file=- --pathspec-file-nul
-        git commit -q -m "$SYNC_MESSAGE" -- .jit
+        git commit -q -m 'chore(jit): sync tracker' -- .jit
     fi
     git merge -q --no-ff --no-edit --end-of-options "$1" && return
     conflicts="$(git diff --name-only --diff-filter=U)"
@@ -33,13 +33,9 @@ land() { # branch
     refuse "merging $1 conflicted and was aborted, in:"$'\n'"$conflicts"
 }
 
-[[ $# -ge 1 && $# -le 2 ]] || refuse "usage: land.sh <branch>"
-if [[ "$1" == --locked ]]; then
-    land "$2"
-    exit
-fi
 [[ $# -eq 1 ]] || refuse "usage: land.sh <branch>"
 [[ -z "${JIT_DATA_DIR:-}" ]] || refuse "JIT_DATA_DIR is set, but this script commits .jit only"
 root="$(git rev-parse --show-toplevel 2> /dev/null)" || refuse "requires a git repository"
 cd "$root"
-exec jit worktree exec -- bash "${BASH_SOURCE[0]}" --locked "$1"
+exec jit worktree exec -- bash -c \
+    "set -euo pipefail; $(declare -f refuse land); land \"\$1\"" land.sh "$1"

@@ -1,10 +1,9 @@
-//! CLI-level startup guard for a too-new repository format (jit:def64ac4 REQ-02).
+//! CLI-level startup guard for an unsupported repository format (jit:def64ac4 REQ-02).
 //!
-//! A binary older than the repository's `index.json` `schema_version` must
-//! refuse to operate at startup for EVERY non-init command — including ones
-//! that never load the index themselves (e.g. `gate list`, which reads
-//! `gates.toml` directly) — with a single-line, nonzero error naming both
-//! versions, rather than misreading newer data.
+//! A binary must refuse a repository in any format but its own at startup for
+//! EVERY non-init command, including ones that never load the index themselves
+//! (e.g. `gate list`, which reads `gates.toml` directly), with a single-line,
+//! nonzero error naming both versions.
 
 use jit::test_cli::JitCli;
 use std::fs;
@@ -78,60 +77,44 @@ fn listed_ids(cli: &JitCli) -> std::collections::BTreeSet<String> {
 }
 
 #[test]
-fn test_format_2_repository_reads_and_writes_from_its_issue_files() {
-    let cli = JitCli::initialised().unwrap();
-    let root = cli.create_issue(["-t", "Root"]).unwrap();
-    let listed_only_in_index = cli.create_issue(["-t", "Indexed"]).unwrap();
-    let unindexed = cli.create_issue(["-t", "Unindexed"]).unwrap();
-    for dependent in [&listed_only_in_index, &unindexed] {
-        cli.run(["dep", "add", dependent, &root]).unwrap();
-    }
-    let index_path = cli.root().join(".jit/index.json");
-    let format_2 = serde_json::to_vec_pretty(&serde_json::json!({
-        "all_ids": [root, listed_only_in_index],
-        "deleted_ids": [],
-        "schema_version": 2,
-    }))
-    .unwrap();
-    fs::write(&index_path, &format_2).unwrap();
-
-    assert_eq!(
-        listed_ids(&cli),
-        [
-            root.clone(),
-            listed_only_in_index.clone(),
-            unindexed.clone()
-        ]
-        .into_iter()
-        .collect()
-    );
-
-    let created = cli.create_issue(["-t", "Created"]).unwrap();
-    assert!(listed_ids(&cli).contains(&created));
-    cli.run(["dep", "add", &created, &root]).unwrap();
-    assert_eq!(
-        fs::read(&index_path).unwrap(),
-        format_2,
-        "a create must leave a format 2 index as it stands"
-    );
-    let validation = cli.command(["validate"]).output().unwrap();
-    assert!(validation.status.success(), "{validation:?}");
-
-    let deleted = cli
-        .command_with_env(
-            ["issue", "delete", &unindexed],
-            [("JIT_ALLOW_DELETION", "1")],
+fn test_every_other_format_exits_10_naming_both_versions() {
+    for found in [2, 4] {
+        let cli = JitCli::initialised().unwrap();
+        fs::write(
+            cli.root().join(".jit/index.json"),
+            format!(r#"{{"schema_version": {found}, "all_ids": [], "deleted_ids": []}}"#),
         )
-        .output()
         .unwrap();
-    assert!(deleted.status.success(), "{deleted:?}");
-    assert!(!listed_ids(&cli).contains(&unindexed));
-    let index: serde_json::Value = serde_json::from_slice(&fs::read(&index_path).unwrap()).unwrap();
-    assert_eq!(index["schema_version"], 2, "a write must keep the marker");
-    assert_eq!(index["deleted_ids"], serde_json::json!([unindexed]));
-    assert!(index.get("all_ids").is_none());
-    let validation = cli.command(["validate"]).output().unwrap();
-    assert!(validation.status.success(), "{validation:?}");
+
+        let out = cli.command(["query", "all"]).output().unwrap();
+
+        assert_eq!(out.status.code(), Some(10), "{out:?}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains(&found.to_string()) && stderr.contains('3'),
+            "{stderr}"
+        );
+    }
+}
+
+#[test]
+fn test_validate_fails_on_a_format_3_index_carrying_all_ids() {
+    let cli = JitCli::initialised().unwrap();
+    fs::write(
+        cli.root().join(".jit/index.json"),
+        r#"{"schema_version": 3, "all_ids": [], "deleted_ids": []}"#,
+    )
+    .unwrap();
+
+    let out = cli.command(["validate"]).output().unwrap();
+
+    assert!(!out.status.success(), "{out:?}");
+    let output = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(output.contains("all_ids"), "{output}");
 }
 
 #[test]

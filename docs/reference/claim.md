@@ -9,9 +9,9 @@ Complete CLI reference for `jit claim` subcommands used in lease-based claim coo
 
 The `jit claim` command family manages exclusive advisory leases on issues for
 parallel work coordination. Lease acquisition is serialized by the claims
-coordinator, but a lease does not itself prevent writes: whether selected write
-commands require one is controlled by `[worktree].enforce_leases` (and `off`
-does not block writes).
+coordinator. Whether a lease refuses other agents' writes to the issue is
+controlled by `[worktree].enforce_leases`; a write to an unleased issue needs no
+lease, and `off` blocks nothing.
 
 ```bash
 jit claim <COMMAND> [OPTIONS]
@@ -283,8 +283,8 @@ change it.
 
 A stale lease is:
 - Marked stale in `jit claim status`
-- Not counted as active: with `enforce_leases = "strict"` a structural
-  operation on the issue is blocked as if no lease were held
+- Not counted as active: with `enforce_leases = "strict"` it no longer refuses
+  other agents' writes to the issue
 - A candidate for `jit claim force-evict`
 
 Staleness never auto-evicts the lease. It persists until a heartbeat,

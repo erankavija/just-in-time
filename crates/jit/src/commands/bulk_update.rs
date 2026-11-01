@@ -244,6 +244,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut result = BulkUpdateResult::new();
         result.matched = matched.iter().map(|i| i.id.clone()).collect();
+        result.warnings = self.refuse_foreign_leases(&result.matched)?;
 
         let candidates: Vec<&Issue> = matched
             .iter()

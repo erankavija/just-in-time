@@ -924,8 +924,8 @@ wire_vocabulary! {
         InvalidIdPrefix = "INVALID_ID_PREFIX",
         /// No `.jit` repository exists at the resolved data directory.
         RepositoryNotFound = "REPOSITORY_NOT_FOUND",
-        /// The repository format is newer than this binary supports.
-        RepositoryFormatTooNew = "REPOSITORY_FORMAT_TOO_NEW",
+        /// The repository format is not the one this binary supports.
+        RepositoryFormatUnsupported = "REPOSITORY_FORMAT_UNSUPPORTED",
         /// Issue deletion was refused because operator confirmation was absent.
         DeletionNotConfirmed = "DELETION_NOT_CONFIRMED",
         /// A state-mutating command was refused because it ran inside a linked
@@ -1025,7 +1025,7 @@ impl ErrorCode {
             ErrorCode::AlreadyExists | ErrorCode::GateError => ExitCode::AlreadyExists,
             ErrorCode::IoError
             | ErrorCode::ClaimRequiresGit
-            | ErrorCode::RepositoryFormatTooNew => ExitCode::ExternalError,
+            | ErrorCode::RepositoryFormatUnsupported => ExitCode::ExternalError,
             ErrorCode::PermissionDenied => ExitCode::PermissionDenied,
             ErrorCode::LockTimeout => ExitCode::LockTimeout,
             ErrorCode::ParseError
@@ -1073,8 +1073,8 @@ impl ErrorCode {
             ErrorCode::AmbiguousId => "The ID prefix matches more than one candidate.",
             ErrorCode::InvalidIdPrefix => "The ID prefix is shorter than the accepted minimum.",
             ErrorCode::RepositoryNotFound => "No JIT repository exists at the resolved path.",
-            ErrorCode::RepositoryFormatTooNew => {
-                "The repository format is newer than this binary supports."
+            ErrorCode::RepositoryFormatUnsupported => {
+                "The repository format is not the one this binary supports."
             }
             ErrorCode::DeletionNotConfirmed => {
                 "Issue deletion lacks the required operator confirmation."
@@ -3599,7 +3599,10 @@ mod tests {
             (ErrorCode::AmbiguousId, ExitCode::InvalidArgument),
             (ErrorCode::InvalidIdPrefix, ExitCode::InvalidArgument),
             (ErrorCode::RepositoryNotFound, ExitCode::NotFound),
-            (ErrorCode::RepositoryFormatTooNew, ExitCode::ExternalError),
+            (
+                ErrorCode::RepositoryFormatUnsupported,
+                ExitCode::ExternalError,
+            ),
             (ErrorCode::DeletionNotConfirmed, ExitCode::InvalidArgument),
             (
                 ErrorCode::LinkedCheckoutWriteRefused,

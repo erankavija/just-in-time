@@ -281,14 +281,18 @@ package that declared it beside the one that could not be found — so an adopte
 is never left diagnosing a package they did not name. Both refusals are raised
 over the whole set before any of it is applied.
 
-A registry declaration or asset target that two packages being applied state
-differently is refused for the same reason: neither package holds authority over
-the other's declarations. The refusal is taken from the same decision
-[`jit profile diff`](cli-commands.md#jit-profile-diff) reports, so it names the
-package being applied, the declaration or target it carries, and every package
-defining it. Only the packages being applied are parties: the repository's
-current content never conflicts with a package. Identical restatements merge, so
-a package and its dependency may declare the same thing.
+When a package and a package it depends on, directly or transitively, declare
+one registry entry, asset target, or managed region, the dependent package's value
+is composed, so a package depending on two others settles what they disagree on
+by stating a value. Two packages with no dependency path between them that state
+one differently, with no dependent stating a value over them, are refused:
+neither holds authority over the other's declarations. The refusal is taken
+from the same decision [`jit profile diff`](cli-commands.md#jit-profile-diff)
+reports, so it names the package being applied, the declaration or target it
+carries, and every package whose differing definition remains. Only the packages
+being applied are parties: the repository's current content never conflicts with
+a package. Identical restatements merge. The result does not depend on the order
+packages are selected in.
 
 Profile enumeration is defined in [Profile
 Commands](cli-commands.md#profile-commands).

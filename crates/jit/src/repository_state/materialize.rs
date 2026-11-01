@@ -187,7 +187,7 @@ pub fn render_capture_closure(
 /// The exact bounded set the validation pipeline reads from the captured image,
 /// so validation touches no live filesystem path outside the closure. [`paths`](ValidationCaptureClosure::paths) enumerates
 /// exact files; [`listings`](ValidationCaptureClosure::listings) enumerates the
-/// complete directory listings validation reconciles against the index.
+/// complete directory listings validation derives issue membership from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationCaptureClosure {
     /// Every exact `.jit/...` or worktree file validation reads.
@@ -219,7 +219,7 @@ pub struct ValidationCaptureClosure {
 pub fn validate_capture_closure(
     layout: &super::RepositoryLayout,
     config: &JitConfig,
-    all_ids: &[IssueId],
+    issue_ids: &[IssueId],
     rules_content: Option<&str>,
 ) -> Result<ValidationCaptureClosure, ProducerError> {
     use crate::config::SourceOfTruth;
@@ -238,7 +238,7 @@ pub fn validate_capture_closure(
         VirtualPath::DATA_IGNORE,
     ];
     // Every issue record the listing states, plus that listing.
-    for id in all_ids {
+    for id in issue_ids {
         paths.push(VirtualPath::issue_record(id));
     }
     let listings = vec![VirtualPath::ISSUES];
@@ -821,7 +821,7 @@ kind = "advisory"
         ] {
             assert!(paths.contains(&expected), "closure missing {expected:?}");
         }
-        // The complete issues listing is reconciled against the index ids.
+        // The complete issues listing states the issue ids.
         assert_eq!(closure.listings, vec![VirtualPath::data("issues").unwrap()]);
         // A referenced rule schema enters the closure when rules bytes are supplied.
         let rules = "[[rules]]\nname = \"shape\"\n\

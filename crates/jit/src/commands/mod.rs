@@ -780,54 +780,93 @@ fn claims_mutation_guard(
     coordinator.lock_claims_for_repository_mutation().map(Some)
 }
 
-fn captured_lease_warnings(
+/// The lease rule every issue-record write obeys: `strict` refuses when another
+/// agent holds an active lease on a target, naming each; `warn` answers the same
+/// findings; `off` answers none.
+fn refuse_foreign_leases(
     mode: crate::config::EnforcementMode,
     targets: &[IssueId],
-    guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
-) -> Result<Vec<String>> {
-    use crate::agent_config::resolve_agent_id;
+    conflicting_holder: impl Fn(&IssueId) -> Option<crate::domain::Assignee>,
+) -> Result<Vec<(IssueId, String)>> {
     use crate::config::EnforcementMode;
 
     if mode == EnforcementMode::Off {
         return Ok(Vec::new());
     }
-    let agent = resolve_agent_id(None).ok();
-    let mut warnings = Vec::new();
-    for id in targets {
-        let active = guard.is_some_and(|guard| guard.has_active_lease(id, agent.as_ref()));
-        if active {
-            continue;
-        }
-        let message =
-            format!("No active lease for issue {id}.\nAcquire lease with: jit claim acquire {id}");
-        match mode {
-            EnforcementMode::Warn => warnings.push(message),
-            EnforcementMode::Strict => return Err(anyhow!(message)),
-            EnforcementMode::Off => unreachable!(),
-        }
+    let findings = targets
+        .iter()
+        .filter_map(|id| {
+            conflicting_holder(id).map(|holder| (id.clone(), format!("{id} is leased by {holder}")))
+        })
+        .collect::<Vec<_>>();
+    if mode == EnforcementMode::Strict && !findings.is_empty() {
+        let named = findings
+            .iter()
+            .map(|(_, finding)| finding.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        anyhow::bail!(
+            "Refusing to write: {named}.\nCoordinate with the holder, or wait for the lease to end. \
+             If the lease is yours, set your identity with JIT_AGENT_ID."
+        );
     }
-    Ok(warnings)
+    Ok(findings)
 }
 
+/// [`refuse_foreign_leases`] over the leases a held claims guard read.
+fn refuse_foreign_leases_held(
+    mode: crate::config::EnforcementMode,
+    targets: &[IssueId],
+    guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
+) -> Result<Vec<String>> {
+    let agent = crate::agent_config::resolve_agent_id(None).ok();
+    let findings = refuse_foreign_leases(mode, targets, |id| {
+        guard
+            .and_then(|guard| guard.conflicting_lease(id, agent.as_ref()))
+            .map(|lease| lease.agent_id)
+    })?;
+    Ok(findings.into_iter().map(|(_, finding)| finding).collect())
+}
+
+/// [`refuse_foreign_leases`] over the leases the claims index holds now, for a
+/// command that reaches it without taking the claims lock.
+fn refuse_foreign_leases_read(
+    paths: &crate::storage::WorktreePaths,
+    mode: crate::config::EnforcementMode,
+    targets: &[IssueId],
+) -> Result<Vec<(IssueId, String)>> {
+    use crate::storage::claim_coordinator::ClaimsIndex;
+
+    if mode == crate::config::EnforcementMode::Off {
+        return Ok(Vec::new());
+    }
+    let claims = ClaimsIndex::load(paths)?;
+    let agent = crate::agent_config::resolve_agent_id(None).ok();
+    let now = chrono::Utc::now();
+    refuse_foreign_leases(mode, targets, |id| {
+        claims
+            .conflicting_lease(id, agent.as_ref(), now)
+            .map(|lease| lease.agent_id.clone())
+    })
+}
+
+/// Refuse claiming `target` for `assignee` when anyone else leases it, whatever
+/// the enforcement mode.
 fn ensure_claim_available(
     guard: Option<&crate::storage::claim_coordinator::ClaimsMutationGuard>,
     target: &IssueId,
     assignee: &crate::domain::Assignee,
 ) -> Result<()> {
-    let Some(lease) = guard.and_then(|guard| guard.conflicting_lease(target, Some(assignee)))
-    else {
-        return Ok(());
-    };
-    let expires = lease
-        .expires_at
-        .map(|time| time.format("%Y-%m-%d %H:%M:%S UTC").to_string())
-        .unwrap_or_else(|| "indefinitely".to_string());
-    Err(anyhow!(
-        "Issue {} is currently leased by {} {}.\nUse 'jit claim acquire' to properly coordinate work.",
-        target,
-        lease.agent_id,
-        expires
-    ))
+    refuse_foreign_leases(
+        crate::config::EnforcementMode::Strict,
+        std::slice::from_ref(target),
+        |id| {
+            guard
+                .and_then(|guard| guard.conflicting_lease(id, Some(assignee)))
+                .map(|lease| lease.agent_id)
+        },
+    )
+    .map(drop)
 }
 
 #[derive(Clone)]
@@ -846,6 +885,7 @@ enum CapturedLifecycleMutation {
     Release {
         issue_id: IssueId,
         reason: String,
+        released_by: crate::domain::Assignee,
     },
     AutoReady {
         issue_id: IssueId,
@@ -920,6 +960,8 @@ struct CapturedFieldUpdate {
     bulk: bool,
     force: bool,
     enforce_lease: bool,
+    /// Rejection: skips rule enforcement and promotes the dependents it unblocks.
+    rejection: bool,
 }
 
 #[derive(Clone)]
@@ -955,6 +997,7 @@ impl CapturedFieldUpdate {
             bulk: true,
             force,
             enforce_lease: false,
+            rejection: false,
         })
     }
 
@@ -994,7 +1037,7 @@ impl CapturedFieldUpdate {
         .collect()
     }
 
-    fn label_edit(issue_id: IssueId, label_edit: CapturedLabelEdit) -> Self {
+    fn new(issue_id: IssueId) -> Self {
         Self {
             issue_id,
             title: None,
@@ -1003,7 +1046,7 @@ impl CapturedFieldUpdate {
             state: None,
             add_labels: Vec::new(),
             remove_labels: Vec::new(),
-            label_edit: Some(label_edit),
+            label_edit: None,
             content_format: None,
             issue_type: None,
             add_gates: Vec::new(),
@@ -1013,6 +1056,25 @@ impl CapturedFieldUpdate {
             bulk: false,
             force: false,
             enforce_lease: false,
+            rejection: false,
+        }
+    }
+
+    fn label_edit(issue_id: IssueId, label_edit: CapturedLabelEdit) -> Self {
+        Self {
+            label_edit: Some(label_edit),
+            ..Self::new(issue_id)
+        }
+    }
+
+    /// Reject the issue, appending `resolution` when given.
+    fn rejection(issue_id: IssueId, resolution: Option<String>) -> Self {
+        Self {
+            state: Some(State::Rejected),
+            enforce_lease: true,
+            rejection: true,
+            label_edit: resolution.map(CapturedLabelEdit::AppendUnchecked),
+            ..Self::new(issue_id)
         }
     }
 }
@@ -1413,8 +1475,8 @@ fn derive_field_update(
     if let Some(target) = target {
         projected.state = target;
     }
-    let validation = match &request.label_edit {
-        Some(CapturedLabelEdit::AppendUnchecked(_)) => {
+    let validation = match (&request.label_edit, request.rejection) {
+        (Some(CapturedLabelEdit::AppendUnchecked(_)), _) | (None, true) => {
             let repo_format = evidence.config.content_format();
             let evaluation = crate::validation::evaluate_local(
                 &projected,
@@ -1432,11 +1494,11 @@ fn derive_field_update(
                 bypassed_rules: Vec::new(),
             }
         }
-        Some(CapturedLabelEdit::ReplaceExact { .. }) => WriteValidation {
+        (Some(CapturedLabelEdit::ReplaceExact { .. }), _) => WriteValidation {
             warnings: Vec::new(),
             bypassed_rules: Vec::new(),
         },
-        None => derive_write_validation(
+        (None, false) => derive_write_validation(
             &projected,
             evidence.declarations,
             evidence.config,
@@ -1529,6 +1591,42 @@ fn derive_field_update(
             EventBody::draft_local_rule_bypassed(issue.id.clone(), rule),
         )
     }));
+    let (promotions, blocked) = if request.rejection && entered_terminal {
+        let graph = evidence
+            .issues
+            .iter()
+            .map(|candidate| {
+                if candidate.id == issue.id {
+                    issue.clone()
+                } else {
+                    candidate.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        crate::domain::queries::issues_becoming_ready(&graph)
+            .iter()
+            .try_fold((Vec::new(), None), |(mut intents, blocked), id| {
+                let dependent = graph
+                    .iter()
+                    .find(|candidate| &candidate.id == id)
+                    .cloned()
+                    .ok_or_else(|| anyhow!("captured dependent {id} disappeared"))?;
+                let (promoted, events, error) = issue::derive_ready_promotion(
+                    dependent,
+                    CapturedTransitionEvidence {
+                        issues: &graph,
+                        ..evidence
+                    },
+                )?;
+                intents.push(MutationIntent::UpdateIssue {
+                    issue: Box::new(promoted),
+                });
+                intents.extend(events);
+                Ok::<_, anyhow::Error>((intents, blocked.or(error)))
+            })?
+    } else {
+        (Vec::new(), None)
+    };
     let intents = changed
         .then(|| MutationIntent::UpdateIssue {
             issue: Box::new(issue),
@@ -1542,13 +1640,14 @@ fn derive_field_update(
                     event: Box::new(event),
                 }),
         )
+        .chain(promotions)
         .collect();
     Ok(DerivedFieldUpdate {
         changed,
         entered_terminal,
         warnings,
         intents,
-        error_after_apply: gate_error,
+        error_after_apply: gate_error.or(blocked),
     })
 }
 
@@ -2667,7 +2766,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = declarations.config();
             let lease_warnings = if request.enforce_lease {
-                captured_lease_warnings(
+                refuse_foreign_leases_held(
                     config.enforcement_mode(),
                     std::slice::from_ref(&target),
                     claims_guard.as_ref(),
@@ -2772,9 +2871,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
+        let released_by = claim::resolve_release_actor(self.require_layout()?.worktree_root())?;
         self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Release {
             issue_id: issue_id.clone(),
             reason,
+            released_by,
         })?;
         Ok(())
     }
@@ -2880,7 +2981,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // Refuse before running prechecks; the held guard repeats this.
                 let preliminary_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
                 if enforce_lease {
-                    captured_lease_warnings(
+                    refuse_foreign_leases_held(
                         precheck.lease_mode,
                         std::slice::from_ref(&expected_target),
                         preliminary_guard.as_ref(),
@@ -2970,7 +3071,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 });
             }
             let mut external_warnings = if enforce_lease {
-                captured_lease_warnings(
+                refuse_foreign_leases_held(
                     lease_mode,
                     std::slice::from_ref(&expected_target),
                     claims_guard.as_ref(),
@@ -3212,7 +3313,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                             update = Some(issue);
                         }
                     }
-                    CapturedLifecycleMutation::Release { reason, .. } => {
+                    CapturedLifecycleMutation::Release {
+                        reason,
+                        released_by,
+                        ..
+                    } => {
                         if let Some(assignee) = record.assignee.take() {
                             events.push((
                                 4,
@@ -3220,6 +3325,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                                     record.id.clone(),
                                     assignee,
                                     reason.clone(),
+                                    released_by.clone(),
                                 ),
                             ));
                             if update.is_none() {
@@ -3365,101 +3471,26 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((Some(identity), warnings))
     }
 
-    /// Check if an active lease exists for the given issue by the current agent.
-    ///
-    /// Returns true if the current agent has an active lease (not expired or stale).
-    /// Returns false if no lease exists, lease is stale, or belongs to another agent.
-    ///
-    /// In tests: If JIT_AGENT_ID is not set, any valid lease counts (single-user mode).
-    fn check_active_lease(&self, issue_id: &IssueId) -> Result<bool> {
-        use crate::agent_config::resolve_agent_id;
-        use crate::storage::claim_coordinator::ClaimsIndex;
-
-        let paths = self.require_worktree_paths()?;
-
-        // Load the active-lease index through storage (an absent index yields an
-        // empty one, i.e. no active leases).
-        let claims_index = ClaimsIndex::load(paths)?;
-
-        // Resolve current agent identity (or None for single-user mode)
-        let current_agent = resolve_agent_id(None).ok();
-
-        // Check if active lease exists for this issue
-        let full_id = issue_id.clone();
-        let now = chrono::Utc::now();
-
-        let has_active_lease = claims_index.leases.iter().any(|lease| {
-            // Must match issue ID
-            if lease.issue_id != full_id {
-                return false;
-            }
-
-            // Must not be expired
-            if let Some(expires) = lease.expires_at {
-                if expires <= now {
-                    return false;
-                }
-            }
-
-            // Must not be stale
-            if lease.is_stale(now) {
-                return false;
-            }
-
-            // Agent verification:
-            // - If current_agent is Some, lease must belong to this agent
-            // - If current_agent is None (single-user mode), any valid lease counts
-            match &current_agent {
-                Some(agent_id) => lease.agent_id == *agent_id,
-                None => true, // Single-user mode: any valid lease
-            }
-        });
-
-        Ok(has_active_lease)
+    /// Refuse a write to any of `targets` another agent holds an active lease on
+    /// ([`refuse_foreign_leases`]), by the repository's enforcement mode.
+    pub(crate) fn refuse_foreign_leases(
+        &self,
+        targets: &[IssueId],
+    ) -> Result<Vec<(IssueId, String)>> {
+        let mode = self.cached_config()?.enforcement_mode();
+        if mode == crate::config::EnforcementMode::Off {
+            return Ok(Vec::new());
+        }
+        refuse_foreign_leases_read(self.require_worktree_paths()?, mode, targets)
     }
 
-    /// Require an active lease for the given issue, respecting enforcement mode.
-    ///
-    /// Checks the configured enforcement mode and either blocks, warns, or bypasses
-    /// the lease requirement. Used before structural operations that modify issues.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error in `strict` mode when no active lease exists.
-    /// In `warn` mode, returns Ok with a warning message.
-    /// In `off` mode, always returns Ok with None.
-    ///
-    /// Returns: Result<Option<String>> where Some(warning) should be printed by the CLI layer.
-    pub fn require_active_lease(&self, issue_id: &IssueId) -> Result<Option<String>> {
-        use crate::config::EnforcementMode;
-
-        // This legacy preflight is rechecked from captured config by mutation
-        // coordinators that enforce leases during publication.
-        let mode = self.cached_config()?.enforcement_mode();
-
-        match mode {
-            EnforcementMode::Off => Ok(None),
-            EnforcementMode::Warn | EnforcementMode::Strict => {
-                let has_lease = self.check_active_lease(issue_id)?;
-
-                if !has_lease {
-                    let msg = format!(
-                        "No active lease for issue {}.\nAcquire lease with: jit claim acquire {}",
-                        issue_id, issue_id
-                    );
-
-                    match mode {
-                        EnforcementMode::Warn => Ok(Some(msg)),
-                        EnforcementMode::Strict => {
-                            anyhow::bail!("{}", msg)
-                        }
-                        _ => unreachable!(),
-                    }
-                } else {
-                    Ok(None)
-                }
-            }
-        }
+    /// [`Self::refuse_foreign_leases`] for one issue, answering its warnings.
+    pub(crate) fn refuse_foreign_lease(&self, issue_id: &IssueId) -> Result<Vec<String>> {
+        Ok(self
+            .refuse_foreign_leases(std::slice::from_ref(issue_id))?
+            .into_iter()
+            .map(|(_, warning)| warning)
+            .collect())
     }
 }
 
@@ -4456,104 +4487,6 @@ assert = {}
 
     // Enforcement tests
     #[test]
-    fn test_require_active_lease_off_mode() {
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-
-        // Create a test issue
-        let issue = crate::test_utils::fixture_issue("test-issue".to_string(), "Test".to_string());
-        let issue_id = issue.id.clone();
-        crate::commands::test_helpers::seed_issue(&storage, issue);
-
-        // Create the root directory and config with enforcement off
-        std::fs::create_dir_all(storage.root()).unwrap();
-        let config_toml = r#"
-[worktree]
-enforce_leases = "off"
-"#;
-        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
-
-        let executor = CommandExecutor::new(storage);
-
-        // Should always succeed in off mode, even without lease, and return None
-        let result = executor.require_active_lease(&issue_id);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), None);
-    }
-
-    #[test]
-    fn test_check_active_lease_no_claims_index() {
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-
-        // Create a test issue
-        let issue = crate::test_utils::fixture_issue("test-issue".to_string(), "Test".to_string());
-        let issue_id = issue.id.clone();
-        crate::commands::test_helpers::seed_issue(&storage, issue);
-
-        let paths =
-            crate::storage::WorktreePaths::detect_from(storage.root()).expect("fixture paths");
-        let executor = CommandExecutor::new(storage).with_worktree_paths(paths);
-
-        // No claims index - should return false
-        let result = executor.check_active_lease(&issue_id);
-        assert!(result.is_ok());
-        assert!(!result.unwrap());
-    }
-
-    #[test]
-    fn test_require_active_lease_strict_mode_no_lease() {
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-
-        // Create a test issue
-        let issue = crate::test_utils::fixture_issue("test-issue".to_string(), "Test".to_string());
-        let issue_id = issue.id.clone();
-        crate::commands::test_helpers::seed_issue(&storage, issue);
-
-        // Create the root directory and config with enforcement strict
-        std::fs::create_dir_all(storage.root()).unwrap();
-        let config_toml = r#"
-[worktree]
-enforce_leases = "strict"
-"#;
-        std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
-
-        let paths =
-            crate::storage::WorktreePaths::detect_from(storage.root()).expect("fixture paths");
-        let executor = CommandExecutor::new(storage).with_worktree_paths(paths);
-
-        // Should fail in strict mode without lease
-        let result = executor.require_active_lease(&issue_id);
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("No active lease"));
-        assert!(err_msg.contains("jit claim acquire"));
-    }
-
-    #[test]
-    fn test_require_active_lease_off_mode_default() {
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-
-        // Create a test issue
-        let issue = crate::test_utils::fixture_issue("test-issue".to_string(), "Test".to_string());
-        let issue_id = issue.id.clone();
-        crate::commands::test_helpers::seed_issue(&storage, issue);
-
-        // No config file - should default to off mode (single-agent development)
-        let executor = CommandExecutor::new(storage);
-
-        // Should succeed in off mode (default) without lease
-        let result = executor.require_active_lease(&issue_id);
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn test_precheck_evidence_detects_manual_status_mutation() {
         use crate::storage::IssueStore;
         let storage = crate::storage::InMemoryStorage::new();
@@ -4631,7 +4564,10 @@ enforce_leases = "strict"
         coordinator.acquire_claim(&issue_id, 600).unwrap();
         let guard = claims_mutation_guard(&paths).unwrap().unwrap();
 
-        assert!(guard.has_active_lease(&issue_id, None));
+        let stranger = "agent:stranger".parse().unwrap();
+        assert!(guard
+            .conflicting_lease(&issue_id, Some(&stranger))
+            .is_some());
     }
 }
 

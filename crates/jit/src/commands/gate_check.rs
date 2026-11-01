@@ -4249,55 +4249,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
-    fn test_strict_lease_rejection_precedes_external_precheck() {
-        let executor = crate::commands::test_helpers::setup_with_enforcement("strict");
-        let marker = executor
-            .storage
-            .root()
-            .parent()
-            .unwrap()
-            .join("unauthorized-precheck-marker");
-        let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry.gates.insert(
-            "precheck".parse().unwrap(),
-            crate::declarations::GateDefinition {
-                version: 1,
-                key: "precheck".parse().unwrap(),
-                title: "Precheck".to_string(),
-                description: String::new(),
-                stage: GateStage::Precheck,
-                mode: GateMode::Auto,
-                checker: Some(GateChecker::Exec {
-                    command: "touch unauthorized-precheck-marker".to_string(),
-                    timeout_seconds: 10,
-                    working_dir: None,
-                    env: HashMap::new(),
-                    pass_context: false,
-                    prompt: None,
-                    prompt_file: None,
-                }),
-                priority: 100,
-                reserved: HashMap::new(),
-                inputs: None,
-            },
-        );
-        seed_gate_registry(executor.storage(), &registry);
-        let mut issue = crate::test_utils::fixture_issue("Test".into(), String::new());
-        issue.state = State::Ready;
-        issue.gates_required.push("precheck".parse().unwrap());
-        let id = issue.id.clone();
-        seed_issue(executor.storage(), issue);
-
-        let error = executor
-            .issues()
-            .update_issue_state(&id, State::InProgress)
-            .expect_err("strict lease enforcement must reject before checker execution");
-
-        assert!(error.to_string().contains("No active lease"));
-        assert!(!marker.exists());
-    }
-
-    #[test]
     fn test_precheck_failure_blocks_transition() {
         let executor = setup();
 

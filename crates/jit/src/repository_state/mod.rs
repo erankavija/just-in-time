@@ -45,9 +45,9 @@ pub use image::{
     RepositoryEntry, RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
-pub(crate) use index::{
-    captured_issue_ids, listed_issue_ids, RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION,
-};
+#[cfg(test)]
+pub(crate) use index::SUPPORTED_INDEX_SCHEMA_VERSION;
+pub(crate) use index::{captured_issue_ids, listed_issue_ids, RepositoryIndex};
 pub use initialize::{
     render_repo_config, structural_minimum_config, GitattributesClaim, GitattributesStatus,
     InitializationError, InitializationScaffold, FRESH_CONFIG_SCHEMA_VERSION,
@@ -70,7 +70,6 @@ pub use mutation::{
 };
 pub use package_tree::{
     finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,
-    TreeFileDisposition, TreeFileOutcome,
 };
 
 /// Finalize one typed gate-registry edit, its audit event, and every coupled
@@ -163,7 +162,8 @@ pub use profile_apply::{
     ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget, SetStringTarget,
 };
 pub(crate) use profile_apply::{
-    profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
+    drop_overridden_claims, profile_capture_closure, profile_contribution_overrides,
+    profile_contribution_target_paths,
 };
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,

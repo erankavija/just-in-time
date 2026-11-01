@@ -1,24 +1,24 @@
 use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::identity::ProfileId;
 use crate::domain::{ProfileLifecycleOperation, ProfileOrigin};
-use crate::profile::profile_plan_entry;
 use crate::profile::{
     build_profile_claims_from_resolved, capture_package_tree, pack_captured_package_archive,
     read_package_archive, resolve_package, CapturedPackageTree, EngineVersion, PackageCaptureError,
     ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
     ProfileComposedApplyResult, ProfileGraphError, ProfilePackEntry, ProfilePackResult,
-    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanResult, ProfileShowEntry,
-    ProfileShowResult, ProfileTargetAction, ProfileTargetChange, ProfileVariableAssignment,
-    ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph, SelectionObservation,
-    VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
+    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfileShowEntry, ProfileShowResult,
+    ProfileTargetAction, ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName,
+    ResolvedProfileContent, ResolvedProfileGraph, VariableInputs,
+    MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
+use crate::profile::{profile_run_entry, ProfileRunMode};
 use crate::repository_state::{
-    apply_overlay, classify_repository_export, derive_materialization,
+    apply_overlay, classify_repository_export, derive_materialization, drop_overridden_claims,
     finalize_package_tree_capture, CaptureBudget, CapturedTreeFile, FileMode, MaterializationPlan,
     MaterializationRequest, MutationContext, PackageTreeCapture, ProfileApplicationInput,
     ProfileContributionClaim, RepositoryAction, RepositoryEntry, RepositoryExportDestination,
     RepositoryExportIntent, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryStateError, RootRelativePath, TreeFileDisposition, TreeFileOutcome, VirtualPath,
+    RepositoryStateError, RootRelativePath, VirtualPath,
 };
 use crate::storage::{IssueStore, RepositoryMutationSession, RepositoryStateStore, WorktreePaths};
 use crate::validation::repository::RepositoryValidationFailure;
@@ -29,77 +29,43 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-/// Project dependency-first unique durable results back onto ordered root
-/// observations. A repeated selector observes the publication's first result,
-/// then reports an unchanged second observation without attempting another
-/// publication.
-pub(super) fn selection_profile_results(
-    applied: Vec<ProfileApplyResult>,
-    roots: &[ProfilePackage],
-) -> Result<ProfileComposedApplyResult> {
-    selection_observations(applied, roots).map(ProfileComposedApplyResult::new)
-}
-
-/// Project one aggregate selection's per-package answers onto the ordered root
+/// Project one run's dependency-first per-package answers onto the ordered root
 /// observations the caller made.
 ///
-/// A closure member the caller did not name is still part of what the selection
-/// settles, so it is reported once, before the roots. A repeated root selector
-/// observes the publication its first occurrence accounts for, so its later
-/// observations report what [`SelectionObservation::observe_without_publishing`]
-/// leaves — one meaning of "this observation publishes nothing", stated once
-/// per answer type rather than per projection.
-///
-/// A rehearsal and the run it precedes project through this one function, so
-/// their answers stay comparable entry for entry rather than drifting into two
-/// shapes.
-fn selection_observations<Observation: Clone + SelectionObservation>(
-    closure: Vec<Observation>,
+/// A closure member the caller did not name is reported once, before the roots.
+/// A repeated root selector observes the publication its first occurrence
+/// accounts for ([`ProfileApplyResult::observed_again`]).
+pub(super) fn selection_profile_results(
+    closure: Vec<ProfileApplyResult>,
     roots: &[ProfilePackage],
-) -> Result<Vec<Observation>> {
+) -> Result<ProfileComposedApplyResult> {
     let root_ids = roots
         .iter()
         .map(|root| root.model().id.as_str())
         .collect::<BTreeSet<_>>();
     let by_id = closure
         .iter()
-        .map(|observation| (observation.profile_id(), observation))
+        .map(|observation| (observation.id.as_str(), observation))
         .collect::<BTreeMap<_, _>>();
     let mut observations = closure
         .iter()
-        .filter(|observation| !root_ids.contains(observation.profile_id()))
+        .filter(|observation| !root_ids.contains(observation.id.as_str()))
         .cloned()
         .collect::<Vec<_>>();
-    let mut occurrences = BTreeMap::<&str, usize>::new();
+    let mut observed = BTreeSet::new();
     for root in roots {
         let id = root.model().id.as_str();
         let Some(source) = by_id.get(id) else {
             anyhow::bail!("selected root '{id}' has no aggregate selection answer");
         };
-        let occurrence = occurrences.entry(id).or_default();
-        let first = *occurrence == 0;
-        *occurrence += 1;
-        let mut observation = (*source).clone();
-        if !first {
-            observation.observe_without_publishing();
-        }
-        observations.push(observation);
+        let observation = (*source).clone();
+        observations.push(if observed.insert(id) {
+            observation
+        } else {
+            observation.observed_again()
+        });
     }
-    Ok(observations)
-}
-
-/// What a prepared selection does with a decision it cannot publish.
-///
-/// The two answers are the whole difference between a rehearsal and a
-/// difference report: both derive the same decision from the same session, and
-/// only one of them is allowed to carry a conflict back to its caller.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ProfileConflictResponse {
-    /// Fail the preparation, exactly where the publication it precedes would.
-    Refuse,
-    /// Return the decision, conflicts included, for a caller that publishes
-    /// nothing.
-    Report,
+    Ok(ProfileComposedApplyResult::new(observations))
 }
 
 /// One ordered profile selection from the command boundary: the package
@@ -306,28 +272,6 @@ pub enum ProfileApplyError {
     },
 }
 
-/// Project package-tree materialization outcomes into the profile family's one
-/// public target-decision vocabulary.
-fn tree_target_changes(outcomes: &[TreeFileOutcome]) -> Vec<ProfileTargetChange> {
-    outcomes
-        .iter()
-        .map(|outcome| {
-            let action = match outcome.disposition {
-                TreeFileDisposition::Unchanged => ProfileTargetAction::Unchanged,
-                TreeFileDisposition::Create => ProfileTargetAction::Create,
-                TreeFileDisposition::Update => ProfileTargetAction::Update,
-                TreeFileDisposition::Remove => ProfileTargetAction::Remove,
-            };
-            ProfileTargetChange::new(
-                outcome.path.repository_relative(),
-                action,
-                outcome.mode,
-                None,
-            )
-        })
-        .collect()
-}
-
 /// Read-only command options for the package's non-secret input channels.
 ///
 /// The command boundary turns these filesystem and process inputs into the
@@ -400,8 +344,6 @@ fn load_profile_variable_inputs(
 #[derive(Clone)]
 pub struct ProfileSelection {
     roots: Vec<ProfilePackage>,
-    graph: ResolvedProfileGraph,
-    variable_inputs: VariableInputs,
     members: Vec<SelectedProfile>,
     contribution_context: Vec<ProfileContributionClaim>,
 }
@@ -410,16 +352,6 @@ impl ProfileSelection {
     /// The selected packages, one per selector occurrence, in occurrence order.
     pub fn roots(&self) -> &[ProfilePackage] {
         &self.roots
-    }
-
-    /// The resolved package graph the closure was taken from.
-    pub fn graph(&self) -> &ResolvedProfileGraph {
-        &self.graph
-    }
-
-    /// The validated variable inputs every member was resolved with.
-    pub fn variable_inputs(&self) -> &VariableInputs {
-        &self.variable_inputs
     }
 
     /// The selected packages' dependency closure, dependency first.
@@ -447,7 +379,6 @@ impl ProfileSelection {
 pub struct SelectedProfile {
     package: ProfilePackage,
     targets: Vec<VirtualPath>,
-    resolved: ResolvedProfileContent,
     input: ProfileApplicationInput,
 }
 
@@ -456,26 +387,13 @@ impl SelectedProfile {
     pub fn package(&self) -> &ProfilePackage {
         &self.package
     }
-
-    /// The package's content with the selection's variables substituted.
-    pub fn resolved(&self) -> &ResolvedProfileContent {
-        &self.resolved
-    }
 }
 
 impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
-    /// Read the package directory one profile command acts on, using the id
-    /// declared by that package.
-    pub fn resolve_profile_package(&self, selector: &ProfileSelector) -> Result<ProfilePackage> {
-        let layout = self.require_layout()?;
-        let ProfileSelector::Path(location) = selector;
-        supplied_package(location, &layout)
-    }
-
     /// Resolve every selector in occurrence order before any package is applied.
     ///
     /// A repeated selector reads its package once.
-    pub fn resolve_profile_selectors(
+    fn resolve_profile_selectors(
         &self,
         selectors: &[ProfileSelector],
     ) -> Result<Vec<ProfilePackage>> {
@@ -638,8 +556,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let destination = worktree_directory(&layout, invocation_dir, destination)?;
         let tree = read_package_archive(&read_archive_bytes(invocation_dir, archive)?)?;
-        let (status, outcomes) =
-            self.publish_package_tree(&layout, &destination, &tree, publish)?;
+        let targets = self.publish_package_tree(&layout, &destination, &tree, publish)?;
         Ok(ProfileAddResult::new(vec![ProfileAddEntry {
             id: tree.model().id.to_string(),
             version: tree.model().version.clone(),
@@ -649,26 +566,29 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             destination: destination.repository_relative(),
             file_count: tree.file_count(),
             byte_size: tree.byte_size(),
-            targets: tree_target_changes(&outcomes),
-            status,
+            targets,
+            status: if publish {
+                ProfileApplicationStatus::Applied
+            } else {
+                ProfileApplicationStatus::WouldApply
+            },
         }]))
     }
 
-    /// Publish one validated package tree at `destination`.
+    /// Publish one validated package tree at `destination`, answering every path
+    /// it creates.
     ///
-    /// A package tree reaches the worktree through one redo record. The
-    /// destination must be absent, which is enforced against the same captured
-    /// image the plan is derived from rather than by a separate look at the
-    /// filesystem. An occupied destination is refused here; one that becomes
-    /// occupied afterwards is refused at apply, because the plan creates it
-    /// with an absent preimage.
+    /// The destination must be absent, which is enforced against the same
+    /// captured image the plan is derived from. One that becomes occupied
+    /// afterwards is refused at apply, because the plan creates it with an absent
+    /// preimage.
     fn publish_package_tree(
         &self,
         layout: &RepositoryLayout,
         destination: &VirtualPath,
         tree: &CapturedPackageTree,
         publish: bool,
-    ) -> Result<(ProfileApplicationStatus, Vec<TreeFileOutcome>)> {
+    ) -> Result<Vec<ProfileTargetChange>> {
         let capture = PackageTreeCapture::new(
             destination.clone(),
             tree.files()
@@ -685,14 +605,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let budget = package_tree_capture_budget(destination);
 
         with_mutation_session(self.storage(), layout, "profile package tree", |session| {
-            // The destination's whole subtree must be read before the delta is
-            // derived, because a file it holds that the tree no longer declares
-            // is one a republication removes.
-            let Some(image) = super::capture_discovering(
-                session,
-                capture.capture_spec(budget)?,
-                |image, spec| Ok(capture.expand_destination_closure(image, spec)?),
-            )?
+            let Some(image) =
+                super::capture_or_retry(session.capture(capture.capture_spec(budget)?))?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -703,18 +617,26 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 .into());
             }
 
-            let (plan, outcomes) = finalize_package_tree_capture(&image, &capture)?;
-            let status = if plan.delta().actions().is_empty() {
-                ProfileApplicationStatus::Unchanged
-            } else if !publish {
-                ProfileApplicationStatus::WouldApply
-            } else {
-                ProfileApplicationStatus::Applied
-            };
+            let plan = finalize_package_tree_capture(&image, &capture)?;
+            let targets = plan
+                .delta()
+                .file_writes()
+                .filter_map(|action| match action {
+                    RepositoryAction::WriteFile { path, mode, .. } => {
+                        Some(ProfileTargetChange::new(
+                            path.repository_relative(),
+                            ProfileTargetAction::Create,
+                            *mode,
+                            None,
+                        ))
+                    }
+                    _ => None,
+                })
+                .collect();
             if publish {
-                Ok(SessionStep::Apply(plan, (status, outcomes)))
+                Ok(SessionStep::Apply(plan, targets))
             } else {
-                Ok(SessionStep::Done((status, outcomes)))
+                Ok(SessionStep::Done(targets))
             }
         })
     }
@@ -828,14 +750,6 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         options: &ProfileVariableOptions,
     ) -> Result<ProfileSelection> {
         let roots = self.resolve_profile_selectors(selectors)?;
-        self.build_profile_selection(roots, options)
-    }
-
-    fn build_profile_selection(
-        &self,
-        roots: Vec<ProfilePackage>,
-        options: &ProfileVariableOptions,
-    ) -> Result<ProfileSelection> {
         let graph = self.resolve_profile_graph(&roots)?;
         let closure = graph.selected_packages();
         let variable_inputs = load_profile_variable_inputs(&closure, options)?;
@@ -862,45 +776,47 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 Ok(SelectedProfile {
                     package,
                     targets,
-                    resolved,
                     input,
                 })
             })
             .collect::<Result<Vec<_>>>()?;
-        let contribution_context = members
+        let claims = drop_overridden_claims(
+            members
+                .iter()
+                .map(|member: &SelectedProfile| member.input.claims.clone())
+                .collect(),
+            &graph.transitive_dependencies(),
+        );
+        let contribution_context = claims
             .iter()
-            .flat_map(|member| member.input.claims.contributions.iter().cloned())
+            .flat_map(|claims| claims.contributions.iter().cloned())
             .collect::<Vec<_>>();
         let members = members
             .into_iter()
-            .map(|member| SelectedProfile {
-                input: member
-                    .input
-                    .with_contribution_context(&contribution_context),
+            .zip(claims)
+            .map(|(member, claims)| SelectedProfile {
+                input: ProfileApplicationInput {
+                    claims,
+                    ..member.input
+                }
+                .with_contribution_context(&contribution_context),
                 ..member
             })
             .collect();
         Ok(ProfileSelection {
             roots,
-            graph,
-            variable_inputs,
             members,
             contribution_context,
         })
     }
 
-    /// Rehearse applying `selection`, refusing a decision the application
-    /// would refuse.
-    pub fn plan_profiles(&self, selection: &ProfileSelection) -> Result<ProfilePlanResult> {
-        self.preview_profile_selection(selection, ProfileConflictResponse::Refuse)
-    }
-
-    /// Resolve and apply profiles by selector with no variable inputs.
-    pub fn apply_profile(
+    /// Rehearse applying `selection`: a read-only run that fails exactly where
+    /// the application would, final validation included.
+    pub fn plan_profiles(
         &self,
-        selectors: &[ProfileSelector],
+        selection: &ProfileSelection,
     ) -> Result<ProfileComposedApplyResult> {
-        self.apply_profiles(&self.select_profiles(selectors, &ProfileVariableOptions::default())?)
+        self.run_profile_selection(selection, ProfileRunMode::Rehearse)
     }
 
     /// Apply `selection`'s complete closure through one held session.
@@ -910,56 +826,80 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         &self,
         selection: &ProfileSelection,
     ) -> Result<ProfileComposedApplyResult> {
-        if selection.members.is_empty() {
-            return Ok(ProfileComposedApplyResult::new(Vec::new()));
-        }
-        let applied = self.publish_profile_selection(selection)?;
-        selection_profile_results(applied.items, &selection.roots)
+        self.run_profile_selection(selection, ProfileRunMode::Publish)
     }
 
-    /// Report what applying a selection would do to this repository, without
-    /// publishing any of it.
+    /// Report what applying a selection would do to this repository, conflicts
+    /// included, without publishing any of it.
     ///
-    /// The report is the decision itself: the selection is planned through
-    /// the same preparation a publication runs, and every target and registry
-    /// declaration each participating profile decided is then stated — the
-    /// values it would create or update and the ones it cannot publish, each
-    /// named beside the packages that define it. A conflict is reported rather
-    /// than refused, which is the whole difference from the rehearsal the
-    /// lifecycle commands run, so an adopter can read a conflicting decision
-    /// before it decides whether to publish one.
-    ///
-    /// A package that is not installed is reported as readily as one that is:
-    /// the selection is resolved from the location its selector names, so an
-    /// adopter inspects a package before applying it rather than after.
-    ///
-    /// Nothing is written. The capture runs under the same session guard the
-    /// publication would, so the answer describes the repository the
-    /// publication would act on.
+    /// A package that is not installed is reported as readily as one that is,
+    /// so an adopter inspects a package before applying it. The capture runs
+    /// under the same session guard the publication would, so the answer
+    /// describes the repository the publication would act on.
     ///
     /// # Errors
     ///
     /// A repository that cannot be read.
-    pub fn diff_profiles(&self, selection: &ProfileSelection) -> Result<ProfilePlanResult> {
-        self.preview_profile_selection(selection, ProfileConflictResponse::Report)
+    pub fn diff_profiles(
+        &self,
+        selection: &ProfileSelection,
+    ) -> Result<ProfileComposedApplyResult> {
+        self.run_profile_selection(selection, ProfileRunMode::Report)
     }
 
-    /// Resolve the complete set of packages applying `package` applies, in the
-    /// order it applies them.
-    ///
-    /// A package's declared dependencies are resolved transitively, so the
-    /// answer closes over everything reachable from `package`, and ordered so
-    /// each package follows everything it depends on. `package` itself is
-    /// therefore last. A dependency reached by two packages is resolved and
-    /// applied once.
-    ///
-    /// Nothing here touches the repository: a
-    /// [`ProfileDependencyError::DependencyCycle`] or an unresolvable
-    /// dependency is raised over the whole closure before its first package is
-    /// applied.
-    pub fn resolve_profile_closure(&self, package: &ProfilePackage) -> Result<Vec<ProfilePackage>> {
-        self.resolve_profile_graph(std::slice::from_ref(package))
-            .map(|graph| graph.selected_packages())
+    /// Run `selection`'s dependency-first unique closure through one mutation
+    /// session and, when publishing, one `session.apply` call at most.
+    fn run_profile_selection(
+        &self,
+        selection: &ProfileSelection,
+        mode: ProfileRunMode,
+    ) -> Result<ProfileComposedApplyResult> {
+        if selection.members.is_empty() {
+            return Ok(ProfileComposedApplyResult::new(Vec::new()));
+        }
+        let layout = self.require_layout()?;
+        let context = match mode {
+            ProfileRunMode::Publish => super::production_mutation_context(),
+            ProfileRunMode::Rehearse | ProfileRunMode::Report => MutationContext::preview(),
+        };
+        let label = match mode {
+            ProfileRunMode::Publish => "profile application",
+            ProfileRunMode::Rehearse | ProfileRunMode::Report => "profile planning",
+        };
+        let closure = with_mutation_session(self.storage(), &layout, label, |session| {
+            let Some(plan) = self.prepare_profile_selection(session, selection, &context, mode)?
+            else {
+                return Ok(SessionStep::Retry);
+            };
+            // A plan its decisions already refuse never reaches final validation
+            // in the publication this reports on, and its overlay omits what
+            // they refuse.
+            let refusal = match mode {
+                ProfileRunMode::Report
+                    if crate::profile::ensure_publishable_targets(&plan).is_ok() =>
+                {
+                    final_validation_refusal(&plan)?.map(|refusal| refusal.to_string())
+                }
+                _ => None,
+            };
+            let entries = selection
+                .members
+                .iter()
+                .map(|member| {
+                    let entry = profile_result(&plan, &member.package, &layout, mode)?;
+                    Ok(match &refusal {
+                        Some(refusal) => entry.refused_by(refusal),
+                        None => entry,
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            if mode == ProfileRunMode::Publish && !plan.delta().actions().is_empty() {
+                Ok(SessionStep::Apply(plan, entries))
+            } else {
+                Ok(SessionStep::Done(entries))
+            }
+        })?;
+        selection_profile_results(closure, &selection.roots)
     }
 
     /// Resolve the selected packages' dependency closure, then settle every
@@ -968,10 +908,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     ///
     /// Only the selection's own closure is a candidate: a package this
     /// repository applied earlier takes no part unless the selection reaches it.
-    pub fn resolve_profile_graph(
-        &self,
-        selected: &[ProfilePackage],
-    ) -> Result<ResolvedProfileGraph> {
+    fn resolve_profile_graph(&self, selected: &[ProfilePackage]) -> Result<ResolvedProfileGraph> {
         #[cfg(test)]
         crate::profile::selection_probe::record(
             crate::profile::selection_probe::SelectionStage::GraphResolution,
@@ -1058,177 +995,19 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         }
     }
 
-    /// Apply one validated package together with the packages it depends on,
-    /// with no variable inputs.
-    ///
-    /// The whole closure is resolved and ordered first, so a cycle or an
-    /// unresolvable dependency fails before a plan is published.
-    pub fn apply_profile_package(
-        &self,
-        package: &ProfilePackage,
-    ) -> Result<ProfileComposedApplyResult> {
-        self.apply_profiles(
-            &self.build_profile_selection(
-                vec![package.clone()],
-                &ProfileVariableOptions::default(),
-            )?,
-        )
-    }
-
-    /// Publish the selection's dependency-first unique closure through one
-    /// mutation session and one `session.apply` call at most.
-    fn publish_profile_selection(
-        &self,
-        selection: &ProfileSelection,
-    ) -> Result<ProfileComposedApplyResult> {
-        let layout = self.require_layout()?;
-        let context = super::production_mutation_context();
-        with_mutation_session(self.storage(), &layout, "profile application", |session| {
-            let Some(plan) = self.prepare_profile_selection(
-                session,
-                selection,
-                &context,
-                ProfileLifecycleOperation::Apply,
-                ProfileConflictResponse::Refuse,
-            )?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            let results = |changed: &dyn Fn(&ProfilePackage) -> bool| {
-                selection
-                    .members
-                    .iter()
-                    .map(|member| {
-                        applied_profile_result(
-                            &plan,
-                            &member.package,
-                            &layout,
-                            if changed(&member.package) {
-                                ProfileApplicationStatus::Applied
-                            } else {
-                                ProfileApplicationStatus::Unchanged
-                            },
-                        )
-                    })
-                    .collect::<Result<Vec<_>>>()
-                    .map(ProfileComposedApplyResult::new)
-            };
-            if plan.delta().actions().is_empty() {
-                return Ok(SessionStep::Done(results(&|_| false)?));
-            }
-            let applied =
-                results(&|package| plan.applied_profiles().contains(&package.model().id))?;
-            Ok(SessionStep::Apply(plan, applied))
-        })
-    }
-
-    /// Preview `selection` through the same preparation durable publication
-    /// runs, deciding what a conflict does.
-    ///
-    /// A rehearsal and a difference report reach this one preview with
-    /// different answers to that question and nothing else, so their entries
-    /// stay comparable entry for entry.
-    fn preview_profile_selection(
-        &self,
-        selection: &ProfileSelection,
-        response: ProfileConflictResponse,
-    ) -> Result<ProfilePlanResult> {
-        if selection.members.is_empty() {
-            return Ok(ProfilePlanResult::new(Vec::new()));
-        }
-        let layout = self.require_layout()?;
-        let context = MutationContext::preview();
-        with_mutation_session(self.storage(), &layout, "profile planning", |session| {
-            let Some(plan) = self.prepare_profile_selection(
-                session,
-                selection,
-                &context,
-                ProfileLifecycleOperation::Apply,
-                response,
-            )?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            // A plan its decisions already refuse never reaches final validation
-            // in the publication this previews, and its overlay omits what they
-            // refuse.
-            let refusal = match response {
-                ProfileConflictResponse::Report
-                    if crate::profile::ensure_publishable_targets(&plan).is_ok() =>
-                {
-                    final_validation_refusal(&plan)?.map(|refusal| refusal.to_string())
-                }
-                _ => None,
-            };
-            let rehearsed = selection
-                .members
-                .iter()
-                .map(|member| {
-                    let entry = profile_plan_entry(
-                        &plan,
-                        &member.package.model().id,
-                        &member.package.model().version,
-                        package_origin(&member.package, &layout)?,
-                    );
-                    Ok(match &refusal {
-                        Some(refusal) => entry.refused_by(refusal),
-                        None => entry,
-                    })
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let plans = selection_observations(rehearsed, &selection.roots)?;
-            Ok(SessionStep::Done(ProfilePlanResult::new(plans)))
-        })
-    }
-
-    /// Test-only single-member view of the aggregate preparation path.
-    #[cfg(test)]
-    fn prepare_profile(
-        &self,
-        session: &mut (dyn RepositoryMutationSession + '_),
-        package: &ProfilePackage,
-        context: &MutationContext,
-    ) -> Result<
-        Option<(
-            MaterializationPlan,
-            Vec<crate::profile::ProfileTargetChange>,
-        )>,
-    > {
-        let layout = self.require_layout()?;
-        let selection = self
-            .build_profile_selection(vec![package.clone()], &ProfileVariableOptions::default())?;
-        let plan = self.prepare_profile_selection(
-            session,
-            &selection,
-            context,
-            ProfileLifecycleOperation::Apply,
-            ProfileConflictResponse::Refuse,
-        )?;
-        let origin = package_origin(package, &layout)?;
-        Ok(plan.map(|plan| {
-            let changes =
-                profile_plan_entry(&plan, &package.model().id, &package.model().version, origin)
-                    .targets;
-            (plan, changes)
-        }))
-    }
-
     /// Capture and close the complete selection once. A retry restarts from a
     /// fresh held session image; no member of the selection is published until
     /// the final aggregate plan reaches `session.apply`.
     ///
-    /// `response` decides what a decision that cannot be published does here.
-    /// Every route that publishes or rehearses a publication refuses it, final
-    /// validation included, and the difference report is the sole reader that
-    /// carries it through, so a conflicting target or declaration reaches an
-    /// adopter as a report entry exactly once and as a refusal everywhere else.
+    /// `mode` decides what a decision that cannot be published does here. A
+    /// publication and its rehearsal refuse it, final validation included, and
+    /// the difference report alone carries it through.
     fn prepare_profile_selection(
         &self,
         session: &mut (dyn RepositoryMutationSession + '_),
         selection: &ProfileSelection,
         context: &MutationContext,
-        operation: ProfileLifecycleOperation,
-        response: ProfileConflictResponse,
+        mode: ProfileRunMode,
     ) -> Result<Option<MaterializationPlan>> {
         let contribution_context = selection.contribution_context();
         let inputs = selection.application_inputs();
@@ -1290,7 +1069,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             MaterializationRequest::ApplyProfileSelection {
                 profiles: &inputs,
                 context,
-                operation,
+                operation: ProfileLifecycleOperation::Apply,
             },
         )?;
         let mut extra_paths = expanded_paths;
@@ -1326,7 +1105,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             MaterializationRequest::ApplyProfileSelection {
                 profiles: &inputs,
                 context,
-                operation,
+                operation: ProfileLifecycleOperation::Apply,
             },
         )?;
         if plan.delta().actions().iter().any(|action| {
@@ -1337,7 +1116,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         }) {
             return Ok(None);
         }
-        if response == ProfileConflictResponse::Refuse {
+        if mode != ProfileRunMode::Report {
             crate::profile::ensure_publishable_targets(&plan)
                 .map_err(RepositoryStateError::from)?;
             ensure_committed_write_targets(
@@ -1519,55 +1298,25 @@ fn profile_graph_error(error: ProfileGraphError) -> anyhow::Error {
     }
 }
 
-/// How many package-model byte budgets one package-tree publication may span.
+/// How many package-model byte budgets one package-tree capture may read.
 ///
-/// One is the tree being published. One more is what the destination already
-/// holds, which a previous publication left there as a package tree bounded the
-/// same way. The rest is headroom for content an adopter added beside it, so a
-/// republication is refused for what the destination holds rather than for the
-/// shape of the package arriving at it.
+/// A publication writes only over absent paths, so this bounds what an occupied
+/// destination holds at the tree's paths: past it, an add is refused for the
+/// budget rather than for the occupant.
 const PACKAGE_TREE_MODEL_BUDGETS: usize = 8;
 
 /// Bounds for publishing one package tree at `destination`.
 ///
-/// Every bound here is derived from what the package model constrains. That
-/// matters because the model bounds a package's file count
-/// ([`MAX_PROFILE_PACKAGE_FILES`]) and its total size
-/// ([`MAX_PROFILE_PACKAGE_BYTES`]) and says nothing about how deep or how long
-/// its paths are, so a bound assuming a path shape refuses packages the model
-/// admits — an archive `jit profile pack` writes that `jit profile add` will
-/// not take.
-///
-/// One property of the model carries all three. The manifest declares every
-/// file the package holds besides itself, by name, and no source may be
-/// declared twice, so the package's declared path lengths sum to less than the
-/// manifest's own size — which is itself part of the same byte budget its
-/// content is. From that:
-///
-/// * **Listings.** A republication takes one per directory beneath the
-///   destination. Each directory the package needs is a proper prefix of a
-///   declared path ending at a separator, so the package contributes fewer of
-///   them than its declared paths have bytes.
-/// * **Depth.** A path's component count is below its own byte length, so no
-///   declared path reaches a package byte budget's worth of components below
-///   the destination the caller named.
-/// * **Bytes.** What actually binds a publication: the tree's content is at
-///   most one package byte budget, and a republication also reads what the
-///   destination already holds.
-///
-/// Nothing bounds how many paths the capture declares, because the same
-/// property already bounds them: the closure is the declared files plus their
-/// directory prefixes, so it stays under `MAX_PROFILE_PACKAGE_FILES` plus a
-/// package byte budget. A budget stating a number that large refuses no package
-/// the model admits, and any smaller number refuses packages it does admit.
-///
-/// [`MAX_PROFILE_PACKAGE_FILES`]: crate::profile::MAX_PROFILE_PACKAGE_FILES
-/// [`MAX_PROFILE_PACKAGE_BYTES`]: crate::profile::MAX_PROFILE_PACKAGE_BYTES
+/// Each bound derives from what the package model constrains: the model bounds
+/// a package's file count and total size and leaves its paths' depth and length
+/// free, so a bound assuming a path shape would refuse an archive `jit profile
+/// pack` writes. The manifest names every file besides itself and no source
+/// twice, so the declared path lengths sum below the package byte budget. That
+/// bounds the directories the tree can need ([`CaptureBudget::max_listings`])
+/// and the components of any one path ([`CaptureBudget::max_depth`]).
 fn package_tree_capture_budget(destination: &VirtualPath) -> CaptureBudget {
     // Saturating throughout: a bound that wrapped would be smaller than the
-    // model demands, which is the failure this function exists to prevent. The
-    // only term this build cannot compute at compile time is the destination's
-    // own depth, which the caller supplies.
+    // model demands.
     const READ_BYTES: usize =
         PACKAGE_TREE_MODEL_BUDGETS.saturating_mul(crate::profile::MAX_PROFILE_PACKAGE_BYTES);
 
@@ -1721,10 +1470,7 @@ fn read_archive_bytes(invocation_dir: &Path, archive: &Path) -> Result<Vec<u8>> 
 /// location that does not depend on machine state. The selected data root is
 /// not a worktree location even when it nests inside one, so a package placed
 /// under it is refused by the same rule.
-pub(super) fn package_origin(
-    package: &ProfilePackage,
-    layout: &RepositoryLayout,
-) -> Result<ProfileOrigin> {
+fn package_origin(package: &ProfilePackage, layout: &RepositoryLayout) -> Result<ProfileOrigin> {
     let ProfilePackageSource::Directory(directory) = package.source();
     layout
         .classify_and_canonicalize(directory)
@@ -1739,28 +1485,20 @@ pub(super) fn package_origin(
         })
 }
 
-/// Project one aggregate publication decision into the same per-profile facts
-/// its rehearsal reports.
-pub(super) fn applied_profile_result(
+/// One member's answer to a run, from the decision `plan` carries.
+pub(super) fn profile_result(
     plan: &MaterializationPlan,
     package: &ProfilePackage,
     layout: &RepositoryLayout,
-    status: ProfileApplicationStatus,
+    mode: ProfileRunMode,
 ) -> Result<ProfileApplyResult> {
-    let preview = profile_plan_entry(
+    Ok(profile_run_entry(
         plan,
         &package.model().id,
         &package.model().version,
         package_origin(package, layout)?,
-    );
-    Ok(ProfileApplyResult {
-        id: preview.id,
-        version: preview.version,
-        origin: preview.origin,
-        status,
-        targets: preview.targets,
-        contributions: preview.contributions,
-    })
+        mode,
+    ))
 }
 
 /// Convert resolved package content into neutral claims.
@@ -1800,19 +1538,20 @@ mod tests {
     use super::*;
     use crate::domain::{Event, EventBody, ProfileLifecycleOperation, ProfileLifecycleStatus};
     use crate::profile::selection_probe;
-    use crate::profile::{
-        ProfileContributionChange, ProfilePlanEntry, ProfilePlanStatus, ProfileTargetAction,
-    };
+    use crate::profile::{ProfileApplyResult, ProfileContributionChange, ProfileTargetAction};
     use crate::repository_state::{
-        Contribution, ContributionConflictOwner, ContributionIdentity, MapEntryTarget,
-        ProfileTargetConflict, ProfileTargetConflictEntry, ProfileTargetSubject,
-        RepositoryStateError, RootRelativePath, ScalarTarget, SetStringTarget,
+        Contribution, ContributionConflictOwner, MapEntryTarget, ProfileTargetConflict,
+        ProfileTargetConflictEntry, ProfileTargetSubject, RepositoryStateError, RootRelativePath,
+        ScalarTarget, SetStringTarget,
     };
     use crate::storage::JsonFileStorage;
     use crate::storage::{
         discover_repository_layout, IssueStore, MutationPoint, RedoPoint, RepositoryStateStore,
     };
-    use crate::test_utils::{file_executor, setup_test_repo, setup_test_repo_with_config};
+    use crate::test_utils::{
+        apply_package, apply_selected_packages, file_executor, selected_closure, setup_test_repo,
+        setup_test_repo_with_config,
+    };
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
@@ -1886,18 +1625,6 @@ mod tests {
             &fixture_package_tree(),
             &temp.path().join(relative),
         );
-        ProfilePackage::from_directory(&root).expect("a valid package tree")
-    }
-
-    /// Rewrite one authored source of the package tree at `relative`, and read
-    /// the package back from there.
-    ///
-    /// Two copies of one fixture are byte-identical and therefore
-    /// indistinguishable in everything a resolution reports, so a test that
-    /// asks which copy was read edits one of them first.
-    fn repackage(temp: &TempDir, relative: &str, source: &str, bytes: &str) -> ProfilePackage {
-        let root = temp.path().join(relative);
-        fs::write(root.join(source), bytes).unwrap();
         ProfilePackage::from_directory(&root).expect("a valid package tree")
     }
 
@@ -1979,12 +1706,51 @@ mod tests {
             .and_then(|selection| executor.apply_profiles(&selection))
     }
 
+    /// Resolve `selector` to the one package it names.
+    fn resolved_selector(
+        executor: &CommandExecutor<JsonFileStorage>,
+        selector: &ProfileSelector,
+    ) -> Result<ProfilePackage> {
+        executor
+            .resolve_profile_selectors(std::slice::from_ref(selector))
+            .map(|mut packages| packages.remove(0))
+    }
+
+    /// The canonical plan `package`'s closure prepares in `session`, and what
+    /// `package` decides in it.
+    fn prepared_plan(
+        executor: &CommandExecutor<JsonFileStorage>,
+        session: &mut (dyn RepositoryMutationSession + '_),
+        package: &ProfilePackage,
+        context: &MutationContext,
+    ) -> (MaterializationPlan, Vec<ProfileTargetChange>) {
+        let selection = executor
+            .select_profiles(
+                &[package_selector(package)],
+                &ProfileVariableOptions::default(),
+            )
+            .unwrap();
+        let plan = executor
+            .prepare_profile_selection(session, &selection, context, ProfileRunMode::Rehearse)
+            .unwrap()
+            .unwrap();
+        let changes = profile_result(
+            &plan,
+            package,
+            &executor.require_layout().unwrap(),
+            ProfileRunMode::Rehearse,
+        )
+        .unwrap()
+        .targets;
+        (plan, changes)
+    }
+
     /// Rehearse `selectors` the way `jit profile apply --dry-run` does.
     fn plan_selected(
         executor: &CommandExecutor<JsonFileStorage>,
         selectors: &[ProfileSelector],
         options: &ProfileVariableOptions,
-    ) -> Result<ProfilePlanResult> {
+    ) -> Result<ProfileComposedApplyResult> {
         executor
             .select_profiles(selectors, options)
             .and_then(|selection| executor.plan_profiles(&selection))
@@ -1995,7 +1761,7 @@ mod tests {
         executor: &CommandExecutor<JsonFileStorage>,
         selectors: &[ProfileSelector],
         options: &ProfileVariableOptions,
-    ) -> Result<ProfilePlanResult> {
+    ) -> Result<ProfileComposedApplyResult> {
         executor
             .select_profiles(selectors, options)
             .and_then(|selection| executor.diff_profiles(&selection))
@@ -2227,46 +1993,14 @@ mod tests {
         }
     }
 
-    /// The one declaration `error` refused, beside every owner defining it.
-    ///
-    /// A contested declaration reaches an adopter as a refused decision of the
-    /// same shape a contested target does, so a test reads it out of the one
-    /// refusal rather than out of a second error family
-    /// (`@/invariant/semantic-test-assertions`). Every profile that declares it
-    /// decides it, so a selection carrying two of them refuses the same
-    /// declaration once per profile and states one answer.
-    fn refused_declaration(
-        error: &anyhow::Error,
-    ) -> (ContributionIdentity, Vec<ContributionConflictOwner>) {
-        let declarations = refused_targets(error)
-            .iter()
-            .filter_map(|entry| match (&entry.subject, &entry.conflict) {
-                (
-                    ProfileTargetSubject::Contribution(identity),
-                    ProfileTargetConflict::Contested { owners },
-                ) => Some((identity.clone(), owners.clone())),
-                _ => None,
-            })
-            .collect::<BTreeSet<_>>();
-        assert_eq!(
-            declarations.len(),
-            1,
-            "this selection refuses one declaration: {error:#}"
-        );
-        declarations
-            .into_iter()
-            .next()
-            .expect("the refused declaration")
-    }
-
     #[test]
-    fn test_resolve_profile_package_reads_the_package_a_supplied_location_holds() {
+    fn test_resolve_profile_selectors_reads_the_package_a_supplied_location_holds() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let supplied = package_read_from(&temp, "vendor/supplied");
 
         let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
-        let resolved = executor.resolve_profile_package(&selector).unwrap();
+        let resolved = resolved_selector(&executor, &selector).unwrap();
 
         assert_eq!(resolved.hashes(), supplied.hashes());
         assert_eq!(
@@ -2276,7 +2010,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_resolves_a_declared_dependency_beside_the_declaring_package() {
+    fn test_apply_profiles_resolves_a_declared_dependency_beside_the_declaring_package() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let config_path = temp.path().join(".jit/config.toml");
@@ -2292,7 +2026,7 @@ mod tests {
         )
         .expect("this repository's jit-default package captures");
         let workflow = package_declaring(&temp, "vendor/workflow", "workflow", &["jit-default"]);
-        let applied = executor.apply_profile_package(&workflow).unwrap();
+        let applied = apply_package(&executor, &workflow).unwrap();
 
         assert_eq!(
             applied
@@ -2330,9 +2064,7 @@ mod tests {
         shipped_package_in(temp.path(), "jit-default");
         let workflow = shipped_package_in(temp.path(), "jit-dogfood");
 
-        executor
-            .apply_profile_package(&workflow)
-            .unwrap_or_else(|error| panic!("{error:#}"));
+        apply_package(&executor, &workflow).unwrap_or_else(|error| panic!("{error:#}"));
 
         let rules: toml::Value =
             toml::from_str(&fs::read_to_string(temp.path().join(".jit/rules.toml")).unwrap())
@@ -2384,7 +2116,7 @@ mod tests {
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
 
-        assert!(executor.apply_profile_package(&dogfood).is_err());
+        assert!(apply_package(&executor, &dogfood).is_err());
 
         let recovered = JsonFileStorage::new(temp.path().join(".jit"));
         let layout = discover_repository_layout(temp.path(), recovered.root()).unwrap();
@@ -2395,10 +2127,12 @@ mod tests {
             events_before
         );
 
-        let repaired = CommandExecutor::new(recovered.clone())
-            .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap())
-            .apply_profile_package(&dogfood)
-            .unwrap();
+        let repaired = apply_package(
+            &CommandExecutor::new(recovered.clone())
+                .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap()),
+            &dogfood,
+        )
+        .unwrap();
         assert!(!stale_schema.exists());
         assert_eq!(
             repaired
@@ -2447,22 +2181,22 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_profile_package_path_selector_uses_the_directory_package_id() {
+    fn test_resolve_profile_selectors_path_selector_uses_the_directory_package_id() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let package = package_read_from(&temp, "vendor/supplied");
         let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
-        let resolved = executor.resolve_profile_package(&selector).unwrap();
+        let resolved = resolved_selector(&executor, &selector).unwrap();
         assert_eq!(resolved.model().id, package.model().id);
     }
 
     #[test]
-    fn test_resolve_profile_package_reports_a_supplied_location_holding_no_package() {
+    fn test_resolve_profile_selectors_reports_a_supplied_location_holding_no_package() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
 
         let selector = ProfileSelector::path(temp.path().join("vendor/absent"));
-        let error = executor.resolve_profile_package(&selector).unwrap_err();
+        let error = resolved_selector(&executor, &selector).unwrap_err();
 
         assert!(
             matches!(
@@ -2475,7 +2209,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_judges_only_paths_inside_the_data_roots_checkout() {
+    fn test_apply_profiles_judges_only_paths_inside_the_data_roots_checkout() {
         let temp = TempDir::new().unwrap();
         let repository = crate::test_harness::git::GitRepository::init(temp.path().join("repo"));
         let outside = temp.path().join("outside");
@@ -2505,7 +2239,7 @@ mod tests {
         )
         .unwrap();
 
-        let error = executor.apply_profile_package(&package).unwrap_err();
+        let error = apply_package(&executor, &package).unwrap_err();
 
         assert!(matches!(
             error.downcast_ref::<ProfileApplyError>(),
@@ -2514,18 +2248,18 @@ mod tests {
         ));
 
         repository.git(&["checkout", "--", "state/config.toml"]);
-        executor.apply_profile_package(&package).unwrap();
+        apply_package(&executor, &package).unwrap();
 
         assert_eq!(fs::read_to_string(outside_target).unwrap(), "rendered\n");
     }
 
     #[test]
-    fn test_apply_profile_package_reports_the_worktree_location_it_read_the_package_from() {
+    fn test_apply_profiles_reports_the_worktree_location_it_read_the_package_from() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let package = package_read_from(&temp, "vendor/profiles/planner");
 
-        let applied = executor.apply_profile_package(&package).unwrap();
+        let applied = apply_package(&executor, &package).unwrap();
 
         // The reported location resolves, from the worktree root alone, back to
         // the directory whose bytes were applied.
@@ -2539,7 +2273,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_reports_the_directory_read_rather_than_a_peer_copy() {
+    fn test_apply_profiles_reports_the_directory_read_rather_than_a_peer_copy() {
         // Two directories inside the worktree hold byte-identical packages.
         // Nothing but the directory a package was read through distinguishes
         // them, so the reported location must follow that and only that.
@@ -2551,8 +2285,8 @@ mod tests {
         let second = package_read_from(&second_temp, "packages/second/tree");
         assert_eq!(first.hashes(), second.hashes());
 
-        let first_applied = first_executor.apply_profile_package(&first).unwrap();
-        let second_applied = second_executor.apply_profile_package(&second).unwrap();
+        let first_applied = apply_package(&first_executor, &first).unwrap();
+        let second_applied = apply_package(&second_executor, &second).unwrap();
 
         assert_eq!(
             first_applied.requested().unwrap().origin,
@@ -2565,7 +2299,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_refuses_a_package_read_from_outside_the_worktree() {
+    fn test_apply_profiles_refuses_a_package_read_from_outside_the_worktree() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
@@ -2576,7 +2310,7 @@ mod tests {
         );
         let package = ProfilePackage::from_directory(&root).expect("a valid package tree");
 
-        let error = executor.apply_profile_package(&package).unwrap_err();
+        let error = apply_package(&executor, &package).unwrap_err();
 
         assert!(
             matches!(
@@ -2591,7 +2325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_refuses_a_package_read_from_the_data_root() {
+    fn test_apply_profiles_refuses_a_package_read_from_the_data_root() {
         // The selected data root is not a worktree location, so a package
         // placed under it has no worktree-relative location to report.
         let (temp, _) = setup_test_repo().unwrap();
@@ -2599,7 +2333,7 @@ mod tests {
         let storage = executor.storage().clone();
         let package = package_read_from(&temp, ".jit/vendored");
 
-        let error = executor.apply_profile_package(&package).unwrap_err();
+        let error = apply_package(&executor, &package).unwrap_err();
 
         assert!(
             matches!(
@@ -2764,7 +2498,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_repairs_a_generated_schema_outside_the_package_targets() {
+    fn test_apply_profiles_repairs_a_generated_schema_outside_the_package_targets() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let package = shipped_package_in(temp.path(), "jit-default");
@@ -2781,7 +2515,7 @@ mod tests {
         let generated = fs::read(&grammar).unwrap();
         fs::remove_file(&grammar).unwrap();
 
-        let applied = executor.apply_profile_package(&package).unwrap();
+        let applied = apply_package(&executor, &package).unwrap();
 
         assert_eq!(
             applied.requested().unwrap().status,
@@ -2795,7 +2529,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_jit_default_writes_every_declaration_it_contributes() {
+    fn test_apply_profiles_jit_default_writes_every_declaration_it_contributes() {
         // An initialization writes the structural minimum, so what the applied
         // package declares is the whole of the repository's vocabulary. Each
         // assertion below reads the manifest rather than a copy of its values,
@@ -2824,7 +2558,7 @@ mod tests {
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
         let package = shipped_package_in(temp.path(), "jit-default");
-        let applied = executor.apply_profile_package(&package).unwrap();
+        let applied = apply_package(&executor, &package).unwrap();
         assert_eq!(
             applied.requested().unwrap().status,
             ProfileApplicationStatus::Applied
@@ -2976,7 +2710,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_jit_dogfood_composes_what_applying_both_packages_composes() {
+    fn test_apply_profiles_jit_dogfood_composes_what_applying_both_packages_composes() {
         // Two bare repositories, one per route: the explicit one has both
         // packages applied to it in turn, and the resolved one names only the
         // workflow package and receives the default as its declared
@@ -2991,9 +2725,9 @@ mod tests {
         shipped_package_in(resolved_temp.path(), "jit-default");
         let resolved_dogfood = shipped_package_in(resolved_temp.path(), "jit-dogfood");
 
-        let explicit_default_result = explicit_executor.apply_profile_package(&explicit_default);
-        let explicit_dogfood_result = explicit_executor.apply_profile_package(&explicit_dogfood);
-        let resolved_result = resolved_executor.apply_profile_package(&resolved_dogfood);
+        let explicit_default_result = apply_package(&explicit_executor, &explicit_default);
+        let explicit_dogfood_result = apply_package(&explicit_executor, &explicit_dogfood);
+        let resolved_result = apply_package(&resolved_executor, &resolved_dogfood);
 
         // A contribution restating an identity under another value is refused
         // as a conflict, so an application that answers at all reported none.
@@ -3115,7 +2849,7 @@ mod tests {
         let storage = executor.storage().clone();
         let package = package_read_from(&temp, FIXTURE_LOCATION);
 
-        let applied = executor.apply_profile_package(&package).unwrap();
+        let applied = apply_package(&executor, &package).unwrap();
         assert_eq!(
             applied.requested().unwrap().status,
             ProfileApplicationStatus::Applied
@@ -3128,7 +2862,7 @@ mod tests {
         assert_eq!(storage.read_events().unwrap().len(), 1);
 
         let before = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
-        let unchanged = executor.apply_profile_package(&package).unwrap();
+        let unchanged = apply_package(&executor, &package).unwrap();
         assert_eq!(
             unchanged.requested().unwrap().status,
             ProfileApplicationStatus::Unchanged
@@ -3140,7 +2874,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_rejects_each_reserved_application_target() {
+    fn test_apply_profiles_rejects_each_reserved_application_target() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
@@ -3156,7 +2890,7 @@ mod tests {
                 target,
                 "reserved target content\n",
             );
-            let error = executor.apply_profile_package(&package).unwrap_err();
+            let error = apply_package(&executor, &package).unwrap_err();
 
             assert!(
                 matches!(
@@ -3169,38 +2903,6 @@ mod tests {
 
         assert!(storage.read_events().unwrap().is_empty());
         assert!(!temp.path().join(".jit/profiles").exists());
-    }
-
-    #[test]
-    fn test_apply_profile_package_reapplies_changed_content() {
-        let (temp, _) = setup_test_repo().unwrap();
-        let executor = file_executor(temp.path()).unwrap();
-        let package = package_read_from(&temp, FIXTURE_LOCATION);
-        executor.apply_profile_package(&package).unwrap();
-        let unowned = temp.path().join("docs/repository-note.txt");
-        fs::write(&unowned, "repository-authored\n").unwrap();
-        let replacement = repackage(
-            &temp,
-            FIXTURE_LOCATION,
-            "assets/profile.txt",
-            "replacement profile content\n",
-        );
-
-        let applied = executor.apply_profile_package(&replacement).unwrap();
-
-        assert_eq!(
-            applied.requested().unwrap().status,
-            ProfileApplicationStatus::Applied
-        );
-        assert_eq!(
-            fs::read_to_string(temp.path().join("docs/profile.txt")).unwrap(),
-            "replacement profile content\n"
-        );
-        assert_eq!(
-            fs::read_to_string(unowned).unwrap(),
-            "repository-authored\n",
-            "a package reapply does not delete unowned repository content"
-        );
     }
 
     #[test]
@@ -3249,10 +2951,8 @@ template = true
                 ),
             ],
         };
-        let selection = executor
-            .select_profiles(&[package_selector(&package)], &options)
-            .unwrap();
-        let inputs = selection.variable_inputs();
+        let inputs =
+            load_profile_variable_inputs(std::slice::from_ref(&package), &options).unwrap();
         assert_eq!(
             inputs.values_file[&"NAME".try_into().unwrap()],
             "values-file-value"
@@ -3262,7 +2962,7 @@ template = true
             "resolved-value-last"
         );
 
-        executor.apply_profiles(&selection).unwrap();
+        apply_selected(&executor, &[package_selector(&package)], &options).unwrap();
 
         assert_eq!(
             fs::read(temp.path().join("docs/profile.txt")).unwrap(),
@@ -3293,10 +2993,7 @@ template = true
                 .with_timezone(&chrono::Utc),
         );
 
-        let (plan, changes) = executor
-            .prepare_profile(session.as_mut(), &package, &context)
-            .unwrap()
-            .unwrap();
+        let (plan, changes) = prepared_plan(&executor, session.as_mut(), &package, &context);
         let paths = plan
             .delta()
             .actions()
@@ -3318,14 +3015,8 @@ template = true
         let mut session = executor.storage().open_mutation_session(layout).unwrap();
         let context = MutationContext::preview();
 
-        let first = executor
-            .prepare_profile(session.as_mut(), &package, &context)
-            .unwrap()
-            .unwrap();
-        let second = executor
-            .prepare_profile(session.as_mut(), &package, &context)
-            .unwrap()
-            .unwrap();
+        let first = prepared_plan(&executor, session.as_mut(), &package, &context);
+        let second = prepared_plan(&executor, session.as_mut(), &package, &context);
 
         assert_eq!(first.0.delta(), second.0.delta());
         assert_eq!(first.1, second.1);
@@ -3368,7 +3059,7 @@ template = true
         let package = package_read_from(&temp, FIXTURE_LOCATION);
         fs::write(temp.path().join(".jit/config.toml"), b"not = [valid").unwrap();
 
-        assert!(executor.apply_profile_package(&package).is_err());
+        assert!(apply_package(&executor, &package).is_err());
         assert!(!temp.path().join("docs/profile.txt").exists());
         assert!(storage.read_events().unwrap().is_empty());
     }
@@ -3382,7 +3073,7 @@ template = true
         let torn = b"{\"torn\":";
         fs::write(temp.path().join(".jit/events.jsonl"), torn).unwrap();
 
-        executor.apply_profile_package(&package).unwrap();
+        apply_package(&executor, &package).unwrap();
 
         let image = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
         assert!(image.starts_with(b"{\"torn\":\n"));
@@ -3402,14 +3093,14 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_applies_a_declared_dependency_before_the_package() {
+    fn test_apply_profiles_applies_a_declared_dependency_before_the_package() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
         package_declaring(&temp, "vendor/base", "base", &[]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
 
-        let applied = executor.apply_profile_package(&dependant).unwrap();
+        let applied = apply_package(&executor, &dependant).unwrap();
 
         // The set is the answer, in the order it was applied: the dependency,
         // then the package that declared it.
@@ -3462,9 +3153,11 @@ template = true
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
 
-        let applied = executor
-            .apply_profile(&[package_selector(&left), package_selector(&right)])
-            .unwrap();
+        let applied = apply_selected_packages(
+            &executor,
+            &[package_selector(&left), package_selector(&right)],
+        )
+        .unwrap();
 
         assert_eq!(
             publications.count(),
@@ -3494,9 +3187,11 @@ template = true
         let executor = file_executor(temp.path()).unwrap();
         let left = package_declaring(&temp, "vendor/left", "left", &[]);
         let right = package_declaring(&temp, "vendor/right", "right", &[]);
-        executor
-            .apply_profile(&[package_selector(&left), package_selector(&right)])
-            .unwrap();
+        apply_selected_packages(
+            &executor,
+            &[package_selector(&left), package_selector(&right)],
+        )
+        .unwrap();
         let events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
         let publications = PublicationCounter::new();
         let storage = JsonFileStorage::with_mutation_interruptions(
@@ -3507,9 +3202,11 @@ template = true
             discover_repository_layout(temp.path(), temp.path().join(".jit")).unwrap(),
         );
 
-        let reapplied = executor
-            .apply_profile(&[package_selector(&left), package_selector(&right)])
-            .unwrap();
+        let reapplied = apply_selected_packages(
+            &executor,
+            &[package_selector(&left), package_selector(&right)],
+        )
+        .unwrap();
 
         assert_eq!(publications.count(), 0);
         assert!(reapplied
@@ -3541,7 +3238,7 @@ template = true
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
 
-        assert!(executor.apply_profile(&selectors).is_err());
+        assert!(apply_selected_packages(&executor, &selectors).is_err());
 
         let recovered = JsonFileStorage::new(temp.path().join(".jit"));
         let layout = discover_repository_layout(temp.path(), recovered.root()).unwrap();
@@ -3554,10 +3251,12 @@ template = true
             original_events
         );
 
-        let retried = CommandExecutor::new(recovered.clone())
-            .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap())
-            .apply_profile(&selectors)
-            .unwrap();
+        let retried = apply_selected_packages(
+            &CommandExecutor::new(recovered.clone())
+                .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap()),
+            &selectors,
+        )
+        .unwrap();
         assert!(retried
             .items
             .iter()
@@ -3572,9 +3271,11 @@ template = true
         let executor = file_executor(temp.path()).unwrap();
         let package = package_declaring(&temp, "vendor/duplicate", "duplicate", &[]);
 
-        let applied = executor
-            .apply_profile(&[package_selector(&package), package_selector(&package)])
-            .unwrap();
+        let applied = apply_selected_packages(
+            &executor,
+            &[package_selector(&package), package_selector(&package)],
+        )
+        .unwrap();
 
         assert_eq!(
             applied
@@ -3594,7 +3295,7 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_applies_a_transitive_dependency_chain_deepest_first() {
+    fn test_apply_profiles_applies_a_transitive_dependency_chain_deepest_first() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
@@ -3602,7 +3303,7 @@ template = true
         package_declaring(&temp, "vendor/base", "base", &["vocabulary"]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
 
-        let applied = executor.apply_profile_package(&dependant).unwrap();
+        let applied = apply_package(&executor, &dependant).unwrap();
 
         // `workflow` never names `vocabulary`; reaching it is what "transitively"
         // means, and it is applied before the package that reaches it.
@@ -3621,7 +3322,7 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_applies_a_shared_dependency_once() {
+    fn test_apply_profiles_applies_a_shared_dependency_once() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
@@ -3630,7 +3331,7 @@ template = true
         package_declaring(&temp, "vendor/right", "right", &["shared"]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["left", "right"]);
 
-        let applied = executor.apply_profile_package(&dependant).unwrap();
+        let applied = apply_package(&executor, &dependant).unwrap();
 
         let order: Vec<&str> = applied
             .items
@@ -3669,7 +3370,7 @@ template = true
             namespace,
             "Published definition.",
         );
-        executor.apply_profile_package(&package).unwrap();
+        apply_package(&executor, &package).unwrap();
 
         let config_path = temp.path().join(".jit/config.toml");
         let registry = fs::read_to_string(&config_path)
@@ -3692,10 +3393,10 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_preflights_a_conflicting_dependency_closure() {
+    fn test_apply_profiles_publishes_the_dependents_value_of_a_shared_declaration() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
-        let namespace = "closure-conflict";
+        let namespace = "closure-override";
         package_declaring_contribution(
             &temp,
             "vendor/base",
@@ -3713,22 +3414,45 @@ template = true
             "Workflow definition.",
         );
 
-        let error = executor.apply_profile_package(&workflow).unwrap_err();
+        apply_package(&executor, &workflow).unwrap();
 
-        let (_, owners) = refused_declaration(&error);
-        assert_eq!(
-            owners,
-            vec![
-                ContributionConflictOwner::Package(ProfileId::try_from("base").unwrap()),
-                ContributionConflictOwner::Package(ProfileId::try_from("workflow").unwrap()),
-            ]
+        let config = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
+        assert!(config.contains("Workflow definition."));
+        assert!(!config.contains("Base definition."));
+    }
+
+    /// A managed region reaches publication through the same override a
+    /// declaration does.
+    #[test]
+    fn test_apply_profiles_publishes_the_dependents_managed_region() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let manifest = |id: &str, dependency: &str| {
+            format!(
+                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\ncompatible-jit = \">=0.2.0, <2.0.0\"\n{dependency}\n[[region]]\nsource = \"regions/guide.md\"\ntarget = \"docs/guide.md\"\nregion-id = \"guidance\"\nplacement = \"append\"\n"
+            )
+        };
+        authored_manifest_package(
+            &temp,
+            "vendor/base",
+            &manifest("base", ""),
+            &[("regions/guide.md", "Base guidance.\n")],
         );
-        for path in ["docs/base.txt", "docs/workflow.txt"] {
-            assert!(
-                !temp.path().join(path).exists(),
-                "the conflicting closure published {path}"
-            );
-        }
+        let workflow = authored_manifest_package(
+            &temp,
+            "vendor/workflow",
+            &manifest(
+                "workflow",
+                "\n[[dependency]]\nid = \"base\"\nversion = \"*\"\n",
+            ),
+            &[("regions/guide.md", "Workflow guidance.\n")],
+        );
+
+        apply_package(&executor, &workflow).unwrap();
+
+        let guide = fs::read_to_string(temp.path().join("docs/guide.md")).unwrap();
+        assert!(guide.contains("Workflow guidance."));
+        assert!(!guide.contains("Base guidance."));
     }
 
     #[test]
@@ -3773,100 +3497,14 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_merges_an_identical_restatement_of_an_applied_target() {
-        let (temp, _) = setup_test_repo().unwrap();
-        let executor = file_executor(temp.path()).unwrap();
-        let target = "docs/shared.txt";
-        let namespace = "shared-namespace";
-        let contribution = namespace_contribution(namespace, "One meaning.");
-        let stated = authored_package(
-            &temp,
-            "vendor/stated",
-            "stated",
-            target,
-            "identical\n",
-            &contribution,
-        );
-        let restated = authored_package(
-            &temp,
-            "vendor/restated",
-            "restated",
-            target,
-            "identical\n",
-            &contribution,
-        );
-        executor.apply_profile_package(&stated).unwrap();
-
-        let applied = executor.apply_profile_package(&restated).unwrap();
-
-        // A restatement of what is already there is not a conflict, and it
-        // publishes nothing: the repository already holds its content.
-        assert_eq!(
-            applied.requested().unwrap().status,
-            ProfileApplicationStatus::Unchanged
-        );
-        assert_eq!(
-            fs::read_to_string(temp.path().join(target)).unwrap(),
-            "identical\n"
-        );
-    }
-
-    #[test]
-    fn test_apply_profile_package_recontributes_its_own_semantic_identity() {
-        let (temp, _) = setup_test_repo().unwrap();
-        let executor = file_executor(temp.path()).unwrap();
-        let package = package_contributing(
-            &temp,
-            "vendor/workflow",
-            "workflow",
-            "self-recontribution",
-            "One package owns this definition.",
-        );
-        executor.apply_profile_package(&package).unwrap();
-
-        let reapplied = executor.apply_profile_package(&package).unwrap();
-
-        assert_eq!(
-            reapplied.requested().unwrap().status,
-            ProfileApplicationStatus::Unchanged
-        );
-    }
-
-    #[test]
-    fn test_apply_profile_package_keeps_distinct_identities_in_one_registry_independent() {
-        let (temp, _) = setup_test_repo().unwrap();
-        let executor = file_executor(temp.path()).unwrap();
-        let first = package_contributing(
-            &temp,
-            "vendor/base",
-            "base",
-            "first-identity",
-            "First registry definition.",
-        );
-        let second = package_contributing(
-            &temp,
-            "vendor/workflow",
-            "workflow",
-            "second-identity",
-            "Second registry definition.",
-        );
-        executor.apply_profile_package(&first).unwrap();
-        executor.apply_profile_package(&second).unwrap();
-
-        let config = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
-        assert!(config.contains("First registry definition."));
-        assert!(config.contains("Second registry definition."));
-    }
-
-    #[test]
-    fn test_apply_profile_package_rejects_a_dependency_cycle_before_applying_anything() {
+    fn test_apply_profiles_rejects_a_dependency_cycle_before_applying_anything() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
         package_declaring(&temp, "vendor/base", "base", &["workflow"]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
 
-        let error = executor.apply_profile_package(&dependant).unwrap_err();
+        let error = apply_package(&executor, &dependant).unwrap_err();
 
         assert!(
             matches!(
@@ -3885,7 +3523,7 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_reports_a_dependency_that_cannot_be_resolved() {
+    fn test_apply_profiles_reports_a_dependency_that_cannot_be_resolved() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
@@ -3893,7 +3531,7 @@ template = true
         // resolves the dependency.
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["absent-base"]);
 
-        let error = executor.apply_profile_package(&dependant).unwrap_err();
+        let error = apply_package(&executor, &dependant).unwrap_err();
 
         assert!(
             matches!(
@@ -3913,7 +3551,7 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_rejects_a_dependency_version_mismatch_before_publication() {
+    fn test_apply_profiles_rejects_a_dependency_version_mismatch_before_publication() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
@@ -3936,9 +3574,7 @@ template = true
             &[],
         );
 
-        let error = executor
-            .apply_profile(&[package_selector(&workflow)])
-            .unwrap_err();
+        let error = apply_selected_packages(&executor, &[package_selector(&workflow)]).unwrap_err();
 
         assert!(
             matches!(
@@ -3956,7 +3592,7 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_rejects_a_package_outside_the_running_engine_range() {
+    fn test_apply_profiles_rejects_a_package_outside_the_running_engine_range() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
@@ -3970,9 +3606,7 @@ template = true
             &[],
         );
 
-        let error = executor
-            .apply_profile(&[package_selector(&package)])
-            .unwrap_err();
+        let error = apply_selected_packages(&executor, &[package_selector(&package)]).unwrap_err();
 
         assert!(
             matches!(
@@ -3987,7 +3621,7 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_rejects_incompatibilities_symmetrically_and_independently_of_selector_order(
+    fn test_apply_profiles_rejects_incompatibilities_symmetrically_and_independently_of_selector_order(
     ) {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
@@ -4013,12 +3647,11 @@ template = true
         let left_selector = package_selector(&left);
         let right_selector = package_selector(&right);
 
-        let first = executor
-            .apply_profile(&[left_selector.clone(), right_selector.clone()])
-            .unwrap_err();
-        let second = executor
-            .apply_profile(&[right_selector, left_selector])
-            .unwrap_err();
+        let first =
+            apply_selected_packages(&executor, &[left_selector.clone(), right_selector.clone()])
+                .unwrap_err();
+        let second =
+            apply_selected_packages(&executor, &[right_selector, left_selector]).unwrap_err();
 
         assert_eq!(format!("{first:#}"), format!("{second:#}"));
         let message = format!("{first:#}");
@@ -4030,7 +3663,7 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_excludes_a_previously_applied_package_from_incompatibility_checks() {
+    fn test_apply_profiles_excludes_a_previously_applied_package_from_incompatibility_checks() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
@@ -4043,7 +3676,7 @@ template = true
             &[],
             &[],
         );
-        executor.apply_profile(&[package_selector(&base)]).unwrap();
+        apply_selected_packages(&executor, &[package_selector(&base)]).unwrap();
         let candidate = package_v2(
             &temp,
             "vendor/candidate",
@@ -4056,25 +3689,23 @@ template = true
 
         // `base` is in the repository but not in the selection, so the
         // incompatibility it would answer has no party to hold against.
-        executor
-            .apply_profile(&[package_selector(&candidate)])
-            .unwrap();
+        apply_selected_packages(&executor, &[package_selector(&candidate)]).unwrap();
 
         assert!(temp.path().join("docs/candidate.txt").is_file());
         assert_eq!(applied_event_ids(&storage), vec!["base", "candidate"]);
     }
 
     #[test]
-    fn test_apply_profile_package_reports_no_work_for_an_applied_unchanged_closure() {
+    fn test_apply_profiles_reports_no_work_for_an_applied_unchanged_closure() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
         package_declaring(&temp, "vendor/base", "base", &[]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
-        executor.apply_profile_package(&dependant).unwrap();
+        apply_package(&executor, &dependant).unwrap();
         let events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
 
-        let reapplied = executor.apply_profile_package(&dependant).unwrap();
+        let reapplied = apply_package(&executor, &dependant).unwrap();
 
         // No work anywhere in the set: the dependency is unchanged too, not
         // only the package that was named.
@@ -4094,18 +3725,18 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_refuses_a_dependency_only_a_previous_application_supplied() {
+    fn test_apply_profiles_refuses_a_dependency_only_a_previous_application_supplied() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let storage = executor.storage().clone();
         let dependency = package_declaring(&temp, "vendor/base", "base", &[]);
-        executor.apply_profile_package(&dependency).unwrap();
+        apply_package(&executor, &dependency).unwrap();
         // A dependant elsewhere in the worktree, with no `base` beside it. The
         // earlier application of `base` is not a candidate for the selection.
         let dependant = package_declaring(&temp, "elsewhere/workflow", "workflow", &["base"]);
         assert!(!temp.path().join("elsewhere/base").exists());
 
-        let error = executor.apply_profile_package(&dependant).unwrap_err();
+        let error = apply_package(&executor, &dependant).unwrap_err();
 
         assert!(
             matches!(
@@ -4120,7 +3751,7 @@ template = true
     }
 
     #[test]
-    fn test_resolve_profile_closure_reads_a_dependency_from_beside_the_declaring_package() {
+    fn test_select_profiles_closure_reads_a_dependency_from_beside_the_declaring_package() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         // The package beside the declaring package is the one its declaration
@@ -4128,7 +3759,7 @@ template = true
         let beside = package_declaring(&temp, "vendor/base", "base", &[]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
 
-        let closure = executor.resolve_profile_closure(&dependant).unwrap();
+        let closure = selected_closure(&executor, &dependant).unwrap();
 
         assert_eq!(
             closure
@@ -4140,7 +3771,7 @@ template = true
     }
 
     #[test]
-    fn test_resolve_profile_closure_reports_an_unreadable_package_beside_the_declaring_one() {
+    fn test_select_profiles_closure_reports_an_unreadable_package_beside_the_declaring_one() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
@@ -4154,7 +3785,7 @@ template = true
         )
         .unwrap();
 
-        let error = executor.resolve_profile_closure(&dependant).unwrap_err();
+        let error = selected_closure(&executor, &dependant).unwrap_err();
 
         assert!(
             matches!(
@@ -4168,7 +3799,7 @@ template = true
     }
 
     #[test]
-    fn test_resolve_profile_closure_passes_over_a_neighbour_declaring_another_profile() {
+    fn test_select_profiles_closure_passes_over_a_neighbour_declaring_another_profile() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         // The directory beside the declarant is named for the dependency but
@@ -4177,7 +3808,7 @@ template = true
         package_declaring(&temp, "vendor/base", "impostor", &[]);
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
 
-        let error = executor.resolve_profile_closure(&dependant).unwrap_err();
+        let error = selected_closure(&executor, &dependant).unwrap_err();
 
         assert!(
             matches!(
@@ -4190,12 +3821,12 @@ template = true
     }
 
     #[test]
-    fn test_resolve_profile_closure_of_a_package_declaring_nothing_is_that_package() {
+    fn test_select_profiles_closure_of_a_package_declaring_nothing_is_that_package() {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let package = package_read_from(&temp, FIXTURE_LOCATION);
 
-        let closure = executor.resolve_profile_closure(&package).unwrap();
+        let closure = selected_closure(&executor, &package).unwrap();
 
         assert_eq!(
             closure
@@ -4231,7 +3862,7 @@ template = true
         )
         .unwrap();
 
-        executor.apply_profile_package(&package).unwrap();
+        apply_package(&executor, &package).unwrap();
 
         let events = storage.read_events().unwrap();
         assert_eq!(events.len(), 2);
@@ -4252,7 +3883,7 @@ template = true
     fn assert_planned_targets_match_published(
         before: &BTreeMap<PathBuf, Vec<u8>>,
         after: &BTreeMap<PathBuf, Vec<u8>>,
-        planned: &ProfilePlanResult,
+        planned: &ProfileComposedApplyResult,
     ) {
         assert!(
             planned
@@ -4327,7 +3958,7 @@ template = true
     }
 
     /// The one entry a report carries for `id`.
-    fn reported(report: &ProfilePlanResult, id: &str) -> ProfilePlanEntry {
+    fn reported(report: &ProfileComposedApplyResult, id: &str) -> ProfileApplyResult {
         report
             .items
             .iter()
@@ -4337,7 +3968,10 @@ template = true
     }
 
     /// The targets `entry` decided `action` about, by repository-relative name.
-    fn decided_targets(entry: &ProfilePlanEntry, action: ProfileTargetAction) -> BTreeSet<String> {
+    fn decided_targets(
+        entry: &ProfileApplyResult,
+        action: ProfileTargetAction,
+    ) -> BTreeSet<String> {
         entry
             .decided(action)
             .map(|target| target.path.clone())
@@ -4371,7 +4005,7 @@ template = true
             .expect("a conflicting selection is reported, not refused");
 
         let entry = reported(&report, "collider");
-        assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
+        assert_eq!(entry.status, ProfileApplicationStatus::WouldConflict);
         assert_eq!(
             decided_targets(&entry, ProfileTargetAction::Conflict),
             targets.map(str::to_string).into_iter().collect(),
@@ -4436,7 +4070,7 @@ template = true
         .expect("an unapplied package is reported from its location");
 
         let entry = reported(&report, "unapplied");
-        assert_eq!(entry.status, ProfilePlanStatus::WouldApply);
+        assert_eq!(entry.status, ProfileApplicationStatus::WouldApply);
         assert!(
             decided_targets(&entry, ProfileTargetAction::Create).contains("docs/unapplied.txt"),
             "the report states the target the package would publish: {entry:?}"
@@ -4485,7 +4119,7 @@ template = true
     }
 
     /// The decision `entry` states for the declaration `identity`.
-    fn declared(entry: &ProfilePlanEntry, identity: &str) -> ProfileContributionChange {
+    fn declared(entry: &ProfileApplyResult, identity: &str) -> ProfileContributionChange {
         entry
             .contributions
             .iter()
@@ -4519,7 +4153,7 @@ template = true
             .expect("a contested declaration is reported, not refused");
 
         let entry = reported(&report, "workflow");
-        assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
+        assert_eq!(entry.status, ProfileApplicationStatus::WouldConflict);
         let contested = declared(&entry, &namespace_identity(namespace));
         assert_eq!(contested.action, ProfileTargetAction::Conflict);
         assert!(
@@ -4637,7 +4271,7 @@ template = true
         ));
         assert_eq!(rehearsal.to_string(), refusal);
         let entry = reported(&report, "workflow");
-        assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
+        assert_eq!(entry.status, ProfileApplicationStatus::WouldConflict);
         assert_eq!(entry.refusal.as_deref(), Some(refusal.as_str()));
         assert_eq!(repository_files(&temp), before, "nothing is written");
     }
@@ -4723,36 +4357,6 @@ template = true
         );
     }
 
-    /// A package reapplied with a changed definition of its own declaration
-    /// is not a conflict party with itself: the repository's current value
-    /// never contests the package being applied.
-    #[test]
-    fn test_apply_profile_package_reapplies_a_changed_contribution_without_a_conflict() {
-        let (temp, _) = setup_test_repo().unwrap();
-        let executor = file_executor(temp.path()).unwrap();
-        let namespace = "reviewed";
-        executor
-            .apply_profile_package(&package_contributing(
-                &temp,
-                "vendor/workflow",
-                "workflow",
-                namespace,
-                "The first wording.",
-            ))
-            .unwrap();
-        let changed = package_contributing(
-            &temp,
-            "vendor/workflow",
-            "workflow",
-            namespace,
-            "The second wording.",
-        );
-
-        let applied = executor.apply_profile_package(&changed);
-
-        assert!(applied.is_ok(), "{:#}", applied.unwrap_err());
-    }
-
     /// Every dimension of the publication budget clears what the package model
     /// can demand of it.
     ///
@@ -4833,7 +4437,7 @@ template = true
     ) -> (ProfileSelector, usize) {
         package_declaring(temp, "vendor/base", "base", &[]);
         let root = package_declaring(temp, "vendor/workflow", "workflow", &["base"]);
-        let closure = executor.resolve_profile_closure(&root).unwrap().len();
+        let closure = selected_closure(executor, &root).unwrap().len();
         (package_selector(&root), closure)
     }
 

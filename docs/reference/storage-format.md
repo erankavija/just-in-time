@@ -405,24 +405,17 @@ tombstones, which let a linked checkout's delete hide the primary checkout's
 file. The first store that mentions an id decides, and within a store a file
 wins over a tombstone.
 
-A format 2 index also carries `all_ids`. This binary ignores that field and
-drops it when a delete rewrites the index, keeping the marker at 2 until the
-repository's index is rewritten to format 3.
+The marker changes whenever an on-disk layout or interpretation changes, and a
+binary accepts exactly one format. On startup every command that opens the
+repository compares the marker against that format. On any other version,
+older or newer, the binary refuses to operate and exits nonzero (exit code 10,
+external-dependency family) with a single-line error naming both versions, so
+an older binary and a newer one each refuse the other's repository. `jit`
+performs no migration; moving a repository between formats is an explicit
+rewrite made alongside installing the matching binary.
 
-This single marker is the authoritative compatibility check, bumped whenever an
-on-disk layout or interpretation changes. On startup every command that opens
-the repository compares it against the format version the running `jit` binary
-supports:
-
-- Binary support **≥** repository version: operates normally. An older
-  repository is read as-is and keeps its marker; `jit` performs no implicit
-  migration.
-- Binary support **<** repository version: the binary refuses to operate and
-  exits nonzero (exit code 10, external-dependency family) with a single-line
-  error naming both the repository's format version and the version the binary
-  supports. The fix is to upgrade `jit` (from a source checkout,
-  `./scripts/install-jit.sh`)
-  rather than treating it as repository corruption.
+An index carrying any other field, such as a format 3 index with `all_ids`,
+fails validation.
 
 `config.toml` separately records a `[version] schema` describing the
 configuration-file layout:

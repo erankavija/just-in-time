@@ -21,9 +21,7 @@ use jit::cli::{
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, ProfileCommands,
     ProjectCommands,
 };
-use jit::commands::{
-    CommandExecutor, DescriptionUpdate, ProfileSelection, ProfileSelector, ProfileVariableOptions,
-};
+use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -502,12 +500,8 @@ fn parse_profile_variable_assignments(
         .collect()
 }
 
-/// One invocation of a profile lifecycle command, as the CLI parsed it.
-struct ProfileLifecycleInvocation<'a> {
-    /// Command path named in an argument diagnostic.
-    command: &'a str,
-    /// Verb this command answers a changed profile with.
-    changed_status: &'a str,
+/// One invocation of `jit profile apply`, as the CLI parsed it.
+struct ProfileApplyInvocation<'a> {
     /// Repeatable raw `--profile` selectors in occurrence order.
     profile: &'a [String],
     /// Optional `--values-file` path.
@@ -520,31 +514,12 @@ struct ProfileLifecycleInvocation<'a> {
     json: bool,
 }
 
-/// Dispatch one profile lifecycle command through its rehearsal or its
-/// publication.
-///
-/// Selector parsing, rehearsal branching, error classification, and rendering
-/// are one contract over the executor entry points and changed-profile verb the
-/// caller supplies.
-fn run_profile_lifecycle<Plan, Apply>(
+/// Dispatch `jit profile apply` through its rehearsal or its publication.
+fn run_profile_apply(
     executor: &CommandExecutor<JsonFileStorage>,
-    invocation: ProfileLifecycleInvocation<'_>,
-    plan: Plan,
-    apply: Apply,
-) -> Result<()>
-where
-    Plan: FnOnce(
-        &CommandExecutor<JsonFileStorage>,
-        &ProfileSelection,
-    ) -> Result<jit::profile::ProfilePlanResult>,
-    Apply: FnOnce(
-        &CommandExecutor<JsonFileStorage>,
-        &ProfileSelection,
-    ) -> Result<jit::profile::ProfileComposedApplyResult>,
-{
-    let ProfileLifecycleInvocation {
-        command,
-        changed_status,
+    invocation: ProfileApplyInvocation<'_>,
+) -> Result<()> {
+    let ProfileApplyInvocation {
         profile,
         values_file,
         set,
@@ -555,7 +530,7 @@ where
     let assignments = parse_profile_variable_assignments(set, json)?;
     if selectors.is_empty() {
         return Err(invalid_argument(
-            format!("{command} requires at least one --profile DIR selector"),
+            "profile apply requires at least one --profile DIR selector".to_string(),
             json,
         ));
     }
@@ -563,44 +538,54 @@ where
         values_file,
         assignments,
     };
-    let selection = executor.select_profiles(&selectors, &options);
-    if dry_run {
-        let plans = profile_result(
-            selection.and_then(|selection| plan(executor, &selection)),
-            json,
-        )?;
-        if json {
-            println!("{}", JsonOutput::success(&plans).to_json_string()?);
-        } else {
-            print_profile_plans(&plans);
-        }
+    let results = profile_result(
+        executor
+            .select_profiles(&selectors, &options)
+            .and_then(|selection| {
+                if dry_run {
+                    executor.plan_profiles(&selection)
+                } else {
+                    executor.apply_profiles(&selection)
+                }
+            }),
+        json,
+    )?;
+    if json {
+        println!("{}", JsonOutput::success(&results).to_json_string()?);
     } else {
-        let applied = profile_result(
-            selection.and_then(|selection| apply(executor, &selection)),
-            json,
-        )?;
-        if json {
-            println!("{}", JsonOutput::success(&applied).to_json_string()?);
-        } else {
-            print_profile_applications(applied, changed_status);
-        }
+        print_profile_results(&results);
     }
     Ok(())
 }
 
-/// Render the decisions every profile lifecycle command previews.
-fn print_profile_plans(plans: &jit::profile::ProfilePlanResult) {
-    for plan in &plans.items {
-        let status = match plan.status {
-            jit::profile::ProfilePlanStatus::Unchanged => "unchanged",
-            jit::profile::ProfilePlanStatus::WouldApply => "would apply",
-            jit::profile::ProfilePlanStatus::WouldConflict => "would conflict",
-        };
-        print_profile_heading(&plan.id, &plan.version, &plan.origin, status);
-        print_profile_decisions(&plan.targets, &plan.contributions);
-        if let Some(refusal) = &plan.refusal {
+/// Render every entry of one apply, rehearsal or difference run.
+fn print_profile_results(results: &jit::profile::ProfileComposedApplyResult) {
+    for profile in &results.items {
+        print_profile_heading(
+            &profile.id,
+            &profile.version,
+            &profile.origin,
+            &profile_status_label(profile.status, "apply", "applied"),
+        );
+        print_profile_decisions(&profile.targets, &profile.contributions);
+        if let Some(refusal) = &profile.refusal {
             println!("  refused: {refusal}");
         }
+    }
+}
+
+/// Name one profile status in the verb its command answers in.
+fn profile_status_label(
+    status: jit::profile::ProfileApplicationStatus,
+    verb: &str,
+    past: &str,
+) -> String {
+    use jit::profile::ProfileApplicationStatus;
+    match status {
+        ProfileApplicationStatus::Unchanged => "unchanged".to_string(),
+        ProfileApplicationStatus::WouldApply => format!("would {verb}"),
+        ProfileApplicationStatus::WouldConflict => "would conflict".to_string(),
+        ProfileApplicationStatus::Applied => past.to_string(),
     }
 }
 
@@ -668,7 +653,10 @@ fn profile_target_action_label(action: jit::profile::ProfileTargetAction) -> &'s
 /// the exit status carries the repository-check contract — `0` when every
 /// participating profile can be published, [`ExitCode::ValidationFailed`] when
 /// one cannot. Nothing is written in either case.
-fn render_profile_difference(plans: &jit::profile::ProfilePlanResult, json: bool) -> Result<()> {
+fn render_profile_difference(
+    plans: &jit::profile::ProfileComposedApplyResult,
+    json: bool,
+) -> Result<()> {
     let conflicted = plans.conflicted().count();
     if json {
         let details = serde_json::to_value(plans)?;
@@ -687,7 +675,7 @@ fn render_profile_difference(plans: &jit::profile::ProfilePlanResult, json: bool
         );
     }
 
-    print_profile_plans(plans);
+    print_profile_results(plans);
     if conflicted == 0 {
         return Ok(());
     }
@@ -696,23 +684,6 @@ fn render_profile_difference(plans: &jit::profile::ProfilePlanResult, json: bool
         plans.count()
     );
     std::process::exit(jit::ExitCode::ValidationFailed.code());
-}
-
-/// Render what a profile lifecycle command published, naming a changed profile
-/// with the verb `changed_status` its own command answers in.
-fn print_profile_applications(
-    applied: jit::profile::ProfileComposedApplyResult,
-    changed_status: &str,
-) {
-    for profile in applied.items {
-        let status = match profile.status {
-            jit::profile::ProfileApplicationStatus::Unchanged => "unchanged",
-            jit::profile::ProfileApplicationStatus::WouldApply => "would apply",
-            jit::profile::ProfileApplicationStatus::Applied => changed_status,
-        };
-        print_profile_heading(&profile.id, &profile.version, &profile.origin, status);
-        print_profile_decisions(&profile.targets, &profile.contributions);
-    }
 }
 
 /// Render a package origin for human output, naming the directory a package
@@ -1935,19 +1906,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 values_file,
                 set,
                 dry_run,
-            } => run_profile_lifecycle(
+            } => run_profile_apply(
                 &executor,
-                ProfileLifecycleInvocation {
-                    command: "profile apply",
-                    changed_status: "applied",
+                ProfileApplyInvocation {
                     profile: &profile,
                     values_file,
                     set: &set,
                     dry_run,
                     json,
                 },
-                CommandExecutor::plan_profiles,
-                CommandExecutor::apply_profiles,
             )?,
             ProfileCommands::Pack {
                 source,
@@ -1970,20 +1937,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             println!("{}", output.to_json_string()?);
                         } else {
                             for profile in result.items {
-                                let status = match profile.status {
-                                    jit::profile::ProfileApplicationStatus::WouldApply => {
-                                        "would pack"
-                                    }
-                                    jit::profile::ProfileApplicationStatus::Applied => "packed",
-                                    jit::profile::ProfileApplicationStatus::Unchanged => {
-                                        "unchanged"
-                                    }
-                                };
+                                let status = profile_status_label(profile.status, "pack", "packed");
                                 print_profile_heading(
                                     &profile.id,
                                     &profile.version,
                                     &profile.origin,
-                                    status,
+                                    &status,
                                 );
                                 println!("Archive: {}", profile.archive);
                                 println!("Package hash: {}", profile.package_hash);
@@ -2021,20 +1980,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             println!("{}", output.to_json_string()?);
                         } else {
                             for profile in result.items {
-                                let status = match profile.status {
-                                    jit::profile::ProfileApplicationStatus::WouldApply => {
-                                        "would add"
-                                    }
-                                    jit::profile::ProfileApplicationStatus::Applied => "added",
-                                    jit::profile::ProfileApplicationStatus::Unchanged => {
-                                        "unchanged"
-                                    }
-                                };
+                                let status = profile_status_label(profile.status, "add", "added");
                                 print_profile_heading(
                                     &profile.id,
                                     &profile.version,
                                     &profile.origin,
-                                    status,
+                                    &status,
                                 );
                                 println!("Archive: {}", profile.archive);
                                 println!("Destination: {}", profile.destination);
@@ -3149,6 +3100,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     executor.add_dependencies_with_policy(&from_id, &to_ids, policy)
                 }) {
                     Ok(result) => {
+                        for warning in &result.warnings {
+                            output_ctx.print_warning(warning)?;
+                        }
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
@@ -3224,6 +3178,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 match resolve_dependency_removal_args(&storage, &from_id, &to_ids).and_then(
                     |(to_ids, unmatched)| {
                         let result = executor.remove_dependencies(&from_id, &to_ids)?;
+                        for warning in &result.warnings {
+                            output_ctx.print_warning(warning)?;
+                        }
                         let not_found = result
                             .not_found
                             .iter()
@@ -3645,7 +3602,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.remove_gate_definition(&key) {
-                    Ok(_) => {
+                    Ok(warnings) => {
+                        for warning in warnings {
+                            output_ctx.print_warning(&warning)?;
+                        }
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
@@ -4995,7 +4955,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             DocCommands::Remove { id, path } => {
                 let id = resolve_issue_arg(&storage, &id)?;
-                let result = executor.remove_document_reference(&id, &path)?;
+                let (result, warnings) = executor.remove_document_reference(&id, &path)?;
+                let output_ctx = OutputContext::new(quiet, json);
+                for warning in warnings {
+                    output_ctx.print_warning(&warning)?;
+                }
 
                 if json {
                     use jit::output::JsonOutput;
@@ -5987,9 +5951,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                     println!("  - {}", hook);
                                 }
                             }
-                            println!("\nHooks are now active. Configure enforcement in .jit/config.toml:");
-                            println!("  [worktree]");
-                            println!("  enforce_leases = \"strict\"");
+                            println!("\nHooks are now active. Leases are enforced when a mutation is written, not at commit.");
                         }
                     }
                     Err(e) => {

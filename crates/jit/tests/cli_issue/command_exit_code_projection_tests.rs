@@ -266,9 +266,9 @@ fn invoke_permission_denied(json: bool) -> Vec<Output> {
     vec![output]
 }
 
-/// `*`/10: a repository index newer than the binary's supported format fails
+/// `*`/10: a repository format other than the binary's supported one fails
 /// before command dispatch.
-fn invoke_too_new_format(json: bool) -> Vec<Output> {
+fn invoke_unsupported_format(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
     let index_path = cli.root().join(".jit/index.json");
     let mut index: serde_json::Value =
@@ -731,7 +731,7 @@ row_bindings! {
     test_command_exit_codes_not_found_emits_3: ("*", Some(3), false) => invoke_not_found;
     #[cfg(unix)]
     test_command_exit_codes_permission_denied_emits_5: ("*", Some(5), false) => invoke_permission_denied;
-    test_command_exit_codes_too_new_format_emits_10: ("*", Some(10), false) => invoke_too_new_format;
+    test_command_exit_codes_unsupported_format_emits_10: ("*", Some(10), false) => invoke_unsupported_format;
     test_command_exit_codes_expired_lock_wait_emits_11: ("*", Some(11), false) => invoke_expired_lock_wait;
     test_command_exit_codes_broken_pipe_emits_141: ("*", Some(141), true) => invoke_broken_pipe;
     test_command_exit_codes_enforcing_write_rule_emits_4: ("any command that writes an issue", Some(4), false) => invoke_enforcing_write_rule;

@@ -18,8 +18,10 @@ use jit::domain::identity::IssueId;
 use jit::domain::{Event, Issue, Priority};
 use jit::gate_presets::{GatePresetDefinition, PresetInfo};
 use jit::repository_state::{CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath};
+use jit::storage::claim_coordinator::ClaimCoordinator;
 use jit::storage::{
-    InMemoryStorage, IssueStore, JsonFileStorage, PathReadError, RepositoryStateStore,
+    FileLocker, InMemoryStorage, IssueStore, JsonFileStorage, PathReadError, RepositoryStateStore,
+    WorktreePaths,
 };
 use jit::templates::{GraphTemplate, TemplateRegistry};
 use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
@@ -697,6 +699,17 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
             taxonomy.config_fragment()
         ),
     );
+    let layout = store.inner.repository_layout();
+    let paths =
+        WorktreePaths::detect_for_data_root(layout.data_root(), layout.worktree_root()).unwrap();
+    let holder = ClaimCoordinator::new(
+        paths,
+        FileLocker::new(Duration::from_secs(5)),
+        "wt:holder".parse().unwrap(),
+        "agent:holder".parse().unwrap(),
+    );
+    holder.init().unwrap();
+    holder.acquire_claim(&container, 600).unwrap();
     let resolves_before = store.resolve_calls();
 
     let (_, warnings) = executor
@@ -709,8 +722,10 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
         .unwrap();
 
     assert!(
-        !warnings.is_empty(),
-        "warn mode must exercise lease preflight"
+        warnings
+            .iter()
+            .any(|warning| warning.contains("agent:holder")),
+        "the preflight must observe the lease: {warnings:?}"
     );
     assert_eq!(store.resolve_calls(), resolves_before);
     assert_eq!(store.active_sessions.load(Ordering::SeqCst), 0);

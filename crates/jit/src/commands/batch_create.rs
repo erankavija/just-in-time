@@ -15,7 +15,7 @@
 //!   returned (mapped to exit code 2, `InvalidArgument`).
 //! - **Publication is atomic.** Each draft carries the id the mutation context
 //!   derived for its entry; the finalizer resolves every symbolic edge to those
-//!   ids and publishes issues, index membership, and audit events in
+//!   ids and publishes issues and audit events in
 //!   one recoverable repository delta.
 
 use super::*;

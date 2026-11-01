@@ -247,7 +247,8 @@ impl std::fmt::Display for ContributionConflictOwner {
 pub enum ContributionOutcome {
     /// Every contributor of the identity resolved one shared definition.
     Agreed(ComposedContribution),
-    /// Contributors resolved definitions that differ, so none of them wins.
+    /// Contributors with no dependency path between them resolved definitions
+    /// that differ, so none of them wins.
     Contested {
         /// Shared semantic identity with incompatible definitions.
         identity: ContributionIdentity,
@@ -269,9 +270,10 @@ impl ContributionOutcome {
 
 /// Compose resolved package claims by semantic identity.
 ///
-/// Only the packages being applied are parties: different package definitions
-/// for an identity decide one order-independent
-/// [`ContributionOutcome::Contested`] naming every package that declares it.
+/// Only the packages being applied are parties, and
+/// [`drop_overridden_claims`] has already removed a definition a dependent
+/// overrides. Definitions that still differ decide one order-independent
+/// [`ContributionOutcome::Contested`] naming every package that declares one.
 pub fn compose_resolved_contributions(
     candidates: impl IntoIterator<Item = ProfileContributionClaim>,
 ) -> Vec<ContributionOutcome> {
@@ -519,14 +521,14 @@ pub struct ProfileRegionClaim {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ProfileTargetConflict {
-    /// Packages being applied define one target or semantic identity
-    /// differently.
+    /// Packages with no dependency path between them define one target or
+    /// semantic identity differently.
     ///
-    /// No package holds authority over another's definitions, so composition
+    /// Neither holds authority over the other's definitions, so composition
     /// picks no winner and the publication is refused.
     Contested {
-        /// Every package declaring the target or identity, sorted independently
-        /// of selector occurrence.
+        /// Every package whose differing definition remains, sorted
+        /// independently of selector occurrence.
         owners: Vec<ContributionConflictOwner>,
     },
 }
@@ -660,7 +662,53 @@ pub struct ProfileClaims {
     pub regions: Vec<ProfileRegionClaim>,
 }
 
+/// One key a package declares inside a file: a whole asset target, or a managed
+/// region of a target.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct FileKey {
+    path: VirtualPath,
+    region: Option<RegionId>,
+}
+
+impl FileKey {
+    fn of_asset(asset: &ProfileAssetClaim) -> Self {
+        Self {
+            path: asset.claim.target().clone(),
+            region: None,
+        }
+    }
+
+    fn of_region(region: &ProfileRegionClaim) -> Self {
+        Self {
+            path: region.claim.target().clone(),
+            region: Some(region.region_id.clone()),
+        }
+    }
+}
+
+/// The value two declarations of one [`FileKey`] compare by.
+type FileValue<'a> = (&'a [u8], Option<FileMode>);
+
 impl ProfileClaims {
+    /// This package's file keys beside their values.
+    fn file_declarations(&self) -> impl Iterator<Item = (FileKey, &ProfileId, FileValue<'_>)> {
+        let assets = self.assets.iter().map(|asset| {
+            (
+                FileKey::of_asset(asset),
+                &self.package_id,
+                (asset.bytes.as_slice(), Some(asset.mode)),
+            )
+        });
+        let regions = self.regions.iter().map(|region| {
+            (
+                FileKey::of_region(region),
+                &self.package_id,
+                (region.content.as_slice(), None),
+            )
+        });
+        assets.chain(regions)
+    }
+
     pub(crate) fn target_paths(&self) -> Result<Vec<VirtualPath>, super::RepositoryLayoutError> {
         let mut paths = self
             .contributions
@@ -818,40 +866,116 @@ pub(crate) struct ProfileTargetDecision {
     pub(crate) mode: FileMode,
 }
 
-/// Asset targets that packages being applied declare with differing content,
+/// Remove each definition a dependent package overrides from `selection`.
+///
+/// `dependencies` maps each package to its transitive dependencies. A
+/// definition is overridden when a package depending on its declarer, at any
+/// depth, defines the key differently, so a common dependent's value settles
+/// what its dependencies disagree on. Differing definitions no dependent
+/// overrides remain for composition to refuse.
+pub(crate) fn drop_overridden_claims(
+    selection: Vec<ProfileClaims>,
+    dependencies: &BTreeMap<ProfileId, BTreeSet<ProfileId>>,
+) -> Vec<ProfileClaims> {
+    let contributions = overridden_declarations(
+        selection.iter().flat_map(|claims| {
+            claims.contributions.iter().map(|claim| {
+                (
+                    claim.contribution.semantic_identity(),
+                    &claims.package_id,
+                    &claim.contribution,
+                )
+            })
+        }),
+        dependencies,
+    );
+    let files = overridden_declarations(
+        selection.iter().flat_map(ProfileClaims::file_declarations),
+        dependencies,
+    );
+    selection
+        .into_iter()
+        .map(|mut claims| {
+            let package = claims.package_id.clone();
+            claims.contributions.retain(|claim| {
+                !contributions.contains(&(claim.contribution.semantic_identity(), package.clone()))
+            });
+            claims
+                .assets
+                .retain(|asset| !files.contains(&(FileKey::of_asset(asset), package.clone())));
+            claims
+                .regions
+                .retain(|region| !files.contains(&(FileKey::of_region(region), package.clone())));
+            claims
+        })
+        .collect()
+}
+
+/// Every `(key, package)` declaration a dependent overrides.
+fn overridden_declarations<'a, K: Ord + Clone, V: PartialEq + 'a>(
+    declarations: impl Iterator<Item = (K, &'a ProfileId, V)>,
+    dependencies: &BTreeMap<ProfileId, BTreeSet<ProfileId>>,
+) -> BTreeSet<(K, ProfileId)> {
+    let depends_on = |package: &ProfileId, other: &ProfileId| {
+        dependencies
+            .get(package)
+            .is_some_and(|required| required.contains(other))
+    };
+    let mut keys = BTreeMap::<K, Vec<(&ProfileId, V)>>::new();
+    for (key, package, value) in declarations {
+        keys.entry(key).or_default().push((package, value));
+    }
+    keys.into_iter()
+        .flat_map(|(key, declared)| {
+            declared
+                .iter()
+                .filter(|(package, value)| {
+                    declared
+                        .iter()
+                        .any(|(other, stated)| stated != value && depends_on(other, package))
+                })
+                .map(|(package, _)| (key.clone(), (*package).clone()))
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Paths holding a file key that packages being applied declare differently,
 /// each beside every package declaring it.
 ///
-/// An asset target is one key, so it composes by the rule a semantic identity
+/// Asset targets and managed regions compose by the rule a semantic identity
 /// composes by: identical restatements merge, and differing definitions are a
 /// conflict naming every declaring package.
-pub(super) fn contested_asset_targets<'a>(
+pub(super) fn contested_file_targets<'a>(
     selection: impl IntoIterator<Item = &'a ProfileClaims>,
 ) -> BTreeMap<VirtualPath, Vec<ContributionConflictOwner>> {
-    let mut declared = BTreeMap::<&VirtualPath, Vec<(&ProfileId, &ProfileAssetClaim)>>::new();
-    for claims in selection {
-        for asset in &claims.assets {
-            declared
-                .entry(asset.claim.target())
+    let mut declared = BTreeMap::<FileKey, Vec<(&ProfileId, FileValue<'_>)>>::new();
+    for (key, package, value) in selection
+        .into_iter()
+        .flat_map(ProfileClaims::file_declarations)
+    {
+        declared.entry(key).or_default().push((package, value));
+    }
+    let mut contested = BTreeMap::<VirtualPath, BTreeSet<ProfileId>>::new();
+    for (key, declarations) in declared {
+        if declarations
+            .iter()
+            .any(|(_, value)| *value != declarations[0].1)
+        {
+            contested
+                .entry(key.path)
                 .or_default()
-                .push((&claims.package_id, asset));
+                .extend(declarations.into_iter().map(|(package, _)| package.clone()));
         }
     }
-    declared
+    contested
         .into_iter()
-        .filter(|(_, declarations)| {
-            declarations.iter().any(|(_, asset)| {
-                (&asset.bytes, asset.mode) != (&declarations[0].1.bytes, declarations[0].1.mode)
-            })
-        })
-        .map(|(path, declarations)| {
-            let owners = declarations
-                .into_iter()
-                .map(|(package_id, _)| package_id.clone())
-                .collect::<BTreeSet<_>>()
+        .map(|(path, owners)| {
+            let owners = owners
                 .into_iter()
                 .map(ContributionConflictOwner::Package)
                 .collect();
-            (path.clone(), owners)
+            (path, owners)
         })
         .collect()
 }
@@ -874,15 +998,15 @@ pub(super) fn contested_asset_targets<'a>(
 /// which targets to write.
 ///
 /// `contribution_context` holds the selected packages' definitions of this
-/// package's semantic identities, and `contested_assets` the asset targets
-/// selected packages declare differently ([`contested_asset_targets`]). The
+/// package's semantic identities, and `contested_files` the file targets
+/// selected packages declare differently ([`contested_file_targets`]). The
 /// repository's current content decides only whether a value is created,
 /// updated, or already exact; it is never a conflict party.
 pub(super) fn compose_profile_targets_with_context(
     base: &RepositoryImage,
     claims: ProfileClaims,
     contribution_context: Vec<ProfileContributionClaim>,
-    contested_assets: &BTreeMap<VirtualPath, Vec<ContributionConflictOwner>>,
+    contested_files: &BTreeMap<VirtualPath, Vec<ContributionConflictOwner>>,
 ) -> Result<ProfileTargetComposition, RepositoryStateError> {
     let declared_identities = claims
         .contributions
@@ -898,10 +1022,16 @@ pub(super) fn compose_profile_targets_with_context(
     let composed = owned_composed_contributions(composition.definitions, &claims.package_id);
     let mut targets = render_composed_contributions(base, &composed)?;
     let projection_targets = configured_projection_targets(base, &targets)?;
-    let asset_paths = claims
+    let file_paths = claims
         .assets
         .iter()
         .map(|asset| asset.claim.target().clone())
+        .chain(
+            claims
+                .regions
+                .iter()
+                .map(|region| region.claim.target().clone()),
+        )
         .collect::<BTreeSet<_>>();
     for asset in claims.assets {
         let path = asset.claim.target().clone();
@@ -968,14 +1098,14 @@ pub(super) fn compose_profile_targets_with_context(
         }
     }
 
-    // A configured projection derives the final bytes of an asset target it
+    // A configured projection derives the final bytes of a file target it
     // rewrites, so the bytes packages declare there are not what they publish.
     let decisions = targets
         .iter()
         .map(|(path, (bytes, mode))| {
-            let contested = contested_assets
+            let contested = contested_files
                 .get(path)
-                .filter(|_| asset_paths.contains(path) && !projection_targets.contains(path));
+                .filter(|_| file_paths.contains(path) && !projection_targets.contains(path));
             let disposition = match contested {
                 Some(owners) => {
                     ProfileTargetDisposition::Conflict(ProfileTargetConflict::Contested {
@@ -1749,6 +1879,7 @@ mod tests {
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, CapturedBytes, RepositoryLayout, RepositoryRootEvidence,
     };
+    use proptest::prelude::*;
     use std::collections::BTreeMap;
 
     /// A captured image whose configuration registry holds `config` and whose
@@ -2019,6 +2150,291 @@ mod tests {
             .all(|contribution| contribution.owners == [ProfileId::try_from("workflow").unwrap()]));
     }
 
+    /// Each `(dependent, dependency)` edge closed over transitively, the way a
+    /// resolved package graph states it.
+    fn closed_dependencies(edges: &[(&str, &str)]) -> BTreeMap<ProfileId, BTreeSet<ProfileId>> {
+        let id = |package: &str| ProfileId::try_from(package).unwrap();
+        let direct = edges.iter().fold(
+            BTreeMap::<ProfileId, BTreeSet<ProfileId>>::new(),
+            |mut map, (from, to)| {
+                map.entry(id(from)).or_default().insert(id(to));
+                map
+            },
+        );
+        fn reach(
+            package: &ProfileId,
+            direct: &BTreeMap<ProfileId, BTreeSet<ProfileId>>,
+        ) -> BTreeSet<ProfileId> {
+            direct
+                .get(package)
+                .into_iter()
+                .flatten()
+                .flat_map(|next| {
+                    let mut reached = reach(next, direct);
+                    reached.insert(next.clone());
+                    reached
+                })
+                .collect()
+        }
+        direct
+            .keys()
+            .map(|package| (package.clone(), reach(package, &direct)))
+            .collect()
+    }
+
+    /// A region claim at `target` holding `content`.
+    fn region_claim(
+        layout: &RepositoryLayout,
+        target: &VirtualPath,
+        content: &[u8],
+    ) -> ProfileRegionClaim {
+        ProfileRegionClaim {
+            claim: TargetClaim::new(layout, target.clone(), "profile-region:guidance").unwrap(),
+            region_id: serde_json::from_str("\"guidance\"").unwrap(),
+            content: content.to_vec(),
+        }
+    }
+
+    /// One package's claims defining the namespace `shared` as `description`.
+    fn claims_defining_shared(package: &str, description: &str) -> ProfileClaims {
+        let (_, layout) = image_holding(b"", &[]);
+        ProfileClaims {
+            contributions: vec![contribution_claim(
+                package,
+                namespace_contribution("shared", description),
+            )],
+            ..asset_claims(&layout, package, &[], b"")
+        }
+    }
+
+    /// What composition decides about `shared` over `selection`, after each
+    /// dependent's overrides.
+    fn compose_shared(
+        selection: Vec<ProfileClaims>,
+        edges: &[(&str, &str)],
+    ) -> Vec<ContributionOutcome> {
+        compose_resolved_contributions(
+            drop_overridden_claims(selection, &closed_dependencies(edges))
+                .into_iter()
+                .flat_map(|claims| claims.contributions),
+        )
+    }
+
+    #[test]
+    fn test_drop_overridden_claims_composes_a_direct_or_transitive_dependents_value() {
+        for (selection, edges) in [
+            (
+                vec![
+                    claims_defining_shared("base", "Base."),
+                    claims_defining_shared("workflow", "Workflow."),
+                ],
+                vec![("workflow", "base")],
+            ),
+            (
+                vec![
+                    claims_defining_shared("base", "Base."),
+                    claims_defining_shared("workflow", "Workflow."),
+                ],
+                vec![("workflow", "middle"), ("middle", "base")],
+            ),
+        ] {
+            let composed = agreed_definitions(compose_shared(selection, &edges));
+
+            assert_eq!(composed.len(), 1);
+            assert_eq!(
+                composed[0].definition,
+                namespace_contribution("shared", "Workflow.")
+            );
+        }
+    }
+
+    #[test]
+    fn test_drop_overridden_claims_keeps_differing_packages_with_no_dependency_path() {
+        let (_, owners) = contested_outcome(compose_shared(
+            vec![
+                claims_defining_shared("left", "Left."),
+                claims_defining_shared("right", "Right."),
+            ],
+            &[],
+        ));
+
+        assert_eq!(owners, package_owners(&["left", "right"]));
+    }
+
+    /// A dependent at any depth settles what its dependencies disagree on.
+    #[test]
+    fn test_drop_overridden_claims_composes_a_common_dependents_value_over_a_disagreement() {
+        for edges in [
+            vec![("top", "left"), ("top", "right")],
+            vec![("top", "middle"), ("middle", "left"), ("middle", "right")],
+        ] {
+            let composed = agreed_definitions(compose_shared(
+                vec![
+                    claims_defining_shared("left", "Left."),
+                    claims_defining_shared("right", "Right."),
+                    claims_defining_shared("top", "Top."),
+                ],
+                &edges,
+            ));
+
+            assert_eq!(composed.len(), 1);
+            assert_eq!(
+                composed[0].definition,
+                namespace_contribution("shared", "Top.")
+            );
+        }
+    }
+
+    /// A common dependent stating no value settles nothing.
+    #[test]
+    fn test_drop_overridden_claims_refuses_a_disagreement_a_silent_dependent_leaves() {
+        let (_, owners) = contested_outcome(compose_shared(
+            vec![
+                claims_defining_shared("left", "Left."),
+                claims_defining_shared("right", "Right."),
+            ],
+            &[("top", "left"), ("top", "right")],
+        ));
+
+        assert_eq!(owners, package_owners(&["left", "right"]));
+    }
+
+    /// The dependent's value replaces the dependency's asset and region, and
+    /// neither remains a contested file.
+    #[test]
+    fn test_drop_overridden_claims_composes_the_dependents_asset_and_region() {
+        let asset = VirtualPath::worktree("docs/shared.txt").unwrap();
+        let region_target = VirtualPath::worktree("docs/guide.md").unwrap();
+        let (_, layout) = image_holding(b"", &[]);
+        let claims = |package: &str, bytes: &[u8]| ProfileClaims {
+            regions: vec![region_claim(&layout, &region_target, bytes)],
+            ..asset_claims(&layout, package, std::slice::from_ref(&asset), bytes)
+        };
+
+        let composed = drop_overridden_claims(
+            vec![claims("base", b"base"), claims("workflow", b"workflow")],
+            &closed_dependencies(&[("workflow", "base")]),
+        );
+
+        assert!(contested_file_targets(&composed).is_empty());
+        let base = &composed[0];
+        assert!(base.assets.is_empty() && base.regions.is_empty());
+        let workflow = &composed[1];
+        assert_eq!(workflow.assets[0].bytes, b"workflow");
+        assert_eq!(workflow.regions[0].content, b"workflow");
+    }
+
+    /// One managed region is one key: unrelated packages stating it differently
+    /// contest its file, and an identical restatement composes.
+    #[test]
+    fn test_contested_file_targets_names_every_package_declaring_a_region_differently() {
+        let target = VirtualPath::worktree("docs/guide.md").unwrap();
+        let (_, layout) = image_holding(b"", &[]);
+        let claims = |package: &str, content: &[u8]| ProfileClaims {
+            regions: vec![region_claim(&layout, &target, content)],
+            ..asset_claims(&layout, package, &[], b"")
+        };
+
+        assert_eq!(
+            contested_file_targets(&[claims("base", b"one"), claims("workflow", b"two")]),
+            BTreeMap::from([(target.clone(), package_owners(&["base", "workflow"]))])
+        );
+        assert!(
+            contested_file_targets(&[claims("base", b"one"), claims("workflow", b"one")])
+                .is_empty()
+        );
+    }
+
+    type GeneratedSelection = (Vec<(String, u8)>, Vec<(String, String)>);
+
+    /// A selection of up to five packages over one key: each package's optional
+    /// value, and which higher-numbered packages each depends on.
+    fn generated_selection() -> impl Strategy<Value = GeneratedSelection> {
+        (
+            proptest::collection::vec(proptest::option::of(0u8..3), 5),
+            proptest::collection::vec(any::<bool>(), 10),
+        )
+            .prop_map(|(values, edges)| {
+                let name = |index: usize| format!("package-{index}");
+                let declared = values
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, value)| value.map(|value| (name(index), value)))
+                    .collect();
+                let pairs = (0..5).flat_map(|from| ((from + 1)..5).map(move |to| (from, to)));
+                let edges = pairs
+                    .zip(edges)
+                    .filter(|(_, present)| *present)
+                    .map(|((from, to), _)| (name(from), name(to)))
+                    .collect();
+                (declared, edges)
+            })
+    }
+
+    /// What composition decides about the selection's one key.
+    fn composed_shared_definition(
+        declared: &[(String, u8)],
+        edges: &[(String, String)],
+    ) -> Vec<ContributionOutcome> {
+        let edges = edges
+            .iter()
+            .map(|(from, to)| (from.as_str(), to.as_str()))
+            .collect::<Vec<_>>();
+        compose_shared(
+            declared
+                .iter()
+                .map(|(package, value)| claims_defining_shared(package, &value.to_string()))
+                .collect(),
+            &edges,
+        )
+    }
+
+    proptest! {
+        #[test]
+        fn prop_drop_overridden_claims_composes_independently_of_selection_order(
+            (declared, edges, selected) in generated_selection().prop_flat_map(
+                |(declared, edges)| {
+                    let selected = Just(declared.clone()).prop_shuffle();
+                    (Just(declared), Just(edges), selected)
+                },
+            ),
+        ) {
+            prop_assert_eq!(
+                composed_shared_definition(&selected, &edges),
+                composed_shared_definition(&declared, &edges)
+            );
+        }
+
+        #[test]
+        fn prop_drop_overridden_claims_contests_exactly_when_undepended_declarers_differ(
+            (declared, edges) in generated_selection(),
+        ) {
+            let dependencies = closed_dependencies(
+                &edges
+                    .iter()
+                    .map(|(from, to)| (from.as_str(), to.as_str()))
+                    .collect::<Vec<_>>(),
+            );
+            let depends = |from: &String, to: &String| {
+                dependencies
+                    .get(&ProfileId::try_from(from.as_str()).unwrap())
+                    .is_some_and(|required| {
+                        required.contains(&ProfileId::try_from(to.as_str()).unwrap())
+                    })
+            };
+            let undepended_values = declared
+                .iter()
+                .filter(|(package, _)| !declared.iter().any(|(other, _)| depends(other, package)))
+                .map(|(_, value)| *value)
+                .collect::<BTreeSet<_>>();
+            let contested = composed_shared_definition(&declared, &edges)
+                .iter()
+                .any(|outcome| matches!(outcome, ContributionOutcome::Contested { .. }));
+
+            prop_assert_eq!(contested, undepended_values.len() > 1);
+        }
+    }
+
     /// The repository is never a conflict party: a registry already declaring
     /// the identity differently is updated to the package's value.
     #[test]
@@ -2082,7 +2498,7 @@ mod tests {
     /// differently contest it, whatever order they are selected in, and an
     /// identical restatement composes.
     #[test]
-    fn test_contested_asset_targets_names_every_package_declaring_a_target_differently() {
+    fn test_contested_file_targets_names_every_package_declaring_a_target_differently() {
         let contested = VirtualPath::worktree("docs/contested.txt").unwrap();
         let restated = VirtualPath::worktree("docs/restated.txt").unwrap();
         let (_, layout) = image_holding(b"", &[]);
@@ -2115,7 +2531,7 @@ mod tests {
 
         for selection in [[&base, &workflow], [&workflow, &base]] {
             assert_eq!(
-                contested_asset_targets(selection),
+                contested_file_targets(selection),
                 BTreeMap::from([(contested.clone(), package_owners(&["base", "workflow"]))])
             );
         }
@@ -2132,7 +2548,7 @@ mod tests {
         let (image, layout) = image_holding(b"", &[]);
         let workflow = asset_claims(&layout, "workflow", &targets, b"workflow bytes");
         let base = asset_claims(&layout, "base", &targets, b"base bytes");
-        let contested = contested_asset_targets([&workflow, &base]);
+        let contested = contested_file_targets([&workflow, &base]);
 
         let composition =
             compose_profile_targets_with_context(&image, workflow, Vec::new(), &contested)

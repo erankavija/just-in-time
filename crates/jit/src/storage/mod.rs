@@ -57,7 +57,8 @@ pub use claim_coordinator::{ClaimAcquireLimits, ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{
     AmbiguousIdError, GateAlreadyExistsError, GateNotFoundError, GateRunNotFoundError,
-    IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError, RepositoryNotFoundError,
+    IssueNotFoundError, PresetNotFoundError, RepositoryFormatUnsupportedError,
+    RepositoryNotFoundError,
 };
 pub use git_revision::{
     GitRevisionError, GitRevisionResolver, PinnedArtifactRead, PinnedTargetRead,
@@ -131,7 +132,7 @@ pub(crate) fn resolve_unique_issue_id<'a>(
 }
 
 /// The one of an issue's stored `dependencies` that `prefix` names. Matching
-/// the stored edges rather than the index keeps an edge whose target was
+/// the stored edges rather than the issue files keeps an edge whose target was
 /// deleted resolvable (jit:f847df3f).
 ///
 /// # Errors
@@ -273,12 +274,8 @@ pub trait IssueStore: Clone {
     /// Returns an error if the registry cannot be loaded.
     fn load_gate_registry(&self) -> Result<GateRegistry>;
 
-    /// Read all events whose tag is in the current event vocabulary.
-    ///
-    /// File storage skips structurally valid records with retired or otherwise
-    /// unknown string tags so append-only history remains readable after a tag
-    /// is removed. Malformed JSON and malformed records for known tags remain
-    /// errors.
+    /// Read all events. Malformed JSON, a malformed record, and a tag outside the
+    /// current event vocabulary are errors.
     ///
     /// # Errors
     ///

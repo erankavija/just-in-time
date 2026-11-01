@@ -1,17 +1,33 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T15:44:13.432879182Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
     "0dcabcca-d6f5-415f-90f2-12dc29f97313"
   ],
-  "description": "The profile executor and repository initialization expose only entry points that production dispatch reaches; tests drive those entries.\n\n## Background\n\nExecutor entry points by production reachability (`crates/jit/src/commands/profile.rs`, `crates/jit/src/commands/init.rs`, line numbers at the investigation baseline):\n\n- Dead: `plan_profile` (1221) with its chain, and `initialize_profiled_repository_from_sources` (`init.rs:89`).\n- Test-only: `plan_profiles` (1163), `apply_profile` (1274), `apply_profile_package` (1807) with `apply_profile_package_with_inputs` (1818) and `resolve_profile_closure` (1622), `initialize_profiled_repository` (`init.rs:79`), and the test-gated `prepare_profile` (1995).\n- Production: `initialize_fresh_repository` (`init.rs:105`) is called by the server (`crates/server/src/routes.rs:1115`) and stays.\n\nAbout 76 unit tests and `crates/jit/tests/fast_rules/derived_state_repair_tests.rs` drive `apply_profile_package`. Many re-prove composition properties that the composition module's own tests own; for example, order independence is tested at `profile.rs:5697` and at `crates/jit/src/repository_state/profile_apply.rs:4085`. Each property has one owning test (`@/inv/orthogonal-tests`).\n\n## Success Criteria\n\n- [hard] REQ-01: No public profile executor or initialization entry point lacks a production caller.\n- [hard] REQ-02: Each test that drove a pruned entry point drives the surviving one, or is deleted when it re-proves a property the composition module's tests own.\n- [hard] REQ-03: Fresh-repository initialization through the server keeps working.\n",
+  "description": "The profile executor and repository initialization expose only entry points that production dispatch reaches; tests drive those entries.\n\n## Background\n\nExecutor entry points by production reachability (`crates/jit/src/commands/profile.rs`, `crates/jit/src/commands/init.rs`, line numbers at the investigation baseline):\n\n- Dead: `plan_profile` (1221) with its chain, and `initialize_profiled_repository_from_sources` (`init.rs:89`).\n- Test-only: `plan_profiles` (1163), `apply_profile` (1274), `apply_profile_package` (1807) with `apply_profile_package_with_inputs` (1818) and `resolve_profile_closure` (1622), `initialize_profiled_repository` (`init.rs:79`), and the test-gated `prepare_profile` (1995).\n- Production: `initialize_fresh_repository` (`init.rs:105`) is called by the server (`crates/server/src/routes.rs:1115`) and stays.\n\nAbout 76 unit tests and `crates/jit/tests/fast_rules/derived_state_repair_tests.rs` drive `apply_profile_package`. Many re-prove composition properties that the composition module's own tests own; for example, order independence is tested at `profile.rs:5697` and at `crates/jit/src/repository_state/profile_apply.rs:4085`. Each property has one owning test (`@/inv/orthogonal-tests`).\n\n## Success Criteria\n\n- [hard] REQ-01: No public profile executor or initialization entry point lacks a production caller.\n- [hard] REQ-02: Each test that drove a pruned entry point drives the surviving one, or is deleted when it re-proves a property the composition module's tests own.\n- [hard] REQ-03: Fresh-repository initialization through `main.rs`'s production caller keeps working, shown by the test the worker names.\n",
   "documents": [],
+  "done_at": "2026-11-01T16:08:31.396611119Z",
+  "first_ready_at": "2026-11-01T16:08:06.367065443Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "de314700-dfef-4ac7-8fa2-8cffae17262a",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:47:34.378907727Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9c7178cf-4141-4dd8-b73f-997fc87ca795",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:49:36.199111309Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "56b89d9a-c2c9-4250-bd8f-e4bf059921d5",
   "labels": [
     "type:task",
@@ -22,7 +38,7 @@
     "satisfies:3d9a0ce3/REQ-13"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Prune dead and test-only profile executor entry points",
-  "updated_at": "2026-10-21T01:06:58.361882571Z"
+  "updated_at": "2026-11-01T16:08:31.396611119Z"
 }

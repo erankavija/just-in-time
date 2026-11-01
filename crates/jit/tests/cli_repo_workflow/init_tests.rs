@@ -190,7 +190,7 @@ fn test_init_idempotent_does_not_overwrite_index() {
     let cli = JitCli::uninitialised().unwrap();
     cli.command(["init"]).output().unwrap();
 
-    // Create an issue so index has real data
+    // Create an issue so the store has real data
     cli.command(["issue", "create", "-t", "My issue"])
         .output()
         .unwrap();

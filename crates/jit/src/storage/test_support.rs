@@ -164,7 +164,7 @@ impl InMemoryStorage {
         }
     }
 
-    /// Seed one exact issue preimage and canonical active-index membership.
+    /// Seed one exact issue preimage and an index when the fixture has none.
     ///
     /// This deliberately bypasses product mutation behavior while preserving the
     /// repository codec and index invariants used by production publishers.

@@ -1,0 +1,36 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "26530d5a8ab633ac5c36d96a2ef4ac5840525676",
+  "completed_at": "2026-11-01T16:36:00.614391966Z",
+  "duration_ms": 228971,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "id": "F1",
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "REQ-04 requires a net-line report including the mutation check, but none exists in the attributable commits or affected artifacts."
+      }
+    ],
+    "summary": "REQ-04 is incomplete because the required net-line report, including the mutation check, is absent.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "17fbcf25-67cd-41a8-acc4-adb6df43b4a2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b6f0df72-919d-43ee-8896-ccb9548fe6f7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T16:32:11.642581520Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 16556 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a197f4-d145-74c0-88e1-bbf60e98b8ba\n--------\nuser\n--- 16543 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2b21efee4, aa555d17f, d643aaa42, c3b503b42, 13e25ab41, f00e71007, ee25baf18, eca1a8108, 26530d5a8 (eca1a8108 is record-only)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 and @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T16:30:39Z); prior code-review failed (exit 1) on F1, now addressed\nTruncation recovery: recovered truncated patches through per-commit/path diffs and current-file slices, including the full lease table and gate-remove implementation\n\n1. **[blocking, issue-impact]** REQ-04’s required net-line report is absent. Neither the tagged commit messages nor the affected implementation, documentation, hook, or test artifacts report the net line count or distinguish the mutation-check addition, despite the hard criterion requiring it.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-04 is incomplete because the required net-line report, including the mutation check, is absent.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-04 requires a net-line report including the mutation check, but none exists in the attributable commits or affected artifacts.\",\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

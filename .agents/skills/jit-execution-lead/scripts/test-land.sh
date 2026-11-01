@@ -81,8 +81,6 @@ new_repo coherent
 first="$(issue One)"; second="$(issue Two)"
 land_status side
 ids="$(printf '%s\n%s\n' "$first" "$second" | sort | xargs)"
-assert "index holds the pending ids" equal \
-    "$(git show HEAD^1:.jit/index.json | jq -r '.all_ids[]' | sort | xargs)" "$ids"
 assert "issue records hold the pending ids" equal \
     "$(git ls-tree --name-only HEAD^1 .jit/issues/ | xargs -n1 basename | sed 's/\.json$//' | sort | xargs)" "$ids"
 assert "events hold the pending ids" equal \
@@ -146,16 +144,20 @@ assert "the union driver keeps both sides' event lines" equal \
 assert "the union merge leaves no markers" empty "$(git grep -l '^<<<<<<<' HEAD -- .jit/events.jsonl)"
 
 new_repo conflict
-git checkout -q side
-JIT_WORKTREE_WRITE_POLICY=allow issue "Branch issue" > /dev/null
+contested="$(issue Contested)"
 git add .jit
-git commit -qm branch-issue
+git commit -qm contested-issue
+git checkout -q side
+git merge -q --no-edit main
+jit issue update "$contested" --priority high > /dev/null
+git add .jit
+git commit -qm branch-edit
 git checkout -q main
-issue "Pending issue" > /dev/null
+jit issue update "$contested" --priority low > /dev/null
 prior="$(git rev-parse HEAD)"
 land_status side
 assert "a conflict exits nonzero" equal "$STATUS" 1
-assert "a conflict names the path" contains "$OUT" .jit/index.json
+assert "a conflict names the path" contains "$OUT" ".jit/issues/$contested.json"
 assert "a conflict keeps the sync commit" equal "$(git rev-parse HEAD^)" "$prior"
 assert "the sync commit is HEAD" equal "$(git log -1 --format=%s)" 'chore(jit): sync tracker'
 assert "the merge is aborted" empty "$(git status --short)"
@@ -185,6 +187,16 @@ OUT="$(JIT_DATA_DIR="$PWD/.jit" "$LAND" side 2>&1)"; STATUS=$?
 assert "JIT_DATA_DIR refuses" equal "$STATUS" 1
 assert "the refusal names JIT_DATA_DIR" contains "$OUT" JIT_DATA_DIR
 assert "JIT_DATA_DIR commits nothing" equal "$(git rev-parse HEAD)" "$prior"
+
+new_repo no-entry
+issue Pending > /dev/null
+prior="$(git rev-parse HEAD)"
+pending="$(git status --short)"
+OUT="$("$LAND" --locked side 2>&1)"; STATUS=$?
+assert "a direct body entry refuses" equal "$STATUS" 1
+assert "the refusal is the usage" contains "$OUT" usage
+assert "a direct body entry commits nothing" equal "$(git rev-parse HEAD)" "$prior"
+assert "a direct body entry stages nothing" equal "$(git status --short)" "$pending"
 
 new_repo refused-hook
 issue Pending > /dev/null

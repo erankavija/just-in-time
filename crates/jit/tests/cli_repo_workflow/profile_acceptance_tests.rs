@@ -824,18 +824,7 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         "ProfilePackageModel must reject undeclared lifecycle fields"
     );
 
-    let apply_schemas = commands["apply"]["output"]["success_schema"]["oneOf"]
-        .as_array()
-        .unwrap();
-    assert_eq!(apply_schemas.len(), 2);
-    let apply_schema = apply_schemas
-        .iter()
-        .find(|schema| schema["definitions"].get("ProfileApplyResult").is_some())
-        .expect("apply output schema");
-    let plan_schema = apply_schemas
-        .iter()
-        .find(|schema| schema["definitions"].get("ProfilePlanEntry").is_some())
-        .expect("rehearsal output schema");
+    let apply_schema = &commands["apply"]["output"]["success_schema"];
     assert_eq!(
         apply_schema["properties"]
             .as_object()
@@ -851,26 +840,6 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             "contributions",
             "id",
             "origin",
-            "status",
-            "targets",
-            "version",
-        ])
-    );
-    assert_eq!(
-        plan_schema["properties"]
-            .as_object()
-            .unwrap()
-            .keys()
-            .cloned()
-            .collect::<BTreeSet<_>>(),
-        expected_keys(&["count", "profiles"])
-    );
-    assert_eq!(
-        property_keys(plan_schema, "ProfilePlanEntry"),
-        expected_keys(&[
-            "contributions",
-            "id",
-            "origin",
             "refusal",
             "status",
             "targets",
@@ -878,11 +847,11 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         ])
     );
     assert_eq!(
-        property_keys(plan_schema, "ProfileTargetChange"),
+        property_keys(apply_schema, "ProfileTargetChange"),
         expected_keys(&["action", "executable", "path", "reason"])
     );
     assert_eq!(
-        property_keys(plan_schema, "ProfileContributionChange"),
+        property_keys(apply_schema, "ProfileContributionChange"),
         expected_keys(&["action", "identity", "reason"])
     );
 }

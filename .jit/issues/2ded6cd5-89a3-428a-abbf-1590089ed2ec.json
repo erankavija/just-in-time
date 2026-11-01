@@ -1,0 +1,26 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T17:47:07.363008598Z",
+  "context": {},
+  "created_at": "2026-11-01T17:47:06.704513252Z",
+  "dependencies": [],
+  "description": "`jit gate update` refuses when another agent leases an issue that requires the gate, as `jit gate remove` does.\n\n## Background\n\n17fbcf25 gave one lease rule to every command, and `gate remove` now refuses under another agent's lease because it changes what a leased issue requires. `gate update` can change what a leased issue's required gate checks and has no check, so the two differ.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit gate update` on a gate required by an issue another agent leases refuses in strict mode, and warns in warn mode, through `refuse_foreign_leases`.\n- [hard] REQ-02: The table-driven lease test carries `gate update` as a refusal row.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T17:47:06.704513252Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "2ded6cd5-89a3-428a-abbf-1590089ed2ec",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Lease-check gate update",
+  "updated_at": "2026-11-01T17:47:07.363008598Z"
+}

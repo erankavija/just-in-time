@@ -107,7 +107,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = issue_id.clone();
-        self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)
+        let lease_warnings = self.refuse_foreign_lease(&full_id)?;
+        let (result, warnings) =
+            self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)?;
+        Ok((result, lease_warnings.into_iter().chain(warnings).collect()))
     }
 
     /// Each declared issue-scoped area paired with its no-follow recursive
@@ -371,12 +374,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &IssueId,
         path: &str,
-    ) -> Result<DocumentRemoveResult>
+    ) -> Result<(DocumentRemoveResult, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = issue_id.clone();
-        self.publish_document_remove(&full_id, path)
+        let warnings = self.refuse_foreign_lease(&full_id)?;
+        Ok((self.publish_document_remove(&full_id, path)?, warnings))
     }
 
     /// Add or refresh one document reference from a coherent repository image.

@@ -89,7 +89,7 @@ an unbounded tree. The image holds, per canonical path, a `RepositoryEntry` —
 `DirectoryListing`s, which hold child names only, and pinned-document evidence.
 
 A mutation reads the repository in one pass. What it reads first names what it
-reads next (the index names the issue files, the issues name the plan documents
+reads next (the issues listing names the issue files, the issues name the plan documents
 their transition rules read), so the session grows the image with
 `RepositoryMutationSession::extend`, which reads only the requests the image does
 not already hold. Nothing is read twice, so no read is compared with an earlier
@@ -269,7 +269,7 @@ the time and emits one exact plan.
   indices of new issue ids first, reserved for the ids their commands derived,
   gate-run/record ids next, event ids last after canonical event ordering — stamps the one timestamp on every transition, emits the new
   event lines as one `AppendEvents` action at the captured log length
-  (`@/inv/event-log`), and derives `index.json` membership from the captured
+  (`@/inv/event-log`), and derives `index.json` tombstones from the captured
   preimage. The captured tail is the finalizer's torn-tail evidence: it refuses to
   append after an uncertified torn final line. `finalize_audit_append` reuses the
   same torn-tail authority for init/profile deltas that carry their own asset

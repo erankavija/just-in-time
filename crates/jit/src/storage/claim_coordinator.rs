@@ -224,6 +224,22 @@ impl ClaimsIndex {
             .collect()
     }
 
+    /// The first active lease on `issue_id` held by anyone but `current_agent`; a
+    /// writer with no identity holds none, so every active lease conflicts.
+    pub(crate) fn conflicting_lease(
+        &self,
+        issue_id: &IssueId,
+        current_agent: Option<&Assignee>,
+        now: DateTime<Utc>,
+    ) -> Option<&Lease> {
+        self.leases.iter().find(|lease| {
+            &lease.issue_id == issue_id
+                && !lease.is_expired(now)
+                && !lease.is_stale(now)
+                && current_agent.is_none_or(|agent| &lease.agent_id != agent)
+        })
+    }
+
     /// Find active lease for an issue
     pub fn find_lease(&self, issue_id: &IssueId) -> Option<&Lease> {
         self.leases.iter().find(|l| &l.issue_id == issue_id)
@@ -278,29 +294,14 @@ pub(crate) struct ClaimsMutationGuard {
 }
 
 impl ClaimsMutationGuard {
-    fn active_leases<'a>(&'a self, issue_id: &'a IssueId) -> impl Iterator<Item = &'a Lease> {
-        self.index.leases.iter().filter(move |lease| {
-            &lease.issue_id == issue_id && !lease.is_expired(self.now) && !lease.is_stale(self.now)
-        })
-    }
-
-    pub(crate) fn has_active_lease(
-        &self,
-        issue_id: &IssueId,
-        current_agent: Option<&Assignee>,
-    ) -> bool {
-        self.active_leases(issue_id)
-            .any(|lease| current_agent.is_none_or(|agent| &lease.agent_id == agent))
-    }
-
     /// Return the first active lease on `issue_id` not held by `current_agent`.
     pub(crate) fn conflicting_lease(
         &self,
         issue_id: &IssueId,
         current_agent: Option<&Assignee>,
     ) -> Option<Lease> {
-        self.active_leases(issue_id)
-            .find(|lease| current_agent.is_none_or(|agent| &lease.agent_id != agent))
+        self.index
+            .conflicting_lease(issue_id, current_agent, self.now)
             .cloned()
     }
 
@@ -2636,7 +2637,8 @@ mod tests {
             coordinator
                 .lock_claims_for_repository_mutation()
                 .unwrap()
-                .has_active_lease(&issue_id, None)
+                .conflicting_lease(&issue_id, Some(&"agent:stranger".parse().unwrap()))
+                .is_some()
         };
         assert!(is_enforced_after(threshold));
         assert!(!is_enforced_after(threshold + 1));
@@ -2778,8 +2780,10 @@ mod tests {
 
         let guard = coordinator.lock_claims_for_repository_mutation().unwrap();
 
-        let current_agent: Assignee = "agent:test".parse().unwrap();
-        assert!(guard.has_active_lease(&issue_id, Some(&current_agent)));
+        let stranger: Assignee = "agent:stranger".parse().unwrap();
+        assert!(guard
+            .conflicting_lease(&issue_id, Some(&stranger))
+            .is_some());
         assert!(
             !index_path.exists(),
             "inspection must not repair derived state"
@@ -2801,8 +2805,6 @@ mod tests {
         let guard = coordinator.lock_claims_for_repository_mutation().unwrap();
         let stranger: Assignee = "agent:stranger".parse().unwrap();
 
-        assert!(guard.has_active_lease(&leased, None));
-        assert!(!guard.has_active_lease(&other, None));
         assert!(guard.conflicting_lease(&leased, Some(&stranger)).is_some());
         assert!(guard.conflicting_lease(&other, Some(&stranger)).is_none());
     }

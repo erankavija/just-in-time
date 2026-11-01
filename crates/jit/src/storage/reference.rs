@@ -487,7 +487,7 @@ pub fn render_reference_markdown() -> Result<String> {
         "- it names every id whose normalized form it prefixes, so a full id resolves in any \
          case or hyphenation;"
             .to_string(),
-        "- it must name exactly one id in the repository index. Several matches are refused as \
+        "- it must name exactly one id among the repository's issues. Several matches are refused as \
          ambiguous, and the error lists the candidates."
             .to_string(),
     ]

@@ -2562,13 +2562,15 @@ pub enum WorktreeCommands {
 /// Git hooks commands
 #[derive(Debug, Subcommand)]
 pub enum HooksCommands {
-    /// Install git hooks for lease and branch-drift validation
+    /// Install the git hook for branch-drift validation
     ///
-    /// Copies hook templates to .git/hooks/ and makes them executable.
+    /// Copies the hook template to .git/hooks/ and makes it executable.
     ///
-    /// Hooks installed:
-    ///   - pre-commit: Validates leases and branch drift before commit
-    ///   - pre-push: Validates leases before push
+    /// Hook installed:
+    ///   - pre-commit: Validates branch drift before commit
+    ///
+    /// No hook checks leases: they are enforced when a mutation is written, so a
+    /// hand edit of an issue record is not caught at commit.
     ///
     /// Examples:
     ///   jit hooks install          # Install hooks

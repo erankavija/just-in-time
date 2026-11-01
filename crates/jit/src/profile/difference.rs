@@ -25,8 +25,8 @@
 use crate::domain::identity::ProfileId;
 use crate::domain::ProfileOrigin;
 use crate::profile::{
-    ProfileContributionChange, ProfilePlanEntry, ProfilePlanStatus, ProfileTargetAction,
-    ProfileTargetChange,
+    ProfileApplicationStatus, ProfileApplyResult, ProfileContributionChange, ProfileRunMode,
+    ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
     MaterializationPlan, ProfileContributionMaterialization, ProfileTargetConflictEntry,
@@ -97,17 +97,17 @@ fn profile_contribution_changes(
         .collect()
 }
 
-/// Build one profile's preview entry from the decision the plan carries.
+/// Build one profile's answer from the decision the plan carries.
 ///
-/// A rehearsal of a publication and a difference report both answer through
-/// this projection, so the entry an adopter inspects before applying is the
-/// entry the run itself would report.
-pub(crate) fn profile_plan_entry(
+/// Every run mode answers through this projection, so the entry an adopter
+/// inspects before applying is the entry the run itself reports.
+pub(crate) fn profile_run_entry(
     plan: &MaterializationPlan,
     id: &ProfileId,
     version: &str,
     origin: ProfileOrigin,
-) -> ProfilePlanEntry {
+    mode: ProfileRunMode,
+) -> ProfileApplyResult {
     let targets = profile_target_changes(plan, id);
     let contributions = profile_contribution_changes(plan, id);
     let conflicted = targets
@@ -115,14 +115,14 @@ pub(crate) fn profile_plan_entry(
         .map(|target| target.action)
         .chain(contributions.iter().map(|contribution| contribution.action))
         .any(|action| action == ProfileTargetAction::Conflict);
-    let status = if conflicted {
-        ProfilePlanStatus::WouldConflict
-    } else if plan.applied_profiles().contains(id) {
-        ProfilePlanStatus::WouldApply
-    } else {
-        ProfilePlanStatus::Unchanged
+    let changed = !plan.delta().actions().is_empty() && plan.applied_profiles().contains(id);
+    let status = match (conflicted, changed, mode) {
+        (true, _, _) => ProfileApplicationStatus::WouldConflict,
+        (false, true, ProfileRunMode::Publish) => ProfileApplicationStatus::Applied,
+        (false, true, _) => ProfileApplicationStatus::WouldApply,
+        (false, false, _) => ProfileApplicationStatus::Unchanged,
     };
-    ProfilePlanEntry {
+    ProfileApplyResult {
         id: id.to_string(),
         version: version.to_string(),
         origin,

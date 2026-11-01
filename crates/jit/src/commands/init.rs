@@ -1,6 +1,6 @@
 use super::{profile::ProfileSelection, with_mutation_session, CommandExecutor, SessionStep};
 use crate::config::{slugify_project_name, ProjectName};
-use crate::profile::{ProfileApplicationStatus, ProfileComposedApplyResult};
+use crate::profile::{ProfileComposedApplyResult, ProfileRunMode};
 use crate::repository_state::{
     apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
     GitattributesStatus, InitializationScaffold, MaterializationPlan, MaterializationRequest,
@@ -171,17 +171,11 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                         members
                             .iter()
                             .map(|member| {
-                                let package = member.package();
-                                let changed = plan.applied_profiles().contains(&package.model().id);
-                                super::profile::applied_profile_result(
+                                super::profile::profile_result(
                                     &plan,
-                                    package,
+                                    member.package(),
                                     &layout,
-                                    if changed {
-                                        ProfileApplicationStatus::Applied
-                                    } else {
-                                        ProfileApplicationStatus::Unchanged
-                                    },
+                                    ProfileRunMode::Publish,
                                 )
                             })
                             .collect::<Result<Vec<_>>>()?,
@@ -324,7 +318,7 @@ fn init_response_paths(
     Ok((created, modified))
 }
 
-/// Preserve the startup-facing too-new-format error while deriving it from the
+/// Preserve the startup-facing unsupported-format error while deriving it from the
 /// same closed proposed image that init validates. Other structural failures keep
 /// their original validation context.
 fn init_validation_error(
@@ -343,7 +337,7 @@ fn init_validation_error(
             })
     });
     unsupported.map_or(error, |(found, supported)| {
-        crate::storage::RepositoryFormatTooNewError::new(found, supported).into()
+        crate::storage::RepositoryFormatUnsupportedError::new(found, supported).into()
     })
 }
 
@@ -419,6 +413,7 @@ fn git_events_pattern(relative: &Path) -> String {
 mod tests {
     use super::*;
     use crate::commands::ProfileSelector;
+    use crate::profile::ProfileApplicationStatus;
     use crate::profile::ProfilePackage;
     use crate::repository_state::{Contribution, MapEntryTarget};
     use crate::storage::{discover_repository_layout, IssueStore, JsonFileStorage};
@@ -792,7 +787,7 @@ mod tests {
             &repo,
             "packages/workflow",
             "workflow",
-            &["base"],
+            &[],
             "Workflow initialization definition.",
         );
 
@@ -800,7 +795,10 @@ mod tests {
             .unwrap()
             .initialize_selected(
                 repo.path(),
-                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
+                &[
+                    ProfileSelector::path(repo.path().join("packages/base")),
+                    ProfileSelector::path(repo.path().join("packages/workflow")),
+                ],
             )
             .unwrap_err();
 
@@ -867,7 +865,7 @@ mod tests {
         // the two sides reach it by different routes.
         let location = crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood");
         let workflow = crate::profile::ProfilePackage::from_directory(&location).unwrap();
-        let closure = executor.resolve_profile_closure(&workflow).unwrap();
+        let closure = crate::test_utils::selected_closure(&executor, &workflow).unwrap();
 
         let result = executor
             .initialize_selected(repo.path(), &[ProfileSelector::path(&location)])
@@ -1347,10 +1345,12 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         );
         let executor = file_executor(repo.path()).unwrap();
         let location = repo.path().join("packages/workflow");
-        let closure = executor
-            .resolve_profile_closure(&ProfilePackage::from_directory(&location).unwrap())
-            .unwrap()
-            .len();
+        let closure = crate::test_utils::selected_closure(
+            &executor,
+            &ProfilePackage::from_directory(&location).unwrap(),
+        )
+        .unwrap()
+        .len();
         let selectors = [ProfileSelector::path(location)];
 
         let (initialized, stages) = crate::profile::selection_probe::observe(|| {

@@ -33,7 +33,7 @@ A `jit events query --issue-id <ID>` filter therefore never returns them.
 | `gate_removed` | issue | yes | A quality gate was removed from the issue's required gates. |
 | `issue_completed` | issue | yes | An issue was completed. |
 | `issue_deleted` | issue | yes | An issue was permanently deleted. |
-| `issue_released` | issue | yes | An issue was released from its assignee; the record carries the former assignee and the reason. |
+| `issue_released` | issue | yes | An issue was released from its assignee; the record carries the former assignee, the reason, and who released it. |
 | `issue_updated` | issue | yes | An issue's fields were updated; the record names the changed fields. |
 | `artifact_archive_executed` | repository | no | `jit archive ... --execute` durably recorded publications, exact reference changes, and identity-guarded planned deletions before deletion attempts. |
 | `dependency_reduced` | issue | yes | `jit validate --fix` removed the issue's redundant (transitively implied) dependency edges. |

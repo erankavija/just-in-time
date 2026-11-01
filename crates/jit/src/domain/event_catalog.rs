@@ -124,7 +124,7 @@ impl EventTag {
             EventTag::IssueDeleted => "An issue was permanently deleted.",
             EventTag::IssueReleased => {
                 "An issue was released from its assignee; the record carries the former \
-                 assignee and the reason."
+                 assignee, the reason, and who released it."
             }
             EventTag::IssueUpdated => {
                 "An issue's fields were updated; the record names the changed fields."
@@ -200,9 +200,12 @@ impl EventTag {
             EventTag::GateRemoved => EventBody::draft_gate_removed(issue_id, gate_key),
             EventTag::IssueCompleted => EventBody::draft_issue_completed(issue_id),
             EventTag::IssueDeleted => EventBody::draft_issue_deleted(issue_id),
-            EventTag::IssueReleased => {
-                EventBody::draft_issue_released(issue_id, assignee, "stale lease".to_string())
-            }
+            EventTag::IssueReleased => EventBody::draft_issue_released(
+                issue_id,
+                assignee.clone(),
+                "stale lease".to_string(),
+                assignee,
+            ),
             EventTag::IssueUpdated => EventBody::draft_issue_updated(
                 issue_id,
                 "agent:worker-1".to_string(),

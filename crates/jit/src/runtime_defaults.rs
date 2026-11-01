@@ -103,7 +103,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Claim stale threshold",
             format!("{CLAIM_STALE_THRESHOLD_SECS} seconds"),
-            "Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer counts as active for lease enforcement and is not evicted automatically.",
+            "Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer refuses other agents' writes and is not evicted automatically.",
         ),
         (
             "Indefinite leases per agent",
@@ -118,7 +118,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Lease enforcement mode",
             EnforcementMode::DEFAULT.to_string(),
-            "Mode applied when the repository's `[worktree]` section omits `enforce_leases`. A repository with no `[worktree]` section enforces no leases.",
+            "Mode applied when the repository's `[worktree]` section omits `enforce_leases`. In `strict` a write is refused only when another agent holds an active lease on the issue. A repository with no `[worktree]` section enforces no leases.",
         ),
         (
             "Linked-checkout write policy",

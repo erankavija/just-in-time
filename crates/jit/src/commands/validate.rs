@@ -396,13 +396,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             }
             // Closure planning is best-effort: a malformed registry cannot fail
             // the capture, because validation itself is the authority that
-            // reports it. A bad config/index/rules yields a conservative closure
+            // reports it. A bad config/listing/rules yields a conservative closure
             // (its projection, item-kind, issue, and schema entries drop out),
             // and the subsequent `validate_repository` pass surfaces the parse
             // error as a finding.
             let config = effective_config(image, &effective_virtual_path)
                 .unwrap_or_else(|_| empty_materialization_config());
-            let all_ids =
+            let issue_ids =
                 crate::repository_state::overlaid_issue_ids(image, overrides).unwrap_or_default();
             let rules_text = effective_virtual_path(image, &VirtualPath::RULES)?
                 .map(String::from_utf8)
@@ -411,7 +411,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 crate::declarations::rules::RuleSet::schema_requests(content).is_ok()
             });
             let closure =
-                validate_capture_closure(image.layout(), &config, &all_ids, schema_rules)?;
+                validate_capture_closure(image.layout(), &config, &issue_ids, schema_rules)?;
             let read = image.capture_spec();
             let closure_read = closure.paths.iter().all(|path| read.contains_path(path))
                 && closure
@@ -437,7 +437,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 let parsed = if mutation {
                     super::captured_active_issues(image)?
                 } else {
-                    effective_issues(image, &all_ids, &effective_repo_path)?
+                    effective_issues(image, &issue_ids, &effective_repo_path)?
                 };
                 if matches!(
                     purpose,
@@ -760,10 +760,10 @@ fn empty_materialization_config() -> JitConfig {
 /// Parse every named issue record (possibly overlaid).
 fn effective_issues(
     image: &crate::repository_state::RepositoryImage,
-    all_ids: &[IssueId],
+    issue_ids: &[IssueId],
     effective: &EffectiveRepoPath<'_>,
 ) -> Result<Vec<Issue>> {
-    all_ids
+    issue_ids
         .iter()
         .map(|id| {
             let path = crate::repository_state::VirtualPath::issue_record(id);
@@ -886,19 +886,19 @@ pub(super) const MUTATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget
 pub(crate) struct MutationBase {
     /// Registries, issues, and the plan documents transition rules read.
     pub(crate) image: crate::repository_state::RepositoryImage,
-    /// Every indexed issue in `image`, sorted by id.
+    /// Every issue the listing in `image` states, sorted by id.
     pub(crate) issues: Vec<Issue>,
 }
 
 /// The lease inputs and target issue a mutation reads before taking the claims
 /// guard, from [`CommandExecutor::capture_mutation_preflight`].
 pub(crate) struct MutationPreflight {
-    /// Configuration, index, and candidate issues, or the full mutation base
+    /// Configuration and candidate issue, or the full mutation base
     /// when `issues` is present.
     pub(crate) image: crate::repository_state::RepositoryImage,
     /// The issue the request names.
     pub(crate) target: Issue,
-    /// Every indexed issue, when the preflight grew to the full base.
+    /// Every listed issue, when the preflight grew to the full base.
     pub(crate) issues: Option<Vec<Issue>>,
 }
 
@@ -1019,12 +1019,12 @@ pub(crate) fn plan_content_from_image(
 
     // Declaration parsing is best-effort, mirroring `capture_proposed_base`: a
     // missing or malformed config (parsed in `plan_content_with_issues`),
-    // index, or issue set yields an empty projection (no
+    // listing, or issue set yields an empty projection (no
     // breakable containers, so no external plan docs), and `validate_repository`
     // is the authority that reports the parse error. Only a genuinely missing
     // required plan document (below) is a hard error.
-    let all_ids = crate::repository_state::captured_issue_ids(image).unwrap_or_default();
-    let all_issues = effective_issues(image, &all_ids, effective_repo_path).unwrap_or_default();
+    let issue_ids = crate::repository_state::captured_issue_ids(image).unwrap_or_default();
+    let all_issues = effective_issues(image, &issue_ids, effective_repo_path).unwrap_or_default();
     plan_content_with_issues(image, &all_issues, emit_for)
 }
 
@@ -1241,6 +1241,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                             old_type, new_type, issue_id
                         ));
                     } else {
+                        messages.extend(self.refuse_foreign_lease(issue_id)?);
                         self.apply_type_fix(issue_id, old_type, new_type)?;
                         messages.push(format!(
                             "Replaced type '{}' with '{}' for issue {}",
@@ -3534,7 +3535,7 @@ depends_on = ["planning"]
             .expect("every reference resolves within its own budget");
     }
 
-    /// Preflight reads only the lease configuration, index, and resolved issue.
+    /// Preflight reads only the lease configuration and resolved issue.
     #[test]
     fn test_capture_mutation_preflight_reads_lease_inputs_and_target_only() {
         use crate::commands::test_helpers::{seed_issue, setup};

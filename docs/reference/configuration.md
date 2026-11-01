@@ -471,7 +471,7 @@ after adding or changing labels that are subject to uniqueness rules.
 
 ### `[worktree]` Section
 
-This section carries lease enforcement for structural issue operations and the
+This section carries lease enforcement for issue-record writes and the
 write-policy stance governing state-mutating commands run inside a linked
 non-primary checkout. Commands apply both.
 
@@ -485,14 +485,32 @@ write_policy = "refuse"    # Linked-checkout write-policy stance
 
 | Value | Description |
 |-------|-------------|
-| `"strict"` | Require an active lease for structural issue operations; fail without one |
-| `"warn"` | Warn if no lease but allow operation |
+| `"strict"` | Refuse a write to an issue anyone but the writer holds an active lease on; a writer with no identity holds none. A write to an unleased issue succeeds |
+| `"warn"` | Warn where `strict` would refuse, and allow the write |
 | `"off"` | No lease enforcement |
+
+Leases remain the way to claim exclusive work: acquire one with `jit claim acquire` and other agents' writes to that issue refuse.
 
 The mode is read from the repository's own `.jit/config.toml` only: `off`
 with no `[worktree]` section, the [default mode](runtime-defaults.md) when the
 section omits the key, and the declared value otherwise. `jit config show`, `jit config get`, and write
 commands all resolve it by this rule; environment variables do not change it.
+
+`jit issue update --filter` checks every matched issue and refuses the whole
+operation before writing, naming the leased ones.
+`jit gate remove` refuses when another agent leases an issue that requires the
+gate.
+
+Some writes reach a leased issue without the check: `jit issue release`
+(timeout recovery with a required reason; its event names who released),
+`jit issue claim` on an unleased issue, promotions of dependents, the rewrite of
+dependents when a dependency is deleted, the derived repair and transitive
+reduction of `jit validate --fix` (its type fix does refuse), `jit archive
+--execute` on a terminal target, and `jit recover`, which replays what already
+committed.
+
+Enforcement happens when a mutation is written; no git hook checks leases, so a
+hand edit of an issue record is not caught at commit.
 
 #### `write_policy`
 
@@ -712,7 +730,7 @@ See [example-config.toml](example-config.toml) for a complete annotated template
 | Use Case | Key Settings |
 |----------|--------------|
 | Single agent | Defaults work, no config needed |
-| Multi-agent team | `enforce_leases = "strict"`; acquire a lease before structural changes |
+| Multi-agent team | `enforce_leases = "strict"`; acquire a lease to claim exclusive work |
 | CI/CD | Set `JIT_AGENT_ID` when a command needs an agent identity |
 | Solo dev | `enforce_leases = "warn"` for flexibility |
 
