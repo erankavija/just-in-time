@@ -25,11 +25,14 @@ fn test_query_interface_works_without_coordinator() {
     // Claim one issue
     h.executor
         .issues()
-        .claim_issue(&id1, "agent:test".to_string())
+        .claim_issue(&id1, "agent:test".parse().unwrap())
         .unwrap();
 
     // Query by assignee
-    let assigned = h.executor.query_by_assignee("agent:test").unwrap();
+    let assigned = h
+        .executor
+        .query_by_assignee(&"agent:test".parse().unwrap())
+        .unwrap();
     assert_eq!(assigned.len(), 1);
     assert_eq!(assigned[0].id, id1);
 
@@ -82,7 +85,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
     // Claim issue
     h.executor
         .issues()
-        .claim_issue(&id, "agent:test".to_string())
+        .claim_issue(&id, "agent:test".parse().unwrap())
         .unwrap();
 
     // Release issue
@@ -172,7 +175,7 @@ fn test_gates_work_without_coordinator() {
         .pass_gate(
             &id,
             &"test-gate".parse().unwrap(),
-            Some("human:reviewer".to_string()),
+            Some("human:reviewer".parse().unwrap()),
             false,
         )
         .unwrap();
@@ -196,7 +199,7 @@ fn test_state_queries_work_without_coordinator() {
     // Claim one
     h.executor
         .issues()
-        .claim_issue(&id1, "agent:test".to_string())
+        .claim_issue(&id1, "agent:test".parse().unwrap())
         .unwrap();
 
     // Query in-progress state (claimed issue)

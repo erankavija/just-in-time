@@ -149,11 +149,13 @@ fn test_query_by_assignee_filters_correctly() {
 
     let issues = vec![issue1, issue2, issue3];
 
-    let alice_issues = jit::domain::queries::query_by_assignee(&issues, "agent:alice");
+    let alice_issues =
+        jit::domain::queries::query_by_assignee(&issues, &"agent:alice".parse().unwrap());
     assert_eq!(alice_issues.len(), 1);
     assert_eq!(alice_issues[0].id, issue_id(1));
 
-    let bob_issues = jit::domain::queries::query_by_assignee(&issues, "agent:bob");
+    let bob_issues =
+        jit::domain::queries::query_by_assignee(&issues, &"agent:bob".parse().unwrap());
     assert_eq!(bob_issues.len(), 1);
     assert_eq!(bob_issues[0].id, issue_id(2));
 }

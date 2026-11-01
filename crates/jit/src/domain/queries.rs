@@ -6,15 +6,15 @@
 
 use crate::domain::identity::GateKey;
 use crate::domain::identity::IssueId;
-use crate::domain::{is_dependency_met, GateStatus, Issue, Priority, State};
+use crate::domain::{is_dependency_met, Assignee, GateStatus, Issue, Priority, State};
 use std::cmp::Reverse;
 use std::collections::HashMap;
 
 /// Optional restrictions on all issues; every supplied filter must match.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct AllFilter<'a> {
     pub state: Option<State>,
-    pub assignee: Option<&'a str>,
+    pub assignee: Option<Assignee>,
     pub priority: Option<Priority>,
     pub labels: &'a [String],
 }
@@ -25,7 +25,7 @@ pub fn query_all(issues: &[Issue], filter: AllFilter<'_>) -> Vec<Issue> {
         .iter()
         .filter(|issue| {
             filter.state.is_none_or(|state| issue.state == state)
-                && filter.assignee.is_none_or(|assignee| {
+                && filter.assignee.as_ref().is_none_or(|assignee| {
                     issue
                         .assignee
                         .as_ref()
@@ -203,10 +203,10 @@ pub fn query_blocked(issues: &[Issue]) -> Vec<(Issue, Vec<BlockingReason>)> {
 }
 
 /// Query issues by assignee.
-pub fn query_by_assignee(issues: &[Issue], assignee: &str) -> Vec<Issue> {
+pub fn query_by_assignee(issues: &[Issue], assignee: &Assignee) -> Vec<Issue> {
     issues
         .iter()
-        .filter(|i| i.assignee.as_ref().is_some_and(|a| a == assignee))
+        .filter(|i| i.assignee.as_ref() == Some(assignee))
         .cloned()
         .collect()
 }
@@ -474,14 +474,15 @@ mod tests {
 
     #[test]
     fn test_query_all_composes_state_and_assignee() {
+        let assignee: Assignee = "agent:a".parse().unwrap();
         assert_query_all_intersects(
             AllFilter {
                 state: Some(State::Ready),
-                assignee: Some("agent:a"),
+                assignee: Some(assignee.clone()),
                 ..AllFilter::default()
             },
             |issues| query_by_state(issues, State::Ready),
-            |issues| query_by_assignee(issues, "agent:a"),
+            |issues| query_by_assignee(issues, &assignee),
         );
     }
 
@@ -514,13 +515,14 @@ mod tests {
 
     #[test]
     fn test_query_all_composes_assignee_and_priority() {
+        let assignee: Assignee = "agent:a".parse().unwrap();
         assert_query_all_intersects(
             AllFilter {
-                assignee: Some("agent:a"),
+                assignee: Some(assignee.clone()),
                 priority: Some(Priority::High),
                 ..AllFilter::default()
             },
-            |issues| query_by_assignee(issues, "agent:a"),
+            |issues| query_by_assignee(issues, &assignee),
             |issues| query_by_priority(issues, Priority::High),
         );
     }
@@ -528,13 +530,14 @@ mod tests {
     #[test]
     fn test_query_all_composes_assignee_and_labels() {
         let labels = ["component:api".into()];
+        let assignee: Assignee = "agent:a".parse().unwrap();
         assert_query_all_intersects(
             AllFilter {
-                assignee: Some("agent:a"),
+                assignee: Some(assignee.clone()),
                 labels: &labels,
                 ..AllFilter::default()
             },
-            |issues| query_by_assignee(issues, "agent:a"),
+            |issues| query_by_assignee(issues, &assignee),
             |issues| query_by_labels(issues, &labels),
         );
     }
@@ -577,12 +580,12 @@ mod tests {
                 issue
             }).collect();
             let state = state_index.map(|index| State::ALL[index]);
-            let assignee = assignee_index.map(|index| assignees[index]);
+            let assignee = assignee_index.map(|index| assignees[index].parse::<Assignee>().unwrap());
             let priority = priority_index.map(|index| Priority::ALL[index]);
             let labels: Vec<_> = label_indexes.into_iter().map(|index| patterns[index].into()).collect();
             let admitted = [
                 state.map(|state| query_by_state(&issues, state)),
-                assignee.map(|assignee| query_by_assignee(&issues, assignee)),
+                assignee.as_ref().map(|assignee| query_by_assignee(&issues, assignee)),
                 priority.map(|priority| query_by_priority(&issues, priority)),
                 Some(query_by_labels(&issues, &labels)),
             ];
@@ -1044,7 +1047,7 @@ mod tests {
         assert!(query_closed(&[]).is_empty());
         assert!(query_by_state(&[], State::Ready).is_empty());
         assert!(query_by_priority(&[], Priority::High).is_empty());
-        assert!(query_by_assignee(&[], "agent:a").is_empty());
+        assert!(query_by_assignee(&[], &"agent:a".parse().unwrap()).is_empty());
         assert!(query_by_label(&[], "epic:auth").is_empty());
         assert!(query_by_labels(&[], &patterns).is_empty());
         assert!(query_strategic(&[], &["epic".to_string()]).is_empty());
@@ -1130,28 +1133,30 @@ mod tests {
 
     #[test]
     fn test_query_by_assignee_matches_exact_assignee_only() {
-        let assigned = |index: usize, assignee: Option<&str>| {
+        let assigned = |index: usize, assignee: Option<Assignee>| {
             let mut issue = state_issue(index, State::Ready);
-            issue.assignee = assignee.map(|a| a.parse().unwrap());
+            issue.assignee = assignee;
             issue
         };
         let issues = vec![
-            assigned(0, Some("agent:a")),
-            assigned(1, Some("agent:b")),
-            assigned(2, Some("agent:a")),
+            assigned(0, Some("agent:a".parse().unwrap())),
+            assigned(1, Some("agent:b".parse().unwrap())),
+            assigned(2, Some("agent:a".parse().unwrap())),
             assigned(3, None),
         ];
 
+        let assignee_a: Assignee = "agent:a".parse().unwrap();
+        let assignee_b: Assignee = "agent:b".parse().unwrap();
+        let assignee_c: Assignee = "agent:c".parse().unwrap();
         assert_eq!(
-            ids_of(&query_by_assignee(&issues, "agent:a")),
+            ids_of(&query_by_assignee(&issues, &assignee_a)),
             [&issues[0].id, &issues[2].id]
         );
         assert_eq!(
-            ids_of(&query_by_assignee(&issues, "agent:b")),
+            ids_of(&query_by_assignee(&issues, &assignee_b)),
             [&issues[1].id]
         );
-        assert!(query_by_assignee(&issues, "agent:c").is_empty());
-        assert!(query_by_assignee(&issues, "agent").is_empty());
+        assert!(query_by_assignee(&issues, &assignee_c).is_empty());
     }
 
     #[test]

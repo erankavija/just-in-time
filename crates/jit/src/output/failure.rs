@@ -308,6 +308,17 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         .downcast_ref::<crate::errors::InvalidArgumentError>()
         .is_some()
         || error
+            .downcast_ref::<crate::domain::AssigneeParseError>()
+            .is_some()
+        || error
+            .downcast_ref::<crate::query_engine::QueryParseError>()
+            .is_some_and(|parse_error| {
+                matches!(
+                    parse_error,
+                    crate::query_engine::QueryParseError::InvalidAssignee { .. }
+                )
+            })
+        || error
             .downcast_ref::<crate::domain::vocabulary::UnknownToken>()
             .is_some()
         || error
@@ -699,6 +710,26 @@ mod exit_code_projection_tests {
                 "classifier produced the wrong code for `{error}`"
             );
         }
+    }
+
+    #[test]
+    fn test_classify_assignee_parse_failures_as_invalid_arguments() {
+        let assignee_error =
+            anyhow::Error::new("invalid".parse::<crate::domain::Assignee>().unwrap_err());
+        assert_eq!(
+            classify(&assignee_error).error.code,
+            ErrorCode::InvalidArgument
+        );
+
+        let filter_error =
+            anyhow::Error::new(crate::query_engine::QueryParseError::InvalidAssignee {
+                value: "invalid".to_string(),
+                reason: "invalid".parse::<crate::domain::Assignee>().unwrap_err(),
+            });
+        assert_eq!(
+            classify(&filter_error).error.code,
+            ErrorCode::InvalidArgument
+        );
     }
 
     #[test]

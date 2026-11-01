@@ -69,13 +69,13 @@ impl QueryEvaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Priority, State};
+    use crate::domain::{Assignee, Priority, State};
 
     fn create_issue(
         id: &IssueId,
         state: State,
         priority: Priority,
-        assignee: Option<&str>,
+        assignee: Option<Assignee>,
         labels: Vec<&str>,
         dependencies: Vec<IssueId>,
     ) -> Issue {
@@ -85,7 +85,7 @@ mod tests {
             description: String::new(),
             state,
             priority,
-            assignee: assignee.map(|s| s.parse().unwrap()),
+            assignee,
             dependencies,
             gates_required: vec![],
             gates_status: Default::default(),
@@ -188,7 +188,7 @@ mod tests {
             &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::Normal,
-            Some("agent:worker-1"),
+            Some("agent:worker-1".parse().unwrap()),
             vec![],
             vec![],
         );
@@ -208,7 +208,7 @@ mod tests {
             &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
             State::Ready,
             Priority::Normal,
-            Some("agent:worker-1"),
+            Some("agent:worker-1".parse().unwrap()),
             vec![],
             vec![],
         );

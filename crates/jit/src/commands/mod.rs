@@ -950,7 +950,7 @@ impl CapturedFieldUpdate {
             issue_type: None,
             add_gates: operations.add_gates.clone(),
             remove_gates: operations.remove_gates.clone(),
-            assignee: operations.assignee.as_deref().map(str::parse).transpose()?,
+            assignee: operations.assignee.clone(),
             unassign: operations.unassign,
             bulk: true,
             force,
