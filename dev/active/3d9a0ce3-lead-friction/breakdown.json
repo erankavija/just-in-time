@@ -132,8 +132,7 @@
     "labels": [
       "epic:lead-friction",
       "milestone:v1.0",
-      "component:core",
-      "satisfies:3d9a0ce3/REQ-03"
+      "component:core"
     ],
     "gates": [
       "cargo-ci",
