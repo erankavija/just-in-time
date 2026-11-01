@@ -61,7 +61,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-11-01T04:51:11.199360406Z"
+  "updated_at": "2026-11-01T05:26:05.801104493Z"
 }
