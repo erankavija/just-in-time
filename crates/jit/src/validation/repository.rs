@@ -36,7 +36,7 @@ pub enum RepositoryValidationPass {
     RulesAndSchemas,
     /// `gates.toml` parses and gate identities are unique.
     Gates,
-    /// `index.json`, issue JSON, and `events.jsonl` are internally consistent.
+    /// `index.json`, issue JSON, and `events.jsonl` parse and agree on embedded ids.
     Records,
     /// Dependencies, required gates, DAG shape, and transitive reduction hold.
     RepositoryIntegrity,

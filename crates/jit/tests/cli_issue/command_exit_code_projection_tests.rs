@@ -266,7 +266,7 @@ fn invoke_permission_denied(json: bool) -> Vec<Output> {
     vec![output]
 }
 
-/// `*`/10: a repository index newer than the binary's supported format fails
+/// `*`/10: a repository format other than the binary's supported one fails
 /// before command dispatch.
 fn invoke_unsupported_format(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();

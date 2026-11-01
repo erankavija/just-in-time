@@ -349,7 +349,7 @@ mod identity {
     }
 
     declare_well_known_paths! {
-        /// The issue index under the data root (`.jit/index.json`).
+        /// The format marker and tombstones under the data root (`.jit/index.json`).
         INDEX: Data = "index.json";
         /// Repository configuration under the data root (`.jit/config.toml`).
         CONFIG: Data = "config.toml";
@@ -394,7 +394,7 @@ mod identity {
 /// access so the defining module above stays the only const-capable scope.
 impl VirtualPath {
     /// The data root's records: issue records, the event log, gate-run
-    /// records, and the index listing the issues.
+    /// records, and the index holding the tombstones.
     pub const RECORDS: [Self; 4] = [Self::ISSUES, Self::EVENTS, Self::GATE_RUNS, Self::INDEX];
 
     /// Whether profile application must refuse this target as application-owned state.

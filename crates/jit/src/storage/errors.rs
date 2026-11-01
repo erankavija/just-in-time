@@ -245,15 +245,15 @@ impl RepositoryFormatUnsupportedError {
 
 /// Error raised when an id prefix matches more than one candidate.
 ///
-/// Two origins share this type: resolving an issue-id prefix against the repo
-/// index ([`Issue`](Self::Issue)) and removing a dependency edge by prefix
+/// Two origins share this type: resolving an issue-id prefix against the repo's
+/// issues ([`Issue`](Self::Issue)) and removing a dependency edge by prefix
 /// against an issue's own stored dependencies ([`Dependency`](Self::Dependency)).
 /// The CLI downcasts to this type to classify the failure as an argument error
 /// (exit code `2`) and to render an `AMBIGUOUS_ID` JSON error. Each variant's
 /// `Display` reproduces the exact phrasing of the call site it replaced.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum AmbiguousIdError {
-    /// An issue-id prefix matched multiple issues in the repository index.
+    /// An issue-id prefix matched multiple issues in the repository.
     #[error("Ambiguous ID '{prefix}' matches multiple issues:\n  {}", .matches.join("\n  "))]
     Issue {
         /// The prefix that resolved ambiguously.

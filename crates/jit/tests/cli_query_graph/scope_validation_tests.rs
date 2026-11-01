@@ -738,7 +738,7 @@ assert = { label-coverage = { } }
 // Container-pointer resolution under scope (ef0065ad): a `container-from-label`
 // coverage rule (the repo's `coverage-preview` shape) fires on a breakdown node
 // and redirects to the bracketed container. Under `--scope`, the pointer must
-// resolve against the COMPLETE repository index — not the partial slice — so an
+// resolve against the COMPLETE repository issue set — not the partial slice — so an
 // unrelated breakdown that entered the closure without its container is
 // recognized and skipped rather than mis-reported as a dangling pointer, while a
 // genuinely dangling pointer still fails precisely.
@@ -778,7 +778,7 @@ fn test_scope_skips_unrelated_breakdown_whose_container_is_out_of_scope() {
     // REQ-02 (ef0065ad): a completed, UNRELATED breakdown B2 enters the scoped
     // slice through the dependency closure (as a breakdown boundary node), but
     // the container it brackets (C2) is not in the slice. Its `brackets:` pointer
-    // resolves against the FULL repository index, so the out-of-scope container is
+    // resolves against the FULL repository issue set, so the out-of-scope container is
     // recognized and B2's coverage is simply not the requested bracket — no false
     // missing-pointer finding. Before the fix, resolving `brackets:C2` against the
     // partial slice found nothing and raised a spurious `config error`.

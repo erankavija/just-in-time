@@ -132,7 +132,7 @@ pub(crate) fn resolve_unique_issue_id<'a>(
 }
 
 /// The one of an issue's stored `dependencies` that `prefix` names. Matching
-/// the stored edges rather than the index keeps an edge whose target was
+/// the stored edges rather than the issue files keeps an edge whose target was
 /// deleted resolvable (jit:f847df3f).
 ///
 /// # Errors

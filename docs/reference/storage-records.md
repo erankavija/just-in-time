@@ -29,7 +29,7 @@ lowercases the input and drops its hyphens, then:
 
 - the normalized input must be at least 4 characters; below the minimum it is refused as an argument error (exit code 2, see [Exit Codes](exit-codes.md)) before any issue record is read;
 - it names every id whose normalized form it prefixes, so a full id resolves in any case or hyphenation;
-- it must name exactly one id in the repository index. Several matches are refused as ambiguous, and the error lists the candidates.
+- it must name exactly one id among the repository's issues. Several matches are refused as ambiguous, and the error lists the candidates.
 
 A short id is 8 characters and the minimum is 4,
 so a short id printed by one command is always long enough to hand back to the next.
