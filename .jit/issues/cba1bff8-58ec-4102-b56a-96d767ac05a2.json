@@ -1,0 +1,26 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T16:48:16.951675351Z",
+  "context": {},
+  "created_at": "2026-11-01T16:48:15.717312131Z",
+  "dependencies": [],
+  "description": "`jit issue reject` leaves a dependent in `backlog` when it removes the dependent's last blocker, so the dependent never becomes available and `jit validate` fails on the repository.\n\n## Background\n\nReproduced on a fresh repository with the installed binary and with main's build: create a blocker and a dependent, add the edge, run `jit issue reject <blocker> --reason obsolete`, and the dependent stays `backlog`. `Rejected` is a terminal state, so the dependency is met. It surfaced in this repository: rejecting 627fdcc4 left cc6ef886 in `backlog` and 9c008d2d's validation refused the repository.\n\nClosing an issue promotes its dependents through `check_auto_transitions`; `reject_issue` does not reach it. da12ad66 made `jit issue reject` the only rejection form, so this is now the only path.\n\n## Success Criteria\n\n- [hard] REQ-01: After `jit issue reject` removes a dependent's last blocker, the dependent is `ready`, in the same mutation, and `jit validate` passes.\n- [hard] REQ-02: Rejection promotes through the same path closing uses, with no second derivation (`@/charter/D-20`).\n- [hard] REQ-03: A harness test owns REQ-01.\n\n## Notes\n\n- This must land before the format 3 window: its binary carries 9c008d2d's stricter validation, so every rejection would otherwise break `jit validate` in every repository.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T16:48:15.717312131Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "cba1bff8-58ec-4102-b56a-96d767ac05a2",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Rejecting an issue does not promote its dependents",
+  "updated_at": "2026-11-01T16:48:16.951675351Z"
+}

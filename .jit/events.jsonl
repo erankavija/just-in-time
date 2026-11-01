@@ -22297,3 +22297,8 @@
 {"id":"3fab8dce-3df4-43a0-ae2d-7228bb496bd3","issue_id":"17fbcf25-67cd-41a8-acc4-adb6df43b4a2","timestamp":"2026-11-01T16:45:32.942533936Z","type":"issue_completed"}
 {"assignee":"agent:worker","id":"08493900-de08-487b-8bc3-1249f330e478","issue_id":"627fdcc4-6245-4b37-bf8d-c3d52a7dbe8b","timestamp":"2026-11-01T16:46:03.474178535Z","type":"issue_claimed"}
 {"from":"backlog","id":"5cf2ed7f-9660-4249-a375-93c5c6db77d4","issue_id":"627fdcc4-6245-4b37-bf8d-c3d52a7dbe8b","timestamp":"2026-11-01T16:46:03.572287705Z","to":"rejected","type":"issue_state_changed"}
+{"id":"a3afb0bf-18e1-4e49-bbcf-91cd0fcf77d4","issue_id":"cba1bff8-58ec-4102-b56a-96d767ac05a2","priority":"normal","timestamp":"2026-11-01T16:48:15.717312131Z","title":"Rejecting an issue does not promote its dependents","type":"issue_created"}
+{"fields":["dependencies"],"id":"43b07665-acac-4ebf-9457-dfda5e2091bb","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T16:48:16.501478579Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"ba09c5aa-2447-4c0c-9f58-b295d53aeee7","issue_id":"cba1bff8-58ec-4102-b56a-96d767ac05a2","timestamp":"2026-11-01T16:48:16.951675351Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"449fa61e-07fc-499b-9c77-6102cd963a65","issue_id":"cba1bff8-58ec-4102-b56a-96d767ac05a2","timestamp":"2026-11-01T16:48:16.951675351Z","type":"issue_claimed"}
+{"from":"backlog","id":"f6517659-293c-484d-b3ca-f1523f49586e","issue_id":"cc6ef886-17a2-48e6-acff-0c206dcd664b","timestamp":"2026-11-01T16:48:21.594658943Z","to":"ready","type":"issue_state_changed"}
