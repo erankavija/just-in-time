@@ -912,7 +912,7 @@ pub(super) fn finalize_delta(
                                 issue_id, gate_key, ..
                             },
                             GateStatus::Failed,
-                        ) => issue_id == &updated.id && gate_key.as_str() == key,
+                        ) => issue_id == &updated.id && gate_key == key,
                         _ => false,
                     },
                     _ => false,
@@ -1434,7 +1434,7 @@ mod tests {
         issue.gates_status = order
             .iter()
             .map(|index| gate_entries[*index].clone())
-            .map(|(key, value)| (key.to_string(), value))
+            .map(|(key, value)| (key.parse().unwrap(), value))
             .collect::<HashMap<_, _>>();
         issue
     }
@@ -1893,6 +1893,13 @@ mod tests {
     }
 
     #[test]
+    fn test_serialize_issue_is_byte_identical_over_its_own_output() {
+        let bytes = serialize_issue(&map_order_draft(false)).unwrap();
+        let decoded: Issue = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(serialize_issue(&decoded).unwrap(), bytes);
+    }
+
+    #[test]
     fn test_canonical_serialization_preserves_repository_record_shapes() {
         let issue_bytes = serialize_issue(&map_order_draft(false)).unwrap();
         assert!(issue_bytes.starts_with(b"{\n"));
@@ -1961,10 +1968,10 @@ mod tests {
         assert!(reproduced > 0, "the repository log holds current events");
     }
 
-    /// Every repository issue record, current-format gate-run result and the
-    /// membership index re-serialize to their stored bytes; every other gate-run
-    /// result decodes and reproduces its ids; every run is stored at the path its
-    /// id names.
+    /// Every repository issue record re-serializes to its canonical JSON; every
+    /// current-format gate-run result and the membership index re-serialize to
+    /// their stored bytes; every other gate-run result decodes and reproduces its
+    /// ids; every run is stored at the path its id names.
     #[test]
     fn test_repository_records_decode_and_reproduce_their_stored_issue_ids() {
         let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit");
@@ -2051,7 +2058,7 @@ mod tests {
             .with_timezone(&Utc);
         let mut preimage = seeded_issue(id, None);
         preimage.gates_status.insert(
-            "tests".into(),
+            "tests".parse().unwrap(),
             GateState {
                 status: GateStatus::Pending,
                 updated_by: None,
@@ -2061,7 +2068,7 @@ mod tests {
         );
         let mut updated = preimage.clone();
         updated.gates_status.insert(
-            "tests".into(),
+            "tests".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("agent:reviewer".parse().unwrap()),
@@ -2092,7 +2099,10 @@ mod tests {
             })
             .unwrap();
         let persisted: Issue = serde_json::from_slice(written).unwrap();
-        assert_eq!(persisted.gates_status["tests"].updated_at, fixed_instant());
+        assert_eq!(
+            persisted.gates_status[&"tests".parse().unwrap()].updated_at,
+            fixed_instant()
+        );
         assert_eq!(persisted.updated_at, fixed_instant());
     }
 

@@ -86,7 +86,7 @@ pub(crate) fn install_templates(cli: &jit::test_cli::JitCli, templates_toml: &st
             cli.run([
                 "gate",
                 "define",
-                key,
+                key.as_str(),
                 "--title",
                 &format!("{key} gate"),
                 "--description",

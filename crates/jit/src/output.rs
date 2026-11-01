@@ -4,6 +4,7 @@
 //! and error cases, ensuring machine-readable output that works well with
 //! AI agents and automation tools.
 
+use crate::domain::identity::GateKey;
 use crate::domain::Assignee;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -295,7 +296,7 @@ pub enum GateRunLine {
 /// The human status line for a gate's run, preserving the requested text.
 pub fn render_gate_run_status(
     line: GateRunLine,
-    gate_key: impl Display,
+    gate_key: &GateKey,
     requested: impl Display,
 ) -> String {
     match line {
@@ -1227,7 +1228,7 @@ impl JsonError {
         .with_suggestion("Check if the issue ID is correct")
     }
 
-    pub fn gate_not_found(gate_key: &str) -> Self {
+    pub fn gate_not_found(gate_key: &GateKey) -> Self {
         Self::new(
             ErrorCode::GateNotFound,
             format!("Gate not found: {}", gate_key),
@@ -1719,7 +1720,7 @@ pub type DivergenceResponse = ListEnvelope<DivergencesKey, DivergenceView>;
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateView {
     /// Gate key.
-    pub key: String,
+    pub key: GateKey,
     /// Gate status.
     pub status: crate::domain::GateStatus,
     /// Timestamp of the gate's latest run, or `null` when never run.
@@ -1734,7 +1735,11 @@ impl GateView {
     /// `state` is the issue's recorded [`GateState`] for this gate (if any) and
     /// `runs` are all recorded runs for the issue; the run `state` was projected
     /// from, the gate's latest published run, supplies `last_run_at`/`exit_code`.
-    fn build(key: &str, state: Option<&crate::domain::GateState>, runs: &[GateRunResult]) -> Self {
+    fn build(
+        key: &GateKey,
+        state: Option<&crate::domain::GateState>,
+        runs: &[GateRunResult],
+    ) -> Self {
         let status = state
             .map(|s| s.status)
             .unwrap_or(crate::domain::GateStatus::Pending);
@@ -1742,7 +1747,7 @@ impl GateView {
         let latest = state.and_then(|state| state.projected_run(key, runs));
 
         GateView {
-            key: key.to_string(),
+            key: key.clone(),
             status,
             last_run_at: latest.map(|r| r.started_at.to_rfc3339()),
             exit_code: latest.and_then(|r| r.exit_code),
@@ -1919,19 +1924,21 @@ impl IssueShowResponse {
 /// # Examples
 ///
 /// ```
+/// use jit::domain::identity::GateKey;
 /// use jit::domain::{GateStatus, Issue, State};
 /// use jit::output::{IssueShowResponse, IssueStatusResponse};
 ///
 /// let id = jit::test_utils::issue_id(1);
 /// let mut issue = Issue::draft(id, "Build parser".into(), "Body".into());
 /// issue.state = State::Ready;
-/// issue.gates_required = vec!["tests".into()];
+/// let gate: GateKey = "tests".parse().unwrap();
+/// issue.gates_required = vec![gate.clone()];
 /// let show = IssueShowResponse::from_issue(issue, vec![], &[]);
 ///
 /// let status = IssueStatusResponse::from_show(&show);
 /// assert_eq!(status.state, State::Ready);
 /// assert_eq!(status.gates.len(), 1);
-/// assert_eq!(status.gates[0].key, "tests");
+/// assert_eq!(status.gates[0].key, gate);
 /// assert_eq!(status.gates[0].status, GateStatus::Pending);
 /// assert!(status.unmet_dependencies.is_empty());
 ///
@@ -2432,7 +2439,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateRunSummary {
     pub run_id: crate::domain::identity::GateRunId,
-    pub key: String,
+    pub key: GateKey,
     pub stage: GateStage,
     pub status: GateRunStatus,
     pub started_at: String,
@@ -2497,7 +2504,7 @@ impl GateRunSummary {
     fn build(r: &GateRunResult, include_output: bool) -> Self {
         Self {
             run_id: r.run_id.clone(),
-            key: r.gate_key.to_string(),
+            key: r.gate_key.clone(),
             stage: r.stage,
             status: r.status,
             started_at: r.started_at.to_rfc3339(),
@@ -2527,7 +2534,7 @@ impl GateRunSummary {
 /// the single nonzero exit code of `gate status-all`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateStatusEntry {
-    pub key: String,
+    pub key: GateKey,
     pub status: GateStatus,
 }
 
@@ -2538,9 +2545,9 @@ impl GateStatusEntry {
     /// Centralizes the pending-default so the compact `gates` projection shared
     /// by `issue status` and `issue show --summary` matches the status the full
     /// [`GateView`] reports for the same gate.
-    pub fn for_required(key: &str, state: Option<&GateState>) -> Self {
+    pub fn for_required(key: &GateKey, state: Option<&GateState>) -> Self {
         Self {
-            key: key.to_string(),
+            key: key.clone(),
             status: state.map(|s| s.status).unwrap_or(GateStatus::Pending),
         }
     }
@@ -2566,7 +2573,7 @@ pub struct GateCheckSummary {
     pub results: Vec<GateRunSummary>,
     pub passed: usize,
     pub total: usize,
-    pub not_run: Vec<String>,
+    pub not_run: Vec<GateKey>,
     pub all_passed: bool,
 }
 
@@ -2593,7 +2600,7 @@ pub struct GateEvaluateManyResult {
     #[serde(rename = "issue_id")]
     pub target: BatchTarget,
     /// Gate key evaluated for this issue.
-    pub key: String,
+    pub key: GateKey,
     /// [`GateStatus::Passed`] token when a verdict was recorded as passing,
     /// otherwise the [`GateStatus::Failed`] token.
     pub status: String,
@@ -2630,7 +2637,7 @@ pub type GateRunHistoryResponse = ListEnvelope<ResultsKey, GateRunSummary>;
 /// plain verbatim output exactly.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateFlatReportResponse {
-    pub key: String,
+    pub key: GateKey,
     pub run_id: crate::domain::identity::GateRunId,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stdout: Option<String>,
@@ -2649,7 +2656,7 @@ pub struct GateFlatReportResponse {
 /// fields.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateFindingsResponse {
-    pub key: String,
+    pub key: GateKey,
     pub run_id: crate::domain::identity::GateRunId,
     /// Whether the latest run carried a machine-readable findings block.
     pub has_findings: bool,
@@ -2677,7 +2684,7 @@ pub type GateListResponse = ListEnvelope<GatesKey, GateDefinition>;
 /// format.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateDefinition {
-    pub key: String,
+    pub key: GateKey,
     pub title: String,
     pub description: String,
     /// Execution stage; serializes as its [`GateStage`] token.
@@ -2697,7 +2704,7 @@ pub struct GateDefinition {
 impl From<crate::declarations::GateDefinition> for GateDefinition {
     fn from(gate: crate::declarations::GateDefinition) -> Self {
         Self {
-            key: gate.key.into(),
+            key: gate.key,
             title: gate.title,
             description: gate.description,
             stage: gate.stage,
@@ -2889,8 +2896,8 @@ mod tests {
     #[test]
     fn test_render_gate_run_status_never_run_and_passed_name_gate_and_issue() {
         let id = crate::test_utils::issue_id(1);
-        let never = render_gate_run_status(GateRunLine::NeverRun, "tests", &id);
-        let passed = render_gate_run_status(GateRunLine::Passed, "tests", &id);
+        let never = render_gate_run_status(GateRunLine::NeverRun, &"tests".parse().unwrap(), &id);
+        let passed = render_gate_run_status(GateRunLine::Passed, &"tests".parse().unwrap(), &id);
         for line in [&never, &passed] {
             assert!(line.contains("'tests'") && line.contains(id.as_str()));
         }
@@ -3301,7 +3308,7 @@ mod tests {
         // `gates` replaces `gates_required`/`gates_status`; neither legacy field
         // appears in the `issue show --json` shape.
         let mut issue = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
-        issue.gates_required = vec!["tests".to_string()];
+        issue.gates_required = vec!["tests".parse().unwrap()];
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
 
@@ -3317,7 +3324,7 @@ mod tests {
     fn test_show_response_gate_never_run_is_null() {
         // Required-but-never-run gate: status pending, last_run_at/exit_code null.
         let mut issue = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
-        issue.gates_required = vec!["tests".to_string()];
+        issue.gates_required = vec!["tests".parse().unwrap()];
         let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
         let v = serde_json::to_value(&resp).unwrap();
 
@@ -3337,11 +3344,11 @@ mod tests {
         // A gate that has run: status from GateState, last_run_at/exit_code from
         // the GateRunResult the state names.
         let mut issue = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
-        issue.gates_required = vec!["tests".to_string()];
+        issue.gates_required = vec!["tests".parse().unwrap()];
         let run_at = Utc::now();
         let run_id = crate::test_utils::gate_run_id(1);
         issue.gates_status.insert(
-            "tests".to_string(),
+            "tests".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("ci:test".parse().unwrap()),
@@ -3425,7 +3432,7 @@ mod tests {
             references,
         };
         let response = GateFindingsResponse {
-            key: "review".to_string(),
+            key: "review".parse().unwrap(),
             run_id: crate::test_utils::gate_run_id(1),
             has_findings: true,
             verdict: Some("fail".to_string()),
@@ -3817,7 +3824,11 @@ mod tests {
         };
         let gate = BlockedReason {
             reason_type: BlockedReasonType::Gate,
-            detail: "test-gate".to_string(),
+            detail: format!(
+                "{} ({})",
+                "test-gate".parse::<GateKey>().unwrap(),
+                GateStatus::Pending
+            ),
         };
 
         let dep_json = serde_json::to_value(&dep).unwrap();
@@ -3832,7 +3843,7 @@ mod tests {
         use crate::declarations::{GateMode, GateStage};
         // --json gate output must remain snake_case regardless of enum Debug repr.
         let def = GateDefinition {
-            key: "ci".to_string(),
+            key: "ci".parse().unwrap(),
             title: "CI".to_string(),
             description: "Continuous integration".to_string(),
             stage: GateStage::Postcheck,
@@ -3845,7 +3856,7 @@ mod tests {
         assert_eq!(v["mode"], "auto", "mode must be snake_case");
 
         let def_pre = GateDefinition {
-            key: "lint".to_string(),
+            key: "lint".parse().unwrap(),
             title: "Lint".to_string(),
             description: "Linting".to_string(),
             stage: GateStage::Precheck,

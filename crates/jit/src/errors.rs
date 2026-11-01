@@ -7,6 +7,7 @@
 //!
 //! Designed to help users understand what went wrong and how to fix it.
 
+use crate::domain::identity::GateKey;
 use std::fmt;
 
 use crate::declarations::GateMode;
@@ -597,7 +598,7 @@ pub(crate) enum TransitionBlocker {
         issue_id: IssueId,
     },
     Gate {
-        gate_key: String,
+        gate_key: GateKey,
         status: GateStatus,
         /// The gate's registry mode, so the remediation hint can name the
         /// `--by <attestor>` form for a manual gate (jit:1d59070d REQ-03)
@@ -642,7 +643,7 @@ impl TransitionBlockedError {
         issue_id: IssueId,
         requested_state: State,
         actual_state: State,
-        gates: Vec<(String, GateStatus, GateMode)>,
+        gates: Vec<(GateKey, GateStatus, GateMode)>,
     ) -> Self {
         Self {
             issue_id,
@@ -1157,7 +1158,7 @@ mod tests {
             State::Done,
             State::Gated,
             vec![(
-                "code-review".to_string(),
+                "code-review".parse().unwrap(),
                 GateStatus::Pending,
                 GateMode::Auto,
             )],
@@ -1176,7 +1177,7 @@ mod tests {
             State::Done,
             State::Gated,
             vec![(
-                "code-review".to_string(),
+                "code-review".parse().unwrap(),
                 GateStatus::Pending,
                 GateMode::Manual,
             )],
@@ -1197,7 +1198,11 @@ mod tests {
             id.clone(),
             State::Done,
             State::Gated,
-            vec![("tests".to_string(), GateStatus::Pending, GateMode::Auto)],
+            vec![(
+                "tests".parse().unwrap(),
+                GateStatus::Pending,
+                GateMode::Auto,
+            )],
         );
 
         let commands = error.remediation_commands();

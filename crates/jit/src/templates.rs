@@ -31,6 +31,7 @@
 //! task (W2). The reference-integrity checks above are all resolvable from the
 //! template file plus the type hierarchy alone.
 
+use crate::domain::identity::GateKey;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -295,12 +296,11 @@ pub struct GraphTemplate {
 pub struct AnchorSlot {
     /// The anchor's name, referenced by `anchor_edges.from`.
     pub name: String,
-    /// Gate-preset names attached to the BOUND anchor issue at apply time,
-    /// declared exactly like a node's [`gates`](TemplateNode::gates). Preset
-    /// existence is validated by the apply engine (not at config load), and the
-    /// presets are attached through the same shared `apply_gate_preset` path.
+    /// Gate or preset keys attached to the bound issue, like a node's
+    /// [`gates`](TemplateNode::gates). Spelling is checked on decode;
+    /// existence is checked at apply time.
     #[serde(default)]
-    pub gates: Vec<String>,
+    pub gates: Vec<GateKey>,
 }
 
 /// A node the template creates when applied.
@@ -314,10 +314,10 @@ pub struct TemplateNode {
     /// `[type_hierarchy].types`.
     #[serde(rename = "type")]
     pub type_name: String,
-    /// Gate-preset names attached to the node (resolved by the gate-preset
-    /// manager at apply time, not validated here).
+    /// Gate or preset keys attached to the node. Spelling is checked on decode;
+    /// existence is checked at apply time.
     #[serde(default)]
-    pub gates: Vec<String>,
+    pub gates: Vec<GateKey>,
     /// Plan-doc location template for the node, with `{...}` interpolation
     /// tokens resolved at apply time.
     ///
@@ -713,7 +713,10 @@ applies_to  = ["epic"]
         let planning = &t.nodes[0];
         assert_eq!(planning.role, "planning");
         assert_eq!(planning.type_name, "planning");
-        assert_eq!(planning.gates, vec!["plan-review"]);
+        assert_eq!(
+            planning.gates,
+            vec!["plan-review".parse::<GateKey>().unwrap()]
+        );
         assert_eq!(
             planning.doc.as_deref(),
             Some("dev/active/{container.id}-plan.md")
@@ -726,6 +729,9 @@ applies_to  = ["epic"]
         assert_eq!(
             breakdown.gates,
             vec!["coverage-preview", "breakdown-review"]
+                .into_iter()
+                .map(|key| key.parse::<GateKey>().unwrap())
+                .collect::<Vec<_>>()
         );
         assert_eq!(breakdown.labels, vec!["brackets:{container.short_id}"]);
         assert_eq!(breakdown.depends_on, vec!["planning"]);
@@ -763,6 +769,9 @@ applies_to  = ["epic"]
         assert_eq!(
             reg.get("anchored").unwrap().anchors[0].gates,
             vec!["plan-review", "coverage-preview"]
+                .into_iter()
+                .map(|key| key.parse::<GateKey>().unwrap())
+                .collect::<Vec<_>>()
         );
     }
 

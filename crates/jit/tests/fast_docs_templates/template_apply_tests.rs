@@ -363,13 +363,15 @@ fn test_apply_attaches_declared_gate_presets() {
     let breakdown = h.get_issue(&result.created_node_ids_by_role["breakdown"]);
 
     // APPA-04: each node carries its template-declared gate presets.
-    assert!(planning.gates_required.contains(&"plan-review".to_string()));
+    assert!(planning
+        .gates_required
+        .contains(&"plan-review".parse().unwrap()));
     assert!(breakdown
         .gates_required
-        .contains(&"coverage-preview".to_string()));
+        .contains(&"coverage-preview".parse().unwrap()));
     assert!(breakdown
         .gates_required
-        .contains(&"breakdown-review".to_string()));
+        .contains(&"breakdown-review".parse().unwrap()));
 }
 
 #[test]
@@ -701,7 +703,7 @@ fn test_apply_plan_template_attaches_repo_validate_to_container() {
     assert!(
         container
             .gates_required
-            .contains(&"repo-validate".to_string()),
+            .contains(&"repo-validate".parse().unwrap()),
         "bound container missing the plan template's repo-validate anchor gate: {:?}",
         container.gates_required
     );
@@ -716,7 +718,7 @@ fn test_apply_attaches_registry_gate_key_not_preset() {
     // Here the anchor and a node each name `deploy-check`, a registry-only gate.
     let h = TestHarness::new();
     h.add_gate(
-        "deploy-check",
+        &"deploy-check".parse().unwrap(),
         "Deploy Check",
         "A config-declared gate with no preset of that name",
         GateMode::Auto,
@@ -763,7 +765,7 @@ applies_to  = ["epic"]
     assert!(
         container
             .gates_required
-            .contains(&"deploy-check".to_string()),
+            .contains(&"deploy-check".parse().unwrap()),
         "bound anchor missing its registry-key gate: {:?}",
         container.gates_required
     );
@@ -772,7 +774,7 @@ applies_to  = ["epic"]
     assert!(
         breakdown
             .gates_required
-            .contains(&"deploy-check".to_string()),
+            .contains(&"deploy-check".parse().unwrap()),
         "node missing its registry-key gate: {:?}",
         breakdown.gates_required
     );
@@ -815,7 +817,7 @@ applies_to  = ["epic"]
     assert!(
         container
             .gates_required
-            .contains(&"plan-review".to_string()),
+            .contains(&"plan-review".parse().unwrap()),
         "bound anchor missing its declared gate preset: {:?}",
         container.gates_required
     );
@@ -881,7 +883,7 @@ fn test_apply_reports_a_planning_bracket_gate_no_preset_and_no_registry_entry_su
                 .load_gate_registry()
                 .expect("an empty registry loads")
                 .gates
-                .contains_key(key),
+                .contains_key(&key.parse::<jit::domain::identity::GateKey>().unwrap()),
             "{key} must not be a registry gate this repository never declared"
         );
 
@@ -977,7 +979,7 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     // name, so the registry-key fallback WOULD match it.
     executor
         .define_gate(
-            "repo-validate".to_string(),
+            &"repo-validate".parse().unwrap(),
             "Repo Validate".to_string(),
             "Whole-repository validation".to_string(),
             jit::declarations::GateStage::Postcheck,
@@ -1138,14 +1140,14 @@ fn test_repo_gates_toml_declares_inputs_for_tree_scoped_gates_only() {
         .unwrap_or_else(|error| panic!("reading {}: {error}", gates_path.display()));
     let registry = jit::declarations::parse_gate_registry(&raw)
         .expect("this repository's gate registry parses");
-    let gate = |key: &str| {
+    let gate = |key: &jit::domain::identity::GateKey| {
         registry
             .gates
             .get(key)
             .unwrap_or_else(|| panic!(".jit/gates.toml must declare the `{key}` gate"))
     };
 
-    let workspace = gate("cargo-ci")
+    let workspace = gate(&"cargo-ci".parse().unwrap())
         .inputs
         .as_ref()
         .expect("the Rust workspace gate declares the files its checker reads");
@@ -1159,7 +1161,7 @@ fn test_repo_gates_toml_declares_inputs_for_tree_scoped_gates_only() {
     );
 
     assert!(
-        gate("code-review").inputs.is_none(),
+        gate(&"code-review".parse().unwrap()).inputs.is_none(),
         "an issue-scoped review's verdict is not a function of the tree, so it declares no inputs"
     );
 }
@@ -1177,7 +1179,7 @@ fn test_repo_gates_toml_excludes_generated_trees_by_declaration() {
         .unwrap_or_else(|error| panic!("reading {}: {error}", gates_path.display()));
     let registry = jit::declarations::parse_gate_registry(&raw)
         .expect("this repository's gate registry parses");
-    let inputs = |key: &str| {
+    let inputs = |key: &jit::domain::identity::GateKey| {
         registry
             .gates
             .get(key)
@@ -1190,7 +1192,7 @@ fn test_repo_gates_toml_excludes_generated_trees_by_declaration() {
     // The web workspace's installed dependency tree is what the ignore rules
     // used to drop silently. It leaves the digest by declaration now, and the
     // lockfile that pins it stays in.
-    let web = inputs("npm-ci");
+    let web = inputs(&"npm-ci".parse().unwrap());
     assert!(!web.covers("web/node_modules/react/index.js"));
     assert!(web.excludes_directory("web/node_modules"));
     assert!(!web.covers("web/dist/index.html"));
@@ -1200,14 +1202,14 @@ fn test_repo_gates_toml_excludes_generated_trees_by_declaration() {
     );
     assert!(web.covers("web/src/App.tsx"));
 
-    let bridge = inputs("mcp-ci");
+    let bridge = inputs(&"mcp-ci".parse().unwrap());
     assert!(!bridge.covers("mcp-server/node_modules/express/index.js"));
     assert!(bridge.covers("mcp-server/package-lock.json"));
 
     // The tree-wide gates prune the agent worktrees, which are checkouts of
     // this repository and dwarf it.
     for key in ["cargo-ci", "cargo-ci-features", "tests", "docs-mechanical"] {
-        let declared = inputs(key);
+        let declared = inputs(&key.parse().unwrap());
         assert!(
             declared.excludes_directory(".agents/worktrees"),
             "gate `{key}` must skip the agent worktrees rather than walk them"
@@ -1231,7 +1233,7 @@ fn test_repo_gates_toml_excludes_generated_trees_by_declaration() {
     // evaluation.
     assert!(registry
         .gates
-        .get("secret-detection")
+        .get(&"secret-detection".parse().unwrap())
         .expect(".jit/gates.toml must declare the `secret-detection` gate")
         .inputs
         .is_none());

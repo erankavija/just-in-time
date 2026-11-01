@@ -19,6 +19,7 @@
 //!   one recoverable repository delta.
 
 use super::*;
+use crate::domain::identity::GateKey;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
@@ -85,7 +86,7 @@ pub struct BatchIssueDef {
     pub labels: Vec<String>,
     /// Quality gate keys to require; each must exist in the gate registry.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub gates: Vec<String>,
+    pub gates: Vec<GateKey>,
     /// Symbolic `key`s of other entries in the same file this issue depends on.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub depends_on: Vec<String>,
@@ -117,7 +118,7 @@ pub enum BatchValidationProblem {
     /// An entry's type is not a known type in the project's type hierarchy.
     UnknownType { key: String, value: String },
     /// An entry requires a gate key absent from the gate registry.
-    UnknownGate { key: String, gate: String },
+    UnknownGate { key: String, gate: GateKey },
     /// An entry's FINAL issue shape would be rejected by the same write-time
     /// validation [`create_issue`](crate::commands::IssueOps::create_issue)
     /// runs (label format, namespace-uniqueness such as a single `type:*`, and
@@ -474,7 +475,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
 
             for gate in &def.gates {
-                if !gate_registry.gates.contains_key(gate.as_str()) {
+                if !gate_registry.gates.contains_key(gate) {
                     problems.push(BatchValidationProblem::UnknownGate {
                         key: def.key.clone(),
                         gate: gate.clone(),
@@ -781,7 +782,7 @@ mod tests {
             },
         );
         let mut d = def("a", &[]);
-        d.gates = vec!["nonexistent-gate".to_string()];
+        d.gates = vec!["nonexistent-gate".parse().unwrap()];
         let problems = exec.collect_batch_problems(&[d]).unwrap();
         assert!(problems
             .iter()

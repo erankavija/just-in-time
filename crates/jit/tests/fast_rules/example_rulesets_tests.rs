@@ -853,9 +853,9 @@ mod fresh_evidence {
     fn done_with_code_review(hours_ago: i64) -> Issue {
         let mut issue = crate::fixture_issue("implement feature".to_string(), String::new());
         issue.state = State::Done;
-        issue.gates_required = vec!["code-review".to_string()];
+        issue.gates_required = vec!["code-review".parse().unwrap()];
         issue.gates_status.insert(
-            "code-review".to_string(),
+            "code-review".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("agent:reviewer".parse().unwrap()),
@@ -903,7 +903,7 @@ mod fresh_evidence {
         // Done, requires the gate, but has no recorded result.
         let mut issue = crate::fixture_issue("implement feature".to_string(), String::new());
         issue.state = State::Done;
-        issue.gates_required = vec!["code-review".to_string()];
+        issue.gates_required = vec!["code-review".parse().unwrap()];
         let findings = issue_graph_findings_at(&rules, std::slice::from_ref(&issue), fixed_now());
         assert!(
             findings

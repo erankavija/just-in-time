@@ -4,6 +4,7 @@
 //! Uses query filter engine to select issues and applies operations atomically per-issue.
 
 use super::*;
+use crate::domain::identity::GateKey;
 use crate::domain::{Assignee, Issue, Priority, State};
 use crate::query_engine::QueryFilter;
 use serde::Serialize;
@@ -24,9 +25,9 @@ pub struct UpdateOperations {
     /// New priority to set
     pub priority: Option<Priority>,
     /// Gates to add
-    pub add_gates: Vec<String>,
+    pub add_gates: Vec<GateKey>,
     /// Gates to remove
-    pub remove_gates: Vec<String>,
+    pub remove_gates: Vec<GateKey>,
 }
 
 impl UpdateOperations {
@@ -600,7 +601,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !operations.add_gates.is_empty() {
             let registry = self.storage.load_gate_registry()?;
             for gate_key in &operations.add_gates {
-                if !registry.gates.contains_key(gate_key.as_str()) {
+                if !registry.gates.contains_key(gate_key) {
                     return Err(crate::storage::GateNotFoundError::single(gate_key).into());
                 }
             }
@@ -1020,7 +1021,7 @@ mod tests {
             State::Gated,
             vec![],
         );
-        issue.gates_required = vec!["tests".to_string()];
+        issue.gates_required = vec!["tests".parse().unwrap()];
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
@@ -1064,7 +1065,7 @@ mod tests {
             State::Ready,
             vec![],
         );
-        blocked.gates_required = vec!["tests".to_string()];
+        blocked.gates_required = vec!["tests".parse().unwrap()];
         crate::commands::test_helpers::seed_issue(&storage, blocked);
 
         crate::commands::test_helpers::seed_issue(
@@ -1434,7 +1435,7 @@ mod tests {
                 State::Ready,
                 vec!["type:task"],
             );
-            gated.gates_required = vec!["tests".to_string()];
+            gated.gates_required = vec!["tests".parse().unwrap()];
             crate::commands::test_helpers::seed_issue(storage, gated);
         };
 
@@ -1601,25 +1602,25 @@ mod tests {
             State::Ready,
             vec![],
         );
-        issue.gates_required = vec!["tests".to_string()];
+        issue.gates_required = vec!["tests".parse().unwrap()];
 
         assert!(UpdateOperations {
-            add_gates: vec!["tests".to_string()],
+            add_gates: vec!["tests".parse().unwrap()],
             ..Default::default()
         }
         .is_provable_noop(&issue));
         assert!(!UpdateOperations {
-            add_gates: vec!["code-review".to_string()],
+            add_gates: vec!["code-review".parse().unwrap()],
             ..Default::default()
         }
         .is_provable_noop(&issue));
         assert!(UpdateOperations {
-            remove_gates: vec!["code-review".to_string()],
+            remove_gates: vec!["code-review".parse().unwrap()],
             ..Default::default()
         }
         .is_provable_noop(&issue));
         assert!(!UpdateOperations {
-            remove_gates: vec!["tests".to_string()],
+            remove_gates: vec!["tests".parse().unwrap()],
             ..Default::default()
         }
         .is_provable_noop(&issue));
@@ -1887,7 +1888,7 @@ mod tests {
             State::Gated,
             vec![],
         );
-        issue.gates_required = vec!["tests".to_string()];
+        issue.gates_required = vec!["tests".parse().unwrap()];
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
@@ -1995,7 +1996,7 @@ mod tests {
                 State::Done,
                 vec!["type:task"],
             );
-            issue.gates_required = vec!["tests".to_string()];
+            issue.gates_required = vec!["tests".parse().unwrap()];
             crate::commands::test_helpers::seed_issue(storage, issue);
         };
         let ops = UpdateOperations {

@@ -22,6 +22,7 @@
 //! evaluation are filled in by downstream tasks; assertion payloads are parsed
 //! and stored here without being evaluated.
 
+use crate::domain::identity::GateKey;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
@@ -547,7 +548,7 @@ pub enum Assertion {
         max_age_hours: u64,
         /// Which gate keys to check. Empty means "all of the issue's
         /// `gates_required`".
-        gates: Vec<String>,
+        gates: Vec<GateKey>,
     },
     /// A type-hierarchy warning, one [`TypeHierarchyKind`] check.
     /// Graph scope. Authorable in `rules.toml` via the `type-hierarchy` assert
@@ -1046,7 +1047,7 @@ struct RawGateRecency {
     #[serde(default, rename = "max-age-hours")]
     max_age_hours: Option<u64>,
     #[serde(default)]
-    gates: Option<Vec<String>>,
+    gates: Option<Vec<GateKey>>,
 }
 
 impl RawGateRecency {
@@ -2263,7 +2264,7 @@ assert = { gate-recency = { max-age-days = 7, gates = ["code-review"] } }
                 gates,
             } => {
                 assert_eq!(*max_age_hours, 7 * 24);
-                assert_eq!(gates, &["code-review".to_string()]);
+                assert_eq!(gates, &["code-review".parse::<GateKey>().unwrap()]);
             }
             other => panic!("expected GateRecency, got {other:?}"),
         }

@@ -123,7 +123,7 @@ fn test_gates_work_without_coordinator() {
 
     // Register a gate
     h.add_gate(
-        "test-gate",
+        &"test-gate".parse().unwrap(),
         "Test Gate",
         "A test gate",
         GateMode::Manual,
@@ -133,7 +133,7 @@ fn test_gates_work_without_coordinator() {
     // Create ready issue then add gate requirement
     let id = h.create_ready_issue("Task");
     let mut issue = h.storage.load_issue(&id).unwrap();
-    issue.gates_required.push("test-gate".to_string());
+    issue.gates_required.push("test-gate".parse().unwrap());
     jit::test_harness::seed_memory_issue(&h.storage, &issue);
 
     // Issue should NOT be blocked by pending gate (gates don't block Ready state)
@@ -171,7 +171,7 @@ fn test_gates_work_without_coordinator() {
     h.executor
         .pass_gate(
             &id,
-            "test-gate".to_string(),
+            &"test-gate".parse().unwrap(),
             Some("human:reviewer".to_string()),
             false,
         )

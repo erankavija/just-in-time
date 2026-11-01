@@ -1,6 +1,7 @@
 //! Issue CRUD operations and lifecycle management
 
 use super::*;
+use crate::domain::identity::GateKey;
 use crate::errors::{DeletionNotConfirmedError, TransitionBlocker};
 use crate::storage::StorageWarning;
 
@@ -34,8 +35,8 @@ impl DescriptionUpdate {
 /// its field changes. `unassign` takes precedence over `assignee`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct IssueLocalUpdate {
-    pub add_gates: Vec<String>,
-    pub remove_gates: Vec<String>,
+    pub add_gates: Vec<GateKey>,
+    pub remove_gates: Vec<GateKey>,
     pub assignee: Option<String>,
     pub unassign: bool,
 }
@@ -181,7 +182,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         title: String,
         description: String,
         priority: Priority,
-        gates: Vec<String>,
+        gates: Vec<GateKey>,
         mut labels: Vec<String>,
         content_format: Option<crate::domain::ContentFormat>,
         issue_type: Option<String>,
@@ -928,12 +929,12 @@ mod tests {
 
     fn seed_scenario_gates(storage: &InMemoryStorage) {
         let mut registry = storage.load_gate_registry().unwrap();
-        for key in ["tests", "code-review"] {
+        for key in ["tests", "code-review"].map(|key| key.parse::<GateKey>().unwrap()) {
             registry.gates.insert(
-                key.parse().unwrap(),
+                key.clone(),
                 GateDefinition {
                     version: 1,
-                    key: key.parse().unwrap(),
+                    key: key.clone(),
                     title: key.to_string(),
                     description: String::new(),
                     stage: GateStage::Postcheck,
@@ -1033,7 +1034,7 @@ mod tests {
         let dep = seed_in_state(&storage, "Upstream", State::Ready, &[]);
         let mut child = crate::test_utils::fixture_issue("Gated child".into(), String::new());
         child.dependencies = vec![dep.clone()];
-        child.gates_required = vec!["tests".into()];
+        child.gates_required = vec!["tests".parse().unwrap()];
         crate::commands::test_helpers::seed_issue(&storage, child.clone());
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -1041,7 +1042,7 @@ mod tests {
 
         assert_eq!(status.title, "Gated child");
         assert_eq!(status.gates.len(), 1);
-        assert_eq!(status.gates[0].key, "tests");
+        assert_eq!(status.gates[0].key, "tests".parse().unwrap());
         assert_eq!(status.unmet_dependencies, [dep.short_id()]);
     }
 
@@ -1235,7 +1236,7 @@ mod tests {
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
-            .add_gate(&issue_id, "tdd-reminder".to_string())
+            .add_gate(&issue_id, &"tdd-reminder".parse().unwrap())
             .unwrap();
 
         // Try to claim the issue - should fail because precheck hasn't passed
@@ -1302,14 +1303,14 @@ mod tests {
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
-            .add_gate(&issue_id, "tdd-reminder".to_string())
+            .add_gate(&issue_id, &"tdd-reminder".parse().unwrap())
             .unwrap();
 
         // Pass the precheck manually
         executor
             .pass_gate(
                 &issue_id,
-                "tdd-reminder".to_string(),
+                &"tdd-reminder".parse().unwrap(),
                 Some("human:dev".to_string()),
                 false,
             )
@@ -1562,7 +1563,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
         let mut issue = crate::test_utils::fixture_issue("Race".to_string(), String::new());
-        issue.gates_required.push("manual-start".to_string());
+        issue.gates_required.push("manual-start".parse().unwrap());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue.clone());
         issue.state = State::Ready;
@@ -1637,9 +1638,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         // Add gates that haven't been passed
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
         executor
-            .add_gate(&issue_id, "code-review".to_string())
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, &"code-review".parse().unwrap())
             .unwrap();
 
         // Transition to Rejected should succeed without passing gates
@@ -1712,7 +1715,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
 
         // Transition to Done should fail (gates not passed)
         let result = executor.issues().update_issue_state(&issue_id, State::Done);
@@ -1743,7 +1748,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
 
         // First `--state done`: a genuine in_progress -> gated transition, which
         // should persist and emit exactly one state-change event.
@@ -1793,7 +1800,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
 
         // First done attempt: genuine transition to Gated.
         assert!(executor
@@ -1965,7 +1974,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
 
         // Move to Gated via a first blocked done attempt.
         assert!(executor
@@ -2050,7 +2061,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
-        executor.add_gate(&issue_id, "tests".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
 
         // First blocked done attempt: transition to Gated.
         assert!(executor
@@ -3311,7 +3324,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             &executor,
             &id,
             IssueLocalUpdate {
-                add_gates: vec!["tests".into()],
+                add_gates: vec!["tests".parse().unwrap()],
                 assignee: Some("agent:w1".into()),
                 ..Default::default()
             },
@@ -3320,7 +3333,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         assert_eq!(counter.0.load(Ordering::SeqCst) - opened, 1);
         let issue = executor.storage.load_issue(&id).unwrap();
-        assert!(issue.gates_required.contains(&"tests".to_string()));
+        assert!(issue.gates_required.contains(&"tests".parse().unwrap()));
         assert_eq!(
             issue.assignee.map(|a| a.to_string()),
             Some("agent:w1".into())
@@ -3331,8 +3344,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_update_issue_resolved_combined_update_matches_separate_steps() {
         let assign = IssueLocalUpdate {
-            add_gates: vec!["tests".into()],
-            remove_gates: vec!["code-review".into()],
+            add_gates: vec!["tests".parse().unwrap()],
+            remove_gates: vec!["code-review".parse().unwrap()],
             assignee: Some("agent:w1".into()),
             unassign: false,
         };
@@ -3352,7 +3365,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 },
             );
             let mut template = crate::test_utils::fixture_issue("Twin".into(), String::new());
-            template.gates_required = vec!["code-review".into()];
+            template.gates_required = vec!["code-review".parse().unwrap()];
             template.assignee = Some("agent:prior".parse().unwrap());
             let separate = seed_fixture_issue(&executor, template.clone());
             template.id = crate::test_utils::fixture_issue(String::new(), String::new()).id;

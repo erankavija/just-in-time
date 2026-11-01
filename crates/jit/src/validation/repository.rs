@@ -11,6 +11,7 @@ use crate::declarations::GateChecker;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::event_log::parse_known_events;
+use crate::domain::identity::GateKey;
 use crate::domain::identity::IssueId;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
@@ -442,7 +443,7 @@ fn validate_integrity(
             }
         }
         for gate in &issue.gates_required {
-            if !gates.gates.contains_key(gate.as_str()) {
+            if !gates.gates.contains_key(gate) {
                 return Err(anyhow!(
                     "Gate '{}' required by issue '{}' is not defined in registry",
                     gate,
@@ -597,7 +598,7 @@ fn collect_enforcement_drift_findings(
 
     let rule_names: Option<BTreeSet<&str>> =
         rules.map(|rules| rules.rules.iter().map(|rule| rule.name.as_str()).collect());
-    let gate_keys: BTreeSet<&str> = gates.gates.keys().map(|key| key.as_str()).collect();
+    let gate_keys: BTreeSet<GateKey> = gates.gates.keys().cloned().collect();
     enforcement_drift(
         &config.invariants.invariants,
         rule_names
@@ -620,11 +621,11 @@ fn collect_enforcement_drift_findings(
 }
 
 fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFinding> {
-    let mut keys: Vec<&str> = gates
+    let mut keys: Vec<&GateKey> = gates
         .gates
         .iter()
         .filter_map(|(key, gate)| {
-            matches!(gate.checker, Some(GateChecker::ReviewPlaceholder)).then_some(key.as_str())
+            matches!(gate.checker, Some(GateChecker::ReviewPlaceholder)).then_some(key)
         })
         .collect();
     keys.sort_unstable();
@@ -638,7 +639,7 @@ fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFind
                 severity: Severity::Warn,
                 message: format!(
                     "WARNING: passing external-review placeholder still configured for gate(s): {}. Replace each placeholder with a real review checker before relying on these gates.",
-                    keys.join(", ")
+                    keys.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
                 ),
             },
         )]
@@ -1222,7 +1223,7 @@ mod tests {
         issue.dependencies = vec![crate::test_utils::issue_id(
             0x424157f2ba6b7bb89e05938a9dbccee5,
         )];
-        issue.gates_required = vec!["planned".to_string()];
+        issue.gates_required = vec!["planned".parse().unwrap()];
         let bad = serde_json::to_vec_pretty(&issue).unwrap();
         let error = format!(
             "{:#}",

@@ -9,6 +9,7 @@
 //! repository template rather than hardcoded workflow vocabulary
 //! (`@/inv/domain-agnostic`).
 
+use crate::domain::identity::GateKey;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::template_expand::{
@@ -44,7 +45,7 @@ enum TemplateGateResolution {
     /// A registered gate preset and its captured definition.
     Preset(crate::gate_presets::GatePresetDefinition),
     /// A single gate key in the registry; attach that one gate via `add_gates`.
-    RegistryKey(crate::domain::identity::GateKey),
+    RegistryKey(GateKey),
 }
 
 enum TemplateRequest<'a> {
@@ -680,7 +681,7 @@ fn parse_template_gate_registry(
 
 fn parse_template_presets(
     image: &RepositoryImage,
-) -> Result<HashMap<String, crate::gate_presets::GatePresetDefinition>> {
+) -> Result<HashMap<GateKey, crate::gate_presets::GatePresetDefinition>> {
     let dir = VirtualPath::GATE_PRESETS;
     let files = listed_json_paths(image, &dir)?
         .into_iter()
@@ -691,7 +692,10 @@ fn parse_template_presets(
             Ok((path.relative().as_str().to_string(), bytes.to_vec()))
         })
         .collect::<Result<Vec<_>>>()?;
-    crate::gate_presets::load_presets_from_custom_files(files)
+    crate::gate_presets::load_presets_from_custom_files(files)?
+        .into_iter()
+        .map(|(name, preset)| Ok((name.parse()?, preset)))
+        .collect()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -703,7 +707,7 @@ fn derive_template_apply(
     roles: &RoleBindings,
     issues: &[Issue],
     mut registry: crate::declarations::GateRegistry,
-    presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
+    presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
     context: &MutationContext,
@@ -1009,7 +1013,7 @@ fn derive_fresh_template(
     delta: &TemplateDelta,
     issues: &[Issue],
     registry: &mut crate::declarations::GateRegistry,
-    presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
+    presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
     context: &MutationContext,
@@ -1046,7 +1050,12 @@ fn derive_fresh_template(
                 "template '{}' node '{}' references invalid gate(s): {}",
                 template.name,
                 planned.role,
-                planned.gates.join(", ")
+                planned
+                    .gates
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )
         })?;
         validate_captured_issue_write(&issue, config, rules).map_err(|_| {
@@ -1092,7 +1101,12 @@ fn derive_fresh_template(
             format!(
                 "template '{}' anchor references invalid gate(s): {}",
                 template.name,
-                attachment.gates.join(", ")
+                attachment
+                    .gates
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )
         })?;
     }
@@ -1127,9 +1141,9 @@ fn validate_captured_issue_write(
 }
 
 fn resolve_captured_gate(
-    name: &str,
+    name: &GateKey,
     registry: &crate::declarations::GateRegistry,
-    presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
+    presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
 ) -> Result<TemplateGateResolution> {
     if let Some(preset) = presets.get(name) {
         return Ok(TemplateGateResolution::Preset(preset.clone()));
@@ -1143,10 +1157,10 @@ fn resolve_captured_gate(
 }
 
 fn attach_captured_gates(
-    names: &[String],
+    names: &[GateKey],
     issue: &mut Issue,
     registry: &mut crate::declarations::GateRegistry,
-    presets: &HashMap<String, crate::gate_presets::GatePresetDefinition>,
+    presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
     events: &mut Vec<(u8, EventBody)>,
     lease_targets: &mut Vec<IssueId>,
 ) -> Result<()> {
@@ -1161,7 +1175,7 @@ fn attach_captured_gates(
                     .into_iter()
                     .map(|template| {
                         let gate = template.to_gate();
-                        if !registry.gates.contains_key(gate.key.as_str()) {
+                        if !registry.gates.contains_key(&gate.key) {
                             events.push((
                                 0,
                                 EventBody::draft_gate_definition_created(gate.key.clone()),
@@ -1178,16 +1192,12 @@ fn attach_captured_gates(
             }
         };
         for key in keys {
-            if issue
-                .gates_required
-                .iter()
-                .any(|required| required == key.as_str())
-            {
+            if issue.gates_required.iter().any(|required| required == &key) {
                 continue;
             }
-            issue.gates_required.push(key.to_string());
+            issue.gates_required.push(key.clone());
             issue.gates_status.insert(
-                key.to_string(),
+                key.clone(),
                 GateState {
                     status: GateStatus::Pending,
                     updated_by: None,

@@ -4,7 +4,6 @@
 mod tests {
     use crate::commands::test_helpers::setup;
     use crate::declarations::{GateChecker, GateMode, GateStage};
-    use crate::errors::InvalidArgumentError;
     use std::collections::HashMap;
 
     // Test: jit gate define <key> --title "Title" --description "Desc" --stage postcheck --mode manual
@@ -13,7 +12,7 @@ mod tests {
         let executor = setup();
 
         let result = executor.define_gate(
-            "manual-review".to_string(),
+            &"manual-review".parse().unwrap(),
             "Manual Review".to_string(),
             "Human code review".to_string(),
             GateStage::Postcheck,
@@ -25,33 +24,14 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify gate was created
-        let gate = executor.show_gate_definition("manual-review").unwrap();
-        assert_eq!(gate.key.as_str(), "manual-review");
+        let gate = executor
+            .show_gate_definition(&"manual-review".parse().unwrap())
+            .unwrap();
+        assert_eq!(gate.key, "manual-review".parse().unwrap());
         assert_eq!(gate.title, "Manual Review");
         assert_eq!(gate.stage, GateStage::Postcheck);
         assert_eq!(gate.mode, GateMode::Manual);
         assert!(gate.checker.is_none());
-    }
-
-    #[test]
-    fn test_define_gate_rejects_malformed_key_naming_it_without_registering_it() {
-        let executor = setup();
-
-        let error = executor
-            .define_gate(
-                "Not_Kebab".to_string(),
-                "Title".to_string(),
-                "Description".to_string(),
-                GateStage::Postcheck,
-                GateMode::Manual,
-                None,
-                100,
-            )
-            .unwrap_err();
-
-        assert!(error.downcast_ref::<InvalidArgumentError>().is_some());
-        assert!(error.to_string().contains("'Not_Kebab'"), "{error}");
-        assert!(executor.list_gates().unwrap().is_empty());
     }
 
     // Test: jit gate define <key> --title "Title" --stage precheck --mode auto --checker-command "cargo test"
@@ -70,7 +50,7 @@ mod tests {
         };
 
         let result = executor.define_gate(
-            "unit-tests".to_string(),
+            &"unit-tests".parse().unwrap(),
             "Unit Tests".to_string(),
             "Run all unit tests".to_string(),
             GateStage::Postcheck,
@@ -82,7 +62,9 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify gate was created with checker
-        let gate = executor.show_gate_definition("unit-tests").unwrap();
+        let gate = executor
+            .show_gate_definition(&"unit-tests".parse().unwrap())
+            .unwrap();
         assert_eq!(gate.mode, GateMode::Auto);
         assert!(gate.checker.is_some());
 
@@ -98,7 +80,7 @@ mod tests {
 
         executor
             .define_gate(
-                "test-gate".to_string(),
+                &"test-gate".parse().unwrap(),
                 "Test Gate".to_string(),
                 "Test".to_string(),
                 GateStage::Postcheck,
@@ -110,7 +92,7 @@ mod tests {
 
         // Try to define same gate again
         let result = executor.define_gate(
-            "test-gate".to_string(),
+            &"test-gate".parse().unwrap(),
             "Test Gate 2".to_string(),
             "Test 2".to_string(),
             GateStage::Postcheck,
@@ -131,7 +113,7 @@ mod tests {
         // Define multiple gates
         executor
             .define_gate(
-                "gate-1".to_string(),
+                &"gate-1".parse().unwrap(),
                 "Gate 1".to_string(),
                 "First gate".to_string(),
                 GateStage::Postcheck,
@@ -143,7 +125,7 @@ mod tests {
 
         executor
             .define_gate(
-                "gate-2".to_string(),
+                &"gate-2".parse().unwrap(),
                 "Gate 2".to_string(),
                 "Second gate".to_string(),
                 GateStage::Precheck,
@@ -165,9 +147,9 @@ mod tests {
         let gates = executor.list_gates().unwrap();
         assert_eq!(gates.len(), 2);
 
-        let keys: Vec<_> = gates.iter().map(|g| g.key.as_str()).collect();
-        assert!(keys.contains(&"gate-1"));
-        assert!(keys.contains(&"gate-2"));
+        let keys: Vec<_> = gates.iter().map(|g| &g.key).collect();
+        assert!(keys.contains(&&"gate-1".parse().unwrap()));
+        assert!(keys.contains(&&"gate-2".parse().unwrap()));
     }
 
     // Test: jit gate show <key>
@@ -187,7 +169,7 @@ mod tests {
 
         executor
             .define_gate(
-                "clippy".to_string(),
+                &"clippy".parse().unwrap(),
                 "Clippy Lints".to_string(),
                 "No clippy warnings".to_string(),
                 GateStage::Postcheck,
@@ -198,8 +180,10 @@ mod tests {
             .unwrap();
 
         // Show gate details
-        let gate = executor.show_gate_definition("clippy").unwrap();
-        assert_eq!(gate.key.as_str(), "clippy");
+        let gate = executor
+            .show_gate_definition(&"clippy".parse().unwrap())
+            .unwrap();
+        assert_eq!(gate.key, "clippy".parse().unwrap());
         assert_eq!(gate.title, "Clippy Lints");
         assert_eq!(gate.description, "No clippy warnings");
         assert_eq!(gate.stage, GateStage::Postcheck);
@@ -228,7 +212,7 @@ mod tests {
     fn test_show_nonexistent_gate_fails() {
         let executor = setup();
 
-        let result = executor.show_gate_definition("nonexistent");
+        let result = executor.show_gate_definition(&"nonexistent".parse().unwrap());
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
@@ -240,7 +224,7 @@ mod tests {
 
         executor
             .define_gate(
-                "test-gate".to_string(),
+                &"test-gate".parse().unwrap(),
                 "Test".to_string(),
                 "Test".to_string(),
                 GateStage::Postcheck,
@@ -251,13 +235,19 @@ mod tests {
             .unwrap();
 
         // Verify it exists
-        assert!(executor.show_gate_definition("test-gate").is_ok());
+        assert!(executor
+            .show_gate_definition(&"test-gate".parse().unwrap())
+            .is_ok());
 
         // Remove it
-        executor.remove_gate_definition("test-gate").unwrap();
+        executor
+            .remove_gate_definition(&"test-gate".parse().unwrap())
+            .unwrap();
 
         // Verify it's gone
-        assert!(executor.show_gate_definition("test-gate").is_err());
+        assert!(executor
+            .show_gate_definition(&"test-gate".parse().unwrap())
+            .is_err());
     }
 
     // Test: Auto gate must have checker
@@ -266,7 +256,7 @@ mod tests {
         let executor = setup();
 
         let result = executor.define_gate(
-            "auto-no-checker".to_string(),
+            &"auto-no-checker".parse().unwrap(),
             "Auto Gate".to_string(),
             "Test".to_string(),
             GateStage::Postcheck,
@@ -296,7 +286,7 @@ mod tests {
 
         // Should succeed but checker is ignored for manual gates
         let result = executor.define_gate(
-            "manual-with-checker".to_string(),
+            &"manual-with-checker".parse().unwrap(),
             "Manual".to_string(),
             "Test".to_string(),
             GateStage::Postcheck,
@@ -309,7 +299,7 @@ mod tests {
 
         // Verify checker was ignored
         let gate = executor
-            .show_gate_definition("manual-with-checker")
+            .show_gate_definition(&"manual-with-checker".parse().unwrap())
             .unwrap();
         assert_eq!(gate.mode, GateMode::Manual);
         assert!(

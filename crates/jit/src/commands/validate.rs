@@ -1,6 +1,7 @@
 //! Validation and status operations
 
 use super::*;
+use crate::domain::identity::GateKey;
 use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
@@ -844,7 +845,7 @@ fn discover_issue_closure(
             issue
                 .gates_required
                 .iter()
-                .filter_map(|key| gates.gates.get(key.as_str()))
+                .filter_map(|key| gates.gates.get(key))
                 .filter(|gate| gate.stage == GateStage::Precheck)
                 .cloned()
                 .collect()
@@ -1441,18 +1442,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Defensive (tolerant) loads: a failure -> unloadable, not an error.
         let rule_names_owned = self.loadable_rule_names();
-        let gate_keys_owned: Option<Vec<crate::domain::identity::GateKey>> = self
+        let gate_set: Option<BTreeSet<GateKey>> = self
             .storage
             .load_gate_registry()
             .ok()
-            .map(|reg| reg.gates.keys().cloned().collect());
+            .map(|registry| registry.gates.into_keys().collect());
 
         let rule_set: Option<BTreeSet<&str>> = rule_names_owned
             .as_ref()
             .map(|v| v.iter().map(String::as_str).collect());
-        let gate_set: Option<BTreeSet<&str>> = gate_keys_owned
-            .as_ref()
-            .map(|v| v.iter().map(|key| key.as_str()).collect());
 
         let rules_state = match &rule_set {
             Some(set) => SourceState::Loaded(set),
@@ -1734,11 +1732,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::validation::report::ReportedFinding;
 
         let registry = self.storage.load_gate_registry()?;
-        let mut keys: Vec<&str> = registry
+        let mut keys: Vec<&GateKey> = registry
             .gates
             .iter()
             .filter_map(|(key, gate)| {
-                matches!(gate.checker, Some(GateChecker::ReviewPlaceholder)).then_some(key.as_str())
+                matches!(gate.checker, Some(GateChecker::ReviewPlaceholder)).then_some(key)
             })
             .collect();
         keys.sort_unstable();
@@ -1753,7 +1751,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     severity: Severity::Warn,
                     message: format!(
                         "WARNING: passing external-review placeholder still configured for gate(s): {}. Replace each placeholder with a real review checker before relying on these gates.",
-                        keys.join(", ")
+                        keys.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
                     ),
                 },
             )]

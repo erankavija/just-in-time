@@ -105,7 +105,7 @@ use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
-use crate::domain::identity::IssueId;
+use crate::domain::identity::{GateKey, IssueId};
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::{
     is_dependency_met, Event, EventBody, GateEvaluationStability, GateState, GateStatus, Issue,
@@ -477,15 +477,15 @@ enum CapturedIssueMutation {
     },
     AddGates {
         issue_id: IssueId,
-        gate_keys: Vec<String>,
+        gate_keys: Vec<GateKey>,
     },
     RemoveGates {
         issue_id: IssueId,
-        gate_keys: Vec<String>,
+        gate_keys: Vec<GateKey>,
     },
     SetManualGateStatus {
         issue_id: IssueId,
-        gate_key: String,
+        gate_key: GateKey,
         status: GateStatus,
         by: Option<crate::domain::Assignee>,
     },
@@ -519,12 +519,12 @@ enum CapturedIssueMutationOutcome {
     Changed,
     Unchanged,
     GatesAdded {
-        added: Vec<String>,
-        already_exist: Vec<String>,
+        added: Vec<GateKey>,
+        already_exist: Vec<GateKey>,
     },
     GatesRemoved {
-        removed: Vec<String>,
-        not_found: Vec<String>,
+        removed: Vec<GateKey>,
+        not_found: Vec<GateKey>,
     },
 }
 
@@ -601,7 +601,7 @@ impl PrecheckEvidence {
 
 struct CapturedPrecheckPlan {
     evidence: PrecheckEvidence,
-    prompts: std::collections::HashMap<String, String>,
+    prompts: std::collections::HashMap<GateKey, String>,
 }
 
 /// One precheck execution retained across publication retries. A transition
@@ -642,7 +642,7 @@ fn has_broad_precheck(issue: &Issue, registry: &crate::declarations::GateRegistr
     issue
         .gates_required
         .iter()
-        .filter_map(|key| registry.gates.get(key.as_str()))
+        .filter_map(|key| registry.gates.get(key))
         .any(|gate| {
             gate.stage == crate::declarations::GateStage::Precheck
                 && is_broad_builtin_precheck(gate)
@@ -661,7 +661,7 @@ fn captured_precheck_plan(
     let gates = issue
         .gates_required
         .iter()
-        .filter_map(|key| registry.gates.get(key.as_str()).map(|gate| (key, gate)))
+        .filter_map(|key| registry.gates.get(key).map(|gate| (key, gate)))
         .filter(|(_, gate)| gate.stage == GateStage::Precheck)
         .collect::<Vec<_>>();
     let broad_builtin = has_broad_precheck(issue, registry);
@@ -913,8 +913,8 @@ struct CapturedFieldUpdate {
     label_edit: Option<CapturedLabelEdit>,
     content_format: Option<Option<crate::domain::ContentFormat>>,
     issue_type: Option<String>,
-    add_gates: Vec<String>,
-    remove_gates: Vec<String>,
+    add_gates: Vec<GateKey>,
+    remove_gates: Vec<GateKey>,
     assignee: Option<crate::domain::Assignee>,
     unassign: bool,
     bulk: bool,
@@ -1325,7 +1325,7 @@ fn derive_field_update(
     let missing_gates = request
         .add_gates
         .iter()
-        .filter(|key| !evidence.declarations.gates.gates.contains_key(key.as_str()))
+        .filter(|key| !evidence.declarations.gates.gates.contains_key(key))
         .cloned()
         .collect::<Vec<_>>();
     if !missing_gates.is_empty() {
@@ -1640,7 +1640,7 @@ fn apply_captured_issue_mutation(
         CapturedIssueMutation::AddGates { gate_keys, .. } => {
             let missing = gate_keys
                 .iter()
-                .filter(|key| !registry.gates.contains_key(key.as_str()))
+                .filter(|key| !registry.gates.contains_key(key))
                 .cloned()
                 .collect::<Vec<_>>();
             if !missing.is_empty() {
@@ -1664,7 +1664,7 @@ fn apply_captured_issue_mutation(
             }
             let events = added
                 .iter()
-                .filter_map(|key| registry.gates.get(key.as_str()))
+                .filter_map(|key| registry.gates.get(key))
                 .map(|gate| {
                     (
                         1,
@@ -1697,12 +1697,12 @@ fn apply_captured_issue_mutation(
             let events = removed
                 .iter()
                 .map(|key| {
-                    Ok((
+                    (
                         1,
-                        EventBody::draft_gate_removed(issue.id.clone(), key.parse()?),
-                    ))
+                        EventBody::draft_gate_removed(issue.id.clone(), key.clone()),
+                    )
                 })
-                .collect::<Result<_>>()?;
+                .collect();
             let changed = !removed.is_empty();
             (
                 CapturedIssueMutationOutcome::GatesRemoved { removed, not_found },
@@ -1728,7 +1728,7 @@ fn apply_captured_issue_mutation(
             }
             let gate = registry
                 .gates
-                .get(gate_key.as_str())
+                .get(gate_key)
                 .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
             if gate.mode == GateMode::Auto {
                 return Err(anyhow!(
@@ -1794,7 +1794,7 @@ fn apply_captured_issue_mutation(
 fn unpassed_gate_blockers(
     issue: &Issue,
     registry: &crate::declarations::GateRegistry,
-) -> Vec<(String, GateStatus, GateMode)> {
+) -> Vec<(GateKey, GateStatus, GateMode)> {
     issue
         .get_unpassed_gates()
         .into_iter()
@@ -1806,7 +1806,7 @@ fn unpassed_gate_blockers(
                 .unwrap_or(GateStatus::Pending);
             let mode = registry
                 .gates
-                .get(gate_key.as_str())
+                .get(&gate_key)
                 .map(|gate| gate.mode)
                 .unwrap_or(GateMode::Manual);
             (gate_key, status, mode)
@@ -2991,9 +2991,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let state = gate_check::gate_state_from_run(result);
                     let by = result.by.clone();
                     let status = state.status;
-                    issue
-                        .gates_status
-                        .insert(result.gate_key.to_string(), state);
+                    issue.gates_status.insert(result.gate_key.clone(), state);
                     precheck_events.push((
                         1,
                         if status == GateStatus::Passed {
@@ -3863,9 +3861,12 @@ mod tests {
         crate::commands::test_helpers::seed_gate_registry(storage, &registry);
         let mut issue = crate::test_utils::fixture_issue("checked".to_string(), String::new());
         issue.state = State::Ready;
-        issue.gates_required = vec!["auto-start".to_string(), "manual-start".to_string()];
+        issue.gates_required = vec![
+            "auto-start".parse().unwrap(),
+            "manual-start".parse().unwrap(),
+        ];
         issue.gates_status.insert(
-            "manual-start".to_string(),
+            "manual-start".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
@@ -3977,11 +3978,11 @@ mod tests {
         plan.delta().appended_event_bytes().unwrap().to_vec()
     }
 
-    fn manual_gate_registry(key: &str) -> crate::declarations::GateRegistry {
+    fn manual_gate_registry(key: &GateKey) -> crate::declarations::GateRegistry {
         use crate::declarations::{GateDefinition, GateMode, GateRegistry, GateStage};
         let definition = GateDefinition {
             version: 1,
-            key: key.parse().unwrap(),
+            key: key.clone(),
             title: key.to_string(),
             description: String::new(),
             stage: GateStage::Postcheck,
@@ -3992,7 +3993,7 @@ mod tests {
             inputs: None,
         };
         GateRegistry {
-            gates: std::collections::HashMap::from([(key.parse().unwrap(), definition)]),
+            gates: std::collections::HashMap::from([(key.clone(), definition)]),
         }
     }
 
@@ -4106,7 +4107,7 @@ mod tests {
             let storage = InMemoryStorage::new();
             crate::commands::test_helpers::seed_gate_registry(
                 &storage,
-                &manual_gate_registry("review"),
+                &manual_gate_registry(&"review".parse().unwrap()),
             );
             let mut issue = crate::test_utils::fixture_issue(
                 format!("repeat-{status:?}"),
@@ -4114,9 +4115,9 @@ mod tests {
             );
             let id = issue.id.clone();
             let actor: crate::domain::Assignee = "agent:reviewer".parse().unwrap();
-            issue.gates_required.push("review".to_string());
+            issue.gates_required.push("review".parse().unwrap());
             issue.gates_status.insert(
-                "review".to_string(),
+                "review".parse().unwrap(),
                 GateState {
                     status,
                     updated_by: Some(actor.clone()),
@@ -4128,7 +4129,7 @@ mod tests {
             let layout = storage.repository_layout();
             let request = CapturedIssueMutation::SetManualGateStatus {
                 issue_id: id.clone(),
-                gate_key: "review".to_string(),
+                gate_key: "review".parse().unwrap(),
                 status,
                 by: Some(actor.clone()),
             };
@@ -4152,7 +4153,8 @@ mod tests {
             first_session.apply(&first_plan).unwrap();
             drop(first_session);
             assert_eq!(
-                storage.load_issue(&id).unwrap().gates_status["review"].updated_at,
+                storage.load_issue(&id).unwrap().gates_status[&"review".parse().unwrap()]
+                    .updated_at,
                 first_time
             );
 
@@ -4177,7 +4179,8 @@ mod tests {
             second_session.apply(&second_plan).unwrap();
 
             assert_eq!(
-                storage.load_issue(&id).unwrap().gates_status["review"].updated_at,
+                storage.load_issue(&id).unwrap().gates_status[&"review".parse().unwrap()]
+                    .updated_at,
                 second_time
             );
             let events = storage.read_events().unwrap();
@@ -4220,7 +4223,7 @@ mod tests {
         );
         let request = CapturedIssueMutation::SetManualGateStatus {
             issue_id: issue.id.clone(),
-            gate_key: "missing-and-not-required".to_string(),
+            gate_key: "missing-and-not-required".parse().unwrap(),
             status: GateStatus::Pending,
             by: None,
         };
@@ -4253,7 +4256,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         crate::commands::test_helpers::seed_gate_registry(
             &storage,
-            &manual_gate_registry("review"),
+            &manual_gate_registry(&"review".parse().unwrap()),
         );
         let issue = crate::test_utils::fixture_issue(
             "registry-race".to_string(),
@@ -4264,7 +4267,7 @@ mod tests {
         let layout = storage.repository_layout();
         let request = CapturedIssueMutation::AddGates {
             issue_id: id.clone(),
-            gate_keys: vec!["review".to_string()],
+            gate_keys: vec!["review".parse().unwrap()],
         };
         let context = MutationContext::deterministic(
             [41; 32],
@@ -4307,7 +4310,7 @@ mod tests {
         };
         assert_eq!(
             error.downcast_ref::<GateNotFoundError>(),
-            Some(&GateNotFoundError::Batch(vec!["review".to_string()]))
+            Some(&GateNotFoundError::Batch(vec!["review".parse().unwrap()]))
         );
         assert!(storage.load_issue(&id).unwrap().gates_required.is_empty());
         assert!(storage.read_events().unwrap().is_empty());
@@ -4572,7 +4575,11 @@ enforce_leases = "strict"
         let before = capture_precheck_plan(&executor, &issue_id).evidence;
 
         let mut issue = storage.load_issue(&issue_id).unwrap();
-        issue.gates_status.get_mut("manual-start").unwrap().status = GateStatus::Failed;
+        issue
+            .gates_status
+            .get_mut(&"manual-start".parse().unwrap())
+            .unwrap()
+            .status = GateStatus::Failed;
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
         assert_ne!(capture_precheck_plan(&executor, &issue_id).evidence, before);
@@ -4601,12 +4608,18 @@ enforce_leases = "strict"
         let issue_id = seed_precheck_evidence(&storage);
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
         let before = capture_precheck_plan(&executor, &issue_id);
-        assert_eq!(before.prompts["auto-start"], "captured prompt");
+        assert_eq!(
+            before.prompts[&"auto-start".parse().unwrap()],
+            "captured prompt"
+        );
 
         storage.add_worktree_file("start-prompt.md", "mutated prompt");
         let after = capture_precheck_plan(&executor, &issue_id);
 
-        assert_eq!(after.prompts["auto-start"], "mutated prompt");
+        assert_eq!(
+            after.prompts[&"auto-start".parse().unwrap()],
+            "mutated prompt"
+        );
         assert_ne!(after.evidence, before.evidence);
     }
 

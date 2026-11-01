@@ -443,3 +443,55 @@ fn test_batch_remove_gates() {
         assert!(!gates.contains(&serde_json::json!("tests")));
     }
 }
+
+#[test]
+fn test_gate_key_arguments_reject_malformed_tokens_at_dispatch() {
+    let cli = JitCli::initialised().unwrap();
+    let id = create_titled_issue(&cli, "Malformed gate argument target");
+    for arguments in [
+        vec![
+            "issue",
+            "create",
+            "--title",
+            "Invalid gate",
+            "--gate",
+            "Bad_Key",
+        ],
+        vec!["issue", "update", &id, "--add-gate", "Bad_Key"],
+        vec!["issue", "update", &id, "--remove-gate", "Bad_Key"],
+        vec![
+            "gate",
+            "define",
+            "Bad_Key",
+            "--title",
+            "Invalid gate",
+            "--description",
+            "Invalid gate",
+        ],
+        vec!["gate", "update", "Bad_Key", "--title", "Invalid gate"],
+        vec!["gate", "show", "Bad_Key"],
+        vec!["gate", "remove", "Bad_Key"],
+        vec!["gate", "add", &id, "Bad_Key"],
+        vec!["gate", "evaluate", &id, "Bad_Key"],
+        vec!["gate", "evaluate-many", "Bad_Key", &id],
+        vec!["gate", "fail", &id, "Bad_Key"],
+        vec!["gate", "status", &id, "Bad_Key"],
+        vec!["gate", "status", &id, "--all", "--gate", "Bad_Key"],
+        vec!["gate", "preset", "apply", "ci", &id, "--except", "Bad_Key"],
+    ] {
+        let output = cli
+            .command(arguments.iter().copied().chain(["--json"]))
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{arguments:?}");
+        let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(
+            envelope["error"]["code"], "INVALID_ARGUMENT",
+            "{arguments:?}"
+        );
+        assert!(envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("Bad_Key"));
+    }
+}

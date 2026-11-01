@@ -454,9 +454,9 @@ mod tests {
         let mut issue =
             crate::test_utils::fixture_issue("Full".to_string(), "Body text".to_string());
         issue.state = State::Done;
-        issue.gates_required.push("tests".to_string());
+        issue.gates_required.push("tests".parse().unwrap());
         issue.gates_status.insert(
-            "tests".to_string(),
+            "tests".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: None,

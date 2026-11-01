@@ -83,7 +83,7 @@ fn new_issue(
     h: &TestHarness,
     title: &str,
     priority: Priority,
-    gates: &[&str],
+    gates: &[jit::domain::identity::GateKey],
     labels: &[&str],
 ) -> IssueId {
     h.executor
@@ -92,7 +92,7 @@ fn new_issue(
             title.to_string(),
             String::new(),
             priority,
-            gates.iter().map(|s| s.to_string()).collect(),
+            gates.to_vec(),
             labels.iter().map(|s| s.to_string()).collect(),
             None,
             None,
@@ -121,7 +121,7 @@ struct Scenario {
 fn build_scenario(h: &TestHarness) -> Scenario {
     configure(h);
     h.add_gate(
-        "code-review",
+        &"code-review".parse().unwrap(),
         "Code review",
         "review",
         GateMode::Manual,
@@ -132,7 +132,7 @@ fn build_scenario(h: &TestHarness) -> Scenario {
         h,
         "Auth epic",
         Priority::High,
-        &["code-review"],
+        &["code-review".parse().unwrap()],
         &["type:epic"],
     );
     let e2 = new_issue(h, "Billing epic", Priority::Normal, &[], &["type:epic"]);
@@ -148,7 +148,7 @@ fn build_scenario(h: &TestHarness) -> Scenario {
         h,
         "Login",
         Priority::Normal,
-        &["code-review"],
+        &["code-review".parse().unwrap()],
         &[
             "type:task",
             &format!("epic:{}", short(&e)),
@@ -212,7 +212,12 @@ fn test_batch_export_scope_projects_membership_and_lifts_type() {
     assert_eq!(e_def.title, "Auth epic");
     assert_eq!(e_def.r#type.as_deref(), Some("epic"));
     assert_eq!(e_def.priority, Some(Priority::High));
-    assert_eq!(e_def.gates, vec!["code-review".to_string()]);
+    assert_eq!(
+        e_def.gates,
+        vec!["code-review"
+            .parse::<jit::domain::identity::GateKey>()
+            .unwrap()]
+    );
     // E depends on c1 and c2 (E → B dropped as a bracket edge). depends_on is
     // sorted by short id, so compare against the sorted expectation.
     let mut expected_deps = vec![short(&s.c1), short(&s.c2)];
@@ -392,7 +397,7 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
     let fresh = TestHarness::new();
     configure(&fresh);
     fresh.add_gate(
-        "code-review",
+        &"code-review".parse().unwrap(),
         "Code review",
         "review",
         GateMode::Manual,
@@ -411,13 +416,23 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
     assert_eq!(e_new.title, "Auth epic");
     assert_eq!(jit::labels::type_label_value(&e_new.labels), Some("epic"));
     assert_eq!(e_new.priority, Priority::High);
-    assert_eq!(e_new.gates_required, vec!["code-review".to_string()]);
+    assert_eq!(
+        e_new.gates_required,
+        vec!["code-review"
+            .parse::<jit::domain::identity::GateKey>()
+            .unwrap()]
+    );
 
     let c1_new = fresh.storage.load_issue(&map[&short(&s.c1)]).unwrap();
     assert_eq!(c1_new.title, "Login");
     assert_eq!(jit::labels::type_label_value(&c1_new.labels), Some("task"));
     assert!(c1_new.labels.contains(&"component:core".to_string()));
-    assert_eq!(c1_new.gates_required, vec!["code-review".to_string()]);
+    assert_eq!(
+        c1_new.gates_required,
+        vec!["code-review"
+            .parse::<jit::domain::identity::GateKey>()
+            .unwrap()]
+    );
 
     // In-scope edges round-trip: E depends on both children; the boundary edge
     // (c1 → ext) and bracket edges did not travel.

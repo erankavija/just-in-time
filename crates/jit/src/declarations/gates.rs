@@ -308,7 +308,7 @@ mode = "manual"
         let accepted =
             registry_with_inputs("roots = [\"crates\"]\nexclude = [\"crates/**/target/**\"]\n")
                 .expect("a declarable input set parses");
-        let inputs = accepted.gates["workspace"]
+        let inputs = accepted.gates[&"workspace".parse().unwrap()]
             .inputs
             .as_ref()
             .expect("the parsed gate carries its declared inputs");

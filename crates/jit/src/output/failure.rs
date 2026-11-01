@@ -525,7 +525,7 @@ mod exit_code_projection_tests {
         };
         crate::commands::GatePassFailed {
             issue_id: crate::test_utils::issue_id(85),
-            gate_key: "tests".to_string(),
+            gate_key: "tests".parse().unwrap(),
             status,
             exit_code: Some(1),
             result,
@@ -596,7 +596,7 @@ mod exit_code_projection_tests {
             (
                 crate::commands::GateNotRequiredError {
                     issue_id: crate::test_utils::issue_id(85),
-                    gate_key: "tests".to_string(),
+                    gate_key: "tests".parse().unwrap(),
                 }
                 .into(),
                 2,
@@ -653,7 +653,7 @@ mod exit_code_projection_tests {
                 "dep add",
             ),
             (
-                crate::storage::GateAlreadyExistsError::new("tests").into(),
+                crate::storage::GateAlreadyExistsError::new(&"tests".parse().unwrap()).into(),
                 6,
                 "gate define",
             ),

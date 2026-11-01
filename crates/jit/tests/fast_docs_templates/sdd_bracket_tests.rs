@@ -177,12 +177,19 @@ fn test_sdd_example_declares_planning_template() {
     );
     assert_eq!(
         plan.planning_node(&reg.roles).map(|n| n.gates.as_slice()),
-        Some(["plan-review".to_string()].as_slice()),
+        Some(
+            ["plan-review"
+                .parse::<jit::domain::identity::GateKey>()
+                .unwrap()]
+            .as_slice()
+        ),
         "plan-review wired on the planning node",
     );
     assert!(
-        plan.breakdown_node(&reg.roles)
-            .is_some_and(|n| n.gates.iter().any(|g| g == "coverage-preview")),
+        plan.breakdown_node(&reg.roles).is_some_and(|n| n
+            .gates
+            .iter()
+            .any(|g| g == &"coverage-preview".parse().unwrap())),
         "coverage-preview wired on the breakdown node",
     );
 

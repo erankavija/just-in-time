@@ -13,6 +13,7 @@
 //! [`InMemoryStorage`]: crate::storage::InMemoryStorage
 //! [`JsonFileStorage`]: crate::storage::JsonFileStorage
 
+use crate::domain::identity::GateKey;
 use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use thiserror::Error;
 
@@ -84,43 +85,43 @@ impl IssueNotFoundError {
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum GateNotFoundError {
     /// One or more gate keys were missing (the batch `gate add` check).
-    #[error("Gates not found in registry: {}", .0.join(", "))]
-    Batch(Vec<String>),
+    #[error("Gates not found in registry: {}", .0.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))]
+    Batch(Vec<GateKey>),
     /// A single gate-key lookup missed (gate-check / template expansion).
     #[error("Gate '{0}' not found in registry")]
-    Single(String),
+    Single(GateKey),
     /// A single gate-key lookup missed, phrased without the "in registry" suffix
     /// (`gate show` / `gate remove`).
     #[error("Gate '{0}' not found")]
-    ByKey(String),
+    ByKey(GateKey),
     /// A single gate-key lookup missed during preset creation, phrased
     /// "Gate not found in registry: <key>" (`gate preset create`).
     #[error("Gate not found in registry: {0}")]
-    InRegistry(String),
+    InRegistry(GateKey),
 }
 
 impl GateNotFoundError {
     /// Build a [`GateNotFoundError::Batch`] from the missing gate keys.
-    pub fn new(keys: impl IntoIterator<Item = impl Into<String>>) -> Self {
-        Self::Batch(keys.into_iter().map(Into::into).collect())
+    pub fn new(keys: impl IntoIterator<Item = GateKey>) -> Self {
+        Self::Batch(keys.into_iter().collect())
     }
 
     /// Build a [`GateNotFoundError::Single`] for one missing gate key
     /// ("Gate '<key>' not found in registry").
-    pub fn single(key: impl Into<String>) -> Self {
-        Self::Single(key.into())
+    pub fn single(key: &GateKey) -> Self {
+        Self::Single(key.clone())
     }
 
     /// Build a [`GateNotFoundError::ByKey`] for one missing gate key, using the
     /// `gate show`/`gate remove` phrasing ("Gate '<key>' not found").
-    pub fn by_key(key: impl Into<String>) -> Self {
-        Self::ByKey(key.into())
+    pub fn by_key(key: &GateKey) -> Self {
+        Self::ByKey(key.clone())
     }
 
     /// Build a [`GateNotFoundError::InRegistry`] for one missing gate key, using
     /// the `gate preset create` phrasing ("Gate not found in registry: <key>").
-    pub fn in_registry(key: impl Into<String>) -> Self {
-        Self::InRegistry(key.into())
+    pub fn in_registry(key: &GateKey) -> Self {
+        Self::InRegistry(key.clone())
     }
 }
 
@@ -191,17 +192,17 @@ impl RepositoryNotFoundError {
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error("Gate '{key}' already exists")]
 pub struct GateAlreadyExistsError {
-    key: String,
+    key: GateKey,
 }
 
 impl GateAlreadyExistsError {
     /// Build a [`GateAlreadyExistsError`] for the given gate key.
-    pub fn new(key: impl Into<String>) -> Self {
-        Self { key: key.into() }
+    pub fn new(key: &GateKey) -> Self {
+        Self { key: key.clone() }
     }
 
     /// The gate key that already exists in the registry.
-    pub fn key(&self) -> &str {
+    pub fn key(&self) -> &GateKey {
         &self.key
     }
 }
@@ -362,12 +363,12 @@ mod tests {
 
     #[test]
     fn test_gate_not_found_batch_and_single_messages() {
-        let batch = GateNotFoundError::new(["lint", "tests"]);
+        let batch = GateNotFoundError::new(["lint", "tests"].map(|key| key.parse().unwrap()));
         assert_eq!(
             batch.to_string(),
             "Gates not found in registry: lint, tests"
         );
-        let single = GateNotFoundError::single("lint");
+        let single = GateNotFoundError::single(&"lint".parse().unwrap());
         assert_eq!(single.to_string(), "Gate 'lint' not found in registry");
     }
 
@@ -376,10 +377,10 @@ mod tests {
         // Per-origin Display lock: each variant reproduces the exact original text
         // of the call site it replaced (gate show/remove vs gate preset create),
         // so a gate-not-found is the dedicated type without changing user output.
-        let by_key = GateNotFoundError::by_key("lint");
+        let by_key = GateNotFoundError::by_key(&"lint".parse().unwrap());
         assert_eq!(by_key.to_string(), "Gate 'lint' not found");
 
-        let in_registry = GateNotFoundError::in_registry("lint");
+        let in_registry = GateNotFoundError::in_registry(&"lint".parse().unwrap());
         assert_eq!(in_registry.to_string(), "Gate not found in registry: lint");
 
         // Both still downcast to the dedicated type for exit-code classification.
@@ -391,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_gate_not_found_downcasts_from_anyhow() {
-        let err: anyhow::Error = GateNotFoundError::single("lint").into();
+        let err: anyhow::Error = GateNotFoundError::single(&"lint".parse().unwrap()).into();
         assert!(err.downcast_ref::<GateNotFoundError>().is_some());
     }
 
@@ -423,14 +424,14 @@ mod tests {
 
     #[test]
     fn test_gate_already_exists_message_and_accessor() {
-        let err = GateAlreadyExistsError::new("lint");
+        let err = GateAlreadyExistsError::new(&"lint".parse().unwrap());
         assert_eq!(err.to_string(), "Gate 'lint' already exists");
-        assert_eq!(err.key(), "lint");
+        assert_eq!(err.key(), &"lint".parse().unwrap());
     }
 
     #[test]
     fn test_gate_already_exists_downcasts_from_anyhow() {
-        let err: anyhow::Error = GateAlreadyExistsError::new("lint").into();
+        let err: anyhow::Error = GateAlreadyExistsError::new(&"lint".parse().unwrap()).into();
         assert!(err.downcast_ref::<GateAlreadyExistsError>().is_some());
     }
 

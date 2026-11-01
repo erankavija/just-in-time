@@ -1565,7 +1565,9 @@ mod tests {
             .first_mut()
             .and_then(|template| template.anchors.first_mut())
             .expect("the package declares a template anchor");
-        anchor.gates.push("a-gate-the-repository-omits".to_string());
+        anchor
+            .gates
+            .push("a-gate-the-repository-omits".parse().unwrap());
         let appended = anchor.gates.len() - 1;
 
         let report = template_drift_report(&repository, &packaged)
