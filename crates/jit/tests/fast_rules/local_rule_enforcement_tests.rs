@@ -970,7 +970,10 @@ impl IssueStore for FailingMutationStorage {
         self.inner.read_events()
     }
 
-    fn load_gate_run_result(&self, run_id: &str) -> anyhow::Result<jit::domain::GateRunResult> {
+    fn load_gate_run_result(
+        &self,
+        run_id: &jit::domain::identity::GateRunId,
+    ) -> anyhow::Result<jit::domain::GateRunResult> {
         self.inner.load_gate_run_result(run_id)
     }
 

@@ -13,7 +13,7 @@
 //! [`InMemoryStorage`]: crate::storage::InMemoryStorage
 //! [`JsonFileStorage`]: crate::storage::JsonFileStorage
 
-use crate::domain::identity::{IssueId, IssueIdPrefix};
+use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use thiserror::Error;
 
 /// Error raised when an issue cannot be found by id or id prefix.
@@ -132,15 +132,13 @@ impl GateNotFoundError {
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error("Gate run '{run_id}' not found")]
 pub struct GateRunNotFoundError {
-    run_id: String,
+    run_id: GateRunId,
 }
 
 impl GateRunNotFoundError {
     /// Build a [`GateRunNotFoundError`] for the given run id.
-    pub fn new(run_id: impl Into<String>) -> Self {
-        Self {
-            run_id: run_id.into(),
-        }
+    pub fn new(run_id: GateRunId) -> Self {
+        Self { run_id }
     }
 }
 
@@ -400,8 +398,8 @@ mod tests {
     #[test]
     fn test_gate_run_preset_repository_not_found_messages() {
         assert_eq!(
-            GateRunNotFoundError::new("run-123").to_string(),
-            "Gate run 'run-123' not found"
+            GateRunNotFoundError::new(crate::test_utils::gate_run_id(1)).to_string(),
+            format!("Gate run '{}' not found", crate::test_utils::gate_run_id(1))
         );
         assert_eq!(
             PresetNotFoundError::new("rust-ci").to_string(),
@@ -414,7 +412,8 @@ mod tests {
 
     #[test]
     fn test_new_not_found_errors_downcast_from_anyhow() {
-        let run: anyhow::Error = GateRunNotFoundError::new("r").into();
+        let run: anyhow::Error =
+            GateRunNotFoundError::new(crate::test_utils::gate_run_id(1)).into();
         assert!(run.downcast_ref::<GateRunNotFoundError>().is_some());
         let preset: anyhow::Error = PresetNotFoundError::new("p").into();
         assert!(preset.downcast_ref::<PresetNotFoundError>().is_some());

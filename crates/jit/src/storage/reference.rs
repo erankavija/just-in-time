@@ -18,7 +18,7 @@
 //!   catalog's own projection ([`crate::domain::event_catalog::event_catalog`]), which this page
 //!   links to.
 //! - The gate-run path comes from
-//!   [`gate_run_result_relative_path`](crate::repository_state::gate_run_result_relative_path),
+//!   [`VirtualPath::gate_run_record`](crate::repository_state::VirtualPath::gate_run_record),
 //!   shared by the repository-state finalizer and storage readers; the record's
 //!   example is a [`GateRunResult`] encoded by [`serialize_gate_run`]; each field's presence when unset is
 //!   read off that encoding.
@@ -31,9 +31,9 @@
 use crate::declarations::GateStage;
 use crate::domain::event_catalog::EventTag;
 use crate::domain::gate_findings::{GateFinding, GateFindings};
-use crate::domain::identity::IssueIdPrefix;
+use crate::domain::identity::{GateRunId, IssueIdPrefix};
 use crate::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION, SHORT_ID_LENGTH};
-use crate::repository_state::{gate_run_result_relative_path, serialize_event, serialize_gate_run};
+use crate::repository_state::{serialize_event, serialize_gate_run, VirtualPath};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use std::path::Path;
@@ -306,7 +306,21 @@ impl Presence {
 
 /// Run id used in the reference's example record, chosen so the example's path
 /// and its `run_id` field are visibly the same string.
-const SAMPLE_RUN_ID: &str = "7b2b0a4c-2f5a-4d3e-9b1a-6c8f0d5e4a21";
+fn sample_run_id() -> GateRunId {
+    GateRunId::from_uuid(uuid::Uuid::from_u128(
+        0x7b2b0a4c_2f5a_4d3e_9b1a_6c8f0d5e4a21,
+    ))
+}
+
+/// The run record's path as the reference prints it, with the id as a placeholder.
+fn documented_result_path() -> String {
+    let id = sample_run_id();
+    Path::new(".jit")
+        .join(VirtualPath::gate_run_record(&id).relative().as_path())
+        .display()
+        .to_string()
+        .replace(id.as_str(), "<run-id>")
+}
 
 /// Fixed timestamp for the reference's sample records, so the projection is
 /// deterministic.
@@ -322,7 +336,7 @@ fn sample_timestamp() -> DateTime<Utc> {
 fn sample_gate_run() -> GateRunResult {
     GateRunResult {
         schema_version: GATE_RUN_SCHEMA_VERSION,
-        run_id: SAMPLE_RUN_ID.to_string(),
+        run_id: sample_run_id(),
         gate_key: "tests".parse().unwrap(),
         stage: GateStage::Postcheck,
         issue_id: crate::domain::identity::IssueId::from_uuid(uuid::Uuid::from_u128(
@@ -362,9 +376,9 @@ fn sample_gate_run() -> GateRunResult {
             builder.push_file("crates/jit/src/lib.rs", b"pub mod domain;\n");
             builder.finish()
         }),
-        origin: crate::domain::GateVerdictOrigin::Reused(
-            "1c4e8a90-3d2b-4f61-9a07-5b8c2d1e6f34".to_string(),
-        ),
+        origin: crate::domain::GateVerdictOrigin::Reused(GateRunId::from_uuid(
+            uuid::Uuid::from_u128(0x1c4e8a90_3d2b_4f61_9a07_5b8c2d1e6f34),
+        )),
         evaluation_stability: crate::domain::GateEvaluationStability::InputsMoved,
     }
 }
@@ -447,7 +461,7 @@ fn cell(text: &str) -> String {
 /// from the constants that enforce them, the event-log block from
 /// [`EventTag::sample`] records encoded the way the log is written, and the
 /// gate-run path, example record, and field table from
-/// [`gate_run_result_relative_path`] and [`GateRunResult`] — so the page cannot
+/// [`VirtualPath::gate_run_record`] and [`GateRunResult`] — so the page cannot
 /// drift from the code that writes and reads the files. The conformance test in
 /// this module asserts the committed file equals this output.
 ///
@@ -458,10 +472,9 @@ pub fn render_reference_markdown() -> Result<String> {
     let example_run = String::from_utf8(serialize_gate_run(&sample_gate_run())?)?;
     let events = event_log_sample()?;
 
-    // The run's path, straight from the pure helper finalization and readers
+    // The run's path, straight from the constructor finalization and readers
     // share, so the page names the live layout rather than a prose copy of it.
-    let result_path = Path::new(".jit").join(gate_run_result_relative_path("<run-id>")?.as_path());
-    let result_path = result_path.display();
+    let result_path = documented_result_path();
 
     let min_prefix_length = IssueIdPrefix::MIN_ID_PREFIX_LENGTH;
     // One line per rule, so the interpolated minimum cannot skew the wrapping.
@@ -708,13 +721,11 @@ mod tests {
     }
 
     /// REQ-03: the page names the path shared by finalization and readers, taken
-    /// from the canonical relative-path helper rather than reconstructed.
+    /// from the canonical path constructor rather than reconstructed.
     #[test]
     fn test_render_projects_the_storage_result_path() {
         let page = render_reference_markdown().expect("the reference renders");
-        let path =
-            Path::new(".jit").join(gate_run_result_relative_path("<run-id>").unwrap().as_path());
-        assert!(page.contains(&format!("`{}`", path.display())));
+        assert!(page.contains(&format!("`{}`", documented_result_path())));
     }
 
     /// REQ-02: the page states the event-log serialization and links the tag

@@ -5,7 +5,7 @@
 
 use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
-use crate::domain::identity::{GateKey, IssueId, ProfileId};
+use crate::domain::identity::{GateKey, GateRunId, IssueId, ProfileId};
 use crate::domain::vocabulary::wire_vocabulary;
 // `repository_state::path` is a self-contained identity vocabulary: it imports
 // nothing from this crate and performs no I/O, so naming its root-relative path
@@ -344,7 +344,7 @@ pub struct GateState {
     /// selects; absent while no run has been recorded since the gate became
     /// required.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub run_id: Option<String>,
+    pub run_id: Option<GateRunId>,
 }
 
 impl GateState {
@@ -354,9 +354,9 @@ impl GateState {
         gate_key: &str,
         runs: &'a [GateRunResult],
     ) -> Option<&'a GateRunResult> {
-        let run_id = self.run_id.as_deref()?;
+        let run_id = self.run_id.as_ref()?;
         runs.iter()
-            .find(|run| run.run_id == run_id && run.gate_key.as_str() == gate_key)
+            .find(|run| &run.run_id == run_id && run.gate_key.as_str() == gate_key)
     }
 }
 
@@ -879,7 +879,7 @@ pub struct GateRunResult {
     /// Schema version for future evolution ([`GATE_RUN_SCHEMA_VERSION`])
     pub schema_version: u32,
     /// Unique run identifier
-    pub run_id: String,
+    pub run_id: GateRunId,
     /// Gate key that was executed
     pub gate_key: GateKey,
     /// Stage at which gate was executed
@@ -968,6 +968,7 @@ impl GateRunResult {
     /// text, or inputs digest, and its [`GateVerdictOrigin::Attested`] origin
     /// keeps it out of verdict reuse.
     pub fn attestation(
+        run_id: &GateRunId,
         issue_id: &IssueId,
         gate_key: &GateKey,
         stage: GateStage,
@@ -976,9 +977,8 @@ impl GateRunResult {
     ) -> Self {
         Self {
             schema_version: GATE_RUN_SCHEMA_VERSION,
-            // Repository mutation finalization assigns the durable run identity
-            // and stamps the attestation time.
-            run_id: String::new(),
+            // Repository mutation finalization stamps the attestation time.
+            run_id: run_id.clone(),
             gate_key: gate_key.clone(),
             stage,
             issue_id: issue_id.clone(),
@@ -1038,7 +1038,7 @@ pub enum GateVerdictOrigin {
     Executed,
     /// The verdict was taken from the run with this id, whose declared inputs
     /// digested to the same value. That run executed the checker.
-    Reused(String),
+    Reused(GateRunId),
     /// The verdict is a manual gate's attestation: `by` names the attestor and
     /// `started_at` the time. No checker ran.
     Attested,
@@ -1064,7 +1064,7 @@ pub enum GateEvaluationStability {
 impl GateVerdictOrigin {
     /// The earlier run this verdict was taken from, or `None` when the verdict
     /// is this run's own.
-    pub fn source_run(&self) -> Option<&str> {
+    pub fn source_run(&self) -> Option<&GateRunId> {
         match self {
             Self::Executed | Self::Attested => None,
             Self::Reused(run_id) => Some(run_id),
@@ -1881,6 +1881,7 @@ mod tests {
                 .finish();
         let attestor: Assignee = "human:reviewer".parse().unwrap();
         let mut attested = GateRunResult::attestation(
+            &crate::test_utils::gate_run_id(1),
             &crate::test_utils::issue_id(160),
             &"review".parse().unwrap(),
             GateStage::Postcheck,
@@ -1895,6 +1896,7 @@ mod tests {
     #[test]
     fn test_gate_run_result_by_round_trips_through_json_byte_identically() {
         let mut run = GateRunResult::attestation(
+            &crate::test_utils::gate_run_id(1),
             &crate::test_utils::issue_id(160),
             &"review".parse().unwrap(),
             GateStage::Postcheck,

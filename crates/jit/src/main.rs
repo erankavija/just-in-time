@@ -7502,7 +7502,7 @@ mod gate_findings_text_tests {
     fn run_with(references: Vec<String>) -> GateRunResult {
         GateRunResult {
             schema_version: GATE_RUN_SCHEMA_VERSION,
-            run_id: "run-1".to_string(),
+            run_id: jit::test_utils::gate_run_id(1),
             gate_key: "review".parse().unwrap(),
             stage: GateStage::Postcheck,
             issue_id: jit::test_utils::issue_id(7),

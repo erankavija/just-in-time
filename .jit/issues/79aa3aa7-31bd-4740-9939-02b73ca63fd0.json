@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a30753de-1b1c-4e8f-89cc-4ec26f98c2d1",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:56:43.543009435Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "29ef432b-54f5-4273-8934-cca2b214f08f",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:55:25.533914527Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate runs are identified by a validated GateRunId",
-  "updated_at": "2026-11-01T00:45:49.959645962Z"
+  "updated_at": "2026-11-01T02:56:43.543009435Z"
 }

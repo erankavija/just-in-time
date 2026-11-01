@@ -70,13 +70,12 @@ fn test_issue_show_errors_on_corrupt_gate_run() {
     let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 0");
 
     // Plant a corrupt gate-run record on disk.
-    let run_dir = temp
-        .root()
-        .join(".jit")
-        .join("gate-runs")
-        .join("corrupt-run");
-    fs::create_dir_all(&run_dir).unwrap();
-    let result_path = run_dir.join("result.json");
+    let result_path = temp.root().join(".jit").join(
+        jit::repository_state::VirtualPath::gate_run_record(&jit::test_utils::gate_run_id(1))
+            .relative()
+            .as_path(),
+    );
+    fs::create_dir_all(result_path.parent().unwrap()).unwrap();
     fs::write(&result_path, "{ this is not valid json").unwrap();
 
     let output = temp

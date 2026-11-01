@@ -1404,10 +1404,10 @@ fn test_backends_publish_prebuilt_gate_run_and_event_bytes() {
         .unwrap()
         .with_timezone(&chrono::Utc);
     let data = worktree.path().join(".jit");
-    let run_id = "run-deterministic-1";
+    let run_id = crate::test_utils::gate_run_id(1);
     let result = crate::domain::GateRunResult {
         schema_version: 1,
-        run_id: run_id.to_string(),
+        run_id: run_id.clone(),
         gate_key: "cargo-ci".parse().unwrap(),
         stage: crate::declarations::GateStage::Postcheck,
         issue_id: crate::test_utils::issue_id(7),
@@ -1437,8 +1437,8 @@ fn test_backends_publish_prebuilt_gate_run_and_event_bytes() {
     event_line.push(b'\n');
     let gate_bytes = serialize_gate_run(&result).unwrap();
     // Both backends must publish these prebuilt payloads unchanged.
-    let run_dir = VirtualPath::data(format!("gate-runs/{run_id}")).unwrap();
-    let run_file = VirtualPath::data(format!("gate-runs/{run_id}/result.json")).unwrap();
+    let run_dir = VirtualPath::gate_run_directory(&run_id);
+    let run_file = VirtualPath::gate_run_record(&run_id);
     let events = VirtualPath::data("events.jsonl").unwrap();
     let build_delta = |layout: &RepositoryLayout| {
         RepositoryDelta::new(
@@ -1512,7 +1512,7 @@ fn test_backends_publish_prebuilt_gate_run_and_event_bytes() {
     }
 
     // Gate-run and provenance bytes are byte-identical across backends.
-    let json_gate = std::fs::read(data.join(format!("gate-runs/{run_id}/result.json"))).unwrap();
+    let json_gate = std::fs::read(data.join(run_file.relative().as_path())).unwrap();
     let json_events = std::fs::read(data.join("events.jsonl")).unwrap();
     let state = memory.repository_state();
     let memory_gate = match state.entries.get(&run_file).unwrap() {

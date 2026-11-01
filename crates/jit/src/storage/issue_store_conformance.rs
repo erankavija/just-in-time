@@ -8,16 +8,16 @@
 
 use crate::declarations::{serialize_gate_registry, GateRegistry, GateStage};
 use crate::domain::artifact_plan::PlanTarget;
-use crate::domain::identity::{IssueId, IssueIdPrefix};
+use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder};
 use crate::domain::{
     Event, EventBody, GateRunResult, GateRunStatus, GateStatus, GateVerdictOrigin, Issue,
 };
 use crate::gate_presets::{GatePresetDefinition, GateTemplate};
 use crate::repository_state::{
-    gate_run_result_relative_path, serialize_gate_run, serialize_issue, CaptureBudget, CaptureSpec,
-    ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction, RepositoryActionOwner,
-    RepositoryDelta, RepositoryIndex, RepositoryLayout, RepositoryRootClass, VirtualPath,
+    serialize_gate_run, serialize_issue, CaptureBudget, CaptureSpec, ExpectedPreimage, FileMode,
+    MaterializationPlan, RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryIndex,
+    RepositoryLayout, RepositoryRootClass, VirtualPath, GATE_RUN_RECORD_FILE,
 };
 use crate::storage::{
     discover_repository_layout, AmbiguousIdError, GateRunNotFoundError, InMemoryStorage,
@@ -225,18 +225,18 @@ fn issue_created(event_id: &str) -> Event {
 /// An executed run of `gate_key` for `issue_id`, started `second` seconds after
 /// the epoch.
 fn executed_run(
-    run_id: &str,
+    run_id: &GateRunId,
     issue_id: &crate::domain::identity::IssueId,
     gate_key: &str,
     second: i64,
     digest: Option<InputsDigest>,
 ) -> GateRunResult {
     GateRunResult {
-        run_id: run_id.to_string(),
         started_at: chrono::DateTime::from_timestamp(second, 0).unwrap(),
         inputs_digest: digest,
         origin: GateVerdictOrigin::Executed,
         ..GateRunResult::attestation(
+            run_id,
             issue_id,
             &gate_key.parse().unwrap(),
             GateStage::Postcheck,
@@ -255,9 +255,8 @@ fn digest_of(content: &[u8]) -> InputsDigest {
 fn gate_run_seed(runs: &[GateRunResult]) -> Vec<(VirtualPath, String)> {
     runs.iter()
         .map(|run| {
-            let path = gate_run_result_relative_path(&run.run_id).unwrap();
             (
-                VirtualPath::data(path.as_path()).unwrap(),
+                VirtualPath::gate_run_record(&run.run_id),
                 String::from_utf8(serialize_gate_run(run).unwrap()).unwrap(),
             )
         })
@@ -564,7 +563,7 @@ fn test_read_artifact_archive_events_keeps_only_archive_executions<B: Backend>()
 
 fn test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found<B: Backend>() {
     let run = executed_run(
-        "run-one",
+        &crate::test_utils::gate_run_id(1),
         &crate::test_utils::issue_id(163),
         "tests",
         10,
@@ -573,10 +572,16 @@ fn test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found<B
     let recorded = Repository::<B>::seeded(&gate_run_seed(std::slice::from_ref(&run)));
     let empty = Repository::<B>::empty();
 
-    assert_eq!(recorded.store.load_gate_run_result("run-one").unwrap(), run);
+    assert_eq!(
+        recorded.store.load_gate_run_result(&run.run_id).unwrap(),
+        run
+    );
     for error in [
-        recorded.store.load_gate_run_result("run-two").unwrap_err(),
-        empty.store.load_gate_run_result("run-one").unwrap_err(),
+        recorded
+            .store
+            .load_gate_run_result(&crate::test_utils::gate_run_id(2))
+            .unwrap_err(),
+        empty.store.load_gate_run_result(&run.run_id).unwrap_err(),
     ] {
         assert!(
             error.downcast_ref::<GateRunNotFoundError>().is_some(),
@@ -588,21 +593,21 @@ fn test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found<B
 fn test_list_gate_runs_for_issue_lists_only_that_issues_runs<B: Backend>() {
     let runs = [
         executed_run(
-            "run-a1",
+            &crate::test_utils::gate_run_id(3),
             &crate::test_utils::issue_id(153),
             "tests",
             10,
             None,
         ),
         executed_run(
-            "run-a2",
+            &crate::test_utils::gate_run_id(4),
             &crate::test_utils::issue_id(153),
             "lint",
             20,
             None,
         ),
         executed_run(
-            "run-b1",
+            &crate::test_utils::gate_run_id(5),
             &crate::test_utils::issue_id(154),
             "tests",
             30,
@@ -622,12 +627,37 @@ fn test_list_gate_runs_for_issue_lists_only_that_issues_runs<B: Backend>() {
 
     assert_eq!(
         listed(&crate::test_utils::issue_id(153)),
-        BTreeSet::from(["run-a1".to_string(), "run-a2".to_string()])
+        BTreeSet::from([
+            crate::test_utils::gate_run_id(3),
+            crate::test_utils::gate_run_id(4)
+        ])
     );
     assert!(listed(&crate::test_utils::issue_id(164)).is_empty());
     assert!(Repository::<B>::empty()
         .store
         .list_gate_runs_for_issue(&crate::test_utils::issue_id(153))
+        .unwrap()
+        .is_empty());
+}
+
+/// A `gate-runs/` directory whose name is not a run id holds no run.
+fn test_list_gate_runs_for_issue_ignores_a_directory_not_named_by_a_run_id<B: Backend>() {
+    let issue = crate::test_utils::issue_id(153);
+    let run = executed_run(
+        &crate::test_utils::gate_run_id(1),
+        &issue,
+        "tests",
+        10,
+        None,
+    );
+    let seed = [(
+        VirtualPath::data("gate-runs/not-a-run-id/result.json").unwrap(),
+        String::from_utf8(serialize_gate_run(&run).unwrap()).unwrap(),
+    )];
+
+    assert!(Repository::<B>::seeded(&seed)
+        .store
+        .list_gate_runs_for_issue(&issue)
         .unwrap()
         .is_empty());
 }
@@ -639,7 +669,7 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
     let errored = GateRunResult {
         status: GateRunStatus::Error,
         ..executed_run(
-            "errored",
+            &crate::test_utils::gate_run_id(6),
             &crate::test_utils::issue_id(153),
             "tests",
             50,
@@ -649,7 +679,7 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
     let attested = GateRunResult {
         origin: GateVerdictOrigin::Attested,
         ..executed_run(
-            "attested",
+            &crate::test_utils::gate_run_id(7),
             &crate::test_utils::issue_id(153),
             "tests",
             40,
@@ -659,7 +689,7 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
     let failed = GateRunResult {
         status: GateRunStatus::Failed,
         ..executed_run(
-            "failed",
+            &crate::test_utils::gate_run_id(8),
             &crate::test_utils::issue_id(154),
             "tests",
             30,
@@ -668,7 +698,7 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
     };
     let runs = [
         executed_run(
-            "older",
+            &crate::test_utils::gate_run_id(9),
             &crate::test_utils::issue_id(153),
             "tests",
             10,
@@ -678,14 +708,14 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
         attested,
         errored,
         executed_run(
-            "other-digest",
+            &crate::test_utils::gate_run_id(10),
             &crate::test_utils::issue_id(153),
             "tests",
             60,
             Some(other),
         ),
         executed_run(
-            "other-gate",
+            &crate::test_utils::gate_run_id(11),
             &crate::test_utils::issue_id(153),
             "lint",
             70,
@@ -711,23 +741,13 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
 }
 
 /// A record under the gate-run root, whatever its shape.
-fn gate_run_entry(relative: &str) -> VirtualPath {
-    VirtualPath::data(format!(
-        "{}/{relative}",
-        VirtualPath::GATE_RUNS.relative().as_str()
-    ))
-    .unwrap()
-}
-
 fn test_gate_run_readers_name_a_malformed_result<B: Backend>() {
-    let path = gate_run_entry("corrupt-run/result.json");
+    let run_id = crate::test_utils::gate_run_id(1);
+    let path = VirtualPath::gate_run_record(&run_id);
     let repository = Repository::<B>::seeded(&[(path.clone(), "{ corrupt".to_string())]);
 
     for error in [
-        repository
-            .store
-            .load_gate_run_result("corrupt-run")
-            .unwrap_err(),
+        repository.store.load_gate_run_result(&run_id).unwrap_err(),
         repository
             .store
             .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
@@ -744,12 +764,23 @@ fn test_gate_run_readers_name_a_malformed_result<B: Backend>() {
 /// file beside the run directories list nothing, and naming the latter is
 /// refused.
 fn test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape<B: Backend>() {
+    let direct_file = crate::test_utils::gate_run_id(2);
     let repository = Repository::<B>::seeded(&[
         (
-            gate_run_entry("outer/nested/result.json"),
+            VirtualPath::data(
+                VirtualPath::gate_run_directory(&crate::test_utils::gate_run_id(1))
+                    .relative()
+                    .as_path()
+                    .join("nested")
+                    .join(GATE_RUN_RECORD_FILE),
+            )
+            .unwrap(),
             "{ corrupt".to_string(),
         ),
-        (gate_run_entry("direct-file"), "root clutter".to_string()),
+        (
+            VirtualPath::gate_run_directory(&direct_file),
+            "root clutter".to_string(),
+        ),
     ]);
 
     assert!(repository
@@ -759,7 +790,7 @@ fn test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape<B: Ba
         .is_empty());
     let named = repository
         .store
-        .load_gate_run_result("direct-file")
+        .load_gate_run_result(&direct_file)
         .unwrap_err();
     assert!(
         format!("{named:#}").contains("ordinary directory"),
@@ -774,7 +805,7 @@ fn test_gate_run_readers_refuse_a_file_as_the_gate_run_root<B: Backend>() {
     for error in [
         repository
             .store
-            .load_gate_run_result("run-one")
+            .load_gate_run_result(&crate::test_utils::gate_run_id(1))
             .unwrap_err(),
         repository
             .store
@@ -789,23 +820,22 @@ fn test_gate_run_readers_refuse_a_file_as_the_gate_run_root<B: Backend>() {
 }
 
 fn test_gate_run_readers_refuse_a_directory_as_a_result<B: Backend>() {
+    let run_id = crate::test_utils::gate_run_id(1);
+    let record = VirtualPath::gate_run_record(&run_id);
     let repository = Repository::<B>::seeded(&[(
-        gate_run_entry("directory-run/result.json/inner"),
+        VirtualPath::data(record.relative().as_path().join("inner")).unwrap(),
         String::new(),
     )]);
 
     for error in [
-        repository
-            .store
-            .load_gate_run_result("directory-run")
-            .unwrap_err(),
+        repository.store.load_gate_run_result(&run_id).unwrap_err(),
         repository
             .store
             .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
             .unwrap_err(),
     ] {
         let message = format!("{error:#}");
-        assert!(message.contains("directory-run/result.json"), "{message}");
+        assert!(message.contains(record.relative().as_str()), "{message}");
         assert!(message.contains("ordinary file"), "{message}");
     }
 }
@@ -1202,6 +1232,7 @@ conformance_suite!(
         test_read_artifact_archive_events_keeps_only_archive_executions,
         test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found,
         test_list_gate_runs_for_issue_lists_only_that_issues_runs,
+        test_list_gate_runs_for_issue_ignores_a_directory_not_named_by_a_run_id,
         test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_digest,
         test_gate_run_readers_name_a_malformed_result,
         test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape,

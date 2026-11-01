@@ -5,11 +5,11 @@
 
 use crate::declarations::{parse_gate_registry, GateRegistry};
 use crate::domain::event_log::parse_known_events;
-use crate::domain::identity::IssueId;
+use crate::domain::identity::{GateRunId, IssueId};
 use crate::domain::{Event, GateRunResult, Issue};
 use crate::repository_state::{
-    gate_run_result_relative_path, CapturedBytes, EntryIdentity, FileMode, RepositoryEntry,
-    RepositoryRootClass, RootRelativePath, VirtualPath,
+    CapturedBytes, EntryIdentity, FileMode, RepositoryEntry, RepositoryRootClass, RootRelativePath,
+    VirtualPath,
 };
 use crate::storage::redo_apply::{check_interruption, occupied_directory};
 use crate::storage::{
@@ -365,36 +365,10 @@ impl InMemoryStorage {
         id
     }
 
-    /// Canonical `Data(...)` identity for one gate-run result.
-    fn gate_run_vpath(run_id: &str) -> Result<VirtualPath> {
-        Ok(VirtualPath::data(
-            gate_run_result_relative_path(run_id)?.as_path(),
-        )?)
-    }
-
-    fn gate_run_directory_vpath(run_id: &str) -> Result<VirtualPath> {
-        let result = gate_run_result_relative_path(run_id)?;
-        Ok(VirtualPath::data(result.as_path().parent().ok_or_else(
-            || anyhow!("canonical gate-run result path has no parent"),
-        )?)?)
-    }
-
-    fn gate_run_directory_id(vpath: &VirtualPath) -> Option<&str> {
-        if vpath.root_class() != RepositoryRootClass::Data {
-            return None;
-        }
-        let mut components = vpath.relative().as_str().split('/');
-        let (Some(directory), Some(run_id), None) =
-            (components.next(), components.next(), components.next())
-        else {
-            return None;
-        };
-        if directory != VirtualPath::GATE_RUNS.relative().as_str() {
-            return None;
-        }
-        gate_run_result_relative_path(run_id)
-            .is_ok_and(|_| Self::gate_run_directory_vpath(run_id).is_ok_and(|path| &path == vpath))
-            .then_some(run_id)
+    /// The id of the gate-run directory at `vpath`, if it is one.
+    fn gate_run_directory_id(vpath: &VirtualPath) -> Option<GateRunId> {
+        let run_id = GateRunId::try_from(vpath.file_name()?).ok()?;
+        (&VirtualPath::gate_run_directory(&run_id) == vpath).then_some(run_id)
     }
 
     fn gate_run_parent_is_directory(
@@ -802,10 +776,7 @@ impl InMemoryStorage {
         run_ids
             .into_iter()
             .filter_map(|run_id| {
-                let vpath = match Self::gate_run_vpath(run_id) {
-                    Ok(vpath) => vpath,
-                    Err(error) => return Some(Err(error)),
-                };
+                let vpath = VirtualPath::gate_run_record(&run_id);
                 match state.entries.get(&vpath) {
                     None | Some(RepositoryEntry::Absent) => None,
                     Some(RepositoryEntry::File { content, .. }) => Some(
@@ -889,17 +860,19 @@ impl IssueStore for InMemoryStorage {
         &self.root_path
     }
 
-    fn load_gate_run_result(&self, run_id: &str) -> Result<GateRunResult> {
-        let path = Self::gate_run_vpath(run_id)?;
-        let run_dir = Self::gate_run_directory_vpath(run_id)?;
+    fn load_gate_run_result(&self, run_id: &GateRunId) -> Result<GateRunResult> {
+        let path = VirtualPath::gate_run_record(run_id);
+        let run_dir = VirtualPath::gate_run_directory(run_id);
         let state = self.repository_state();
         if !Self::gate_run_parent_is_directory(&state, &VirtualPath::GATE_RUNS)?
             || !Self::gate_run_parent_is_directory(&state, &run_dir)?
         {
-            return Err(GateRunNotFoundError::new(run_id).into());
+            return Err(GateRunNotFoundError::new(run_id.clone()).into());
         }
         match state.entries.get(&path) {
-            None | Some(RepositoryEntry::Absent) => Err(GateRunNotFoundError::new(run_id).into()),
+            None | Some(RepositoryEntry::Absent) => {
+                Err(GateRunNotFoundError::new(run_id.clone()).into())
+            }
             Some(RepositoryEntry::File { content, .. }) => serde_json::from_slice(content.bytes())
                 .with_context(|| {
                     format!(
@@ -1043,7 +1016,7 @@ mod tests {
                 .entries
                 .insert(VirtualPath::GATE_RUNS, gate_run_parent_entry(kind));
 
-            let loaded = storage.load_gate_run_result("run-one");
+            let loaded = storage.load_gate_run_result(&crate::test_utils::gate_run_id(1));
             let listed = storage.list_gate_runs_for_issue(&crate::test_utils::issue_id(2));
             if kind == "absent" {
                 assert!(loaded
@@ -1063,7 +1036,7 @@ mod tests {
         for kind in ["absent", "directory", "symlink", "unsupported"] {
             let storage = InMemoryStorage::new();
             let root = VirtualPath::GATE_RUNS;
-            let run_dir = InMemoryStorage::gate_run_directory_vpath("run-one").unwrap();
+            let run_dir = VirtualPath::gate_run_directory(&crate::test_utils::gate_run_id(1));
             let mut state = storage.repository_state();
             state
                 .entries
@@ -1071,7 +1044,7 @@ mod tests {
             state.entries.insert(run_dir, gate_run_parent_entry(kind));
             drop(state);
 
-            let loaded = storage.load_gate_run_result("run-one");
+            let loaded = storage.load_gate_run_result(&crate::test_utils::gate_run_id(1));
             let listed = storage.list_gate_runs_for_issue(&crate::test_utils::issue_id(2));
             if matches!(kind, "absent" | "directory") {
                 assert!(loaded
