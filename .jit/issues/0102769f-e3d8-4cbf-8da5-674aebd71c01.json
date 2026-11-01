@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "348e8180-b31d-4537-a553-159994e9258b",
+      "run_id": "583874d4-ea96-429b-a176-370517ad04e9",
       "status": "passed",
-      "updated_at": "2026-11-01T00:24:52.037988221Z",
+      "updated_at": "2026-11-01T00:44:43.760179967Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Issue record paths come from a VirtualPath constructor",
-  "updated_at": "2026-11-01T00:27:11.824740194Z"
+  "updated_at": "2026-11-01T00:44:43.760179967Z"
 }
