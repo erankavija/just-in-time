@@ -17,6 +17,12 @@
       "status": "passed",
       "updated_at": "2026-11-01T05:21:00.158323503Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "3a37a303-4e71-4b7f-a55a-d3bfe1284932",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:23:53.286324512Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "592d663e-f516-4167-8449-d2b467ea32f4",
@@ -33,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "A profile has one identity type",
-  "updated_at": "2026-11-01T05:21:00.158323503Z"
+  "updated_at": "2026-11-01T05:23:53.286324512Z"
 }
