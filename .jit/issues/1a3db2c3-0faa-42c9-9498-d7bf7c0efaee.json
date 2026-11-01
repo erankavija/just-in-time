@@ -27,9 +27,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "65249190-f03e-4f36-98fa-4530f86f90e3",
-      "status": "failed",
-      "updated_at": "2026-11-01T04:15:06.598511032Z",
+      "run_id": "1922d7a8-6129-4672-8e7b-c5d7e3312db3",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:18:46.282822227Z",
       "updated_by": "auto:executor"
     }
   },
@@ -47,5 +47,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The dependency graph carries typed node ids",
-  "updated_at": "2026-11-01T04:15:28.281507128Z"
+  "updated_at": "2026-11-01T04:18:46.282822227Z"
 }
