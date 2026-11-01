@@ -53,6 +53,7 @@
   ],
   "description": "Aggregate the work that delivers this outcome: CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: One shared fixture spawns `jit` for every CLI test, and no test file defines its own binary locator, repository setup or id scraping from human-readable output.\n- [hard] REQ-02: Issue construction, the taxonomy repository and the memory executor each have one definition in shared test support, and the memory executor is set up by product initialisation.\n- [hard] REQ-03: Tests that need the shipped item kinds derive them from the shipped default package.\n- [hard] REQ-04: Tests reach the working directory and environment only through the shared scoped guards, and every test passes alone, in any order and in parallel.\n",
   "documents": [],
+  "first_ready_at": "2026-11-01T08:55:16.232503177Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -74,7 +75,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Tests run on shared fixtures and guards",
-  "updated_at": "2026-11-01T08:30:44.481280965Z"
+  "updated_at": "2026-11-01T08:55:16.232503177Z"
 }

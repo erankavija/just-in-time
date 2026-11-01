@@ -21934,3 +21934,10 @@
 {"gate_key":"code-review","id":"e9273996-1aa6-4b08-b233-3345b6932d86","issue_id":"e7d98542-456d-4421-9e17-faf4f739a800","timestamp":"2026-11-01T08:40:55.060549969Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"20d0e4cc-373a-4f9a-8206-b089e1399329","issue_id":"e7d98542-456d-4421-9e17-faf4f739a800","timestamp":"2026-11-01T08:41:45.721358807Z","to":"done","type":"issue_state_changed"}
 {"id":"7daa93e4-3e18-4e4a-b39c-feaa9d14e4bb","issue_id":"e7d98542-456d-4421-9e17-faf4f739a800","timestamp":"2026-11-01T08:41:45.721358807Z","type":"issue_completed"}
+{"fields":["title","description"],"id":"5ffc369a-4865-4d10-86b7-64ece23500a8","issue_id":"7984d807-acb1-4c61-bc6d-fa7c2f3a52d0","timestamp":"2026-11-01T08:42:11.308246974Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["description"],"id":"ed03e385-ea3c-4208-a4a4-31aad0a5a822","issue_id":"7984d807-acb1-4c61-bc6d-fa7c2f3a52d0","timestamp":"2026-11-01T08:50:28.759204930Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"cargo-ci","id":"c8430f25-3ce8-4e9c-8f4a-102c9ef1abfa","issue_id":"7984d807-acb1-4c61-bc6d-fa7c2f3a52d0","timestamp":"2026-11-01T08:52:07.405512809Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"758423d8-086c-49e7-a7da-b14f5bf863b3","issue_id":"7984d807-acb1-4c61-bc6d-fa7c2f3a52d0","timestamp":"2026-11-01T08:54:41.893669766Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"fb86f2fc-fc5b-4465-b205-f731c6384422","issue_id":"7984d807-acb1-4c61-bc6d-fa7c2f3a52d0","timestamp":"2026-11-01T08:55:16.107204267Z","to":"done","type":"issue_state_changed"}
+{"id":"c4bf6d9c-9376-48dd-8456-f028a939af00","issue_id":"7984d807-acb1-4c61-bc6d-fa7c2f3a52d0","timestamp":"2026-11-01T08:55:16.107204267Z","type":"issue_completed"}
+{"from":"backlog","id":"435dfd86-e035-4b6f-ae13-8670a2ec0770","issue_id":"c5aafdc0-998c-46a0-a286-7f853f0b814a","timestamp":"2026-11-01T08:55:16.232503177Z","to":"ready","type":"issue_state_changed"}
