@@ -14,9 +14,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "6bd5bfba-ff7c-412b-8ce9-e7b24034bc18",
+      "run_id": "e925aaad-39d6-45b2-97af-42d65da36b67",
       "status": "passed",
-      "updated_at": "2026-11-01T09:40:55.483482678Z",
+      "updated_at": "2026-11-01T09:58:12.161404602Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -37,5 +37,5 @@
   "priority": "normal",
   "state": "done",
   "title": "The suite passes when tests share a process",
-  "updated_at": "2026-11-01T09:56:46.010083234Z"
+  "updated_at": "2026-11-01T09:58:12.161404602Z"
 }
