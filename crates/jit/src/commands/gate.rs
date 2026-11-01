@@ -400,14 +400,24 @@ fn captured_gate_preset_issue(
     Ok(issue)
 }
 
+/// Which of a preset's gates an application leaves out.
+struct PresetGateExclusions<'a> {
+    skip_precheck: bool,
+    skip_postcheck: bool,
+    except_gates: &'a [String],
+}
+
 fn derive_gate_preset_application(
     issue: Issue,
     mut registry: crate::declarations::GateRegistry,
     preset: &crate::gate_presets::GatePresetDefinition,
     timeout_override: Option<u64>,
-    skip_precheck: bool,
-    skip_postcheck: bool,
-    except_gates: &[String],
+    PresetGateExclusions {
+        skip_precheck,
+        skip_postcheck,
+        except_gates,
+    }: PresetGateExclusions<'_>,
+    context: &crate::repository_state::MutationContext,
 ) -> Result<DerivedGatePresetApplication> {
     use crate::declarations::{GateChecker, GateStage};
     use crate::repository_state::MutationIntent;
@@ -472,6 +482,7 @@ fn derive_gate_preset_application(
             issue_id,
             gate_keys: keys,
         },
+        context,
     )?;
     let super::CapturedIssueMutationOutcome::GatesAdded {
         added,
@@ -1303,9 +1314,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 captured_gate_registry(&image)?,
                 &preset,
                 timeout_override,
-                skip_precheck,
-                skip_postcheck,
-                except_gates,
+                PresetGateExclusions {
+                    skip_precheck,
+                    skip_postcheck,
+                    except_gates,
+                },
+                &context,
             )?;
             if derived.intents.is_empty() {
                 return Ok(AttemptOutcome::Done((derived.result, warnings)));
@@ -1347,7 +1361,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Load a single gate run result by run ID.
-    pub fn get_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult> {
+    pub fn get_gate_run_result(
+        &self,
+        run_id: &crate::domain::identity::GateRunId,
+    ) -> Result<crate::domain::GateRunResult> {
         self.storage.load_gate_run_result(run_id)
     }
 

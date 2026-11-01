@@ -2401,7 +2401,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///
 /// let run = GateRunResult {
 ///     schema_version: 1,
-///     run_id: "r1".into(),
+///     run_id: jit::test_utils::gate_run_id(1),
 ///     gate_key: "tests".into(),
 ///     stage: GateStage::Postcheck,
 ///     issue_id: jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678),
@@ -2431,7 +2431,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 /// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateRunSummary {
-    pub run_id: String,
+    pub run_id: crate::domain::identity::GateRunId,
     pub key: String,
     pub stage: GateStage,
     pub status: GateRunStatus,
@@ -2631,7 +2631,7 @@ pub type GateRunHistoryResponse = ListEnvelope<ResultsKey, GateRunSummary>;
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateFlatReportResponse {
     pub key: String,
-    pub run_id: String,
+    pub run_id: crate::domain::identity::GateRunId,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stdout: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2650,7 +2650,7 @@ pub struct GateFlatReportResponse {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateFindingsResponse {
     pub key: String,
-    pub run_id: String,
+    pub run_id: crate::domain::identity::GateRunId,
     /// Whether the latest run carried a machine-readable findings block.
     pub has_findings: bool,
     /// Checker-declared verdict; `None` when no block was emitted.
@@ -3339,19 +3339,20 @@ mod tests {
         let mut issue = crate::test_utils::fixture_issue("T".to_string(), "B".to_string());
         issue.gates_required = vec!["tests".to_string()];
         let run_at = Utc::now();
+        let run_id = crate::test_utils::gate_run_id(1);
         issue.gates_status.insert(
             "tests".to_string(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("ci:test".parse().unwrap()),
                 updated_at: run_at,
-                run_id: Some("run-1".to_string()),
+                run_id: Some(run_id.clone()),
             },
         );
 
         let run = GateRunResult {
             schema_version: 1,
-            run_id: "run-1".to_string(),
+            run_id,
             gate_key: "tests".to_string(),
             stage: GateStage::Postcheck,
             issue_id: issue.id.clone(),
@@ -3425,7 +3426,7 @@ mod tests {
         };
         let response = GateFindingsResponse {
             key: "review".to_string(),
-            run_id: "run-1".to_string(),
+            run_id: crate::test_utils::gate_run_id(1),
             has_findings: true,
             verdict: Some("fail".to_string()),
             summary: Some("two defects".to_string()),

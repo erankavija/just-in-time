@@ -166,35 +166,26 @@ fn issue_mutation_capture_budget() -> crate::repository_state::CaptureBudget {
 }
 
 /// The `gate-runs` directory and the paths the first `count` gate-run records
-/// `context` allocates are published at: what a mutation publishing those
+/// `context` derives ids for are published at: what a mutation publishing those
 /// records must capture.
 ///
-/// Gate-run records take the first identifiers a mutation allocates, so a
+/// Gate-run records take the first identifiers a mutation derives, so a
 /// mutation that also creates issues cannot use this.
 fn gate_run_record_paths(
     context: &crate::repository_state::MutationContext,
     count: usize,
-) -> Result<Vec<crate::repository_state::VirtualPath>> {
+) -> Vec<crate::repository_state::VirtualPath> {
     use crate::repository_state::VirtualPath;
 
-    let records = (0..count as u64)
-        .map(|index| {
-            let result = crate::repository_state::gate_run_result_relative_path(
-                &context.identifier_at(index),
-            )?;
-            let directory = result
-                .as_path()
-                .parent()
-                .ok_or_else(|| anyhow!("canonical gate-run result path has no parent"))?;
-            Ok([
-                VirtualPath::data(directory)?,
-                VirtualPath::data(result.as_path())?,
-            ])
-        })
-        .collect::<Result<Vec<_>>>()?;
-    Ok(std::iter::once(VirtualPath::GATE_RUNS)
-        .chain(records.into_iter().flatten())
-        .collect())
+    std::iter::once(VirtualPath::GATE_RUNS)
+        .chain((0..count as u64).flat_map(|index| {
+            let run_id = context.gate_run_id_at(index);
+            [
+                VirtualPath::gate_run_directory(&run_id),
+                VirtualPath::gate_run_record(&run_id),
+            ]
+        }))
+        .collect()
 }
 
 /// An annotation installed for as long as this guard lives.
@@ -698,9 +689,12 @@ fn captured_precheck_plan(
                 .collect::<std::result::Result<Vec<_>, _>>()?,
         );
         if consumes_history {
-            let run_paths = crate::repository_state::captured_gate_run_result_paths(image)?
+            let run_ids = crate::repository_state::captured_gate_run_ids(image)
                 .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?;
-            for path in run_paths {
+            for path in run_ids
+                .iter()
+                .map(crate::repository_state::VirtualPath::gate_run_record)
+            {
                 match image.entry(&path)? {
                     crate::repository_state::RepositoryEntry::File { content, .. } => {
                         let run: crate::domain::GateRunResult =
@@ -1289,8 +1283,12 @@ fn derive_field_update(
         .try_fold(
             (original, false, Vec::new()),
             |(issue, staged, mut events), mutation| {
-                let applied =
-                    apply_captured_issue_mutation(issue, &evidence.declarations.gates, mutation)?;
+                let applied = apply_captured_issue_mutation(
+                    issue,
+                    &evidence.declarations.gates,
+                    mutation,
+                    evidence.context,
+                )?;
                 events.extend(applied.events);
                 Ok::<_, anyhow::Error>((applied.issue, staged || applied.changed, events))
             },
@@ -1557,6 +1555,7 @@ fn derive_captured_issue_mutation(
     issue: Issue,
     registry: &crate::declarations::GateRegistry,
     request: &CapturedIssueMutation,
+    context: &crate::repository_state::MutationContext,
 ) -> Result<DerivedCapturedIssueMutation> {
     use crate::repository_state::MutationIntent;
 
@@ -1566,7 +1565,7 @@ fn derive_captured_issue_mutation(
         events,
         gate_runs,
         changed,
-    } = apply_captured_issue_mutation(issue, registry, request)?;
+    } = apply_captured_issue_mutation(issue, registry, request, context)?;
     let intents = if changed {
         std::iter::once(MutationIntent::UpdateIssue {
             issue: Box::new(issue),
@@ -1607,6 +1606,7 @@ fn apply_captured_issue_mutation(
     mut issue: Issue,
     registry: &crate::declarations::GateRegistry,
     request: &CapturedIssueMutation,
+    context: &crate::repository_state::MutationContext,
 ) -> Result<AppliedIssueMutation> {
     let mut gate_runs = Vec::new();
     let (outcome, events, changed) = match request {
@@ -1740,11 +1740,12 @@ fn apply_captured_issue_mutation(
                     gate_key
                 ));
             }
+            let run_id = context.gate_run_id_at(0);
             let replacement = GateState {
                 status: *status,
                 updated_by: by.clone(),
                 updated_at: chrono::DateTime::default(),
-                run_id: None,
+                run_id: Some(run_id.clone()),
             };
             issue.gates_status.insert(gate_key.clone(), replacement);
             let event = match status {
@@ -1757,6 +1758,7 @@ fn apply_captured_issue_mutation(
                 GateStatus::Pending => unreachable!("validated manual gate evidence status"),
             };
             gate_runs.push(crate::domain::GateRunResult::attestation(
+                &run_id,
                 &issue.id,
                 gate_key,
                 gate.stage,
@@ -2097,7 +2099,8 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
 
 /// Add the gate-run root and its complete listing to `spec`, then each run
 /// directory the image lists, then the result leaf of each the image holds as
-/// a directory. Direct non-directory occupants are captured as evidence but
+/// a directory. Direct occupants not named by a run id are evidence only through
+/// the listing, and direct non-directory occupants are captured as evidence but
 /// ignored as storage clutter, matching the typed readers.
 fn discover_gate_run_results(
     image: &crate::repository_state::RepositoryImage,
@@ -2113,14 +2116,15 @@ fn discover_gate_run_results(
             listing
                 .names()
                 .iter()
-                .map(|run_id| {
-                    VirtualPath::data(VirtualPath::GATE_RUNS.relative().as_path().join(run_id))
-                })
-                .collect::<std::result::Result<Vec<_>, _>>()?,
+                .filter_map(|name| crate::domain::identity::GateRunId::try_from(name.as_str()).ok())
+                .map(|run_id| VirtualPath::gate_run_directory(&run_id)),
         )?;
     }
     spec.discover_paths(
-        crate::repository_state::captured_gate_run_result_paths(image)?.unwrap_or_default(),
+        crate::repository_state::captured_gate_run_ids(image)
+            .unwrap_or_default()
+            .iter()
+            .map(VirtualPath::gate_run_record),
     )?;
     Ok(())
 }
@@ -2343,7 +2347,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             |session| {
                 let context = production_mutation_context();
                 let run_paths = if request.records_gate_run() {
-                    gate_run_record_paths(&context, 1)?
+                    gate_run_record_paths(&context, 1)
                 } else {
                     Vec::new()
                 };
@@ -2401,7 +2405,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     crate::declarations::GateRegistry::default()
                 };
 
-                let derived = derive_captured_issue_mutation(issue, &registry, &request)?;
+                let derived = derive_captured_issue_mutation(issue, &registry, &request, &context)?;
                 if derived.intents.is_empty() {
                     return Ok(SessionStep::Done(derived.outcome));
                 }
@@ -2906,6 +2910,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                             &precheck.issue,
                             &precheck.registry,
                             &precheck.plan.prompts,
+                            &context,
                         )?,
                     });
                 }
@@ -2919,7 +2924,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .as_ref()
                 .filter(|_| expected_precheck.is_some())
                 .is_some_and(|cached| cached.execution.error.is_some());
-            let precheck_run_paths = gate_run_record_paths(&context, precheck_runs.len())?;
+            let precheck_run_paths = gate_run_record_paths(&context, precheck_runs.len());
 
             let claims_guard = coordinate_claims
                 .then(|| claims_mutation_guard(self.require_worktree_paths()?))
@@ -3901,7 +3906,7 @@ mod tests {
     fn prior_precheck_run(issue_id: &IssueId) -> crate::domain::GateRunResult {
         crate::domain::GateRunResult {
             schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
-            run_id: "prior-run".to_string(),
+            run_id: crate::test_utils::gate_run_id(1),
             gate_key: "auto-start".to_string(),
             stage: crate::declarations::GateStage::Precheck,
             issue_id: issue_id.clone(),
@@ -3942,7 +3947,7 @@ mod tests {
     }
 
     /// The capture of an issue mutation over `id` whose gate-run records
-    /// `context` allocates.
+    /// `context` derives ids for.
     fn captured_gate_issue_spec(
         id: &IssueId,
         context: &crate::repository_state::MutationContext,
@@ -3953,7 +3958,7 @@ mod tests {
             VirtualPath::data("events.jsonl").unwrap(),
             VirtualPath::data("gates.toml").unwrap(),
         ]);
-        paths.extend(gate_run_record_paths(context, 1).unwrap());
+        paths.extend(gate_run_record_paths(context, 1));
         CaptureSpec::new(
             paths,
             CaptureBudget {
@@ -4030,6 +4035,7 @@ mod tests {
             issue_from_image(&first_image, &id),
             &crate::declarations::GateRegistry::default(),
             &request,
+            &context,
         )
         .unwrap();
         let first_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
@@ -4051,6 +4057,7 @@ mod tests {
             issue_from_image(&retry_image, &id),
             &crate::declarations::GateRegistry::default(),
             &request,
+            &context,
         )
         .unwrap();
         let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents).unwrap();
@@ -4079,6 +4086,7 @@ mod tests {
             issue,
             &crate::declarations::GateRegistry::default(),
             &request,
+            &crate::repository_state::MutationContext::preview(),
         )
         .unwrap();
         assert!(
@@ -4138,6 +4146,7 @@ mod tests {
                 issue_from_image(&first_image, &id),
                 &gate_registry_from_image(&first_image),
                 &request,
+                &first_context,
             )
             .unwrap();
             let first_plan =
@@ -4161,6 +4170,7 @@ mod tests {
                 issue_from_image(&second_image, &id),
                 &gate_registry_from_image(&second_image),
                 &request,
+                &second_context,
             )
             .unwrap();
             let second_plan =
@@ -4221,6 +4231,7 @@ mod tests {
             issue,
             &crate::declarations::GateRegistry::default(),
             &request,
+            &crate::repository_state::MutationContext::preview(),
         ) {
             Ok(_) => panic!("pending status unexpectedly accepted"),
             Err(error) => error,
@@ -4272,6 +4283,7 @@ mod tests {
             issue_from_image(&first_image, &id),
             &gate_registry_from_image(&first_image),
             &request,
+            &context,
         )
         .unwrap();
         drop(finalize(&layout, &first_image, &context, &first.intents).unwrap());
@@ -4290,6 +4302,7 @@ mod tests {
             issue_from_image(&retry_image, &id),
             &gate_registry_from_image(&retry_image),
             &request,
+            &context,
         ) {
             Ok(_) => panic!("retry must revalidate against the changed registry"),
             Err(error) => error,
@@ -4575,7 +4588,9 @@ enforce_leases = "strict"
         let before = capture_precheck_plan(&executor, &issue_id).evidence;
         let run = prior_precheck_run(&issue_id);
         storage.add_data_file(
-            "gate-runs/prior-run/result.json",
+            crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
+                .relative()
+                .as_str(),
             &serde_json::to_string(&run).unwrap(),
         );
 

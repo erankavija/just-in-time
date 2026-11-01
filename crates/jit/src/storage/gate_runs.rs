@@ -6,8 +6,7 @@ mod tests {
     use crate::domain::gate_findings::{GateFinding, GateFindings};
     use crate::domain::{GateRunResult, GateRunStatus};
     use crate::repository_state::{
-        finalize, gate_run_result_relative_path, CaptureBudget, CaptureSpec, MutationContext,
-        MutationIntent, VirtualPath,
+        finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, VirtualPath,
     };
     use crate::storage::{
         discover_repository_layout, IssueStore, JsonFileStorage, RepositoryStateStore,
@@ -20,15 +19,16 @@ mod tests {
         storage: &JsonFileStorage,
         draft: GateRunResult,
         seed: u8,
-    ) -> String {
+    ) -> crate::domain::identity::GateRunId {
         let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
         let context = MutationContext::deterministic([seed; 32], draft.started_at);
-        let run_id = context.identifier_at(0);
-        let run_dir = VirtualPath::data(format!("gate-runs/{run_id}")).unwrap();
-        let run_file =
-            VirtualPath::data(gate_run_result_relative_path(&run_id).unwrap().as_path()).unwrap();
+        let run_id = draft.run_id.clone();
         let spec = CaptureSpec::new(
-            [VirtualPath::data("gate-runs").unwrap(), run_dir, run_file],
+            [
+                VirtualPath::GATE_RUNS,
+                VirtualPath::gate_run_directory(&run_id),
+                VirtualPath::gate_run_record(&run_id),
+            ],
             CaptureBudget {
                 max_listings: 0,
                 max_bytes: 1024 * 1024,
@@ -57,7 +57,7 @@ mod tests {
 
         let result = GateRunResult {
             schema_version: 1,
-            run_id: "test-run-1".to_string(),
+            run_id: crate::test_utils::gate_run_id(1),
             gate_key: "unit-tests".to_string(),
             stage: GateStage::Postcheck,
             issue_id: crate::test_utils::issue_id(51),
@@ -126,7 +126,7 @@ mod tests {
         // serde default fills `findings` with None rather than erroring.
         let legacy = serde_json::json!({
             "schema_version": 1,
-            "run_id": "legacy-run",
+            "run_id": crate::test_utils::gate_run_id(3),
             "gate_key": "tests",
             "stage": "postcheck",
             "issue_id": crate::test_utils::issue_id(1),
@@ -153,7 +153,7 @@ mod tests {
     fn test_load_gate_run_ignores_retired_tree_dirty_key() {
         let base = serde_json::json!({
             "schema_version": 1,
-            "run_id": "tree-legacy",
+            "run_id": crate::test_utils::gate_run_id(4),
             "gate_key": "tests",
             "stage": "postcheck",
             "issue_id": crate::test_utils::issue_id(1),
@@ -173,14 +173,14 @@ mod tests {
         });
 
         let loaded: GateRunResult = serde_json::from_value(base).unwrap();
-        assert_eq!(loaded.run_id, "tree-legacy");
+        assert_eq!(loaded.run_id, crate::test_utils::gate_run_id(4));
     }
 
     #[test]
     fn test_load_legacy_gate_finding_without_references_defaults_empty() {
         let legacy = serde_json::json!({
             "schema_version": 1,
-            "run_id": "legacy-finding-run",
+            "run_id": crate::test_utils::gate_run_id(5),
             "gate_key": "review",
             "stage": "postcheck",
             "issue_id": crate::test_utils::issue_id(1),
@@ -214,7 +214,7 @@ mod tests {
 
         let result = GateRunResult {
             schema_version: 1,
-            run_id: "test-run-nogit".to_string(),
+            run_id: crate::test_utils::gate_run_id(2),
             gate_key: "lint".to_string(),
             stage: GateStage::Postcheck,
             issue_id: crate::test_utils::issue_id(52),

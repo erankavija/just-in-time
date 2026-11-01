@@ -104,6 +104,12 @@ pub fn issue_id(seed: u128) -> IssueId {
     IssueId::from_uuid(uuid::Uuid::from_u128(seed.rotate_left(96)))
 }
 
+/// A deterministic canonical gate-run id; distinct numeric seeds yield distinct
+/// ids.
+pub fn gate_run_id(seed: u128) -> crate::domain::identity::GateRunId {
+    crate::domain::identity::GateRunId::from_uuid(uuid::Uuid::from_u128(seed.rotate_left(96)))
+}
+
 /// A drafted issue carrying a fresh random id.
 pub fn fixture_issue(title: String, description: String) -> crate::domain::Issue {
     crate::domain::Issue::draft(issue_id(uuid::Uuid::new_v4().as_u128()), title, description)

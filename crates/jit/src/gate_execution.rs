@@ -7,7 +7,7 @@
 //! - Result storage for audit trail
 
 use crate::declarations::{GateChecker, GateStage};
-use crate::domain::identity::IssueId;
+use crate::domain::identity::{GateRunId, IssueId};
 use crate::domain::repository_inputs::{InputsDigest, InputsDigestBuilder, RepositoryInputs};
 use crate::domain::{
     Assignee, DocumentReference, GateContext, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
@@ -57,6 +57,16 @@ pub fn build_issue_docs_env(documents: &[DocumentReference]) -> String {
     serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string())
 }
 
+/// What a gate run records itself as being about.
+#[derive(Debug, Clone, Copy)]
+pub struct GateRunSubject<'a> {
+    /// The run id the mutation publishing this run pre-derived.
+    pub run_id: &'a GateRunId,
+    pub gate_key: &'a str,
+    pub issue_id: &'a IssueId,
+    pub stage: GateStage,
+}
+
 /// Execute a gate checker with optional structured context.
 ///
 /// This function runs the specified checker and captures all execution details
@@ -68,9 +78,12 @@ pub fn build_issue_docs_env(documents: &[DocumentReference]) -> String {
 /// written containing the structured context and made available via the
 /// `JIT_CONTEXT_FILE` env var.
 pub fn execute_gate_checker_with_context(
-    gate_key: &str,
-    issue_id: &IssueId,
-    stage: GateStage,
+    GateRunSubject {
+        run_id,
+        gate_key,
+        issue_id,
+        stage,
+    }: GateRunSubject<'_>,
     checker: &GateChecker,
     working_dir: &Path,
     context: Option<&GateContext>,
@@ -140,8 +153,7 @@ pub fn execute_gate_checker_with_context(
 
     Ok(GateRunResult {
         schema_version: GATE_RUN_SCHEMA_VERSION,
-        // Repository mutation finalization assigns the durable run identity.
-        run_id: String::new(),
+        run_id: run_id.clone(),
         gate_key: gate_key.to_string(),
         stage,
         issue_id: issue_id.clone(),
@@ -565,12 +577,36 @@ fn get_git_branch(working_dir: &Path) -> Option<String> {
 mod tests {
     use super::*;
     use crate::repository_state::{
-        gate_run_result_relative_path, RepositoryLayout, RepositoryRootEvidence, VirtualPath,
-        BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
-        RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
+        RepositoryLayout, RepositoryRootEvidence, VirtualPath, BOOTSTRAP_LOCK_FILE,
+        EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR,
+        REPO_WRITE_LOCK_FILE,
     };
     use crate::test_utils::{document_reference, document_reference_typed};
     use std::collections::HashMap;
+
+    /// Execute `checker` as the run of a fixed test id.
+    fn execute_fixture_checker(
+        gate_key: &str,
+        issue_id: &IssueId,
+        stage: GateStage,
+        checker: &GateChecker,
+        working_dir: &Path,
+        context: Option<&GateContext>,
+        documents: &[DocumentReference],
+    ) -> Result<GateRunResult> {
+        execute_gate_checker_with_context(
+            GateRunSubject {
+                run_id: &crate::test_utils::gate_run_id(1),
+                gate_key,
+                issue_id,
+                stage,
+            },
+            checker,
+            working_dir,
+            context,
+            documents,
+        )
+    }
 
     #[test]
     fn test_execute_simple_command_success() {
@@ -585,7 +621,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "test-gate",
             &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
@@ -615,7 +651,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "test-gate",
             &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
@@ -644,7 +680,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "test-gate",
             &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
@@ -683,7 +719,7 @@ mod tests {
 
         let temp_dir = std::env::temp_dir();
         let start = Instant::now();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "test-gate",
             &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
@@ -986,12 +1022,7 @@ mod tests {
     fn write_tracker_paths(layout: &RepositoryLayout) {
         let records = [
             VirtualPath::EVENTS,
-            VirtualPath::data(
-                gate_run_result_relative_path("run-1")
-                    .expect("a gate-run record path")
-                    .as_path(),
-            )
-            .expect("a gate-run record path"),
+            VirtualPath::gate_run_record(&crate::test_utils::gate_run_id(1)),
             VirtualPath::INDEX,
         ];
         let written = records
@@ -1120,7 +1151,7 @@ mod tests {
             prompt: None,
             prompt_file: None,
         };
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "g",
             &crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725),
             GateStage::Postcheck,
@@ -1156,7 +1187,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "test-gate",
             &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
@@ -1186,7 +1217,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "my-gate",
             &crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066),
             GateStage::Postcheck,
@@ -1254,7 +1285,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "my-gate",
             &crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066),
             GateStage::Postcheck,
@@ -1290,7 +1321,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "my-gate",
             &crate::test_utils::issue_id(0xdd2d_59e0_9bc4_ccb0_00c2_4a77_9225_c066),
             GateStage::Postcheck,
@@ -1331,7 +1362,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "review",
             &issue_id,
             GateStage::Postcheck,
@@ -1378,7 +1409,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "test-gate",
             &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
@@ -1414,7 +1445,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "test-gate",
             &crate::test_utils::issue_id(0xfb9a_5d7a_9def_7971_ebc7_0df1_a8bb_16a7),
             GateStage::Postcheck,
@@ -1437,7 +1468,7 @@ mod tests {
 
         let previous_run = GateRunResult {
             schema_version: 1,
-            run_id: "prev-run-1".to_string(),
+            run_id: crate::test_utils::gate_run_id(2),
             gate_key: "review".to_string(),
             stage: GateStage::Postcheck,
             issue_id: issue_id.clone(),
@@ -1478,7 +1509,7 @@ mod tests {
         };
 
         let temp_dir = std::env::temp_dir();
-        let result = execute_gate_checker_with_context(
+        let result = execute_fixture_checker(
             "review",
             &issue_id,
             GateStage::Postcheck,
@@ -1492,7 +1523,10 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
         let history = parsed["run_history"].as_array().unwrap();
         assert_eq!(history.len(), 1);
-        assert_eq!(history[0]["run_id"], "prev-run-1");
+        assert_eq!(
+            history[0]["run_id"],
+            crate::test_utils::gate_run_id(2).as_str()
+        );
         assert_eq!(history[0]["status"], "failed");
         assert_eq!(history[0]["stdout"], "Previous review feedback");
     }

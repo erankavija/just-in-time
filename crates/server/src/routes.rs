@@ -14,7 +14,7 @@ use tokio_util::sync::CancellationToken;
 
 use jit::commands::CommandExecutor;
 use jit::declarations::GateDefinition;
-use jit::domain::identity::{IssueId, IssueIdPrefix};
+use jit::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use jit::domain::{Issue, Priority, State as IssueState};
 use jit::graph::hierarchy::NodeHierarchy;
 use jit::output::GateRunSummary;
@@ -1000,6 +1000,9 @@ async fn get_gate_run<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateRunSummary>, StatusCode> {
     let _id = resolve_issue_path_id(&state.executor, &id)?;
+    let run_id = run_id
+        .parse::<GateRunId>()
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
     state
         .executor
         .get_gate_run_result(&run_id)
@@ -1222,6 +1225,23 @@ mod tests {
         ));
         let response = server.get("/issues/abc").await;
         response.assert_status(StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_get_gate_run_refuses_a_malformed_id_and_reports_an_unknown_one_missing() {
+        let (server, id, _) = dependent_pair_server();
+
+        server
+            .get(&format!("/issues/{id}/gate-runs/not-a-run-id"))
+            .await
+            .assert_status(StatusCode::BAD_REQUEST);
+        server
+            .get(&format!(
+                "/issues/{id}/gate-runs/{}",
+                jit::test_utils::gate_run_id(1)
+            ))
+            .await
+            .assert_status(StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

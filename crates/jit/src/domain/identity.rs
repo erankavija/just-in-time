@@ -10,6 +10,11 @@ use std::str::FromStr;
 use thiserror::Error;
 use uuid::Uuid;
 
+/// Whether `input` is the canonical lowercase hyphenated spelling of a UUID.
+fn is_canonical_uuid(input: &str) -> bool {
+    Uuid::parse_str(input).is_ok_and(|uuid| uuid.to_string() == input)
+}
+
 /// Error raised when an issue id is not a canonical lowercase hyphenated UUID.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error("invalid issue id '{input}'; expected a lowercase hyphenated UUID")]
@@ -54,10 +59,8 @@ impl TryFrom<&str> for IssueId {
     type Error = InvalidIssueIdError;
 
     fn try_from(input: &str) -> Result<Self, Self::Error> {
-        Uuid::parse_str(input)
-            .ok()
-            .filter(|uuid| uuid.to_string() == input)
-            .map(|_| Self(input.to_string()))
+        is_canonical_uuid(input)
+            .then(|| Self(input.to_string()))
             .ok_or_else(|| InvalidIssueIdError {
                 input: input.to_string(),
             })
@@ -92,6 +95,75 @@ impl fmt::Display for IssueId {
     }
 }
 
+/// Error raised when a gate-run id is not a canonical lowercase hyphenated UUID.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error("invalid gate run id '{input}'; expected a lowercase hyphenated UUID")]
+pub struct InvalidGateRunIdError {
+    input: String,
+}
+
+/// A gate-run id in the canonical lowercase hyphenated UUID form.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(try_from = "String", into = "String")]
+// The empty description keeps this rustdoc out of the published schema.
+#[schemars(with = "String", description = "")]
+pub struct GateRunId(String);
+
+impl GateRunId {
+    /// Borrow the id.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// The id of a generated UUID; its hyphenated form is canonical, so this
+    /// cannot fail.
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid.hyphenated().to_string())
+    }
+}
+
+impl TryFrom<&str> for GateRunId {
+    type Error = InvalidGateRunIdError;
+
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        is_canonical_uuid(input)
+            .then(|| Self(input.to_string()))
+            .ok_or_else(|| InvalidGateRunIdError {
+                input: input.to_string(),
+            })
+    }
+}
+
+impl TryFrom<String> for GateRunId {
+    type Error = InvalidGateRunIdError;
+
+    fn try_from(input: String) -> Result<Self, Self::Error> {
+        Self::try_from(input.as_str())
+    }
+}
+
+impl FromStr for GateRunId {
+    type Err = InvalidGateRunIdError;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Self::try_from(input)
+    }
+}
+
+impl From<GateRunId> for String {
+    fn from(id: GateRunId) -> Self {
+        id.0
+    }
+}
+
+impl fmt::Display for GateRunId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 /// Invalid lease identity, including the rejected input.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error("invalid lease id '{input}'; expected a lowercase hyphenated UUID")]
@@ -118,13 +190,11 @@ impl TryFrom<&str> for LeaseId {
     type Error = InvalidLeaseIdError;
 
     fn try_from(input: &str) -> Result<Self, Self::Error> {
-        (Uuid::parse_str(input)
-            .ok()
-            .is_some_and(|uuid| uuid.to_string() == input))
-        .then(|| Self(input.to_string()))
-        .ok_or_else(|| InvalidLeaseIdError {
-            input: input.to_string(),
-        })
+        is_canonical_uuid(input)
+            .then(|| Self(input.to_string()))
+            .ok_or_else(|| InvalidLeaseIdError {
+                input: input.to_string(),
+            })
     }
 }
 
@@ -557,6 +627,24 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_gate_run_id_json_schema_is_a_plain_string() {
+        let schema = GateRunId::json_schema(&mut schemars::gen::SchemaGenerator::default());
+        assert_eq!(
+            serde_json::to_value(schema).unwrap(),
+            json!({"type": "string"})
+        );
+    }
+
+    #[test]
+    fn test_gate_run_id_rejects_inputs_that_are_not_uuids() {
+        for input in ["", "run-1", "../run", "nested/run", "."] {
+            let error = GateRunId::try_from(input).unwrap_err();
+            assert!(error.to_string().contains(input));
+            assert!(serde_json::from_value::<GateRunId>(json!(input)).is_err());
+        }
+    }
+
     fn canonical_id() -> impl Strategy<Value = String> {
         any::<u128>().prop_map(|bits| Uuid::from_u128(bits).to_string())
     }
@@ -606,6 +694,40 @@ mod tests {
                 prop_assert!(
                     serde_json::from_value::<IssueId>(json!(spelling)).is_err()
                 );
+            }
+        }
+
+        /// A canonical gate-run id survives parsing, serde and `from_uuid` as
+        /// the same text.
+        #[test]
+        fn test_gate_run_id_round_trips_a_canonical_id(bits in any::<u128>()) {
+            let uuid = Uuid::from_u128(bits);
+            let id = uuid.to_string();
+            let parsed = GateRunId::try_from(id.as_str()).unwrap();
+            prop_assert_eq!(parsed.as_str(), id.as_str());
+            prop_assert_eq!(parsed.to_string(), id.clone());
+            prop_assert_eq!(&id.parse::<GateRunId>().unwrap(), &parsed);
+            prop_assert_eq!(&GateRunId::from_uuid(uuid), &parsed);
+            let encoded = serde_json::to_value(&parsed).unwrap();
+            prop_assert_eq!(&encoded, &Value::String(id.clone()));
+            prop_assert_eq!(&serde_json::from_value::<GateRunId>(encoded).unwrap(), &parsed);
+            prop_assert_eq!(String::from(parsed), id);
+        }
+
+        /// Every other spelling of a UUID is refused as a gate-run id.
+        #[test]
+        fn test_gate_run_id_rejects_each_non_canonical_spelling(bits in any::<u128>()) {
+            let uuid = Uuid::from_u128(bits);
+            let canonical = uuid.to_string();
+            let spellings = [
+                uuid.simple().to_string(),
+                uuid.braced().to_string(),
+                uuid.urn().to_string(),
+                canonical.to_uppercase(),
+            ];
+            for spelling in spellings.iter().filter(|spelling| **spelling != canonical) {
+                prop_assert!(GateRunId::try_from(spelling.as_str()).is_err());
+                prop_assert!(serde_json::from_value::<GateRunId>(json!(spelling)).is_err());
             }
         }
 

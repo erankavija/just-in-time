@@ -59,12 +59,12 @@ pub use materialize::{
     assemble_config, render_capture_closure, render_data_root_ignore, validate_capture_closure,
     ValidationCaptureClosure,
 };
-pub(crate) use mutation::captured_gate_run_result_paths;
+pub(crate) use mutation::captured_gate_run_ids;
 pub(crate) use mutation::MutationContextFactory;
 pub use mutation::{
-    finalize, fresh_index_bytes, gate_run_result_relative_path, prefix_has_torn_tail,
-    serialize_event, serialize_gate_run, serialize_issue, IdAuthority, MutationClock,
-    MutationContext, MutationContextAnnotation, MutationError, MutationIntent, SystemMutationClock,
+    finalize, fresh_index_bytes, prefix_has_torn_tail, serialize_event, serialize_gate_run,
+    serialize_issue, IdAuthority, MutationClock, MutationContext, MutationContextAnnotation,
+    MutationError, MutationIntent, SystemMutationClock,
 };
 pub use package_tree::{
     finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,
@@ -148,7 +148,8 @@ pub use overlay::{action_overrides, apply_overlay, OverlayError};
 pub use path::{
     repository_relative_path, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath, BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE,
-    GATES_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
+    GATES_LOCK_FILE, GATE_RUN_RECORD_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR,
+    REPO_WRITE_LOCK_FILE,
 };
 pub use profile_apply::{
     compose_resolved_contributions, CompleteProjectionConfig, ComposedContribution, Contribution,

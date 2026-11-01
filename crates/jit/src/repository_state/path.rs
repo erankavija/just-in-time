@@ -11,6 +11,9 @@ use std::path::{Component, Path, PathBuf};
 /// it so version control never carries a commit point a checkout never made.
 pub const RECORD_SCRATCH_DIR: &str = "tmp";
 
+/// The file holding one gate run's record inside its directory.
+pub const GATE_RUN_RECORD_FILE: &str = "result.json";
+
 /// The worktree's bootstrap lock file, which serializes every session sharing
 /// one worktree over the init publisher's sibling stage.
 pub const BOOTSTRAP_LOCK_FILE: &str = ".jit-bootstrap.lock";
@@ -209,18 +212,23 @@ pub use self::identity::VirtualPath;
 /// const identity cannot be spelled outside this module: everywhere else in the
 /// crate, including the rest of this file, a struct literal is a privacy error.
 /// What the module hands its parent is [`from_parts`](VirtualPath::from_parts),
-/// [`issue_record`](VirtualPath::issue_record), and the two field accessors.
-/// `from_parts` returns a `Result`; `issue_record` is the one infallible derived
-/// path, whose canonical UUID component makes its descendant safe by construction.
+/// the record constructors, and the two field accessors. `from_parts` returns a
+/// `Result`; [`issue_record`](VirtualPath::issue_record),
+/// [`gate_run_directory`](VirtualPath::gate_run_directory), and
+/// [`gate_run_record`](VirtualPath::gate_run_record) are the infallible derived
+/// paths, whose canonical UUID component makes their descendants safe by
+/// construction.
 ///
 /// Only this module can write the raw struct literal needed for const identities
-/// and the well-formed issue-record descendant. It is therefore kept to the
+/// and the well-formed record descendants. It is therefore kept to the
 /// identity's accessors, these constructors, the reserved-namespace guard, the
 /// const-construction primitive, and the declaration list that emits every const
 /// together with its inventory.
 mod identity {
-    use super::{RepositoryLayoutError, RepositoryRootClass, RootRelativePath};
-    use crate::domain::identity::IssueId;
+    use super::{
+        RepositoryLayoutError, RepositoryRootClass, RootRelativePath, GATE_RUN_RECORD_FILE,
+    };
+    use crate::domain::identity::{GateRunId, IssueId};
     use serde::Serialize;
     use std::borrow::Cow;
 
@@ -232,6 +240,24 @@ mod identity {
     }
 
     impl VirtualPath {
+        /// Construct the data-root directory path of one gate run.
+        pub fn gate_run_directory(id: &GateRunId) -> Self {
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::GATE_RUNS.relative().join(id.as_str()),
+            }
+        }
+
+        /// Construct the data-root path of one gate run's record.
+        pub fn gate_run_record(id: &GateRunId) -> Self {
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::gate_run_directory(id)
+                    .relative
+                    .join(GATE_RUN_RECORD_FILE),
+            }
+        }
+
         /// Construct the data-root record path from one canonical UUID component.
         pub fn issue_record(id: &IssueId) -> Self {
             Self {
@@ -871,6 +897,29 @@ mod tests {
                 && data == Path::new("/external/data")
                 && identity == "same-object"
         ));
+    }
+
+    #[test]
+    fn test_virtual_path_gate_run_record_nests_the_record_in_the_runs_directory() {
+        let id = crate::test_utils::gate_run_id(1);
+        let path = VirtualPath::gate_run_record(&id);
+        let directory = VirtualPath::gate_run_directory(&id);
+
+        assert_eq!(path.root_class(), RepositoryRootClass::Data);
+        assert_eq!(
+            path.relative().as_path().parent(),
+            Some(directory.relative().as_path())
+        );
+        assert_eq!(
+            directory.relative().as_path().parent(),
+            Some(VirtualPath::GATE_RUNS.relative().as_path())
+        );
+        assert_eq!(directory.file_name(), Some(id.as_str()));
+        assert_eq!(
+            VirtualPath::data(path.relative().as_path()).unwrap(),
+            path,
+            "the derived path is the path parsing yields"
+        );
     }
 
     #[test]

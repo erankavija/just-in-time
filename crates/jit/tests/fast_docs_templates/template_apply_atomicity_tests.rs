@@ -162,7 +162,10 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn read_events(&self) -> Result<Vec<Event>> {
         self.inner.read_events()
     }
-    fn load_gate_run_result(&self, run_id: &str) -> Result<jit::domain::GateRunResult> {
+    fn load_gate_run_result(
+        &self,
+        run_id: &jit::domain::identity::GateRunId,
+    ) -> Result<jit::domain::GateRunResult> {
         self.inner.load_gate_run_result(run_id)
     }
     fn list_gate_runs_for_issue(

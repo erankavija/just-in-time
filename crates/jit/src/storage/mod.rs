@@ -302,7 +302,10 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if the result does not exist or cannot be deserialized.
-    fn load_gate_run_result(&self, run_id: &str) -> Result<crate::domain::GateRunResult>;
+    fn load_gate_run_result(
+        &self,
+        run_id: &crate::domain::identity::GateRunId,
+    ) -> Result<crate::domain::GateRunResult>;
 
     /// List all gate run results for a specific issue.
     ///

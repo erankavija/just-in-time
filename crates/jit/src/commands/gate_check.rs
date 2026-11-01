@@ -5,11 +5,12 @@ use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
 use crate::domain::gate_findings::{
     FindingDisposition, FindingOrigin, FindingSeverity, GateFinding, GateFindings,
 };
+use crate::domain::identity::GateRunId;
 use crate::domain::{
     Assignee, GateContext, GateEvaluationStability, GateRunResult, GateRunStatus, GateStatus,
 };
 use crate::errors::TransitionBlockedError;
-use crate::gate_execution;
+use crate::gate_execution::{self, GateRunSubject};
 use crate::output::IssueShowResponse;
 use std::collections::HashMap;
 
@@ -35,12 +36,16 @@ pub enum VerdictSource {
 /// no exit code is claimed, because no process ran here. The raw report text
 /// stays at the source run, which [`GateVerdictOrigin::Reused`] names, rather
 /// than being copied into every record that carries the verdict.
-fn reused_gate_run(source: &GateRunResult, issue_id: &IssueId, stage: GateStage) -> GateRunResult {
+fn reused_gate_run(
+    run_id: &GateRunId,
+    source: &GateRunResult,
+    issue_id: &IssueId,
+    stage: GateStage,
+) -> GateRunResult {
     let started_at = chrono::Utc::now();
     GateRunResult {
         schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
-        // Repository mutation finalization assigns the durable run identity.
-        run_id: String::new(),
+        run_id: run_id.clone(),
         gate_key: source.gate_key.clone(),
         stage,
         issue_id: issue_id.clone(),
@@ -69,6 +74,7 @@ pub(super) struct PrecheckExecution {
 }
 
 struct CapturedGateExecution<'a> {
+    run_id: &'a GateRunId,
     image: &'a crate::repository_state::RepositoryImage,
     issue: &'a Issue,
     issues: &'a [Issue],
@@ -265,12 +271,13 @@ fn captured_gate_runs(
     image: &crate::repository_state::RepositoryImage,
     issue_id: &IssueId,
 ) -> Result<CapturedGateRuns> {
-    use crate::repository_state::RepositoryEntry;
+    use crate::repository_state::{RepositoryEntry, VirtualPath};
 
-    let paths = crate::repository_state::captured_gate_run_result_paths(image)?
+    let run_ids = crate::repository_state::captured_gate_run_ids(image)
         .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?;
-    let mut captured = paths
-        .into_iter()
+    let mut captured = run_ids
+        .iter()
+        .map(VirtualPath::gate_run_record)
         .map(|path| {
             let entry = image.entry(&path)?;
             let identity = entry.identity().cloned();
@@ -686,9 +693,12 @@ fn label_target_report(
 /// The `error` run of a built-in checker that could not judge the repository,
 /// distinct from a `failed` verdict on its content.
 fn builtin_fault_run(
-    gate_key: &str,
-    issue_id: &IssueId,
-    stage: GateStage,
+    GateRunSubject {
+        run_id,
+        gate_key,
+        issue_id,
+        stage,
+    }: GateRunSubject<'_>,
     command: &str,
     started_at: chrono::DateTime<chrono::Utc>,
     start: std::time::Instant,
@@ -697,8 +707,7 @@ fn builtin_fault_run(
     let summary = format!("Built-in checker could not judge the repository: {fault:#}");
     GateRunResult {
         schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
-        // Repository mutation finalization assigns the durable run identity.
-        run_id: String::new(),
+        run_id: run_id.clone(),
         gate_key: gate_key.to_string(),
         stage,
         issue_id: issue_id.clone(),
@@ -899,8 +908,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let requested = issue_id.clone();
         let layout = self.require_layout()?;
         let mutation = super::production_mutation_context();
-        let run_id = mutation.identifier_at(0);
-        let run_paths = super::gate_run_record_paths(&mutation, 1)?;
+        let run_id = mutation.gate_run_id_at(0);
+        let run_paths = super::gate_run_record_paths(&mutation, 1);
         let (target_id, image, issue, issues, registry, runs, captured) =
             with_mutation_attempts("gate evaluation inputs", || {
                 let mut session = self.storage.open_mutation_session(layout.clone())?;
@@ -952,8 +961,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             _ => None,
         };
         let mut result = match reused {
-            Some(source_run) => reused_gate_run(&source_run, &issue.id, gate.stage),
+            Some(source_run) => reused_gate_run(&run_id, &source_run, &issue.id, gate.stage),
             None => self.execute_captured_gate(CapturedGateExecution {
+                run_id: &run_id,
                 image: &image,
                 issue: &issue,
                 issues: &issues,
@@ -1024,9 +1034,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
-            let mut recorded_result = result.clone();
-            recorded_result.run_id = run_id.clone();
-            Ok(AttemptOutcome::Done(recorded_result))
+            Ok(AttemptOutcome::Done(result.clone()))
         })
     }
 
@@ -1064,9 +1072,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Execute a built-in checker against one exact repository image.
     fn execute_builtin_checker_with_repository_view(
         &self,
-        gate_key: &str,
-        issue_id: &IssueId,
-        stage: GateStage,
+        subject: GateRunSubject<'_>,
         checker: &crate::declarations::GateChecker,
         repository_image: &crate::repository_state::RepositoryImage,
     ) -> Result<GateRunResult>
@@ -1075,6 +1081,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::declarations::GateChecker;
 
+        let GateRunSubject {
+            run_id,
+            gate_key,
+            issue_id,
+            stage,
+        } = subject;
         let started_at = chrono::Utc::now();
         let start = std::time::Instant::now();
 
@@ -1119,7 +1131,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             Ok(judged) => judged,
             Err(fault) => {
                 return Ok(builtin_fault_run(
-                    gate_key, issue_id, stage, command, started_at, start, &fault,
+                    subject, command, started_at, start, &fault,
                 ))
             }
         };
@@ -1166,8 +1178,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(GateRunResult {
             schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
-            // Repository mutation finalization assigns the durable run identity.
-            run_id: String::new(),
+            run_id: run_id.clone(),
             gate_key: gate_key.to_string(),
             stage,
             issue_id: issue_id.clone(),
@@ -1226,7 +1237,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue
             .gates_status
             .get(gate_key)
-            .and_then(|state| state.run_id.as_deref())
+            .and_then(|state| state.run_id.as_ref())
             .map(|run_id| self.storage.load_gate_run_result(run_id))
             .transpose()
     }
@@ -1315,13 +1326,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             _ => repo_root,
         };
         let context = self.build_captured_gate_context(checker, &input)?;
+        let subject = GateRunSubject {
+            run_id: input.run_id,
+            gate_key: input.gate_key,
+            issue_id: &input.issue.id,
+            stage: input.gate.stage,
+        };
         match checker {
             crate::declarations::GateChecker::Exec { .. } => {
                 self.storage.run_external_process(|| {
                     gate_execution::execute_gate_checker_with_context(
-                        input.gate_key,
-                        &input.issue.id,
-                        input.gate.stage,
+                        subject,
                         checker,
                         &working_dir,
                         context.as_ref(),
@@ -1329,13 +1344,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     )
                 })
             }
-            _ => self.execute_builtin_checker_with_repository_view(
-                input.gate_key,
-                &input.issue.id,
-                input.gate.stage,
-                checker,
-                input.image,
-            ),
+            _ => self.execute_builtin_checker_with_repository_view(subject, checker, input.image),
         }
     }
 
@@ -1421,6 +1430,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue: &Issue,
         registry: &crate::declarations::GateRegistry,
         captured_prompts: &HashMap<String, String>,
+        mutation: &crate::repository_state::MutationContext,
     ) -> Result<PrecheckExecution>
     where
         S: crate::storage::RepositoryStateStore,
@@ -1458,7 +1468,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .as_ref()
                         .filter(|checker| super::checker_consumes_run_history(checker))
                         .map_or(&[][..], |_| history.as_slice());
+                    let run_id = mutation.gate_run_id_at(runs.len() as u64);
                     let result = match self.execute_captured_gate(CapturedGateExecution {
+                        run_id: &run_id,
                         image,
                         issue: &projected_issue,
                         issues: &issues,
@@ -1571,8 +1583,9 @@ mod tests {
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::gate_findings::GateFindings;
-    use crate::domain::identity::IssueId;
+    use crate::domain::identity::{GateRunId, IssueId};
     use crate::domain::{GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION};
+    use crate::gate_execution::GateRunSubject;
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
     use crate::test_utils::document_reference;
     use chrono::{TimeZone, Utc};
@@ -1718,14 +1731,14 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
     }
 
     fn prior_run(
-        run_id: &str,
+        run_id: &GateRunId,
         gate_key: &str,
         started_at: i64,
         findings: Option<GateFindings>,
     ) -> GateRunResult {
         GateRunResult {
             schema_version: GATE_RUN_SCHEMA_VERSION,
-            run_id: run_id.to_string(),
+            run_id: run_id.clone(),
             gate_key: gate_key.to_string(),
             stage: GateStage::Postcheck,
             issue_id: crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725),
@@ -1750,12 +1763,12 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
 
     #[test]
     fn test_compact_run_history_selects_the_run_the_gate_status_names() {
-        let named = prior_run("named", "review", 20, None);
+        let named = prior_run(&crate::test_utils::gate_run_id(1), "review", 20, None);
         let runs = vec![
             named.clone(),
-            prior_run("other-gate", "cargo-ci", 40, None),
-            prior_run("started-later", "review", 30, None),
-            prior_run("oldest", "review", 10, None),
+            prior_run(&crate::test_utils::gate_run_id(2), "cargo-ci", 40, None),
+            prior_run(&crate::test_utils::gate_run_id(3), "review", 30, None),
+            prior_run(&crate::test_utils::gate_run_id(4), "review", 10, None),
         ];
 
         let compact = compact_run_history_for_context(
@@ -1778,7 +1791,12 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             summary: "one defect".to_string(),
             findings: Vec::new(),
         };
-        let source = prior_run("structured", "review", 10, Some(findings.clone()));
+        let source = prior_run(
+            &crate::test_utils::gate_run_id(5),
+            "review",
+            10,
+            Some(findings.clone()),
+        );
 
         let compact = compact_run_history_for_context(
             std::slice::from_ref(&source),
@@ -1790,13 +1808,13 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         assert_eq!(compact[0].findings, Some(findings));
         assert!(compact[0].stdout.is_empty());
         assert!(compact[0].stderr.is_empty());
-        assert_eq!(source.stdout, "stdout-structured");
-        assert_eq!(source.stderr, "stderr-structured");
+        assert_eq!(source.stdout, format!("stdout-{}", source.run_id));
+        assert_eq!(source.stderr, format!("stderr-{}", source.run_id));
     }
 
     #[test]
     fn test_compact_run_history_is_empty_without_matching_runs() {
-        let run = prior_run("cargo", "cargo-ci", 10, None);
+        let run = prior_run(&crate::test_utils::gate_run_id(6), "cargo-ci", 10, None);
         let state = super::gate_state_from_run(&run);
 
         assert!(compact_run_history_for_context(&[run], "review", Some(&state)).is_empty());
@@ -1826,7 +1844,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         let mut issue = crate::test_utils::fixture_issue("Test".into(), String::new());
         issue.id = crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725);
         issue.gates_required = vec!["first".into(), "second".into()];
-        let mut run = prior_run("", "first", 10, None);
+        let mut run = prior_run(&crate::test_utils::gate_run_id(7), "first", 10, None);
         run.status = GateRunStatus::Passed;
         issue
             .gates_status
@@ -2292,7 +2310,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         assert_eq!(fixture.executions(), 1, "the checker must run exactly once");
         assert!(executed.origin.is_executed());
-        assert_eq!(reused.origin.source_run(), Some(executed.run_id.as_str()));
+        assert_eq!(reused.origin.source_run(), Some(&executed.run_id));
         assert_eq!(reused.status, executed.status);
         assert_eq!(reused.inputs_digest, executed.inputs_digest);
         assert!(
@@ -2329,7 +2347,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(executed.status, GateRunStatus::Failed);
         assert_eq!(fixture.executions(), 1);
         assert_eq!(reused.status, GateRunStatus::Failed);
-        assert_eq!(reused.origin.source_run(), Some(executed.run_id.as_str()));
+        assert_eq!(reused.origin.source_run(), Some(&executed.run_id));
     }
 
     /// REQ-06: an edit, an addition, and a removal beneath a declared root each
@@ -2396,7 +2414,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         assert_eq!(fixture.executions(), 2, "the restored content was verified");
         assert_eq!(restored.inputs_digest, original.inputs_digest);
-        assert_eq!(restored.origin.source_run(), Some(original.run_id.as_str()));
+        assert_eq!(restored.origin.source_run(), Some(&original.run_id));
     }
 
     /// REQ-07: a change to a file no declared root covers leaves the digest
@@ -2422,7 +2440,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         assert_eq!(fixture.executions(), 1);
         assert_eq!(reused.inputs_digest, executed.inputs_digest);
-        assert_eq!(reused.origin.source_run(), Some(executed.run_id.as_str()));
+        assert_eq!(reused.origin.source_run(), Some(&executed.run_id));
     }
 
     /// REQ-07: an excluded path beneath a declared root is outside the set too,
@@ -2448,7 +2466,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let reused = fixture.evaluate(&fixture.issue("Test", "Test"));
 
         assert_eq!(fixture.executions(), 1);
-        assert_eq!(reused.origin.source_run(), Some(executed.run_id.as_str()));
+        assert_eq!(reused.origin.source_run(), Some(&executed.run_id));
     }
 
     /// REQ-08: a gate declaring no inputs has nothing to prove unchanged, so
@@ -2539,7 +2557,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert!(
             wave.iter()
                 .filter(|run| !run.origin.is_executed())
-                .all(|run| run.origin.source_run() == Some(executed[0].run_id.as_str())),
+                .all(|run| run.origin.source_run() == Some(&executed[0].run_id)),
             "every reused record must name the one run that executed"
         );
         assert!(
@@ -2640,7 +2658,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "the two derivations must not read identically"
         );
         assert!(
-            reused_json["origin"].to_string().contains(&executed.run_id),
+            reused_json["origin"]
+                .to_string()
+                .contains(executed.run_id.as_str()),
             "the reused summary must name the run it was taken from: {reused_json}"
         );
         assert_eq!(
@@ -2679,10 +2699,28 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         executor.add_gate(issue_id, gate_key.to_string()).unwrap();
     }
 
+    fn corrupt_gate_run_record() -> crate::repository_state::VirtualPath {
+        crate::repository_state::VirtualPath::gate_run_record(&crate::test_utils::gate_run_id(0xc0))
+    }
+
     fn write_corrupt_gate_run(repo: &std::path::Path) {
-        let path = repo.join(".jit/gate-runs/corrupt/result.json");
+        let path = repo
+            .join(".jit")
+            .join(corrupt_gate_run_record().relative().as_path());
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, "{ corrupt").unwrap();
+    }
+
+    /// Shell commands a checker runs to publish `concurrent-run.json` as the
+    /// record of `run_id`.
+    fn publish_concurrent_run_script(run_id: &GateRunId) -> String {
+        use crate::repository_state::VirtualPath;
+
+        format!(
+            "mkdir -p .jit/{}; cp concurrent-run.json .jit/{}",
+            VirtualPath::gate_run_directory(run_id).relative().as_str(),
+            VirtualPath::gate_run_record(run_id).relative().as_str(),
+        )
     }
 
     fn capture_gate_evidence(
@@ -2693,11 +2731,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         use crate::storage::RepositoryStateStore;
 
         let layout = executor.require_layout().unwrap();
-        let result =
-            crate::repository_state::gate_run_result_relative_path("evidence-probe").unwrap();
+        let probe = crate::test_utils::gate_run_id(0xe0);
         let run_paths = [
-            crate::repository_state::VirtualPath::data("gate-runs/evidence-probe").unwrap(),
-            crate::repository_state::VirtualPath::data(result.as_path()).unwrap(),
+            crate::repository_state::VirtualPath::gate_run_directory(&probe),
+            crate::repository_state::VirtualPath::gate_run_record(&probe),
         ];
         let mut session = executor.storage.open_mutation_session(layout).unwrap();
         let image = executor
@@ -2820,7 +2857,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         let error = executor.check_gate(&issue_id, "with-context").unwrap_err();
 
-        assert!(format!("{error:#}").contains("gate-runs/corrupt/result.json"));
+        assert!(format!("{error:#}").contains(corrupt_gate_run_record().relative().as_str()));
     }
 
     #[test]
@@ -2885,9 +2922,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap();
         let live = executor
             .execute_builtin_checker_with_repository_view(
-                "not-a-reserved-repository-key",
-                &issue_id,
-                GateStage::Postcheck,
+                GateRunSubject {
+                    run_id: &crate::test_utils::gate_run_id(1),
+                    gate_key: "not-a-reserved-repository-key",
+                    issue_id: &issue_id,
+                    stage: GateStage::Postcheck,
+                },
                 &GateChecker::RepositoryValidation,
                 &live_image,
             )
@@ -2921,9 +2961,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let planned_image = executor.capture_validation_image_with(&overrides).unwrap();
         let planned = executor
             .execute_builtin_checker_with_repository_view(
-                "not-a-reserved-repository-key",
-                &issue_id,
-                GateStage::Postcheck,
+                GateRunSubject {
+                    run_id: &crate::test_utils::gate_run_id(1),
+                    gate_key: "not-a-reserved-repository-key",
+                    issue_id: &issue_id,
+                    stage: GateStage::Postcheck,
+                },
                 &GateChecker::RepositoryValidation,
                 &planned_image,
             )
@@ -2986,9 +3029,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         let result = executor
             .execute_builtin_checker_with_repository_view(
-                "not-a-reserved-repository-key",
-                &issue_id,
-                GateStage::Postcheck,
+                GateRunSubject {
+                    run_id: &crate::test_utils::gate_run_id(1),
+                    gate_key: "not-a-reserved-repository-key",
+                    issue_id: &issue_id,
+                    stage: GateStage::Postcheck,
+                },
                 &GateChecker::RepositoryValidation,
                 &image,
             )
@@ -3319,9 +3365,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .unwrap();
             let result = executor
                 .execute_builtin_checker_with_repository_view(
-                    "not-a-reserved-repository-key",
-                    &issue_id,
-                    GateStage::Postcheck,
+                    GateRunSubject {
+                        run_id: &crate::test_utils::gate_run_id(1),
+                        gate_key: "not-a-reserved-repository-key",
+                        issue_id: &issue_id,
+                        stage: GateStage::Postcheck,
+                    },
                     &checker,
                     &image,
                 )
@@ -3960,18 +4009,20 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         let root = repo.path().join(".jit/gate-runs");
         for index in 0..257 {
-            let run_id = format!("history-{index}");
-            let run_dir = root.join(&run_id);
-            std::fs::create_dir_all(&run_dir).unwrap();
+            let run_id = crate::test_utils::gate_run_id(index as u128 + 1);
+            let record = repo.path().join(".jit").join(
+                crate::repository_state::VirtualPath::gate_run_record(&run_id)
+                    .relative()
+                    .as_path(),
+            );
+            std::fs::create_dir_all(record.parent().unwrap()).unwrap();
             let mut run = prior_run(&run_id, "history", index, None);
             run.issue_id = issue_id.clone();
-            std::fs::write(
-                run_dir.join("result.json"),
-                serde_json::to_vec_pretty(&run).unwrap(),
-            )
-            .unwrap();
+            std::fs::write(record, serde_json::to_vec_pretty(&run).unwrap()).unwrap();
         }
         std::fs::write(root.join("clutter-file"), "ignored").unwrap();
+        std::fs::create_dir(root.join("clutter-directory")).unwrap();
+        std::fs::write(root.join("clutter-directory/result.json"), "{ corrupt").unwrap();
         std::os::unix::fs::symlink("clutter-file", root.join("clutter-link")).unwrap();
         assert!(std::process::Command::new("mkfifo")
             .arg(root.join("clutter-fifo"))
@@ -4900,7 +4951,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let mut concurrent = prior_run(
-            "concurrent",
+            &crate::test_utils::gate_run_id(0xcc),
             "run-race",
             chrono::Utc::now().timestamp(),
             None,
@@ -4916,7 +4967,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             &issue_id,
             "run-race",
             "Run race",
-            "if [ ! -f .run-race-seen ]; then : > .run-race-seen; mkdir -p .jit/gate-runs/concurrent; cp concurrent-run.json .jit/gate-runs/concurrent/result.json; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"".to_string(),
+            format!(
+                "if [ ! -f .run-race-seen ]; then : > .run-race-seen; {}; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"",
+                publish_concurrent_run_script(&concurrent.run_id)
+            ),
             None,
         );
 
@@ -4958,7 +5012,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             &issue_id,
             "run-race",
             "Run race",
-            "mkdir -p .jit/gate-runs/concurrent; cp concurrent-run.json .jit/gate-runs/concurrent/result.json; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"".to_string(),
+            format!(
+                "{}; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"",
+                publish_concurrent_run_script(&concurrent.run_id)
+            ),
             None,
         );
 
@@ -5228,7 +5285,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let ctx3: serde_json::Value = serde_json::from_str(&result3.stdout).unwrap();
         let history3 = ctx3["run_history"].as_array().unwrap();
         assert_eq!(history3.len(), 1);
-        assert_eq!(history3[0]["run_id"], result2.run_id);
+        assert_eq!(history3[0]["run_id"], result2.run_id.as_str());
         assert!(!history3[0]["stdout"].as_str().unwrap().is_empty());
     }
 

@@ -502,7 +502,7 @@ mod exit_code_projection_tests {
     fn gate_pass_failed(status: GateRunStatus) -> anyhow::Error {
         let result = GateRunResult {
             schema_version: 1,
-            run_id: "run-1".to_string(),
+            run_id: crate::test_utils::gate_run_id(1),
             gate_key: "tests".to_string(),
             stage: GateStage::Precheck,
             issue_id: crate::test_utils::issue_id(85),
