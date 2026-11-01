@@ -31,6 +31,7 @@ it from there.
 
 Every leaf command in `jit --schema` becomes a callable tool named `jit_<command_path>`, so
 `jit doc assets list` is `jit_doc_assets_list`. Any generated tool can be invoked by name.
+`jit worktree exec` runs an arbitrary host command, so it generates no tool.
 
 `tools/list` advertises a curated subset: the commands an autonomous agent drives to find work,
 claim it, inspect it, transition it, check gates, and read repository structure. Interactive

@@ -448,6 +448,7 @@ it from a client; the generation model in brief:
   [`mcp-server/curated-tools.json`](../../mcp-server/curated-tools.json).
 - **Full set on demand.** Setting `JIT_MCP_ALL_TOOLS=1` in the server's
   environment exposes every generated tool, not just the curated subset.
+  `jit worktree exec` generates no tool, flag or no flag.
 
 ### See Also
 

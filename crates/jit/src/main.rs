@@ -7447,6 +7447,16 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                 }
             }
+            jit::cli::WorktreeCommands::Exec { command } => {
+                let (program, args) = command.split_first().context("no command to run")?;
+                let status = jit::commands::worktree::execute_worktree_exec(
+                    &storage,
+                    &executor_layout,
+                    program,
+                    args,
+                )?;
+                std::process::exit(status);
+            }
             jit::cli::WorktreeCommands::StoreDivergence => {
                 use jit::commands::worktree::execute_worktree_store_divergence;
                 use jit::output::{JsonOutput, WorktreeStoreDivergenceResponse};

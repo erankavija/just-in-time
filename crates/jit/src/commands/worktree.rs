@@ -4,12 +4,13 @@
 
 use crate::domain::identity::WorktreeId;
 use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
-use crate::repository_state::RepositoryLayout;
+use crate::output::ExitCode;
+use crate::repository_state::{RepositoryLayout, RECORD_SCRATCH_DIR};
 use crate::storage::claim_coordinator::ClaimsIndex;
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{read_exact_store, StorageWarning};
-use anyhow::{Context, Result};
+use crate::storage::{read_exact_store, IssueStore, StorageWarning, RECORD_FILE_NAME};
+use anyhow::{anyhow, ensure, Context, Result};
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::path::Path;
@@ -43,6 +44,37 @@ pub struct WorktreeListEntry {
     pub is_main: bool,
     /// Number of active claims in this worktree
     pub active_claims: usize,
+}
+
+/// Run `program` holding the repository write lock, answering its exit status.
+/// Opens no mutation session, because a session would apply the leftover redo
+/// record this refuses.
+///
+/// # Errors
+///
+/// Returns a lock timeout when the bounded wait expires, and an error for a
+/// pending record or when `program` cannot start.
+pub fn execute_worktree_exec<S: IssueStore>(
+    storage: &S,
+    layout: &RepositoryLayout,
+    program: &str,
+    args: &[String],
+) -> Result<i32> {
+    let _guard = storage.acquire_repo_write_lock()?;
+    let record = layout
+        .data_root()
+        .join(RECORD_SCRATCH_DIR)
+        .join(RECORD_FILE_NAME);
+    ensure!(
+        !record.exists(),
+        "Refusing to run over a leftover redo record at {}: run `jit recover` first",
+        record.display()
+    );
+    let status = Command::new(program)
+        .args(args)
+        .status()
+        .map_err(|error| anyhow!("Failed to run {program}: {error}"))?;
+    Ok(status.code().unwrap_or(ExitCode::GenericError.code()))
 }
 
 /// Get current git branch name.

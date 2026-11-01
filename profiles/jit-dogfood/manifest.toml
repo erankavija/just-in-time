@@ -592,6 +592,11 @@ target = ".agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh"
 executable = true
 
 [[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/scripts/land.sh"
+target = ".agents/skills/jit-execution-lead/scripts/land.sh"
+executable = true
+
+[[asset]]
 source = "assets/live/.agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh"
 target = ".agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh"
 executable = true

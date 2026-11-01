@@ -11,7 +11,7 @@
 
 import { readFileSync } from "fs";
 
-/** Curation manifest: `{ policy, max_curated_tools, include, exclude }`. */
+/** Curation manifest: `{ policy, forbidden, max_curated_tools, include, exclude }`. */
 export const CURATION = JSON.parse(
   readFileSync(new URL("../curated-tools.json", import.meta.url), "utf8")
 );
@@ -302,7 +302,8 @@ export function curationCoverage(schema) {
  * @returns {Object[]} Array of MCP tool definitions
  */
 export function generateTools(schema, includeOutputSchema = true) {
-  return generateToolsRecursive(schema.commands, [], schema.types || {}, includeOutputSchema);
+  return generateToolsRecursive(schema.commands, [], schema.types || {}, includeOutputSchema)
+    .filter(tool => !Object.hasOwn(CURATION.forbidden, tool.name));
 }
 
 /**

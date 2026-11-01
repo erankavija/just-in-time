@@ -54,14 +54,12 @@ never hard-kill a background agent holding uncommitted work.
 After each agent commits to its branch, merge sequentially into `main`:
 
 ```bash
-git merge --no-ff worktree-agent-<short-id>
+.agents/skills/jit-execution-lead/scripts/land.sh worktree-agent-<short-id>
 ```
 
-`.jit/events.jsonl` is declared `merge=union` in `.gitattributes`, so git concatenates
-both sides of that per-worktree append-only log without a conflict. The claim log
-(`.git/jit/claims.jsonl`) needs no merge driver: it lives in the shared control plane
-outside the versioned `.jit/` tree, so every worktree already reads and writes the same
-physical file. Code conflicts require manual resolution.
+This commits pending tracker state as `chore(jit): sync tracker`, then merges, holding the
+repository write lock. On a conflict it aborts the merge, keeps that commit, and names the
+paths: resolve them with `git merge` by hand.
 
 After **each** merge — before the next merge and before any further commit lands on top —
 run the project's build-and-test gate on the result:

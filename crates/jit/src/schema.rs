@@ -267,6 +267,7 @@ impl CommandSchema {
             "worktree_info",
             "worktree_list",
             "worktree_store-divergence",
+            "worktree_exec",
         ]
         .into_iter()
         .collect()

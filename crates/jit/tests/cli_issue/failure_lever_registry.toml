@@ -174,6 +174,14 @@ expected_code = "WORKTREE_STORE_DIVERGENCE_ERROR"
 confirmation = "invoked"
 
 [[arms]]
+path = "worktree exec"
+argv = ["worktree", "exec", "--json", "--", "true"]
+setup = ["git:absent"]
+expected_failure = "REPOSITORY_NOT_FOUND: JIT repository is absent"
+expected_code = "REPOSITORY_NOT_FOUND"
+confirmation = "invoked"
+
+[[arms]]
 path = "doc add"
 argv = ["doc", "add", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]

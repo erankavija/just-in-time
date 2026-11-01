@@ -151,7 +151,8 @@ function stagePackage(repo, location, id, dependencies = []) {
 // ---------------------------------------------------------------------------
 
 class MCPTester {
-  constructor(responseMode = 'content') {
+  constructor(responseMode = 'content', extraEnv = {}) {
+    this.extraEnv = extraEnv;
     this.server = null;
     this.responseBuffer = '';
     this.pendingRequests = new Map();
@@ -175,6 +176,7 @@ class MCPTester {
           ...process.env,
           JIT_ALLOW_DELETION: '1',
           JIT_MCP_RESPONSE_MODE: this.responseMode,
+          ...this.extraEnv,
         },
       });
 
@@ -692,6 +694,23 @@ async function main() {
         assert.deepStrictEqual(orderedProfileIds, ['alpha', 'alpha', 'beta']);
       } finally {
         await profileTester.stop();
+      }
+    });
+
+    await runTest('a forbidden tool is neither listed nor callable under JIT_MCP_ALL_TOOLS', async () => {
+      const allTools = new MCPTester('content', { JIT_MCP_ALL_TOOLS: '1' });
+      await allTools.start();
+      try {
+        const listed = (await allTools.request('tools/list')).result.tools.map(t => t.name);
+        assert.ok(listed.length > Object.keys(CURATION.include).length, 'the full set is listed');
+        for (const name of Object.keys(CURATION.forbidden)) {
+          assert.ok(!listed.includes(name), `${name} must not be listed`);
+          const called = await allTools.request('tools/call', { name, arguments: {} });
+          assert.ok(called.result.isError, `${name} must not be callable`);
+          assert.match(called.result.content[0].text, /UNKNOWN_TOOL/);
+        }
+      } finally {
+        await allTools.stop();
       }
     });
 

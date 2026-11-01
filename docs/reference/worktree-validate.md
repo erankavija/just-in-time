@@ -156,6 +156,39 @@ listed. For the code each failure exits with, see the
 
 ---
 
+### jit worktree exec
+
+Run a command holding the repository write lock.
+
+#### Synopsis
+
+```bash
+jit worktree exec [OPTIONS] -- <COMMAND> [ARGS]...
+```
+
+#### Description
+
+The command waits for the lock up to `JIT_LOCK_TIMEOUT` seconds, refuses a
+pending redo record without applying it, runs `<COMMAND>`, exits with its status,
+and releases the lock. It knows nothing about what the command does.
+
+Every mutation waits for the lock, so what the command reads and writes under
+`.jit/` holds still while it runs. A `jit` mutation run by the command waits on
+the same lock and fails with `LOCK_TIMEOUT`; `jit` reads run normally.
+
+`--json` shapes only this command's own failures, and belongs before `--`.
+
+#### Failure modes
+
+| Failure | Code | Exit |
+|---------|------|------|
+| Lock wait expired; the command did not run | `LOCK_TIMEOUT` | 11 |
+| Pending redo record, or the command could not start | `GENERIC_ERROR` | 1 |
+
+Any other status is the command's own.
+
+---
+
 ### jit worktree store-divergence
 
 Report the records the inspected checkout's store and the primary checkout's

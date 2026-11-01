@@ -2543,6 +2543,20 @@ pub enum WorktreeCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "divergences": [...]}`.
     StoreDivergence,
+
+    /// Run a command holding the repository write lock
+    ///
+    /// Waits for the lock up to `JIT_LOCK_TIMEOUT` seconds, refuses a leftover
+    /// redo record, runs the command, and exits with its status. `--json` shapes
+    /// only this command's own failures.
+    ///
+    /// Examples:
+    ///   jit worktree exec -- git status
+    Exec {
+        /// The command and its arguments
+        #[arg(last = true, required = true)]
+        command: Vec<String>,
+    },
 }
 
 /// Git hooks commands
@@ -3135,7 +3149,10 @@ impl ClaimCommands {
 impl WorktreeCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
-            Self::Info { .. } | Self::List { .. } | Self::StoreDivergence { .. } => false,
+            Self::Info { .. }
+            | Self::List { .. }
+            | Self::StoreDivergence { .. }
+            | Self::Exec { .. } => false,
         }
     }
 }
@@ -3311,6 +3328,7 @@ mod recovery_dispatch_tests {
         "status",
         "validate",
         "version",
+        "worktree exec",
         "worktree info",
         "worktree list",
         "worktree store-divergence",
