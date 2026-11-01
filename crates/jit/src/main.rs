@@ -23,7 +23,7 @@ use jit::cli::{
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
-use jit::domain::{GateRunResult, Priority, State};
+use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
 };
@@ -59,7 +59,7 @@ fn dep_add_batch_json_error(
     // batch was made atomic (jit:a05b87ae).
     let edge_code = |err: &anyhow::Error| -> &'static str {
         if matches!(
-            err.downcast_ref::<GraphError>(),
+            err.downcast_ref::<GraphError<IssueId>>(),
             Some(GraphError::CycleDetected)
         ) {
             ErrorCode::CycleDetected.as_str()
@@ -72,7 +72,7 @@ fn dep_add_batch_json_error(
             .downcast_ref::<jit::storage::IssueNotFoundError>()
             .is_some()
             || matches!(
-                err.downcast_ref::<GraphError>(),
+                err.downcast_ref::<GraphError<IssueId>>(),
                 Some(GraphError::NodeNotFound { .. })
             )
         {
@@ -95,7 +95,7 @@ fn dep_add_batch_json_error(
         // The nicer templated cycle message names both ends of the edge;
         // every other kind's `Display` already names what's needed.
         if matches!(
-            err.downcast_ref::<GraphError>(),
+            err.downcast_ref::<GraphError<IssueId>>(),
             Some(GraphError::CycleDetected)
         ) {
             format!("Adding dependency would create a cycle: {from_id} -> {to}")
@@ -132,7 +132,7 @@ fn dep_add_batch_json_error(
     let (to, err) = &batch.rejected()[dominant_index];
 
     let mut json_error = if matches!(
-        err.downcast_ref::<GraphError>(),
+        err.downcast_ref::<GraphError<IssueId>>(),
         Some(GraphError::CycleDetected)
     ) {
         JsonError::cycle_detected(from_id, to)
@@ -145,7 +145,7 @@ fn dep_add_batch_json_error(
         .downcast_ref::<jit::storage::IssueNotFoundError>()
         .is_some()
         || matches!(
-            err.downcast_ref::<GraphError>(),
+            err.downcast_ref::<GraphError<IssueId>>(),
             Some(GraphError::NodeNotFound { .. })
         )
     {
@@ -1384,7 +1384,7 @@ fn run_query_all<S: IssueStore>(
     executor: &CommandExecutor<S>,
     quiet: bool,
     state: Option<String>,
-    assignee: Option<String>,
+    assignee: Option<Assignee>,
     priority: Option<String>,
     label: Vec<String>,
     full: bool,
@@ -1396,7 +1396,7 @@ fn run_query_all<S: IssueStore>(
         .as_ref()
         .map(|p| Priority::from_str(p))
         .transpose()?;
-    let issues = executor.query_all(state_filter, assignee.as_deref(), priority_filter, &label)?;
+    let issues = executor.query_all(state_filter, assignee, priority_filter, &label)?;
 
     if json {
         use jit::domain::MinimalIssue;
@@ -2219,6 +2219,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     let state_filter = state.map(|s| State::from_str(&s)).transpose()?;
                     let priority_filter = priority.map(|p| Priority::from_str(&p)).transpose()?;
+                    let assignee = assignee
+                        .map(|value| Assignee::from_str(&value))
+                        .transpose()?;
                     let issues = executor.search_issues_with_filters(
                         query.as_deref().unwrap_or(""),
                         priority_filter,
@@ -2591,6 +2594,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 } => {
                     let add_gate = parse_gate_keys(add_gate, json)?;
                     let remove_gate = parse_gate_keys(remove_gate, json)?;
+                    let assignee = assignee
+                        .map(|value| Assignee::from_str(&value))
+                        .transpose()?;
 
                     let output_ctx = OutputContext::new(quiet, json);
 
@@ -2863,6 +2869,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Assign { id, assignee } => {
                     let output_ctx = OutputContext::new(quiet, json);
+                    let assignee = Assignee::from_str(&assignee)?;
                     let full_id = resolve_issue_arg(&storage, &id)?;
                     let warnings = executor.issues().assign_issue(&full_id, assignee)?;
                     for warning in warnings {
@@ -2891,6 +2898,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     assign_only,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
+                    let assignee = Assignee::from_str(&assignee)?;
                     let full_id = resolve_issue_arg(&storage, &id)?;
 
                     if assign_only {
@@ -3018,6 +3026,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::ClaimNext { assignee, filter } => {
                     let output_ctx = OutputContext::new(quiet, json);
+                    let assignee = Assignee::from_str(&assignee)?;
                     let (id, claim_warnings) = match executor.issues().claim_next(assignee, filter)
                     {
                         Ok(result) => result,
@@ -3060,6 +3069,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     label,
                     full,
                 } => {
+                    let assignee = assignee
+                        .map(|value| Assignee::from_str(&value))
+                        .transpose()?;
                     run_query_all(
                         &executor, quiet, state, assignee, priority, label, full, json,
                     )?;
@@ -5411,7 +5423,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 &executor,
                 quiet,
                 bare_state,
-                bare_assignee,
+                bare_assignee
+                    .map(|value| Assignee::from_str(&value))
+                    .transpose()?,
                 bare_priority,
                 bare_label,
                 bare_full,
@@ -5439,6 +5453,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         label,
                         full,
                     } => {
+                        let assignee = assignee
+                            .map(|value| Assignee::from_str(&value))
+                            .transpose()?;
                         run_query_all(
                             &executor, quiet, state, assignee, priority, label, full, json,
                         )?;

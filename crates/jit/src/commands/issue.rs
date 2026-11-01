@@ -37,7 +37,7 @@ impl DescriptionUpdate {
 pub struct IssueLocalUpdate {
     pub add_gates: Vec<GateKey>,
     pub remove_gates: Vec<GateKey>,
-    pub assignee: Option<String>,
+    pub assignee: Option<crate::domain::Assignee>,
     pub unassign: bool,
 }
 
@@ -244,7 +244,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     pub fn list_issues(
         &self,
         state_filter: Option<State>,
-        assignee_filter: Option<String>,
+        assignee_filter: Option<crate::domain::Assignee>,
         priority_filter: Option<Priority>,
     ) -> Result<Vec<Issue>> {
         let issues = self.exec.storage.list_issues()?;
@@ -258,11 +258,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                     }
                 }
                 if let Some(ref assignee) = assignee_filter {
-                    if !issue
-                        .assignee
-                        .as_ref()
-                        .is_some_and(|a| a == assignee.as_str())
-                    {
+                    if !issue.assignee.as_ref().is_some_and(|a| a == assignee) {
                         return false;
                     }
                 }
@@ -528,10 +524,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let assignee = local
-            .assignee
-            .map(|assignee| assignee.parse::<crate::domain::Assignee>())
-            .transpose()?;
+        let assignee = local.assignee;
         let outcome = self
             .exec
             .publish_captured_field_update(CapturedFieldUpdate {
@@ -719,7 +712,11 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// Assign an issue to someone.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
-    pub fn assign_issue(&self, id: &IssueId, assignee: String) -> Result<Vec<String>>
+    pub fn assign_issue(
+        &self,
+        id: &IssueId,
+        assignee: crate::domain::Assignee,
+    ) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -731,9 +728,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
             warnings.push(warning);
         }
 
-        // Validate through the one `Assignee` path so `assign` cannot persist a
-        // raw, malformed assignee (this command previously skipped validation).
-        let assignee: crate::domain::Assignee = assignee.parse()?;
         self.exec
             .publish_captured_issue_mutation(CapturedIssueMutation::Assign {
                 issue_id: full_id,
@@ -747,15 +741,18 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// Returns any non-fatal [`StorageWarning`]s (e.g. a worktree relocation
     /// observed while checking leases) so the calling command can surface them
     /// at its own output boundary; this method never writes to stderr.
-    pub fn claim_issue(&self, id: &IssueId, assignee: String) -> Result<Vec<StorageWarning>>
+    pub fn claim_issue(
+        &self,
+        id: &IssueId,
+        assignee: crate::domain::Assignee,
+    ) -> Result<Vec<StorageWarning>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let claimant: crate::domain::Assignee = assignee.parse()?;
         // The captured claim owns the precheck capture/checker/recapture loop so
         // checker success and coordinator evidence cannot be applied to a
         // different source state or short-id target.
-        self.exec.publish_captured_claim(id, claimant)
+        self.exec.publish_captured_claim(id, assignee)
     }
 
     /// Unassign an issue.
@@ -796,7 +793,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// [`InvalidArgumentError`](crate::errors::InvalidArgumentError).
     pub fn claim_next(
         &self,
-        assignee: String,
+        assignee: crate::domain::Assignee,
         filter: Option<String>,
     ) -> Result<(IssueId, Vec<StorageWarning>)>
     where
@@ -962,7 +959,7 @@ mod tests {
         );
         let error = executor
             .issues()
-            .claim_next("agent:test".to_string(), None)
+            .claim_next("agent:test".parse().unwrap(), None)
             .expect_err("an empty ready set must reject claim-next");
 
         assert!(
@@ -1078,7 +1075,10 @@ mod tests {
 
         let (claimed, _) = executor
             .issues()
-            .claim_next("agent:w1".to_string(), Some("label:type:epic".to_string()))
+            .claim_next(
+                "agent:w1".parse().unwrap(),
+                Some("label:type:epic".to_string()),
+            )
             .unwrap();
 
         assert_eq!(claimed, gamma);
@@ -1101,7 +1101,10 @@ mod tests {
 
         let error = executor
             .issues()
-            .claim_next("agent:w1".to_string(), Some("label:type:epic".to_string()))
+            .claim_next(
+                "agent:w1".parse().unwrap(),
+                Some("label:type:epic".to_string()),
+            )
             .expect_err("a filter matching no ready issue must not claim");
 
         assert!(error
@@ -1130,7 +1133,7 @@ mod tests {
 
         let error = executor
             .issues()
-            .claim_next("agent:w1".to_string(), Some("garbage %%%".to_string()))
+            .claim_next("agent:w1".parse().unwrap(), Some("garbage %%%".to_string()))
             .expect_err("a malformed filter must be rejected");
 
         assert!(error
@@ -1242,7 +1245,7 @@ mod tests {
         // Try to claim the issue - should fail because precheck hasn't passed
         let result = executor
             .issues()
-            .claim_issue(&issue_id, "agent:test".to_string());
+            .claim_issue(&issue_id, "agent:test".parse().unwrap());
 
         // Currently this test FAILS because claim_issue bypasses prechecks
         // After fix, claiming should fail with "Manual precheck 'tdd-reminder' has not been passed"
@@ -1311,7 +1314,7 @@ mod tests {
             .pass_gate(
                 &issue_id,
                 &"tdd-reminder".parse().unwrap(),
-                Some("human:dev".to_string()),
+                Some("human:dev".parse().unwrap()),
                 false,
             )
             .unwrap();
@@ -1319,7 +1322,7 @@ mod tests {
         // Now claiming should succeed
         let result = executor
             .issues()
-            .claim_issue(&issue_id, "agent:test".to_string());
+            .claim_issue(&issue_id, "agent:test".parse().unwrap());
         assert!(
             result.is_ok(),
             "Claiming should succeed when precheck passes"
@@ -1362,7 +1365,7 @@ mod tests {
         // (a full claim here would exit 4 on the blocked in_progress transition).
         executor
             .issues()
-            .assign_issue(&dependent_id, "agent:test".to_string())
+            .assign_issue(&dependent_id, "agent:test".parse().unwrap())
             .unwrap();
         let assigned = executor.storage.load_issue(&dependent_id).unwrap();
         assert_eq!(assigned.state, State::Backlog);
@@ -1394,7 +1397,7 @@ mod tests {
         // Claim as the SAME assignee: must proceed rather than erroring.
         let result = executor
             .issues()
-            .claim_issue(&dependent_id, "agent:test".to_string());
+            .claim_issue(&dependent_id, "agent:test".parse().unwrap());
         assert!(
             result.is_ok(),
             "same-assignee claim should promote the assignment, got: {:?}",
@@ -1433,12 +1436,12 @@ mod tests {
 
         executor
             .issues()
-            .claim_issue(&issue_id, "agent:first".to_string())
+            .claim_issue(&issue_id, "agent:first".parse().unwrap())
             .unwrap();
 
         let result = executor
             .issues()
-            .claim_issue(&issue_id, "agent:second".to_string());
+            .claim_issue(&issue_id, "agent:second".parse().unwrap());
         assert!(
             result.is_err(),
             "claim by a different assignee must still be rejected"
@@ -2131,14 +2134,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         executor
             .issues()
-            .assign_issue(&issue_id, "agent:a".to_string())
+            .assign_issue(&issue_id, "agent:a".parse().unwrap())
             .unwrap();
         let updated_after_assign = executor.storage.load_issue(&issue_id).unwrap().updated_at;
 
         // Re-assigning the same assignee is a no-op.
         executor
             .issues()
-            .assign_issue(&issue_id, "agent:a".to_string())
+            .assign_issue(&issue_id, "agent:a".parse().unwrap())
             .unwrap();
         assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().updated_at,
@@ -3325,7 +3328,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             &id,
             IssueLocalUpdate {
                 add_gates: vec!["tests".parse().unwrap()],
-                assignee: Some("agent:w1".into()),
+                assignee: Some("agent:w1".parse().unwrap()),
                 ..Default::default()
             },
         )
@@ -3346,7 +3349,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let assign = IssueLocalUpdate {
             add_gates: vec!["tests".parse().unwrap()],
             remove_gates: vec!["code-review".parse().unwrap()],
-            assignee: Some("agent:w1".into()),
+            assignee: Some("agent:w1".parse().unwrap()),
             unassign: false,
         };
         let unassign = IssueLocalUpdate {

@@ -209,7 +209,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
 
     // Graph errors are typed: a cycle is a validation failure, a missing node is
     // a not-found condition. Classified by downcast, not by message text.
-    if let Some(graph_error) = error.downcast_ref::<crate::graph::GraphError>() {
+    if let Some(graph_error) =
+        error.downcast_ref::<crate::graph::GraphError<crate::domain::identity::IssueId>>()
+    {
         return match graph_error {
             crate::graph::GraphError::CycleDetected => ErrorCode::CycleDetected,
             crate::graph::GraphError::NodeNotFound { .. } => ErrorCode::IssueNotFound,
@@ -305,6 +307,17 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     if error
         .downcast_ref::<crate::errors::InvalidArgumentError>()
         .is_some()
+        || error
+            .downcast_ref::<crate::domain::AssigneeParseError>()
+            .is_some()
+        || error
+            .downcast_ref::<crate::query_engine::QueryParseError>()
+            .is_some_and(|parse_error| {
+                matches!(
+                    parse_error,
+                    crate::query_engine::QueryParseError::InvalidAssignee { .. }
+                )
+            })
         || error
             .downcast_ref::<crate::domain::vocabulary::UnknownToken>()
             .is_some()
@@ -636,7 +649,11 @@ mod exit_code_projection_tests {
                 "*",
             ),
             // Command-family rows, each pinned by the error that command raises.
-            (crate::graph::GraphError::CycleDetected.into(), 4, "dep add"),
+            (
+                crate::graph::GraphError::<crate::domain::identity::IssueId>::CycleDetected.into(),
+                4,
+                "dep add",
+            ),
             (
                 crate::errors::RedundantDependencyError::new(
                     (
@@ -693,6 +710,26 @@ mod exit_code_projection_tests {
                 "classifier produced the wrong code for `{error}`"
             );
         }
+    }
+
+    #[test]
+    fn test_classify_assignee_parse_failures_as_invalid_arguments() {
+        let assignee_error =
+            anyhow::Error::new("invalid".parse::<crate::domain::Assignee>().unwrap_err());
+        assert_eq!(
+            classify(&assignee_error).error.code,
+            ErrorCode::InvalidArgument
+        );
+
+        let filter_error =
+            anyhow::Error::new(crate::query_engine::QueryParseError::InvalidAssignee {
+                value: "invalid".to_string(),
+                reason: "invalid".parse::<crate::domain::Assignee>().unwrap_err(),
+            });
+        assert_eq!(
+            classify(&filter_error).error.code,
+            ErrorCode::InvalidArgument
+        );
     }
 
     #[test]
@@ -814,12 +851,13 @@ mod repository_state_classifier_tests {
     //! variant) fails here rather than silently changing a command's exit status.
 
     use super::{classify, profile_json_error};
+    use crate::domain::identity::ProfileId;
     use crate::repository_state::{
         AmbiguousOwnershipError, ArchiveExecutionError, Contribution, ContributionConflictOwner,
         GateRegistryEditError, InitializationError, ManagedDocumentError, ProducerError,
-        ProfilePackageId, ProfileTargetConflict, ProfileTargetConflictEntry,
-        ProfileTargetConflictsError, ProfileTargetSubject, ProjectionError, RepositoryLayoutError,
-        RepositoryStateError, ScalarTarget, VirtualPath,
+        ProfileTargetConflict, ProfileTargetConflictEntry, ProfileTargetConflictsError,
+        ProfileTargetSubject, ProjectionError, RepositoryLayoutError, RepositoryStateError,
+        ScalarTarget, VirtualPath,
     };
 
     fn path() -> VirtualPath {
@@ -831,8 +869,8 @@ mod repository_state_classifier_tests {
     fn target_conflicts() -> ProfileTargetConflictsError {
         let contested = || ProfileTargetConflict::Contested {
             owners: vec![
-                ContributionConflictOwner::Package(ProfilePackageId::new("candidate")),
-                ContributionConflictOwner::Package(ProfilePackageId::new("occupant")),
+                ContributionConflictOwner::Package(ProfileId::try_from("candidate").unwrap()),
+                ContributionConflictOwner::Package(ProfileId::try_from("occupant").unwrap()),
             ],
         };
         ProfileTargetConflictsError::new(vec![

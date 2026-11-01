@@ -74,12 +74,10 @@ use crate::validation::engine::Finding;
 ///    [`crate::commands::CommandExecutor::dangling_link_findings`],
 ///    `validation::desugar::desugar_require_label`,
 ///    [`crate::commands::CommandExecutor::query_by_label`],
-///    `snapshot::SnapshotScope::parse`, plus the unrelated-namespace assignee
-///    parsers (`commands::claim::assert_valid_actor`,
-///    `domain::Assignee::from_str` /
-///    `domain::Assignee`'s `PartialEq<str>` — label values never reach
-///    these; they parse `{type}:{identifier}` assignees, a different input
-///    domain per @/inv/assignee-format).
+///    `snapshot::SnapshotScope::parse`, plus unrelated-namespace assignee
+///    parsing (`commands::claim::assert_valid_actor` and
+///    `domain::Assignee::from_str` — label values never reach these parsers,
+///    which handle different input domains per @/inv/assignee-format).
 /// 2. **Slash-decode qualified-id sites** — route through the structural
 ///    address parser ([`crate::domain::item::parse_kind_segmented_address`] /
 ///    [`crate::domain::item::expand_sugar_address`]):
@@ -106,14 +104,13 @@ use crate::validation::engine::Finding;
 /// `rg -n "splitn|split_once|\.split\(" crates/jit/src crates/server/src --type rust`
 /// and classify against these three buckets rather than re-deriving them.
 ///
-/// Whether a link `label` credits criterion `id` owned by the issue whose short
-/// id is `scope_short_id`.
+/// Whether a link `label` credits criterion `id` owned by `scope_id`.
 ///
 /// The single matcher behind `label-coverage` and `criteria-to-check`. Only a
 /// label that names the criterion's owner credits it:
 ///
-/// - **Qualified** `<namespace>:<scope>/<self-id>` — credited iff `scope` equals
-///   `scope_short_id` and `self-id` equals `id`.
+/// - **Qualified** `<namespace>:<scope>/<self-id>` — credited iff `scope` names
+///   `scope_id` by id prefix and `self-id` equals `id`.
 /// - **`@`-address** `<namespace>:@…` — parsed by
 ///   [`parse_kind_segmented_address`]; only the issue form
 ///   `@/issue/<short-id>/<kind>/<self-id>` credits, on scope and self-id alone
@@ -122,16 +119,14 @@ use crate::validation::engine::Finding;
 ///
 /// An unqualified `<namespace>:<id>` names no owner, so it credits nothing;
 /// validation reports it for migration.
-fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str) -> bool {
+fn label_credits_id(label: &str, namespace: &str, id: &str, scope_id: &IssueId) -> bool {
     let Some(value) = label.strip_prefix(&format!("{namespace}:")) else {
         return false;
     };
     if value.starts_with(PROJECT_SCOPE_SENTINEL) {
         return match parse_kind_segmented_address(value) {
             Ok(addr) => match addr.scope {
-                AddressScope::Issue(short_id) => {
-                    short_id.matches(scope_short_id) && addr.self_id == id
-                }
+                AddressScope::Issue(short_id) => short_id.matches(scope_id) && addr.self_id == id,
                 AddressScope::Project | AddressScope::NamedProject(_) => false,
             },
             Err(_) => false,
@@ -142,7 +137,7 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
     value.split_once('/').is_some_and(|(scope, self_id)| {
         matches!(
             crate::domain::item::Scope::parse(scope),
-            Ok(crate::domain::item::Scope::Issue(prefix)) if prefix.matches(scope_short_id)
+            Ok(crate::domain::item::Scope::Issue(prefix)) if prefix.matches(scope_id)
         ) && self_id == id
     })
 }
@@ -758,11 +753,11 @@ fn evaluate_label_coverage(
         .collect();
     let container_ns = config.container_from_label.as_deref();
 
-    let satisfied_id = |child: &Issue, id: &str, container_short_id: &str| -> bool {
+    let satisfied_id = |child: &Issue, id: &str, container_id: &IssueId| -> bool {
         let claims = child
             .labels
             .iter()
-            .any(|l| label_credits_id(l, satisfies_ns, id, container_short_id));
+            .any(|l| label_credits_id(l, satisfies_ns, id, container_id));
         let state_ok = child_state.is_none_or(|state| child.state == state);
         claims && state_ok
     };
@@ -840,13 +835,12 @@ fn evaluate_label_coverage(
             };
             let candidates: Vec<&Issue> =
                 children_of(container, graph_context, child_link, &exclude_types);
-            let container_short = container.short_id();
             criteria
                 .into_iter()
                 .filter(move |id| {
                     !candidates
                         .iter()
-                        .any(|child| satisfied_id(child, id, &container_short))
+                        .any(|child| satisfied_id(child, id, &container.id))
                 })
                 .map(move |id| {
                     issue_finding(
@@ -1084,7 +1078,7 @@ fn resolve_container<'a>(value: &str, issues: &'a [Issue]) -> ContainerMatch<'a>
     else {
         return ContainerMatch::None;
     };
-    let mut matches = issues.iter().filter(|i| prefix.matches(i.id.as_str()));
+    let mut matches = issues.iter().filter(|i| prefix.matches(&i.id));
     match (matches.next(), matches.next()) {
         (Some(c), None) => ContainerMatch::Unique(c),
         (Some(_), Some(_)) => ContainerMatch::Ambiguous,
@@ -1179,11 +1173,9 @@ fn depends_on_target(
     }
     // A transitive dependency of `source` is, in this graph, an issue for which
     // `source` is a transitive dependent.
-    target_ids.iter().any(|target| {
-        !graph
-            .find_shortest_path(source.id.as_str(), target.as_str())
-            .is_empty()
-    })
+    target_ids
+        .iter()
+        .any(|target| !graph.find_shortest_path(&source.id, target).is_empty())
 }
 
 // ---------------------------------------------------------------------------
@@ -1348,11 +1340,10 @@ fn evaluate_criteria_to_check(
 
 /// Whether criterion `id` has a check label naming its owning issue.
 fn criterion_is_checked(issue: &Issue, id: &str, check_namespace: &str) -> bool {
-    let scope = issue.short_id();
     issue
         .labels
         .iter()
-        .any(|label| label_credits_id(label, check_namespace, id, &scope))
+        .any(|label| label_credits_id(label, check_namespace, id, &issue.id))
 }
 
 // ---------------------------------------------------------------------------
@@ -1569,7 +1560,7 @@ mod tests {
             "satisfies:abc12345/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
         // Scope mismatch, self-id mismatch, wrong namespace, no namespace.
         for label in [
@@ -1579,7 +1570,12 @@ mod tests {
             "plainlabel",
         ] {
             assert!(
-                !label_credits_id(label, "satisfies", "REQ-01", "abc12345"),
+                !label_credits_id(
+                    label,
+                    "satisfies",
+                    "REQ-01",
+                    &crate::test_utils::issue_id(0xabc12345)
+                ),
                 "{label}"
             );
         }
@@ -1591,10 +1587,10 @@ mod tests {
         #[test]
         fn test_label_credits_id_unqualified_label_credits_nothing(
             id in "[A-Z][A-Z0-9]{0,3}-[0-9]{1,3}",
-            scope in "[0-9a-f]{8}",
+            scope in proptest::prelude::any::<u128>(),
         ) {
             let label = format!("satisfies:{id}");
-            proptest::prop_assert!(!label_credits_id(&label, "satisfies", &id, &scope));
+            proptest::prop_assert!(!label_credits_id(&label, "satisfies", &id, &crate::test_utils::issue_id(scope)));
         }
     }
 
@@ -1612,13 +1608,13 @@ mod tests {
             "satisfies:@/issue/abc12345/requirement/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
         assert!(label_credits_id(
             "satisfies:@/issue/abc12345/rule/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
 
         // A non-matching short-id in the issue form does not credit.
@@ -1626,7 +1622,7 @@ mod tests {
             "satisfies:@/issue/deadbeef/requirement/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
 
         // The project form `@/<kind>/<self-id>` addresses a project-scoped item,
@@ -1635,7 +1631,7 @@ mod tests {
             "satisfies:@/requirement/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
 
         // The named-project form `@<name>/<kind>/<self-id>` likewise never credits.
@@ -1643,7 +1639,7 @@ mod tests {
             "satisfies:@acme/requirement/REQ-01",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
 
         // A malformed `@`-address never credits (and, importantly, never panics).
@@ -1651,13 +1647,13 @@ mod tests {
             "satisfies:@/issue/abc12345/requirement",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
         assert!(!label_credits_id(
             "satisfies:@bogus",
             "satisfies",
             "REQ-01",
-            "abc12345"
+            &crate::test_utils::issue_id(0xabc12345)
         ));
     }
 

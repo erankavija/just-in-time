@@ -386,7 +386,7 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
             let path = VirtualPath::issue_record(id).repository_relative();
             let issue: Issue = serde_json::from_str(&required_text(read, &path)?)
                 .with_context(|| format!("invalid {path}"))?;
-            if issue.id.as_str() != id.as_str() {
+            if &issue.id != id {
                 return Err(anyhow!(
                     "issue file '{path}' contains id '{}' instead of '{id}'",
                     issue.id
@@ -488,11 +488,11 @@ fn validate_integrity(
         }
     }
     for issue in issues {
-        let reduced = graph.compute_transitive_reduction(issue.id.as_str());
+        let reduced = graph.compute_transitive_reduction(&issue.id);
         let reduced_set: HashSet<_> = reduced.iter().map(|node| &node.id).collect();
         for dependency in &issue.dependencies {
             if !reduced_set.contains(dependency) {
-                let path = graph.find_shortest_path(issue.id.as_str(), dependency.as_str());
+                let path = graph.find_shortest_path(&issue.id, dependency);
                 let path = if path.is_empty() {
                     "unknown path".to_string()
                 } else {

@@ -43,22 +43,6 @@ pub fn publish_fixture_directory_noreplace(source: &Path, destination: &Path) ->
     rename_noreplace_cap(&parent, source_name, &parent, destination_name).map_err(Into::into)
 }
 
-/// Publish a staged fixture receipt as one no-replace hard link.
-#[doc(hidden)]
-pub fn publish_fixture_file_noreplace(source: &Path, destination: &Path) -> Result<()> {
-    let metadata = std::fs::symlink_metadata(source)?;
-    if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
-        bail!("fixture receipt staging path is not an ordinary file");
-    }
-    std::fs::hard_link(source, destination).with_context(|| {
-        format!(
-            "atomically publish fixture receipt {}",
-            destination.display()
-        )
-    })?;
-    Ok(())
-}
-
 impl InMemoryStorage {
     /// Replace this store with an exact semantic image of `repository_root`.
     ///

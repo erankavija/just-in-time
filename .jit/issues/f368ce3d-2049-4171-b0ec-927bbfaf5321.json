@@ -30,7 +30,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Take engine vocabulary and test switches only from declarations and caller inputs",
-  "updated_at": "2026-10-20T20:36:52.837983350Z"
+  "updated_at": "2026-11-01T05:30:04.196716250Z"
 }

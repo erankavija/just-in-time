@@ -89,7 +89,7 @@ pub use repository_state_store::{
 };
 #[cfg(feature = "test-support")]
 #[doc(hidden)]
-pub use test_support::{publish_fixture_directory_noreplace, publish_fixture_file_noreplace};
+pub use test_support::publish_fixture_directory_noreplace;
 pub use warnings::StorageWarning;
 pub use worktree_paths::WorktreePaths;
 
@@ -106,7 +106,7 @@ fn resolve_unique_id<'a>(
 ) -> Result<IssueId> {
     let matches = ids
         .into_iter()
-        .filter(|id| prefix.matches(id.as_str()))
+        .filter(|id| prefix.matches(id))
         .collect::<Vec<_>>();
     match matches.as_slice() {
         [] => Err(IssueNotFoundError::by_prefix(prefix.clone()).into()),

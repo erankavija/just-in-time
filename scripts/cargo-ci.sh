@@ -457,8 +457,7 @@ run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D
 # on a warm one, failing and passing one budget for a reason the tree had no
 # part in (dev/benchmarks/cold-warm-verdict-0708d692/README.md). Most of that
 # was compilation this step had not covered, because the suite compiled from
-# inside its own clock — see scripts/setup-recorded-failure-corpus.sh, whose
-# Cargo package selection now matches the build below.
+# inside its own clock.
 #
 # What remains here is the artifacts themselves: nothing has read the
 # executables this step links, so the `test` substep would fault them in while

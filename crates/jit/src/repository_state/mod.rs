@@ -156,7 +156,7 @@ pub use profile_apply::{
     ContributionConflictOwner, ContributionIdentity, ContributionIdentityTarget,
     ContributionOutcome, ContributionRegistry, KeyedArrayTarget, MapEntryTarget,
     ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim,
-    ProfilePackageId, ProfileRegionClaim, ProfileTargetConflict, ProfileTargetConflictEntry,
+    ProfileRegionClaim, ProfileTargetConflict, ProfileTargetConflictEntry,
     ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget, SetStringTarget,
 };
 pub(crate) use profile_apply::{

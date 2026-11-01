@@ -1,0 +1,23 @@
+{
+  "branch": "worktree-agent-2195c98f-r2",
+  "by": "auto:executor",
+  "command": "jit validate",
+  "commit": "1ca677c7b980c1ffc34b64cc36f6f72db6bdd67c",
+  "completed_at": "2026-11-01T05:26:20.921156186Z",
+  "duration_ms": 4205,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "repo-validate",
+  "issue_id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ef0fd351-e5ef-4949-9c3a-fb33cb8f3540",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T05:26:16.715889774Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Repository validation passed\nwarning: 1 membership label(s) not backed by the DAG (run `jit query divergence` for details)\n"
+}

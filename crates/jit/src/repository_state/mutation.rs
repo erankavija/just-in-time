@@ -23,7 +23,7 @@ use super::{
 };
 use crate::declarations::GateRegistry;
 use crate::domain::event_catalog::EventTag;
-use crate::domain::identity::{GateRunId, IssueId};
+use crate::domain::identity::{GateKey, GateRunId, IssueId};
 use crate::domain::{
     Assignee, Event, EventBody, GateRunResult, GateStatus, Issue, LinkedCheckoutWriteStance, State,
 };
@@ -436,20 +436,35 @@ struct PendingEvent {
     phase: u8,
     tag: EventTag,
     primary: Option<IssueId>,
-    secondary: String,
+    secondary: EventSecondaryIdentity,
     ordinal: usize,
     body: EventBody,
 }
 
+enum EventSecondaryIdentity {
+    None,
+    Gate(GateKey),
+    Assignee(Assignee),
+}
+
+impl EventSecondaryIdentity {
+    fn sort_key(&self) -> (Option<&GateKey>, Option<String>) {
+        match self {
+            Self::None => (None, None),
+            Self::Gate(key) => (Some(key), None),
+            Self::Assignee(assignee) => (None, Some(assignee.to_string())),
+        }
+    }
+}
+
 impl PendingEvent {
-    fn sort_key(&self) -> (u8, &str, Option<&IssueId>, &str, usize) {
-        (
-            self.phase,
-            self.tag.as_str(),
-            self.primary.as_ref(),
-            self.secondary.as_str(),
-            self.ordinal,
-        )
+    fn compare(&self, other: &Self) -> std::cmp::Ordering {
+        self.phase
+            .cmp(&other.phase)
+            .then_with(|| self.tag.as_str().cmp(other.tag.as_str()))
+            .then_with(|| self.primary.cmp(&other.primary))
+            .then_with(|| self.secondary.sort_key().cmp(&other.secondary.sort_key()))
+            .then_with(|| self.ordinal.cmp(&other.ordinal))
     }
 }
 
@@ -768,7 +783,7 @@ pub(super) fn finalize_delta(
                 phase: 0,
                 tag: EventTag::IssueCreated,
                 primary: Some(id.clone()),
-                secondary: String::new(),
+                secondary: EventSecondaryIdentity::None,
                 ordinal: pending_events.len(),
                 body: EventBody::draft_issue_created(&issue),
             });
@@ -805,7 +820,7 @@ pub(super) fn finalize_delta(
                     phase: 0,
                     tag: EventTag::IssueCreated,
                     primary: Some(issue.id.clone()),
-                    secondary: String::new(),
+                    secondary: EventSecondaryIdentity::None,
                     ordinal: pending_events.len(),
                     body: EventBody::draft_issue_created(&issue),
                 });
@@ -814,7 +829,7 @@ pub(super) fn finalize_delta(
                         phase: 1,
                         tag: EventTag::IssueUpdated,
                         primary: Some(issue.id.clone()),
-                        secondary: String::new(),
+                        secondary: EventSecondaryIdentity::None,
                         ordinal: pending_events.len(),
                         body: EventBody::draft_issue_updated(
                             issue.id.clone(),
@@ -866,7 +881,7 @@ pub(super) fn finalize_delta(
                     phase: 1,
                     tag: EventTag::IssueClaimed,
                     primary: Some(issue_id.clone()),
-                    secondary: agent.to_string(),
+                    secondary: EventSecondaryIdentity::Assignee(agent.clone()),
                     ordinal: pending_events.len(),
                     body: EventBody::draft_issue_claimed(issue_id.clone(), agent.clone()),
                 });
@@ -1168,7 +1183,7 @@ fn compose_event_action(
     let now = context.timestamp();
     // Assign identifiers in canonical event order, stamping the single mutation
     // timestamp and the torn-tail evidence.
-    pending_events.sort_by(|left, right| left.sort_key().cmp(&right.sort_key()));
+    pending_events.sort_by(PendingEvent::compare);
     let mut events = pending_events
         .into_iter()
         .map(|pending| {
@@ -1305,7 +1320,7 @@ fn index_membership_action(
 }
 
 /// Primary/secondary ordering identities for an event.
-fn event_identities(body: &EventBody) -> (Option<IssueId>, String) {
+fn event_identities(body: &EventBody) -> (Option<IssueId>, EventSecondaryIdentity) {
     let issue_id = body.issue_id().cloned();
     match body {
         EventBody::GatePassed { gate_key, .. }
@@ -1314,9 +1329,13 @@ fn event_identities(body: &EventBody) -> (Option<IssueId>, String) {
         | EventBody::GateRemoved { gate_key, .. }
         | EventBody::GateDefinitionCreated { gate_key, .. }
         | EventBody::GateDefinitionUpdated { gate_key, .. }
-        | EventBody::GateDefinitionRemoved { gate_key, .. } => (issue_id, gate_key.to_string()),
-        EventBody::IssueClaimed { assignee, .. } => (issue_id, assignee.to_string()),
-        _ => (issue_id, String::new()),
+        | EventBody::GateDefinitionRemoved { gate_key, .. } => {
+            (issue_id, EventSecondaryIdentity::Gate(gate_key.clone()))
+        }
+        EventBody::IssueClaimed { assignee, .. } => {
+            (issue_id, EventSecondaryIdentity::Assignee(assignee.clone()))
+        }
+        _ => (issue_id, EventSecondaryIdentity::None),
     }
 }
 

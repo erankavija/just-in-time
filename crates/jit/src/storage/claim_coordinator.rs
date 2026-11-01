@@ -1135,7 +1135,7 @@ impl ClaimCoordinator {
             .into_iter()
             .filter(|lease| {
                 if let Some(issue) = issue_id {
-                    if !issue.matches(lease.issue_id.as_str()) {
+                    if !issue.matches(&lease.issue_id) {
                         return false;
                     }
                 }

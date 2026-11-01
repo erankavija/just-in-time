@@ -7,6 +7,7 @@
 //! to be used for issues, tasks, packages, or any other dependency relationships.
 
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 use thiserror::Error;
 
 pub mod hierarchy;
@@ -43,22 +44,25 @@ pub struct Expansion<'a, T> {
 /// Types implementing this trait can be used with `DependencyGraph` to enforce
 /// DAG properties, detect cycles, and perform graph traversals.
 pub trait GraphNode {
+    /// Identity preserved across graph queries.
+    type Id: Clone + Eq + Hash + Ord;
+
     /// Unique identifier for this node
-    fn id(&self) -> &str;
+    fn id(&self) -> &Self::Id;
 
     /// IDs of nodes this node depends on
-    fn dependencies(&self) -> impl Iterator<Item = &str> + '_;
+    fn dependencies(&self) -> impl Iterator<Item = &Self::Id> + '_;
 }
 
 /// Errors that can occur during graph operations
 #[derive(Debug, Error, PartialEq)]
-pub enum GraphError {
+pub enum GraphError<Id> {
     /// A cycle was detected in the dependency graph
     #[error("Cycle detected: adding dependency would create a cycle")]
     CycleDetected,
-    /// Display-only name of a reference to an absent node.
+    /// Identity of a reference to an absent node.
     #[error("Node not found: {id}")]
-    NodeNotFound { id: String },
+    NodeNotFound { id: Id },
 }
 
 /// Generic dependency graph with cycle detection and traversal
@@ -66,7 +70,7 @@ pub enum GraphError {
 /// Provides DAG enforcement and graph operations for any type implementing `GraphNode`.
 /// All methods are pure functions that do not modify the graph structure.
 pub struct DependencyGraph<'a, T: GraphNode> {
-    nodes: HashMap<String, &'a T>,
+    nodes: HashMap<T::Id, &'a T>,
 }
 
 impl<'a, T: GraphNode> DependencyGraph<'a, T> {
@@ -74,7 +78,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     pub fn new(nodes: &[&'a T]) -> Self {
         let nodes_map = nodes
             .iter()
-            .map(|node| (node.id().to_string(), *node))
+            .map(|node| (node.id().clone(), *node))
             .collect();
 
         Self { nodes: nodes_map }
@@ -87,7 +91,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// keep dependency-declaration order for [`Direction::Dependencies`] and are
     /// sorted by id for [`Direction::Dependents`], so a traversal is
     /// deterministic in either direction.
-    fn neighbors(&self, direction: Direction) -> HashMap<&'a str, Vec<&'a str>> {
+    fn neighbors(&self, direction: Direction) -> HashMap<&'a T::Id, Vec<&'a T::Id>> {
         match direction {
             Direction::Dependencies => self
                 .nodes
@@ -95,7 +99,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
                 .map(|node| (node.id(), node.dependencies().collect()))
                 .collect(),
             Direction::Dependents => {
-                let mut index: HashMap<&'a str, Vec<&'a str>> = self
+                let mut index: HashMap<&'a T::Id, Vec<&'a T::Id>> = self
                     .nodes
                     .values()
                     .map(|node| (node.id(), Vec::new()))
@@ -124,9 +128,9 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     ///
     /// At `max_depth = 0` and [`Direction::Dependencies`] this returns the same
     /// nodes as [`get_transitive_dependencies`](Self::get_transitive_dependencies).
-    pub fn traverse(&self, start: &str, direction: Direction, max_depth: u32) -> Vec<&'a T> {
+    pub fn traverse(&self, start: &T::Id, direction: Direction, max_depth: u32) -> Vec<&'a T> {
         let neighbors = self.neighbors(direction);
-        let frontier = |id: &str, depth: u32| -> Vec<(&'a str, u32)> {
+        let frontier = |id: &T::Id, depth: u32| -> Vec<(&'a T::Id, u32)> {
             neighbors
                 .get(id)
                 .into_iter()
@@ -137,7 +141,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
         // Reverse-push so the stack pops neighbours in adjacency order; seeding
         // `visited` with `start` keeps the root out of its own result.
         let mut stack = frontier(start, 1);
-        let mut visited: HashSet<&str> = HashSet::from([start]);
+        let mut visited: HashSet<&T::Id> = HashSet::from([start]);
         let mut reached = Vec::new();
 
         while let Some((id, depth)) = stack.pop() {
@@ -165,7 +169,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// `max_depth` counts edges from `start`, 0 being unlimited.
     pub fn expand(
         &self,
-        start: &str,
+        start: &T::Id,
         direction: Direction,
         max_depth: u32,
     ) -> Vec<Expansion<'a, T>> {
@@ -178,10 +182,10 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// non-zero `max_depth` bounds the descent regardless.
     fn expand_from(
         &self,
-        id: &str,
+        id: &T::Id,
         level: u32,
         max_depth: u32,
-        neighbors: &HashMap<&'a str, Vec<&'a str>>,
+        neighbors: &HashMap<&'a T::Id, Vec<&'a T::Id>>,
     ) -> Vec<Expansion<'a, T>> {
         neighbors
             .get(id)
@@ -200,16 +204,18 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     }
 
     /// Validate that adding a dependency would not create a cycle
-    pub fn validate_add_dependency(&self, from_id: &str, to_id: &str) -> Result<(), GraphError> {
+    pub fn validate_add_dependency(
+        &self,
+        from_id: &T::Id,
+        to_id: &T::Id,
+    ) -> Result<(), GraphError<T::Id>> {
         if !self.nodes.contains_key(from_id) {
             return Err(GraphError::NodeNotFound {
-                id: from_id.to_string(),
+                id: from_id.clone(),
             });
         }
         if !self.nodes.contains_key(to_id) {
-            return Err(GraphError::NodeNotFound {
-                id: to_id.to_string(),
-            });
+            return Err(GraphError::NodeNotFound { id: to_id.clone() });
         }
 
         // Check if adding this dependency would create a cycle
@@ -221,13 +227,13 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
         Ok(())
     }
 
-    fn would_create_cycle(&self, from: &str, to: &str) -> bool {
+    fn would_create_cycle(&self, from: &T::Id, to: &T::Id) -> bool {
         // Adding edge from -> to creates a cycle if there's already a path to -> from
         // In other words, if 'from' is reachable from 'to'
         self.is_reachable(to, from)
     }
 
-    fn is_reachable(&self, start: &str, target: &str) -> bool {
+    fn is_reachable(&self, start: &T::Id, target: &T::Id) -> bool {
         let mut visited = HashSet::new();
         let mut stack = vec![start];
 
@@ -268,7 +274,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     }
 
     /// Get all nodes that directly depend on the given node
-    pub fn get_dependents(&self, node_id: &str) -> Vec<&'a T> {
+    pub fn get_dependents(&self, node_id: &T::Id) -> Vec<&'a T> {
         self.nodes
             .values()
             .filter(|node| node.dependencies().any(|dep| dep == node_id))
@@ -277,7 +283,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     }
 
     /// Get all nodes that transitively depend on the given node
-    pub fn get_transitive_dependents(&self, node_id: &str) -> Vec<&'a T> {
+    pub fn get_transitive_dependents(&self, node_id: &T::Id) -> Vec<&'a T> {
         let mut result = HashSet::new();
         let mut stack = vec![node_id];
         let mut visited = HashSet::new();
@@ -308,10 +314,10 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// [`get_transitive_dependents`](Self::get_transitive_dependents), it answers
     /// "what does this node (transitively) require?" — used to assemble an issue's
     /// dependency neighborhood for transition-time graph-rule evaluation.
-    pub fn get_transitive_dependencies(&self, node_id: &str) -> Vec<&'a T> {
-        let mut result: HashSet<&str> = HashSet::new();
+    pub fn get_transitive_dependencies(&self, node_id: &T::Id) -> Vec<&'a T> {
+        let mut result: HashSet<&T::Id> = HashSet::new();
         let mut stack = vec![node_id];
-        let mut visited: HashSet<&str> = HashSet::new();
+        let mut visited: HashSet<&T::Id> = HashSet::new();
 
         while let Some(current) = stack.pop() {
             if !visited.insert(current) {
@@ -350,16 +356,14 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             .collect()
     }
 
-    /// Validate that the graph is a DAG (no cycles)
-    pub fn validate_dag(&self) -> Result<(), GraphError> {
+    /// Validate that the graph is a DAG; the only error is [`GraphError::CycleDetected`].
+    pub fn validate_dag(&self) -> Result<(), GraphError<T::Id>> {
         // Check for cycles using DFS
         let mut visited = HashSet::new();
         let mut rec_stack = HashSet::new();
 
         for id in self.nodes.keys() {
-            if !visited.contains(id.as_str())
-                && self.has_cycle_dfs(id, &mut visited, &mut rec_stack)
-            {
+            if !visited.contains(id) && self.has_cycle_dfs(id, &mut visited, &mut rec_stack) {
                 return Err(GraphError::CycleDetected);
             }
         }
@@ -369,12 +373,12 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
 
     fn has_cycle_dfs(
         &self,
-        node: &str,
-        visited: &mut HashSet<String>,
-        rec_stack: &mut HashSet<String>,
+        node: &T::Id,
+        visited: &mut HashSet<T::Id>,
+        rec_stack: &mut HashSet<T::Id>,
     ) -> bool {
-        visited.insert(node.to_string());
-        rec_stack.insert(node.to_string());
+        visited.insert(node.clone());
+        rec_stack.insert(node.clone());
 
         if let Some(graph_node) = self.nodes.get(node) {
             for dep in graph_node.dependencies() {
@@ -396,13 +400,13 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     ///
     /// An edge is transitive if there exists a path from→...→to
     /// through other edges (i.e., path length > 1).
-    pub fn is_transitive(&self, from: &str, to: &str) -> bool {
+    pub fn is_transitive(&self, from: &T::Id, to: &T::Id) -> bool {
         // Check if there's a path from→to excluding the direct edge
         self.has_path_excluding_direct(from, to)
     }
 
     /// Check if path exists from start to target, excluding the direct edge.
-    fn has_path_excluding_direct(&self, start: &str, target: &str) -> bool {
+    fn has_path_excluding_direct(&self, start: &T::Id, target: &T::Id) -> bool {
         let mut visited = HashSet::new();
         let mut stack = vec![start];
 
@@ -435,12 +439,12 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// Returns the minimal set of dependencies that preserves reachability.
     /// An edge is kept only if it's not reachable through other edges.
     /// References to absent nodes are skipped.
-    pub fn compute_transitive_reduction(&self, node_id: &str) -> Vec<&'a T> {
+    pub fn compute_transitive_reduction(&self, node_id: &T::Id) -> Vec<&'a T> {
         let Some(node) = self.nodes.get(node_id) else {
             return Vec::new();
         };
 
-        let deps: Vec<&str> = node.dependencies().collect();
+        let deps: Vec<&T::Id> = node.dependencies().collect();
         let mut kept = HashSet::new();
 
         // Keep only dependencies that are NOT reachable through other dependencies
@@ -448,7 +452,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             .copied()
             .filter(|dep| {
                 // Check if this dep is reachable through other deps
-                let other_deps: Vec<&str> = deps.iter().filter(|d| *d != dep).copied().collect();
+                let other_deps: Vec<&T::Id> = deps.iter().filter(|d| *d != dep).copied().collect();
 
                 // If dep is reachable from any other dep, it's redundant
                 !other_deps.iter().any(|other| self.is_reachable(other, dep))
@@ -465,7 +469,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     ///
     /// Returns nodes along the path, or an empty vector if no path exists.
     /// References to absent nodes are skipped.
-    pub fn find_shortest_path(&self, from: &str, to: &str) -> Vec<&'a T> {
+    pub fn find_shortest_path(&self, from: &T::Id, to: &T::Id) -> Vec<&'a T> {
         use std::collections::VecDeque;
 
         let Some(start) = self.nodes.get(from).copied() else {
@@ -518,7 +522,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
         let mut redundant = Vec::new();
         for node in self.nodes.values() {
             let id = node.id();
-            let reduced: HashSet<&str> = self
+            let reduced: HashSet<&T::Id> = self
                 .compute_transitive_reduction(id)
                 .into_iter()
                 .map(GraphNode::id)
@@ -541,8 +545,8 @@ impl<'a, T: GraphNode> Expansion<'a, T> {
     ///
     /// A count above 1 marks a node shared between paths, the diamonds a
     /// dependency tree flags.
-    pub fn occurrences(forest: &[Self]) -> HashMap<&'a str, usize> {
-        let mut counts: HashMap<&'a str, usize> = HashMap::new();
+    pub fn occurrences(forest: &[Self]) -> HashMap<&'a T::Id, usize> {
+        let mut counts: HashMap<&'a T::Id, usize> = HashMap::new();
         let mut stack: Vec<&Self> = forest.iter().collect();
         while let Some(occurrence) = stack.pop() {
             *counts.entry(occurrence.node.id()).or_insert(0) += 1;
@@ -587,12 +591,14 @@ mod tests {
     }
 
     impl GraphNode for TestNode {
-        fn id(&self) -> &str {
+        type Id = String;
+
+        fn id(&self) -> &String {
             &self.id
         }
 
-        fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
-            self.deps.iter().map(String::as_str)
+        fn dependencies(&self) -> impl Iterator<Item = &String> + '_ {
+            self.deps.iter()
         }
     }
 
@@ -607,10 +613,12 @@ mod tests {
         let graph = DependencyGraph::new(&nodes);
 
         // C -> B -> A chain exists, so adding C -> A is OK (redundant but valid)
-        assert!(graph.validate_add_dependency("C", "A").is_ok());
+        assert!(graph
+            .validate_add_dependency(&"C".to_string(), &"A".to_string())
+            .is_ok());
         // But A -> C would create a cycle: A -> C -> B -> A
         assert_eq!(
-            graph.validate_add_dependency("A", "C"),
+            graph.validate_add_dependency(&"A".to_string(), &"C".to_string()),
             Err(GraphError::CycleDetected)
         );
     }
@@ -639,7 +647,7 @@ mod tests {
         let nodes = vec![&node1, &node2, &node3];
         let graph = DependencyGraph::new(&nodes);
 
-        let dependents = graph.get_dependents("base");
+        let dependents = graph.get_dependents(&"base".to_string());
         assert_eq!(dependents.len(), 2);
         assert!(dependents.iter().any(|n| n.id() == "dep1"));
         assert!(dependents.iter().any(|n| n.id() == "dep2"));
@@ -654,7 +662,7 @@ mod tests {
         let nodes = vec![&node1, &node2, &node3];
         let graph = DependencyGraph::new(&nodes);
 
-        let transitive = graph.get_transitive_dependents("root");
+        let transitive = graph.get_transitive_dependents(&"root".to_string());
         assert_eq!(transitive.len(), 2);
         assert!(transitive.iter().any(|n| n.id() == "level1"));
         assert!(transitive.iter().any(|n| n.id() == "level2"));
@@ -683,7 +691,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
 
         assert!(graph
-            .validate_add_dependency(issue1.id.as_str(), issue2.id.as_str())
+            .validate_add_dependency(&issue1.id, &issue2.id)
             .is_ok());
     }
 
@@ -694,12 +702,17 @@ mod tests {
         let issues = vec![&issue1];
         let graph = DependencyGraph::new(&issues);
 
-        let result = graph.validate_add_dependency(issue1.id.as_str(), "nonexistent");
+        let missing = crate::test_utils::issue_id(1);
+        let result = graph.validate_add_dependency(&issue1.id, &missing);
         assert_eq!(
             result,
             Err(GraphError::NodeNotFound {
-                id: "nonexistent".to_string()
+                id: missing.clone()
             })
+        );
+        assert_eq!(
+            graph.validate_add_dependency(&missing, &issue1.id),
+            Err(GraphError::NodeNotFound { id: missing })
         );
     }
 
@@ -716,7 +729,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
 
         // Trying to make issue2 depend on issue1 would create a cycle
-        let result = graph.validate_add_dependency(issue2.id.as_str(), issue1.id.as_str());
+        let result = graph.validate_add_dependency(&issue2.id, &issue1.id);
         assert_eq!(result, Err(GraphError::CycleDetected));
     }
 
@@ -736,7 +749,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
 
         // Trying to make issue3 depend on issue1 would create a cycle
-        let result = graph.validate_add_dependency(issue3.id.as_str(), issue1.id.as_str());
+        let result = graph.validate_add_dependency(&issue3.id, &issue1.id);
         assert_eq!(result, Err(GraphError::CycleDetected));
     }
 
@@ -772,7 +785,7 @@ mod tests {
         let issues = vec![&issue1, &issue2, &issue3];
         let graph = DependencyGraph::new(&issues);
 
-        let dependents = graph.get_dependents(issue1.id.as_str());
+        let dependents = graph.get_dependents(&issue1.id);
         assert_eq!(dependents.len(), 2);
         assert!(dependents.iter().any(|i| i.id == issue2.id));
         assert!(dependents.iter().any(|i| i.id == issue3.id));
@@ -792,7 +805,7 @@ mod tests {
         let issues = vec![&issue1, &issue2, &issue3];
         let graph = DependencyGraph::new(&issues);
 
-        let transitive = graph.get_transitive_dependents(issue1.id.as_str());
+        let transitive = graph.get_transitive_dependents(&issue1.id);
         assert_eq!(transitive.len(), 2);
         assert!(transitive.iter().any(|i| i.id == issue2.id));
         assert!(transitive.iter().any(|i| i.id == issue3.id));
@@ -843,11 +856,11 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c]);
 
         // A→C is transitive (reachable via A→B→C)
-        assert!(graph.is_transitive("A", "C"));
+        assert!(graph.is_transitive(&"A".to_string(), &"C".to_string()));
         // A→B is NOT transitive (direct edge)
-        assert!(!graph.is_transitive("A", "B"));
+        assert!(!graph.is_transitive(&"A".to_string(), &"B".to_string()));
         // B→C is NOT transitive (direct edge)
-        assert!(!graph.is_transitive("B", "C"));
+        assert!(!graph.is_transitive(&"B".to_string(), &"C".to_string()));
     }
 
     #[test]
@@ -861,11 +874,11 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c]);
 
         // A→C is transitive (reachable via A→B→C)
-        assert!(graph.is_transitive("A", "C"));
+        assert!(graph.is_transitive(&"A".to_string(), &"C".to_string()));
         // A→B is NOT transitive
-        assert!(!graph.is_transitive("A", "B"));
+        assert!(!graph.is_transitive(&"A".to_string(), &"B".to_string()));
         // B→C is NOT transitive
-        assert!(!graph.is_transitive("B", "C"));
+        assert!(!graph.is_transitive(&"B".to_string(), &"C".to_string()));
     }
 
     #[test]
@@ -879,7 +892,7 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
 
         // A→D has no path at all
-        assert!(!graph.is_transitive("A", "D"));
+        assert!(!graph.is_transitive(&"A".to_string(), &"D".to_string()));
     }
 
     #[test]
@@ -894,12 +907,12 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
 
         // A→D is transitive (reachable via A→B→D and A→C→D)
-        assert!(graph.is_transitive("A", "D"));
+        assert!(graph.is_transitive(&"A".to_string(), &"D".to_string()));
         // Direct edges are not transitive
-        assert!(!graph.is_transitive("A", "B"));
-        assert!(!graph.is_transitive("A", "C"));
-        assert!(!graph.is_transitive("B", "D"));
-        assert!(!graph.is_transitive("C", "D"));
+        assert!(!graph.is_transitive(&"A".to_string(), &"B".to_string()));
+        assert!(!graph.is_transitive(&"A".to_string(), &"C".to_string()));
+        assert!(!graph.is_transitive(&"B".to_string(), &"D".to_string()));
+        assert!(!graph.is_transitive(&"C".to_string(), &"D".to_string()));
     }
 
     #[test]
@@ -914,12 +927,12 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c, &d, &e]);
 
         // A→E is transitive (long path)
-        assert!(graph.is_transitive("A", "E"));
+        assert!(graph.is_transitive(&"A".to_string(), &"E".to_string()));
         // All direct edges are not transitive
-        assert!(!graph.is_transitive("A", "B"));
-        assert!(!graph.is_transitive("B", "C"));
-        assert!(!graph.is_transitive("C", "D"));
-        assert!(!graph.is_transitive("D", "E"));
+        assert!(!graph.is_transitive(&"A".to_string(), &"B".to_string()));
+        assert!(!graph.is_transitive(&"B".to_string(), &"C".to_string()));
+        assert!(!graph.is_transitive(&"C".to_string(), &"D".to_string()));
+        assert!(!graph.is_transitive(&"D".to_string(), &"E".to_string()));
     }
 
     #[test]
@@ -929,10 +942,12 @@ mod tests {
         let c = TestNode::new("C", vec![]);
         let graph = DependencyGraph::new(&[&a, &b, &c]);
 
-        let path = graph.find_shortest_path("A", "C");
+        let path = graph.find_shortest_path(&"A".to_string(), &"C".to_string());
 
         assert_eq!(
-            path.iter().map(|node| node.id()).collect::<Vec<_>>(),
+            path.iter()
+                .map(|node| node.id().as_str())
+                .collect::<Vec<_>>(),
             ["A", "B", "C"]
         );
     }
@@ -945,15 +960,21 @@ mod tests {
 
         assert_eq!(
             graph
-                .compute_transitive_reduction("A")
+                .compute_transitive_reduction(&"A".to_string())
                 .iter()
-                .map(|node| node.id())
+                .map(|node| node.id().as_str())
                 .collect::<Vec<_>>(),
             ["B"]
         );
-        assert!(graph.compute_transitive_reduction("missing").is_empty());
-        assert!(graph.find_shortest_path("A", "missing").is_empty());
-        assert!(graph.find_shortest_path("missing", "A").is_empty());
+        assert!(graph
+            .compute_transitive_reduction(&"missing".to_string())
+            .is_empty());
+        assert!(graph
+            .find_shortest_path(&"A".to_string(), &"missing".to_string())
+            .is_empty());
+        assert!(graph
+            .find_shortest_path(&"missing".to_string(), &"A".to_string())
+            .is_empty());
         assert!(graph.find_redundant_edges().is_empty());
     }
 
@@ -967,9 +988,9 @@ mod tests {
 
         let graph = DependencyGraph::new(&[&a, &b, &c]);
         let reduced_deps = graph
-            .compute_transitive_reduction("A")
+            .compute_transitive_reduction(&"A".to_string())
             .into_iter()
-            .map(GraphNode::id)
+            .map(|node| node.id().as_str())
             .collect::<HashSet<_>>();
 
         // A should only depend on B (not C)
@@ -987,9 +1008,9 @@ mod tests {
 
         let graph = DependencyGraph::new(&[&a, &b, &c]);
         let reduced_deps = graph
-            .compute_transitive_reduction("A")
+            .compute_transitive_reduction(&"A".to_string())
             .into_iter()
-            .map(GraphNode::id)
+            .map(|node| node.id().as_str())
             .collect::<HashSet<_>>();
 
         // Both dependencies should remain
@@ -1009,9 +1030,9 @@ mod tests {
 
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
         let reduced_deps = graph
-            .compute_transitive_reduction("A")
+            .compute_transitive_reduction(&"A".to_string())
             .into_iter()
-            .map(GraphNode::id)
+            .map(|node| node.id().as_str())
             .collect::<HashSet<_>>();
 
         // A should depend on B and C, but not D
@@ -1076,7 +1097,7 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
         let isolated = graph.get_isolated_nodes();
         assert_eq!(isolated.len(), 2);
-        let isolated_ids: Vec<&str> = isolated.iter().map(|n| n.id()).collect();
+        let isolated_ids: Vec<&str> = isolated.iter().map(|n| n.id().as_str()).collect();
         assert!(isolated_ids.contains(&"C"));
         assert!(isolated_ids.contains(&"D"));
     }
@@ -1110,7 +1131,7 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
 
         assert_eq!(
-            ids(&graph.traverse("A", Direction::Dependencies, 1)),
+            ids(&graph.traverse(&"A".to_string(), Direction::Dependencies, 1)),
             vec!["B", "C"]
         );
     }
@@ -1122,11 +1143,11 @@ mod tests {
 
         // Depth 2 reaches C (via B or the shortcut) but stops before D.
         assert_eq!(
-            sorted_ids(&graph.traverse("A", Direction::Dependencies, 2)),
+            sorted_ids(&graph.traverse(&"A".to_string(), Direction::Dependencies, 2)),
             vec!["B", "C"]
         );
         assert_eq!(
-            sorted_ids(&graph.traverse("A", Direction::Dependencies, 3)),
+            sorted_ids(&graph.traverse(&"A".to_string(), Direction::Dependencies, 3)),
             vec!["B", "C", "D"]
         );
     }
@@ -1138,7 +1159,7 @@ mod tests {
 
         // C is reachable as A→C and A→B→C; it is returned once.
         assert_eq!(
-            sorted_ids(&graph.traverse("A", Direction::Dependencies, 0)),
+            sorted_ids(&graph.traverse(&"A".to_string(), Direction::Dependencies, 0)),
             vec!["B", "C", "D"]
         );
     }
@@ -1149,11 +1170,11 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
 
         assert!(graph
-            .traverse("A", Direction::Dependencies, 0)
+            .traverse(&"A".to_string(), Direction::Dependencies, 0)
             .iter()
             .all(|node| node.id() != "A"));
         assert!(graph
-            .traverse("D", Direction::Dependents, 0)
+            .traverse(&"D".to_string(), Direction::Dependents, 0)
             .iter()
             .all(|node| node.id() != "D"));
     }
@@ -1164,15 +1185,15 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
 
         assert_eq!(
-            ids(&graph.traverse("C", Direction::Dependents, 1)),
+            ids(&graph.traverse(&"C".to_string(), Direction::Dependents, 1)),
             vec!["A", "B"]
         );
         assert_eq!(
-            sorted_ids(&graph.traverse("D", Direction::Dependents, 0)),
+            sorted_ids(&graph.traverse(&"D".to_string(), Direction::Dependents, 0)),
             vec!["A", "B", "C"]
         );
         assert_eq!(
-            ids(&graph.traverse("D", Direction::Dependents, 1)),
+            ids(&graph.traverse(&"D".to_string(), Direction::Dependents, 1)),
             vec!["C"]
         );
     }
@@ -1183,14 +1204,14 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
 
         let mut expected: Vec<String> = graph
-            .get_transitive_dependents("D")
+            .get_transitive_dependents(&"D".to_string())
             .iter()
             .map(|node| node.id().to_string())
             .collect();
         expected.sort();
 
         assert_eq!(
-            sorted_ids(&graph.traverse("D", Direction::Dependents, 0)),
+            sorted_ids(&graph.traverse(&"D".to_string(), Direction::Dependents, 0)),
             expected
         );
     }
@@ -1202,7 +1223,7 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b]);
 
         assert_eq!(
-            ids(&graph.traverse("A", Direction::Dependencies, 0)),
+            ids(&graph.traverse(&"A".to_string(), Direction::Dependencies, 0)),
             vec!["B"]
         );
     }
@@ -1213,7 +1234,7 @@ mod tests {
         let graph = DependencyGraph::new(&[&a]);
 
         assert!(graph
-            .traverse("nonexistent", Direction::Dependencies, 0)
+            .traverse(&"nonexistent".to_string(), Direction::Dependencies, 0)
             .is_empty());
     }
 
@@ -1225,14 +1246,14 @@ mod tests {
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
 
         let mut expected: Vec<String> = graph
-            .get_transitive_dependencies("A")
+            .get_transitive_dependencies(&"A".to_string())
             .iter()
             .map(|node| node.id().to_string())
             .collect();
         expected.sort();
 
         assert_eq!(
-            sorted_ids(&graph.traverse("A", Direction::Dependencies, 0)),
+            sorted_ids(&graph.traverse(&"A".to_string(), Direction::Dependencies, 0)),
             expected
         );
     }
@@ -1242,7 +1263,7 @@ mod tests {
         let (a, b, c, d) = chain_with_shortcut();
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
 
-        let forest = graph.expand("A", Direction::Dependencies, 0);
+        let forest = graph.expand(&"A".to_string(), Direction::Dependencies, 0);
         // A's neighbours, in declaration order.
         assert_eq!(
             forest.iter().map(|e| e.node.id()).collect::<Vec<_>>(),
@@ -1251,9 +1272,9 @@ mod tests {
         assert!(forest.iter().all(|e| e.level == 1));
         // B's subtree re-unfolds C, so C occurs twice overall (and D with it).
         let counts = Expansion::occurrences(&forest);
-        assert_eq!(counts.get("C"), Some(&2));
-        assert_eq!(counts.get("D"), Some(&2));
-        assert_eq!(counts.get("B"), Some(&1));
+        assert_eq!(counts.get(&"C".to_string()), Some(&2));
+        assert_eq!(counts.get(&"D".to_string()), Some(&2));
+        assert_eq!(counts.get(&"B".to_string()), Some(&1));
     }
 
     #[test]
@@ -1261,11 +1282,11 @@ mod tests {
         let (a, b, c, d) = chain_with_shortcut();
         let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
 
-        let forest = graph.expand("A", Direction::Dependencies, 1);
+        let forest = graph.expand(&"A".to_string(), Direction::Dependencies, 1);
         assert_eq!(forest.len(), 2);
         assert!(forest.iter().all(|e| e.children.is_empty()));
 
-        let forest = graph.expand("A", Direction::Dependencies, 2);
+        let forest = graph.expand(&"A".to_string(), Direction::Dependencies, 2);
         let b_node = forest.iter().find(|e| e.node.id() == "B").unwrap();
         assert_eq!(b_node.children.len(), 1);
         assert_eq!(b_node.children[0].node.id(), "C");
@@ -1282,7 +1303,7 @@ mod tests {
             format!("{}@{}{}", node.id(), level, children.join(""))
         };
         let rendered: Vec<String> = graph
-            .expand("A", Direction::Dependencies, 0)
+            .expand(&"A".to_string(), Direction::Dependencies, 0)
             .iter()
             .map(|expansion| expansion.fold(&render))
             .collect();

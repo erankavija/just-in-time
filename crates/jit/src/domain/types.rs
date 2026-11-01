@@ -288,17 +288,6 @@ impl std::fmt::Display for Assignee {
     }
 }
 
-/// Compare an [`Assignee`] against a raw `kind:identifier` string without
-/// allocating, so filter predicates can match a parsed assignee to user input.
-impl PartialEq<str> for Assignee {
-    fn eq(&self, other: &str) -> bool {
-        match other.split_once(':') {
-            Some((kind, identifier)) => self.kind == kind && self.identifier == identifier,
-            None => false,
-        }
-    }
-}
-
 impl Serialize for Assignee {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -682,7 +671,8 @@ pub struct MinimalIssue {
     pub priority: Priority,
     /// Assigned agent or person (optional for context)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub assignee: Option<String>,
+    #[schemars(with = "Option<String>")]
+    pub assignee: Option<Assignee>,
     /// Labels for categorization (optional for context)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<String>,
@@ -728,7 +718,7 @@ impl From<&Issue> for MinimalIssue {
             title: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
-            assignee: issue.assignee.as_ref().map(Assignee::to_string),
+            assignee: issue.assignee.clone(),
             labels: issue.labels.clone(),
             archived_from: issue.archived_from,
         }
@@ -756,7 +746,8 @@ pub struct MinimalBlockedIssue {
     pub title: String,
     pub state: State,
     pub priority: Priority,
-    pub assignee: Option<String>,
+    #[schemars(with = "Option<String>")]
+    pub assignee: Option<Assignee>,
     pub labels: Vec<String>,
     pub blocked_reasons: Vec<String>,
 }
@@ -800,7 +791,7 @@ impl From<(&Issue, Vec<String>)> for MinimalBlockedIssue {
             title: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
-            assignee: issue.assignee.as_ref().map(Assignee::to_string),
+            assignee: issue.assignee.clone(),
             labels: issue.labels.clone(),
             blocked_reasons,
         }
@@ -809,12 +800,14 @@ impl From<(&Issue, Vec<String>)> for MinimalBlockedIssue {
 
 /// Implement GraphNode for Issue to enable dependency graph operations
 impl crate::graph::GraphNode for Issue {
-    fn id(&self) -> &str {
-        self.id.as_str()
+    type Id = IssueId;
+
+    fn id(&self) -> &IssueId {
+        &self.id
     }
 
-    fn dependencies(&self) -> impl Iterator<Item = &str> + '_ {
-        self.dependencies.iter().map(IssueId::as_str)
+    fn dependencies(&self) -> impl Iterator<Item = &IssueId> + '_ {
+        self.dependencies.iter()
     }
 }
 
@@ -2780,11 +2773,9 @@ mod tests {
         }
 
         #[test]
-        fn test_assignee_partial_eq_str() {
+        fn test_assignee_display_renders_canonical_spelling() {
             let a = Assignee::from_str("agent:copilot").unwrap();
-            assert!(a == *"agent:copilot");
-            assert!(a != *"agent:other");
-            assert!(a != *"nocolon");
+            assert_eq!(a.to_string(), "agent:copilot");
         }
 
         #[test]

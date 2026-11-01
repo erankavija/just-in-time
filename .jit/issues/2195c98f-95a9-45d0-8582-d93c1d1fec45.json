@@ -1,11 +1,14 @@
 {
+  "archived_from": "done",
   "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-20T20:35:49.020284998Z",
   "context": {},
   "created_at": "2026-10-20T20:12:36.610884572Z",
   "dependencies": [
     "0461a6f7-cd92-4432-b835-d7d3dd2d9a8f",
+    "592d663e-f516-4167-8449-d2b467ea32f4",
     "5dd29767-b7c9-4037-a99c-c6c9a1081344",
+    "64420cff-2c04-42a7-bbcf-232cb0e8003c",
     "83d04069-e6ea-4591-a97f-44c2c941aa72",
     "8c40d01b-145e-4974-8f22-41676a158aa0",
     "9537f74b-bec7-4762-8350-b255a1864e35",
@@ -18,22 +21,43 @@
       "doc_type": "session",
       "format": "markdown",
       "label": "Session 2 handoff",
-      "path": "dev/active/2195c98f-semantic-types/handoff.md"
+      "path": "dev/archive/2195c98f-semantic-types/active/handoff.md"
     },
     {
       "commit": null,
       "doc_type": "handoff",
       "format": "markdown",
       "label": "Session 3 handoff",
-      "path": "dev/active/2195c98f-semantic-types/handoff-2.md"
+      "path": "dev/archive/2195c98f-semantic-types/active/handoff-2.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/2195c98f-semantic-types/active/completion-report.md"
     }
   ],
+  "done_at": "2026-11-01T05:30:03.966921533Z",
   "first_ready_at": "2026-10-20T20:12:36.610884572Z",
   "gates_required": [
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "holistic-review": {
+      "run_id": "8e445bfa-633d-440f-b848-c03ade9c6672",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:28:45.465794931Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "run_id": "ef0fd351-e5ef-4949-9c3a-fb33cb8f3540",
+      "status": "passed",
+      "updated_at": "2026-11-01T05:26:20.931671524Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
   "labels": [
     "epic:semantic-types",
@@ -46,7 +70,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "archived",
   "title": "Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-10-27T01:03:09.785063348Z"
+  "updated_at": "2026-11-01T05:30:35.035154985Z"
 }

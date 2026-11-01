@@ -13,15 +13,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "3ef69fa7-c2d7-4120-ba04-d08928e4b3c7",
+      "run_id": "b0da478b-8d01-4ca6-a785-32edec201ad0",
       "status": "passed",
-      "updated_at": "2026-11-01T01:00:25.088543998Z",
+      "updated_at": "2026-11-01T04:34:20.608748641Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "394509a8-4768-461b-9729-9711df855d25",
+      "run_id": "00564033-c16f-49fe-8a0b-fdb88bdb726a",
       "status": "failed",
-      "updated_at": "2026-11-01T01:03:07.931467656Z",
+      "updated_at": "2026-11-01T04:36:39.833862928Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Cold profiled-fixture builds no longer time out their waiters",
-  "updated_at": "2026-11-01T01:03:07.931467656Z"
+  "updated_at": "2026-11-01T04:36:39.833862928Z"
 }

@@ -18,7 +18,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(crate::domain::queries::query_blocked(&issues))
     }
 
-    pub fn query_by_assignee(&self, assignee: &str) -> Result<Vec<Issue>> {
+    pub fn query_by_assignee(&self, assignee: &crate::domain::Assignee) -> Result<Vec<Issue>> {
         let issues = self.storage.list_issues()?;
         Ok(crate::domain::queries::query_by_assignee(&issues, assignee))
     }
@@ -90,7 +90,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn query_all(
         &self,
         state_filter: Option<State>,
-        assignee_filter: Option<&str>,
+        assignee_filter: Option<crate::domain::Assignee>,
         priority_filter: Option<Priority>,
         label_filters: &[String],
     ) -> Result<Vec<Issue>> {
@@ -147,8 +147,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !label_filters.is_empty() {
             let label_matches = self.query_by_labels(label_filters)?;
             let label_ids: std::collections::HashSet<_> =
-                label_matches.iter().map(|i| i.id.as_str()).collect();
-            blocked.retain(|(i, _)| label_ids.contains(i.id.as_str()));
+                label_matches.iter().map(|i| &i.id).collect();
+            blocked.retain(|(i, _)| label_ids.contains(&i.id));
         }
 
         Ok(blocked)
@@ -171,8 +171,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !label_filters.is_empty() {
             let label_matches = self.query_by_labels(label_filters)?;
             let label_ids: std::collections::HashSet<_> =
-                label_matches.iter().map(|i| i.id.as_str()).collect();
-            issues.retain(|i| label_ids.contains(i.id.as_str()));
+                label_matches.iter().map(|i| &i.id).collect();
+            issues.retain(|i| label_ids.contains(&i.id));
         }
 
         Ok(issues)
@@ -245,8 +245,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         if !label_filters.is_empty() {
             let label_matches = self.query_by_labels(label_filters)?;
             let label_ids: std::collections::HashSet<_> =
-                label_matches.iter().map(|i| i.id.as_str()).collect();
-            issues.retain(|i| label_ids.contains(i.id.as_str()));
+                label_matches.iter().map(|i| &i.id).collect();
+            issues.retain(|i| label_ids.contains(&i.id));
         }
 
         Ok(issues)

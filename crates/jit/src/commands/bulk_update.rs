@@ -19,7 +19,7 @@ pub struct UpdateOperations {
     /// Labels to remove
     pub remove_labels: Vec<String>,
     /// New assignee to set
-    pub assignee: Option<String>,
+    pub assignee: Option<Assignee>,
     /// Clear assignee
     pub unassign: bool,
     /// New priority to set
@@ -40,8 +40,8 @@ impl UpdateOperations {
     /// repository. It never authorizes a skip by itself — a `false` result
     /// means only "not a candidate," and a `true` result means only
     /// "worth checking further": repository-dependent validity (gate registry
-    /// membership, dependency/gate transition guards, rule cleanliness, label
-    /// and assignee format) is decided exclusively inside a session — the
+    /// membership, dependency/gate transition guards, and rule cleanliness) is
+    /// decided exclusively inside a session — the
     /// shared verification session that confirms candidates
     /// (`CommandExecutor::confirm_bulk_noop_candidates`), or the normal
     /// per-issue session for anything that session does not confirm.
@@ -65,9 +65,7 @@ impl UpdateOperations {
                 .iter()
                 .all(|gate| !issue.gates_required.contains(gate));
         let assignee_holds = match &self.assignee {
-            Some(target) => {
-                issue.assignee.as_ref().map(Assignee::to_string).as_deref() == Some(target.as_str())
-            }
+            Some(target) => issue.assignee.as_ref() == Some(target),
             None => !self.unassign || issue.assignee.is_none(),
         };
 
@@ -533,7 +531,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Assignee change
         let current_assignee = issue.assignee.as_ref().map(Assignee::to_string);
         if let Some(ref assignee) = operations.assignee {
-            if current_assignee.as_deref() != Some(assignee.as_str()) {
+            if issue.assignee.as_ref() != Some(assignee) {
                 changes.push(format!(
                     "assignee: {} → {}",
                     current_assignee.as_deref().unwrap_or("none"),
@@ -579,9 +577,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             updated.labels.retain(|l| l != label);
         }
         if let Some(ref assignee) = operations.assignee {
-            // Projection only feeds label/state rules; a malformed assignee here
-            // (rejected later by `validate_update`) is simply dropped.
-            updated.assignee = assignee.parse().ok();
+            updated.assignee = Some(assignee.clone());
         } else if operations.unassign {
             updated.assignee = None;
         }
@@ -605,11 +601,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     return Err(crate::storage::GateNotFoundError::single(gate_key).into());
                 }
             }
-        }
-
-        // Validate assignee format
-        if let Some(ref assignee) = operations.assignee {
-            crate::labels::validate_assignee_format(assignee)?;
         }
 
         // The captured mutation coordinator owns dependency and gate guards.
@@ -840,7 +831,7 @@ mod tests {
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
-            assignee: Some("agent:worker-1".to_string()),
+            assignee: Some("agent:worker-1".parse().unwrap()),
             ..Default::default()
         };
         executor.apply_bulk_update(&filter, &ops, false).unwrap();
@@ -865,7 +856,7 @@ mod tests {
         // First-occurrence: a second assignee change does not move claimed_at.
         let first = updated.claimed_at;
         let ops2 = UpdateOperations {
-            assignee: Some("agent:worker-2".to_string()),
+            assignee: Some("agent:worker-2".parse().unwrap()),
             ..Default::default()
         };
         executor.apply_bulk_update(&filter, &ops2, false).unwrap();
@@ -1189,40 +1180,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bulk_update_rejects_invalid_assignee_format() {
-        use crate::query_engine::QueryFilter;
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-        crate::commands::test_helpers::seed_issue(
-            &storage,
-            create_test_issue(
-                &crate::test_utils::issue_id(0x4d6d_537d_80cc_5cce_1e28_447c_f692_926d),
-                State::Ready,
-                vec![],
-            ),
-        );
-
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
-
-        // Try to set assignee without colon (invalid format)
-        let filter = QueryFilter::parse("state:ready").unwrap();
-        let ops = UpdateOperations {
-            assignee: Some("invalid_no_colon".to_string()),
-            ..Default::default()
-        };
-
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
-
-        // Should reject with error
-        assert_eq!(result.summary.total_matched, 1);
-        assert_eq!(result.summary.total_modified, 0);
-        assert_eq!(result.summary.total_errors, 1);
-        assert!(result.errors[0].1.contains("format"));
-    }
-
-    #[test]
-    fn test_bulk_update_accepts_valid_assignee_format() {
+    fn test_bulk_update_sets_typed_assignee() {
         use crate::query_engine::QueryFilter;
         use crate::storage::InMemoryStorage;
 
@@ -1241,7 +1199,7 @@ mod tests {
         // Valid assignee format should work
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
-            assignee: Some("agent:copilot".to_string()),
+            assignee: Some("agent:copilot".parse().unwrap()),
             ..Default::default()
         };
 
@@ -1648,12 +1606,12 @@ mod tests {
         }
         .is_provable_noop(&issue));
         assert!(UpdateOperations {
-            assignee: Some("agent:worker-1".to_string()),
+            assignee: Some("agent:worker-1".parse().unwrap()),
             ..Default::default()
         }
         .is_provable_noop(&issue));
         assert!(!UpdateOperations {
-            assignee: Some("agent:worker-2".to_string()),
+            assignee: Some("agent:worker-2".parse().unwrap()),
             ..Default::default()
         }
         .is_provable_noop(&issue));

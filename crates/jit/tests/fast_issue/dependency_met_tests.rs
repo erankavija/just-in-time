@@ -115,7 +115,7 @@ fn test_claim_next_selects_issue_whose_dependency_is_rejected() {
     let (claimed, _) = h
         .executor
         .issues()
-        .claim_next("agent:worker-1".to_string(), None)
+        .claim_next("agent:worker-1".parse().unwrap(), None)
         .unwrap();
 
     assert_eq!(claimed, dependent);
@@ -136,7 +136,7 @@ fn test_claim_next_skips_issue_with_unmet_dependency() {
     let result = h
         .executor
         .issues()
-        .claim_next("agent:worker-1".to_string(), None);
+        .claim_next("agent:worker-1".parse().unwrap(), None);
 
     assert!(
         result.is_err(),

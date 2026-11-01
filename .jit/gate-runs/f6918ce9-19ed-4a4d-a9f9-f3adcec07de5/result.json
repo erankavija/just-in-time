@@ -1,0 +1,57 @@
+{
+  "branch": "worktree-agent-2195c98f",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7aaf7d3dd4c7f86541eeefd6ed1ba08e9a9dce03",
+  "completed_at": "2026-11-01T04:49:03.134647520Z",
+  "duration_ms": 263361,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 1399,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/2195c98f/requirement/REQ-11",
+          "@/issue/2195c98f/requirement/REQ-17",
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "The query-all CLI passes assignee text into command and domain filters as raw &str values, rather than parsing one Assignee at the boundary."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/profile_apply.rs",
+        "id": "F2",
+        "line": 521,
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/2195c98f/requirement/REQ-09",
+          "@/invariant/semantic-types",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "ProfilePackageId remains a separate unvalidated String-backed profile identity and is constructed from stringified ProfileId values in production claims."
+      }
+    ],
+    "summary": "Two hard semantic-type requirements remain unmet: legacy query assignee filters are raw strings, and an unvalidated ProfilePackageId duplicates ProfileId.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f6918ce9-19ed-4a4d-a9f9-f3adcec07de5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T04:44:39.773229216Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 17284 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.164.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7abcc22d\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1956c-8687-7572-8eb3-ce71255213fd\n--------\nuser\n--- 17271 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — high, blocking:** `jit query all --assignee` passes raw text beyond the CLI boundary (`main.rs:1399`), and the command/domain APIs retain it as `Option<&str>` (`commands/query.rs:93`, `domain/queries.rs:17`) and compare it as text. This leaves a user-facing query-assignee filter unparsed and untyped, despite the query-language AST being typed. It fails REQ-11 and REQ-17.\n\n2. **F2 — high, blocking:** A second, unvalidated profile identity remains: `ProfilePackageId(String)` with public `new(impl Into<String>)` in `repository_state/profile_apply.rs:521`. Production claim construction stringifies `ProfileId` to create it (`profile/apply_claims.rs:83,98`). This contradicts REQ-09’s one validated domain `ProfileId` requirement. The linked note delegates removal to the still-incomplete profile rework, but that does not substantiate the current hard criterion.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two hard semantic-type requirements remain unmet: legacy query assignee filters are raw strings, and an unvalidated ProfilePackageId duplicates ProfileId.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The query-all CLI passes assignee text into command and domain filters as raw &str values, rather than parsing one Assignee at the boundary.\",\"file\":\"crates/jit/src/main.rs\",\"line\":1399,\"references\":[\"@/issue/2195c98f/requirement/REQ-11\",\"@/issue/2195c98f/requirement/REQ-17\",\"@/invariant/semantic-types\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"pre-existing\",\"summary\":\"ProfilePackageId remains a separate unvalidated String-backed profile identity and is constructed from stringified ProfileId values in production claims.\",\"file\":\"crates/jit/src/repository_state/profile_apply.rs\",\"line\":521,\"references\":[\"@/issue/2195c98f/requirement/REQ-09\",\"@/invariant/semantic-types\",\"@/invariant/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

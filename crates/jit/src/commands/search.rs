@@ -41,7 +41,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         query: &str,
         priority_filter: Option<Priority>,
         state_filter: Option<State>,
-        assignee_filter: Option<String>,
+        assignee_filter: Option<crate::domain::Assignee>,
         label_filters: &[String],
     ) -> Result<Vec<Issue>> {
         label_filters
@@ -62,11 +62,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
             if let Some(ref assignee) = assignee_filter {
-                if !issue
-                    .assignee
-                    .as_ref()
-                    .is_some_and(|a| a == assignee.as_str())
-                {
+                if issue.assignee.as_ref() != Some(assignee) {
                     return false;
                 }
             }

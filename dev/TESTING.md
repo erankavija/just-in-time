@@ -278,12 +278,11 @@ Test Costs" below attributes what the measured suite duration is spent on.
 
 The measurement is taken over a target the `suite-build` step has already built and read
 into the page cache, so a fresh target directory and a warm one reach the same verdict and
-a duration failure is about the tree (jit:0708d692). Anything the suite runs inside the clock,
-including the recorded-failure-corpus setup script `.config/nextest.toml` declares, must reuse
-the workspace build's Cargo resolution, or it compiles a second feature-unification variant
-mid-suite; `scratch_build/build_profile_policy_tests.rs` asserts this. Profiled-repository
-fixtures are built inside the suite on first use from a cache keyed by their inputs. Their
-first-run construction contributes to the duration margin the budgets README records; see
+a duration failure is about the tree (jit:0708d692). The suite runs no nested Cargo build:
+`.config/nextest.toml` declares no setup script, which `scratch_build/build_profile_policy_tests.rs`
+asserts. Profiled-repository fixtures and the recorded-failure corpus are built inside the suite
+on first use from a cache keyed by their inputs. Their first-run construction contributes to
+the duration margin the budgets README records; see
 [dev/benchmarks/cold-warm-verdict-0708d692/README.md](benchmarks/cold-warm-verdict-0708d692/README.md)
 for the cold and warm figures behind this paragraph. Re-measuring needs `--force`, since
 `jit gate evaluate` reuses a recorded verdict over unchanged declared inputs, `target/` not
