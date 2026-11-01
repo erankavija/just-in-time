@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d54f81dd3768435a311386523ca15e33f38008ef",
+  "completed_at": "2026-11-01T13:36:30.491855798Z",
+  "duration_ms": 323735,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied and the prior coverage-label finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d5966ba2-93b2-4d9e-aa07-2b38b020231e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0d042a60-8a6e-4310-b988-948425fd6d75",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T13:31:06.756738960Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c5815b684, 5165747bf (duplicate merge integration), fa91e1e75\nPolicy sources: AGENTS.md\nResolved items: @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); @/issue/3d9a0ce3/requirement/REQ-03 (issue record)\nGate evidence: cargo-ci passed (exit 0); code-review previously failed (exit 1), with its unsupported satisfies claim removed by fa91e1e75\nTruncation recovery: re-read merge first-parent patch and changed paths by file; excluded the unrelated second-parent mainline delta\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied and the prior coverage-label finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
