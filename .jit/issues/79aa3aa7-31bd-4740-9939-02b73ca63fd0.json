@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-11-01T02:52:28.155998595Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "29ef432b-54f5-4273-8934-cca2b214f08f",
+      "status": "passed",
+      "updated_at": "2026-11-01T02:55:25.533914527Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
@@ -37,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate runs are identified by a validated GateRunId",
-  "updated_at": "2026-11-01T02:52:28.155998595Z"
+  "updated_at": "2026-11-01T02:55:25.533914527Z"
 }
