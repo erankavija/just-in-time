@@ -17,10 +17,11 @@
     "epic:lead-friction",
     "milestone:v1.0",
     "component:core",
-    "type:bug"
+    "type:bug",
+    "resolution:covered-by-578ed10d"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "rejected",
   "title": "jit validate leaves a bootstrap lock file in the repository",
-  "updated_at": "2026-11-01T17:47:08.285420101Z"
+  "updated_at": "2026-11-01T18:00:08.639274676Z"
 }
