@@ -135,7 +135,7 @@ impl Serialize for IssueBody {
     }
 }
 
-/// List all issues
+/// List all issues, each `documents` explicit and derived from one shared listing of the declared areas.
 async fn list_issues<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<IssueResponse>>, StatusCode> {
@@ -143,6 +143,7 @@ async fn list_issues<S: IssueStore>(
         .executor
         .issues()
         .list_issues(None, None, None)
+        .and_then(|issues| state.executor.with_reported_documents(issues))
         .map(|issues| Json(issues.into_iter().map(IssueResponse::from).collect()))
         .map_err(|e| {
             tracing::error!("Failed to list issues: {:?}", e);
@@ -167,9 +168,6 @@ fn resolve_issue_path_id<S: IssueStore>(
 }
 
 /// Get single issue by ID, its `documents` explicit and derived.
-///
-/// The issue list keeps explicit links only: reporting derived documents there
-/// would list the declared areas on every list read.
 async fn get_issue<S: IssueStore>(
     Path(id): Path<String>,
     State(state): State<AppState<S>>,
@@ -2483,7 +2481,7 @@ unique = false
     /// Every issue-scoped document read, and the search universe, accept a
     /// file under the issue's artifact directory that no link names.
     #[tokio::test]
-    async fn test_get_issue_reports_a_derived_document_the_list_keeps_unlisted() {
+    async fn test_issue_reads_report_a_derived_document_in_the_list_and_the_single_read() {
         use jit::domain::Priority;
 
         let (temp, executor) =
@@ -2521,7 +2519,7 @@ unique = false
         let listed: serde_json::Value = server.get("/issues").await.json();
 
         assert_eq!(issue["documents"][0]["path"], doc_rel.as_str());
-        assert!(listed[0]["documents"].as_array().unwrap().is_empty());
+        assert_eq!(listed[0]["documents"], issue["documents"]);
     }
 
     #[tokio::test]

@@ -215,16 +215,30 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect())
     }
 
-    /// `issue`'s documents as every reader reports them: its explicit links,
-    /// then the files it owns by location. Nothing derived is stored.
+    /// `issues` with `documents` replaced by the set every reader reports:
+    /// explicit links, then the files each owns by location. For display only;
+    /// nothing derived is stored.
+    pub fn with_reported_documents(
+        &self,
+        issues: Vec<crate::domain::Issue>,
+    ) -> Result<Vec<crate::domain::Issue>> {
+        Ok(self
+            .with_issue_documents(issues)?
+            .into_iter()
+            .map(|(issue, documents)| crate::domain::Issue { documents, ..issue })
+            .collect())
+    }
+
+    /// `issue`'s documents as every reader reports them
+    /// ([`with_reported_documents`](Self::with_reported_documents)).
     pub fn issue_documents(
         &self,
         issue: &crate::domain::Issue,
     ) -> Result<Vec<crate::domain::DocumentReference>> {
         Ok(self
-            .with_issue_documents(vec![issue.clone()])?
+            .with_reported_documents(vec![issue.clone()])?
             .into_iter()
-            .flat_map(|(_, documents)| documents)
+            .flat_map(|issue| issue.documents)
             .collect())
     }
 
