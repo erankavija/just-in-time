@@ -66,7 +66,7 @@ Filed in this epic under the invoker's rulings.
 - 03ce8d2c: listings fail and name a malformed record.
 - 0838348a, 2ded6cd5, 9a3a9f1e: `update_issue_state` deleted, `gate update` checks leases, `PROFILE_NOT_FOUND` removed.
 - From epic f4d9502a, by ruling: 81664a6a, 07663984, 3a3b86cf, d7cce445. `epic:git-cli-module` labels are kept.
-- From epic-free v1 work: 5f71a48d keeps `epic:v1-release`.
+- 5f71a48d keeps its `epic:v1-release` label.
 
 ## Format 3 cutover (2a504b17, c47d78c8)
 
@@ -96,7 +96,7 @@ All 13 are treated as stale, by ruling and kept, because they are the owner's: n
 
 - Landed in batches over a serial profile track instead of one worktree per task.
 - Gates were evaluated as `agent:worker` after an identity mismatch produced no verdict.
-- Workers reclaim without harvesting into the cache pool, to protect disk.
+- Merged worktrees were reclaimed without harvesting into the cache pool, to protect disk.
 
 ## Escalations
 
@@ -106,9 +106,9 @@ The invoker, just-in-time-c9, ruled on every escalation. Decisions the user made
 
 - Reported 25 open issues before counting; the count was 28.
 - Announced the format 3 window as started in the same step as the command the classifier then denied. Corrected with each session.
-- Claimed a bench-time and a reassignment that had not happened, in a message and a commit subject. Each was corrected; `cd0740752`'s subject is wrong and `e8bc4b785` says so.
-- Landed `da12ad66` on targeted test results, turning main's cargo-ci red for about 15 minutes. Full-suite runs are now required when a CLI form is removed.
-- Told the invoker `research`'s defect was an assignee, and the installed binary had a gap it did not have. Both were corrected.
+- Wrote commit subjects claiming a reassignment and a rejection that had not happened. `cd0740752`'s subject is wrong and `e8bc4b785` says so; the other was amended before anything built on it.
+- Landed `da12ad66` on targeted test results, turning main's cargo-ci red for a few minutes. Full-suite runs are now required when a CLI form is removed.
+- Told the invoker `research`'s defect was an assignee, and that the installed binary had a data-root gap it did not have. Both were corrected.
 
 ## Issues Discovered During Execution
 
