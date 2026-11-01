@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-01T23:09:57.221174482Z",
+  "dependencies": [
+    "5046408a-9706-4ca0-9302-54d20e2088aa",
+    "7dd59ebf-26eb-4475-94ec-c05e9efd5007",
+    "c4e07f6d-8e88-4953-b9e3-f9c5d61878d5"
+  ],
+  "description": "Let a code checkout select its out-of-repo data root without per-process environment, from any directory, so every shell, agent and linked worktree reaches the same store.\n\n## Background\n\n`JIT_DATA_DIR` is the only way to select an external data root. A `.jit` symlink in the checkout is refused with `failed to construct repository layout`. Environment selection has three costs in a repository that runs agents in many linked worktrees:\n\n- Every shell and agent must export the variable. An unset variable fails with `JIT repository not found`.\n- A relative value resolves against the process directory, so a value that works at the root selects another path from a subdirectory.\n- Observed with jit 1.0.0: with `JIT_DATA_DIR` set and the process in a subdirectory of the checkout, worktree information reports that subdirectory as the root. Documents, projections and gate checkers then resolve against the wrong directory, with no error.\n\nA worktree-root setting in the data root points from the store to the code. It cannot name many linked worktrees, so a store shared by several checkouts also needs the invoking checkout to supply its own root.\n\n## Success Criteria\n\n- [hard] REQ-01: A setting held in a code repository names its external data root, and every linked worktree of that repository resolves the same data root with no environment variable set.\n- [hard] REQ-02: `JIT_DATA_DIR` takes precedence over the setting.\n- [hard] REQ-03: With a data root selected through the setting, the worktree root is the top level of the invoking checkout, in the primary checkout and in each linked worktree.\n- [hard] REQ-04: Gate checkers started from a linked worktree in that layout run in that worktree and record its commit and branch.\n- [hard] REQ-05: With an external data root selected, a command run from a subdirectory of a checkout uses the checkout's top level as the worktree root.\n- [hard] REQ-06: A setting that names a missing or unusable data root fails with a typed error naming the path and the setting.\n- [hard] REQ-07: A repository without the setting and without `JIT_DATA_DIR` behaves as before this change.\n- [hard] REQ-08: The storage-format reference documents the setting, its precedence over `JIT_DATA_DIR` and its interaction with the worktree-root setting.\n\n## Notes\n\n- Found while assessing a move of gf2's tracker data out of its repository. gf2 keeps about 17 linked worktrees.\n- The setting's location and format are design choices for planning. It has to be visible from all linked worktrees of a repository.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-01T23:09:57.221174482Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ba7aa27a-d0b3-4f60-8171-6a813e9a08b8",
+  "labels": [
+    "component:storage",
+    "component:cli",
+    "type:enhancement"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Code checkouts select an external data root without environment variables",
+  "updated_at": "2026-11-01T23:10:12.690193790Z"
+}
