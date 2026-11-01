@@ -9,9 +9,16 @@
   "first_ready_at": "2026-11-01T04:15:19.570262439Z",
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "package-drift"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "package-drift": {
+      "status": "pending",
+      "updated_at": "2026-11-01T08:04:40.900232637Z",
+      "updated_by": null
+    }
+  },
   "id": "14c08f51-2cbe-4e4b-8004-2f433d838ba4",
   "labels": [
     "epic:test-topology",
@@ -24,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Package drift over the registries runs as a gate",
-  "updated_at": "2026-11-01T07:22:36.270641406Z"
+  "updated_at": "2026-11-01T08:04:40.900232637Z"
 }

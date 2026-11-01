@@ -834,3 +834,40 @@ roots = [
 ]
 
 [gates.reserved]
+
+[[gates]]
+version = 1
+key = "package-drift"
+title = "Package Drift"
+description = "This repository's registries agree with the packages it publishes, and its gate inputs hold their footprints. Runs the dev-only package-drift example."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = "cargo run --quiet -p jit --example package-drift"
+timeout_seconds = 600
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = ["."]
+exclude = [
+  ".agents/cache-pool",
+  ".agents/worktrees",
+  ".claude",
+  ".jit/server.log",
+  ".jit/server.pid.json",
+  "badges",
+  "coverage.json",
+  "mcp-server/jit-schema.json",
+  "mcp-server/node_modules",
+  "target",
+  "web/dist",
+  "web/node_modules",
+  "web/test-output.log",
+]
+
+[gates.reserved]
