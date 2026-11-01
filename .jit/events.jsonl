@@ -22430,3 +22430,9 @@
 {"from":"ready","id":"0397d84f-a826-4ba4-9eb3-a4f46c0dac4a","issue_id":"024b98b1-8afe-47f0-b7e3-6cbf904367db","timestamp":"2026-11-01T19:19:29.535947630Z","to":"done","type":"issue_state_changed"}
 {"id":"d7901e50-a37d-40a5-8d90-adb6fc439bd8","issue_id":"024b98b1-8afe-47f0-b7e3-6cbf904367db","timestamp":"2026-11-01T19:19:29.535947630Z","type":"issue_completed"}
 {"from":"backlog","id":"3041db99-9edd-4612-9289-a954bc7e56c0","issue_id":"536a48ef-97bc-4f34-a813-54f70572b91e","timestamp":"2026-11-01T19:19:29.633613974Z","to":"ready","type":"issue_state_changed"}
+{"id":"495bed13-0e72-4fd5-a085-c76a740d9335","issue_id":"9a3a9f1e-a8f8-4a31-8ba3-a22c3dea6ce7","priority":"normal","timestamp":"2026-11-01T19:19:53.197473349Z","title":"Settle the unreachable PROFILE_NOT_FOUND code","type":"issue_created"}
+{"fields":["dependencies"],"id":"03bdad16-efc0-4c94-b87b-ce8790720eec","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-11-01T19:19:53.663452042Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"97d2b10c-28fe-4c53-8892-4f6dde186cd9","issue_id":"536a48ef-97bc-4f34-a813-54f70572b91e","timestamp":"2026-11-01T19:19:54.579523079Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"455a3693-4ba9-4959-8714-31d39b9ccd9e","issue_id":"536a48ef-97bc-4f34-a813-54f70572b91e","timestamp":"2026-11-01T19:19:54.579523079Z","type":"issue_claimed"}
+{"from":"ready","id":"166db5a0-4c3a-4b05-8fd1-8bc5d9f18457","issue_id":"9a3a9f1e-a8f8-4a31-8ba3-a22c3dea6ce7","timestamp":"2026-11-01T19:19:54.755391268Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"6d2b6e09-5024-4340-b761-dd28476cd0fa","issue_id":"9a3a9f1e-a8f8-4a31-8ba3-a22c3dea6ce7","timestamp":"2026-11-01T19:19:54.755391268Z","type":"issue_claimed"}

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-01T19:19:54.579523079Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -23,7 +24,7 @@
     "satisfies:3d9a0ce3/REQ-08"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Show a package's target set without value hashes",
-  "updated_at": "2026-11-01T19:19:29.633613974Z"
+  "updated_at": "2026-11-01T19:19:54.579523079Z"
 }
