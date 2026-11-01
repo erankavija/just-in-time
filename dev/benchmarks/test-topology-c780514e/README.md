@@ -123,6 +123,9 @@ before runs set `RUSTC_WRAPPER=sccache`, the value that default selects at that 
 After is commit `de34a0590`; before is commit `0896fc29b`, measured in a seeded
 worktree with isolated build state.
 
+[`measurement-log-c780514e.txt`](measurement-log-c780514e.txt) holds the raw output of
+these windows, including the load sampled immediately before each command.
+
 ### Build footprint
 
 The budget checker passes on the after tree. Before is gate run `8e22dd96` at
