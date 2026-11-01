@@ -72,10 +72,12 @@ for sid in "$@"; do
         [[ -d "$src" && ! -L "$src" ]] || continue
         mkdir -p "$pool/$name"
         # Newest file wins so a stale harvest never clobbers fresher artifacts.
+        # Both branches replace the destination file, leaving any hardlink
+        # sibling of the old file untouched.
         if command -v rsync > /dev/null; then
             rsync -a --update "$src/" "$pool/$name/"
         else
-            cp -au "$src/." "$pool/$name/"
+            cp -au --remove-destination "$src/." "$pool/$name/"
         fi
         echo "[ok] harvested $src -> $pool/$name"
     done

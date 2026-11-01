@@ -481,73 +481,30 @@ fn keyed_fixture_cache_root(runtime_artifact: &Path) -> Result<PathBuf> {
     Ok(target_context.join(KEYED_FIXTURE_DIRECTORY))
 }
 
-/// What a failed build leaves for the consumers that were waiting on it.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct KeyedFixtureBuildFailure {
-    /// Tells this failure from an earlier one with the same cause.
-    attempt: u64,
-    cause: String,
+/// The lock one family's consumers coordinate through.
+fn keyed_fixture_lock(cache_root: &Path, family: &str) -> PathBuf {
+    cache_root.join("locks").join(format!("{family}.lock"))
 }
 
-/// The locations one family's consumers coordinate through.
-struct KeyedFixturePaths {
-    family_root: PathBuf,
-    lock: PathBuf,
-}
-
-impl KeyedFixturePaths {
-    fn new(cache_root: &Path, family: &str) -> Self {
-        Self {
-            family_root: cache_root.join(family),
-            lock: cache_root.join("locks").join(format!("{family}.lock")),
-        }
-    }
-
-    /// `key`'s own record, beside the lock and outside the family's retired entries.
-    fn build_failure(&self, key: &str) -> PathBuf {
-        self.lock.with_extension(format!("{key}.failure.json"))
-    }
-}
-
+/// Leases the family's entry for `key`, building and publishing it under the
+/// exclusive family lock when absent. A consumer fails only with its own build's
+/// cause: a holder that failed or died leaves no entry, so the next consumer to
+/// get the lock builds it. The kernel releases a dead holder's lock, and the
+/// runner's per-test limit ends any wait, so lock waits are unbounded here.
 fn ensure_keyed_fixture(
     cache_root: &Path,
     family: &str,
     key: &str,
     build: impl FnOnce(&Path) -> Result<()>,
 ) -> Result<KeyedFixtureLease> {
-    let paths = KeyedFixturePaths::new(cache_root, family);
-    let observed_failure = read_fixture_build_failure(&paths, key)?;
-    ensure_keyed_fixture_observing(&paths, family, key, observed_failure.as_ref(), build)
-}
-
-/// Leases the family's entry for `key`, building and publishing it under the
-/// exclusive family lock when absent. A failure recorded other than
-/// `observed_failure` came from a build this consumer waited on, so its cause
-/// becomes this consumer's error even when a later retry has since published the
-/// entry; an observed one predates the wait, so this consumer reads the entry or
-/// retries the build. The record outlives a successful retry, which keeps it
-/// visible to every waiter and `attempt` monotonic per key, until the target is
-/// cleaned. The kernel releases a dead holder's lock, so lock waits are unbounded.
-fn ensure_keyed_fixture_observing(
-    paths: &KeyedFixturePaths,
-    family: &str,
-    key: &str,
-    observed_failure: Option<&KeyedFixtureBuildFailure>,
-    build: impl FnOnce(&Path) -> Result<()>,
-) -> Result<KeyedFixtureLease> {
-    fs::create_dir_all(&paths.family_root)?;
-    fs::create_dir_all(paths.lock.parent().context("fixture lock has no parent")?)?;
-    let entry = paths.family_root.join(key);
+    let family_root = cache_root.join(family);
+    let lock = keyed_fixture_lock(cache_root, family);
+    fs::create_dir_all(&family_root)?;
+    fs::create_dir_all(lock.parent().context("fixture lock has no parent")?)?;
+    let entry = family_root.join(key);
     let locker = FileLocker::new(Duration::MAX);
     loop {
-        let shared = locker.lock_shared(&paths.lock)?;
-        refuse_unobserved_fixture_build_failure(
-            read_fixture_build_failure(paths, key)?.as_ref(),
-            observed_failure,
-            family,
-            key,
-        )?;
+        let shared = locker.lock_shared(&lock)?;
         if is_published_fixture(&entry)? {
             validate_keyed_fixture(&entry, key)?;
             return Ok(KeyedFixtureLease {
@@ -556,47 +513,20 @@ fn ensure_keyed_fixture_observing(
             });
         }
         drop(shared);
-        let Some(exclusive) = locker.try_lock_exclusive(&paths.lock)? else {
+        let Some(exclusive) = locker.try_lock_exclusive(&lock)? else {
             std::thread::sleep(Duration::from_millis(
                 crate::runtime_defaults::LOCK_POLL_INTERVAL_MS,
             ));
             continue;
         };
-        let failure = read_fixture_build_failure(paths, key)?;
-        refuse_unobserved_fixture_build_failure(failure.as_ref(), observed_failure, family, key)?;
         if is_published_fixture(&entry)? {
             continue;
         }
-        return match publish_keyed_fixture(&paths.family_root, &entry, key, build) {
-            Ok(()) => Ok(KeyedFixtureLease {
-                entry,
-                _family_lock: exclusive,
-            }),
-            Err(error) => {
-                let recorded = KeyedFixtureBuildFailure {
-                    attempt: failure.map_or(1, |failure| failure.attempt + 1),
-                    cause: format!("{error:#}"),
-                };
-                write_fixture_build_failure(paths, key, &recorded)
-                    .with_context(|| format!("record fixture build failure: {error:#}"))?;
-                Err(error)
-            }
-        };
-    }
-}
-
-fn refuse_unobserved_fixture_build_failure(
-    failure: Option<&KeyedFixtureBuildFailure>,
-    observed_failure: Option<&KeyedFixtureBuildFailure>,
-    family: &str,
-    key: &str,
-) -> Result<()> {
-    match failure.filter(|&failure| Some(failure) != observed_failure) {
-        Some(failure) => bail!(
-            "keyed fixture {family} key {key} failed to build: {}",
-            failure.cause
-        ),
-        None => Ok(()),
+        publish_keyed_fixture(&family_root, &entry, key, build)?;
+        return Ok(KeyedFixtureLease {
+            entry,
+            _family_lock: exclusive,
+        });
     }
 }
 
@@ -640,36 +570,6 @@ fn publish_keyed_fixture(
         validate_keyed_fixture(entry, key)?;
     }
     retire_older_fixture_entries(family_root, key)
-}
-
-fn read_fixture_build_failure(
-    paths: &KeyedFixturePaths,
-    key: &str,
-) -> Result<Option<KeyedFixtureBuildFailure>> {
-    let record = paths.build_failure(key);
-    let bytes = match fs::read(&record) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(error.into()),
-    };
-    serde_json::from_slice(&bytes)
-        .with_context(|| format!("parse fixture failure {}", record.display()))
-}
-
-/// Replaces the record atomically: a waiter reads it before taking any lock.
-fn write_fixture_build_failure(
-    paths: &KeyedFixturePaths,
-    key: &str,
-    failure: &KeyedFixtureBuildFailure,
-) -> Result<()> {
-    let directory = paths
-        .lock
-        .parent()
-        .context("fixture failure record has no parent")?;
-    let staged = tempfile::NamedTempFile::new_in(directory)?;
-    fs::write(staged.path(), serde_json::to_vec_pretty(failure)?)?;
-    staged.persist(paths.build_failure(key))?;
-    Ok(())
 }
 
 fn is_published_fixture(entry: &Path) -> Result<bool> {
@@ -1809,180 +1709,74 @@ mod tests {
     }
 
     #[test]
-    fn test_keyed_fixture_failed_build_reports_its_cause_to_every_waiter() {
-        const WAITERS: usize = 4;
+    fn test_keyed_fixture_failing_builds_each_report_their_own_cause() {
+        const CONSUMERS: usize = 6;
         let cache = TempDir::new().unwrap();
-        let paths = KeyedFixturePaths::new(cache.path(), "family");
-        let waiter_builds = AtomicUsize::new(0);
-        let held = Barrier::new(2);
+        let start = Barrier::new(CONSUMERS);
+        let builds = AtomicUsize::new(0);
 
         std::thread::scope(|scope| {
-            let builder = scope.spawn(|| {
-                ensure_keyed_fixture_observing(&paths, "family", "key", None, |_| {
+            (0..CONSUMERS)
+                .map(|consumer| {
+                    let (cache, start, builds) = (&cache, &start, &builds);
+                    scope.spawn(move || {
+                        start.wait();
+                        let error = ensure_keyed_fixture(cache.path(), "family", "key", |_| {
+                            builds.fetch_add(1, Ordering::SeqCst);
+                            bail!("consumer {consumer}'s cause")
+                        })
+                        .unwrap_err();
+                        (consumer, format!("{error:#}"))
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|handle| handle.join().unwrap())
+                .for_each(|(consumer, error)| {
+                    assert!(
+                        error.contains(&format!("consumer {consumer}'s cause")),
+                        "{error}"
+                    );
+                });
+        });
+
+        assert_eq!(builds.load(Ordering::SeqCst), CONSUMERS);
+    }
+
+    #[test]
+    fn test_keyed_fixture_waiter_builds_after_its_holder_fails() {
+        let cache = TempDir::new().unwrap();
+        let held = Barrier::new(2);
+
+        let lease = std::thread::scope(|scope| {
+            let holder = scope.spawn(|| {
+                ensure_keyed_fixture(cache.path(), "family", "key", |_| {
                     held.wait();
                     std::thread::sleep(Duration::from_millis(200));
-                    bail!("the build's own cause")
+                    bail!("the holder's cause")
                 })
             });
             held.wait();
-            let waiters = (0..WAITERS)
-                .map(|_| {
-                    scope.spawn(|| {
-                        ensure_keyed_fixture_observing(&paths, "family", "key", None, |_| {
-                            waiter_builds.fetch_add(1, Ordering::SeqCst);
-                            Ok(())
-                        })
-                    })
+            let waiter = scope.spawn(|| {
+                ensure_keyed_fixture(cache.path(), "family", "key", |repository| {
+                    fs::write(repository.join("state"), b"built")?;
+                    Ok(())
                 })
-                .collect::<Vec<_>>();
-
-            assert!(builder.join().unwrap().is_err());
-            waiters.into_iter().for_each(|waiter| {
-                let error = waiter.join().unwrap().unwrap_err();
-                assert!(
-                    format!("{error:#}").contains("the build's own cause"),
-                    "{error:#}"
-                );
             });
+            assert!(holder.join().unwrap().is_err());
+            waiter.join().unwrap().unwrap()
         });
-
-        assert_eq!(waiter_builds.load(Ordering::SeqCst), 0);
-    }
-
-    #[test]
-    fn test_keyed_fixture_consumer_arriving_after_a_failure_retries_the_build() {
-        let cache = TempDir::new().unwrap();
-
-        ensure_keyed_fixture(cache.path(), "family", "key", |_| {
-            bail!("a transient cause")
-        })
-        .unwrap_err();
-        let lease = ensure_keyed_fixture(cache.path(), "family", "key", |repo| {
-            fs::write(repo.join("state"), b"built")?;
-            Ok(())
-        })
-        .unwrap();
 
         assert_eq!(fs::read(lease.entry.join("tree/state")).unwrap(), b"built");
-    }
-
-    #[test]
-    fn test_keyed_fixture_waiter_reports_a_failure_a_later_retry_recovered_from() {
-        let cache = TempDir::new().unwrap();
-        let paths = KeyedFixturePaths::new(cache.path(), "family");
-        ensure_keyed_fixture_observing(&paths, "family", "key", None, |_| {
-            bail!("the build's own cause")
-        })
-        .unwrap_err();
-        let observed = read_fixture_build_failure(&paths, "key").unwrap().unwrap();
-        ensure_keyed_fixture_observing(&paths, "family", "key", Some(&observed), |_| Ok(()))
-            .unwrap();
-
-        let error = ensure_keyed_fixture_observing(&paths, "family", "key", None, |_| {
-            bail!("a waiter must not build")
-        })
-        .unwrap_err();
-
-        assert!(
-            format!("{error:#}").contains("the build's own cause"),
-            "{error:#}"
-        );
-    }
-
-    #[test]
-    fn test_keyed_fixture_consumer_observing_a_failure_reads_a_retrys_entry() {
-        let cache = TempDir::new().unwrap();
-        let paths = KeyedFixturePaths::new(cache.path(), "family");
-        ensure_keyed_fixture_observing(&paths, "family", "key", None, |_| {
-            bail!("a transient cause")
-        })
-        .unwrap_err();
-        let observed = read_fixture_build_failure(&paths, "key").unwrap().unwrap();
-        ensure_keyed_fixture_observing(&paths, "family", "key", Some(&observed), |repo| {
-            fs::write(repo.join("state"), b"built")?;
-            Ok(())
-        })
-        .unwrap();
-
-        let lease =
-            ensure_keyed_fixture_observing(&paths, "family", "key", Some(&observed), |_| {
-                bail!("the published entry must be read")
-            })
-            .unwrap();
-
-        assert_eq!(fs::read(lease.entry.join("tree/state")).unwrap(), b"built");
-    }
-
-    #[test]
-    fn test_keyed_fixture_failures_of_two_keys_each_reach_their_own_waiter() {
-        let cache = TempDir::new().unwrap();
-        let paths = KeyedFixturePaths::new(cache.path(), "family");
-        ["first", "second"].into_iter().for_each(|key| {
-            ensure_keyed_fixture_observing(&paths, "family", key, None, |_| {
-                bail!("the {key} key's cause")
-            })
-            .unwrap_err();
-        });
-
-        ["first", "second"].into_iter().for_each(|key| {
-            let error = ensure_keyed_fixture_observing(&paths, "family", key, None, |_| {
-                bail!("a waiter must not build")
-            })
-            .unwrap_err();
-
-            assert!(
-                format!("{error:#}").contains(&format!("the {key} key's cause")),
-                "{error:#}"
-            );
-        });
-    }
-
-    #[test]
-    fn test_keyed_fixture_failure_reaches_its_waiter_after_another_key_publishes() {
-        let cache = TempDir::new().unwrap();
-        let paths = KeyedFixturePaths::new(cache.path(), "family");
-        ensure_keyed_fixture_observing(&paths, "family", "failed", None, |_| {
-            bail!("the failed key's cause")
-        })
-        .unwrap_err();
-        ensure_keyed_fixture_observing(&paths, "family", "published", None, |_| Ok(())).unwrap();
-
-        let error = ensure_keyed_fixture_observing(&paths, "family", "failed", None, |_| {
-            bail!("a waiter must not build")
-        })
-        .unwrap_err();
-
-        assert!(
-            format!("{error:#}").contains("the failed key's cause"),
-            "{error:#}"
-        );
-    }
-
-    #[test]
-    fn test_keyed_fixture_failure_of_another_key_does_not_reach_a_waiter() {
-        let cache = TempDir::new().unwrap();
-        let paths = KeyedFixturePaths::new(cache.path(), "family");
-        ensure_keyed_fixture_observing(&paths, "family", "other", None, |_| {
-            bail!("the other key's cause")
-        })
-        .unwrap_err();
-
-        let lease = ensure_keyed_fixture_observing(&paths, "family", "key", None, |repo| {
-            fs::write(repo.join("state"), b"built")?;
-            Ok(())
-        })
-        .unwrap();
-
-        assert!(lease.entry.join("tree/state").is_file());
     }
 
     #[test]
     fn test_keyed_fixture_waiter_builds_when_the_holder_dies_without_an_outcome() {
         let cache = TempDir::new().unwrap();
-        let paths = KeyedFixturePaths::new(cache.path(), "family");
-        fs::create_dir_all(paths.lock.parent().unwrap()).unwrap();
+        let lock = keyed_fixture_lock(cache.path(), "family");
+        fs::create_dir_all(lock.parent().unwrap()).unwrap();
         let holder = FileLocker::new(Duration::from_secs(1))
-            .lock_exclusive(&paths.lock)
+            .lock_exclusive(&lock)
             .unwrap();
         let built = AtomicUsize::new(0);
 
