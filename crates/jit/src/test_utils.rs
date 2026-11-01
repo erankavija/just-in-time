@@ -1343,10 +1343,11 @@ pub fn transition_issue<S: IssueStore + crate::storage::RepositoryStateStore>(
 
 /// The selector naming the directory `package` was read from.
 fn selector_of(package: &crate::profile::ProfilePackage) -> crate::commands::ProfileSelector {
-    let Some(crate::profile::ProfilePackageSource::Directory(path)) = package.source() else {
-        panic!("the selector names a package read from a directory");
-    };
-    crate::commands::ProfileSelector::path(path.clone())
+    crate::commands::ProfileSelector::path(
+        package
+            .directory()
+            .expect("the selector names a package read from a directory"),
+    )
 }
 
 /// Apply `package` and the packages it depends on.

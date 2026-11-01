@@ -6,9 +6,9 @@ use crate::profile::{
     read_package_archive, resolve_package, EngineVersion, PackageCaptureError, ProfileAddEntry,
     ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
     ProfileGraphError, ProfilePackEntry, ProfilePackResult, ProfilePackage, ProfilePackageError,
-    ProfilePackageSource, ProfileShowEntry, ProfileShowResult, ProfileTargetAction,
-    ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent,
-    ResolvedProfileGraph, VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
+    ProfileShowEntry, ProfileShowResult, ProfileTargetAction, ProfileTargetChange,
+    ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph,
+    VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
 use crate::profile::{profile_run_entry, ProfileRunMode};
 use crate::repository_state::{
@@ -910,8 +910,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             crate::errors::NotFoundError::new(format!("Profile not found: {dependency}")).into()
         };
         let Some(location) = declaring
-            .source()
-            .and_then(|ProfilePackageSource::Directory(directory)| directory.parent())
+            .directory()
+            .and_then(Path::parent)
             .map(|parent| parent.join(dependency.as_str()))
         else {
             return Err(not_found());
@@ -1156,21 +1156,15 @@ fn insert_candidate_package(
             }
             .into());
         }
-        if package_source_key(&package) < package_source_key(existing) {
+        // A stable choice between byte-identical copies; package bytes and graph
+        // claims remain the semantic identity.
+        if package.directory() < existing.directory() {
             packages.insert(id, package);
         }
         return Ok(());
     }
     packages.insert(id, package);
     Ok(())
-}
-
-/// Stable source spelling used only to choose between byte-identical package
-/// copies. Package bytes and graph claims remain the semantic identity.
-fn package_source_key(package: &ProfilePackage) -> Option<String> {
-    package
-        .source()
-        .map(|ProfilePackageSource::Directory(path)| path.to_string_lossy().into_owned())
 }
 
 /// How many package-model byte budgets one package-tree capture may read.
@@ -1339,14 +1333,14 @@ fn read_archive_bytes(invocation_dir: &Path, archive: &Path) -> Result<Vec<u8>> 
 
 /// The worktree-relative origin a package's own bytes came through.
 ///
-/// The location is taken from the source the package recorded while reading
+/// The location is taken from the directory the package recorded while reading
 /// itself, never from a path supplied beside it. A directory that resolves
 /// outside the worktree is refused, because a report names a package by a
 /// location that does not depend on machine state. The selected data root is
 /// not a worktree location even when it nests inside one, so a package placed
 /// under it is refused by the same rule.
 fn package_origin(package: &ProfilePackage, layout: &RepositoryLayout) -> Result<ProfileOrigin> {
-    let Some(ProfilePackageSource::Directory(directory)) = package.source() else {
+    let Some(directory) = package.directory() else {
         anyhow::bail!(
             "profile '{}' was not read from a directory, so it names no origin",
             package.model().id
@@ -1649,10 +1643,10 @@ mod tests {
 
     /// Select a package through the worktree location it was read from.
     fn package_selector(package: &ProfilePackage) -> ProfileSelector {
-        let Some(ProfilePackageSource::Directory(path)) = package.source() else {
-            panic!("the fixture package was read from a directory");
-        };
-        ProfileSelector::path(path.clone())
+        let path = package
+            .directory()
+            .expect("the fixture package was read from a directory");
+        ProfileSelector::path(path)
     }
 
     /// The profile ids this repository's audit log records as applied, in the

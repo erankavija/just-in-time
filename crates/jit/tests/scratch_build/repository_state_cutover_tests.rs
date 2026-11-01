@@ -285,26 +285,16 @@ fn tagged_source_values(value: &serde_json::Value) -> Vec<String> {
 
 fn assert_directory_only_profile_sources(
     domain: &str,
-    package: &str,
     commands: &str,
     schema: &serde_json::Value,
 ) -> Result<(), String> {
-    for (surface, declaration, source) in [
-        ("reported profile origin", "pub enum ProfileOrigin", domain),
-        (
-            "runtime profile package source",
-            "pub enum ProfilePackageSource",
-            package,
-        ),
-    ] {
-        let body = enum_body(source, declaration)
-            .ok_or_else(|| format!("{surface} declaration disappeared: {declaration}"))?;
-        let variants = top_level_enum_variants(body);
-        if variants != ["Directory"] {
-            return Err(format!(
-                "forbidden non-directory {surface}: found variants {variants:?}; profile packages have one repository-directory source"
-            ));
-        }
+    let body = enum_body(domain, "pub enum ProfileOrigin")
+        .ok_or_else(|| "reported profile origin declaration disappeared".to_string())?;
+    let variants = top_level_enum_variants(body);
+    if variants != ["Directory"] {
+        return Err(format!(
+            "forbidden non-directory reported profile origin: found variants {variants:?}; profile packages have one repository-directory source"
+        ));
     }
 
     let resolution_errors = enum_body(commands, "pub enum ProfileResolutionError")
@@ -1223,7 +1213,6 @@ fn test_profile_lifecycle_has_only_the_repository_directory_package_source() {
 
     assert_directory_only_profile_sources(
         &production_source(&source_root.join("domain/types.rs")),
-        &production_source(&source_root.join("profile/package.rs")),
         &production_source(&source_root.join("commands/profile.rs")),
         &schema,
     )
@@ -1349,7 +1338,6 @@ fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
     );
 
     let directory_domain = "pub enum ProfileOrigin { Directory(RootRelativePath), }";
-    let directory_package = "pub enum ProfilePackageSource { Directory(PathBuf), }";
     let canonical_commands = r#"
 pub enum ProfileResolutionError { UnreadableLocation { location: String, source: ProfilePackageError }, }
 "#;
@@ -1365,30 +1353,20 @@ pub enum ProfileResolutionError { UnreadableLocation { location: String, source:
     });
     assert!(assert_directory_only_profile_sources(
         directory_domain,
-        directory_package,
         canonical_commands,
         &directory_schema,
     )
     .is_ok());
 
-    for (domain, package, commands, schema, expected) in [
+    for (domain, commands, schema, expected) in [
         (
             "pub enum ProfileOrigin { Directory(RootRelativePath), BinaryResident, }",
-            directory_package,
             canonical_commands,
             directory_schema.clone(),
             "forbidden non-directory reported profile origin",
         ),
         (
             directory_domain,
-            "pub enum ProfilePackageSource { Directory(PathBuf), StaticBundle, }",
-            canonical_commands,
-            directory_schema.clone(),
-            "forbidden non-directory runtime profile package source",
-        ),
-        (
-            directory_domain,
-            directory_package,
             r#"
 pub enum ProfileResolutionError { EmbeddedSourceCannotResolve { location: String }, }
 "#,
@@ -1397,7 +1375,6 @@ pub enum ProfileResolutionError { EmbeddedSourceCannotResolve { location: String
         ),
         (
             directory_domain,
-            directory_package,
             canonical_commands,
             serde_json::json!({
                 "definitions": {
@@ -1412,7 +1389,7 @@ pub enum ProfileResolutionError { EmbeddedSourceCannotResolve { location: String
             "forbidden generated ProfileOrigin source options",
         ),
     ] {
-        let error = assert_directory_only_profile_sources(domain, package, commands, &schema)
+        let error = assert_directory_only_profile_sources(domain, commands, &schema)
             .err()
             .unwrap_or_else(|| {
                 panic!("the adversarial mutation for `{expected}` must be rejected")

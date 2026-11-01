@@ -36,17 +36,6 @@ pub struct ProfilePackageHashes {
     pub targets: BTreeMap<String, PackageHash>,
 }
 
-/// Where a validated package's bytes came from.
-///
-/// Minted only by the constructor of [`ProfilePackage`], from the route it
-/// took, so the source a package reports is the source its own bytes were read
-/// through rather than a claim made about them.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ProfilePackageSource {
-    /// Bytes read from this absolute, symlink-resolved directory.
-    Directory(PathBuf),
-}
-
 /// A validated immutable package owning the bytes it validated.
 ///
 /// Reading a directory ([`from_directory`](Self::from_directory)), capturing
@@ -55,13 +44,13 @@ pub enum ProfilePackageSource {
 /// run one validation over one path-to-bytes map, so packages built from
 /// identical content are indistinguishable in manifest, package hash, and
 /// target digests. They differ in exactly one observable: the
-/// [`source`](Self::source) a directory read records.
+/// [`directory`](Self::directory) a directory read records.
 #[derive(Debug, Clone)]
 pub struct ProfilePackage {
     model: ProfilePackageModel,
     files: BTreeMap<String, Vec<u8>>,
     hashes: ProfilePackageHashes,
-    source: Option<ProfilePackageSource>,
+    directory: Option<PathBuf>,
 }
 
 impl ProfilePackage {
@@ -77,7 +66,7 @@ impl ProfilePackage {
     /// [`UnreadableDirectory`](ProfilePackageError::UnreadableDirectory), which
     /// no invalid package produces.
     ///
-    /// The recorded [`source`](Self::source) is the resolved root the walk
+    /// The recorded [`directory`](Self::directory) is the resolved root the walk
     /// anchored its handle chain at, not the argument: `directory` may be
     /// relative and may use ordinary path normalization, but the package root
     /// itself and every entry beneath it must not be a symbolic link.
@@ -86,7 +75,7 @@ impl ProfilePackage {
         Self::from_files_with_modes(
             contents.files,
             contents.executable_sources,
-            Some(ProfilePackageSource::Directory(contents.root)),
+            Some(contents.root),
         )
     }
 
@@ -140,11 +129,8 @@ impl ProfilePackage {
     }
 
     #[cfg(test)]
-    fn from_files(
-        files: BTreeMap<String, Vec<u8>>,
-        source: ProfilePackageSource,
-    ) -> Result<Self, ProfilePackageError> {
-        Self::from_files_with_modes(files, BTreeSet::new(), Some(source))
+    fn from_files(files: BTreeMap<String, Vec<u8>>) -> Result<Self, ProfilePackageError> {
+        Self::from_files_with_modes(files, BTreeSet::new(), None)
     }
 
     /// Validate one package's complete content and derive its identity.
@@ -163,7 +149,7 @@ impl ProfilePackage {
     pub(super) fn from_files_with_modes(
         files: BTreeMap<String, Vec<u8>>,
         executable_sources: BTreeSet<String>,
-        source: Option<ProfilePackageSource>,
+        directory: Option<PathBuf>,
     ) -> Result<Self, ProfilePackageError> {
         validate_package_bounds(&files)?;
         let manifest_bytes = files
@@ -178,7 +164,7 @@ impl ProfilePackage {
             model,
             files,
             hashes,
-            source,
+            directory,
         })
     }
 
@@ -189,8 +175,8 @@ impl ProfilePackage {
 
     /// The directory this package's validated bytes were read from. A package
     /// captured from repository files or extracted from an archive has none.
-    pub fn source(&self) -> Option<&ProfilePackageSource> {
-        self.source.as_ref()
+    pub fn directory(&self) -> Option<&Path> {
+        self.directory.as_deref()
     }
 
     /// Owned bytes for a declared package-relative source.
@@ -1030,15 +1016,10 @@ mod tests {
     }
 
     /// Run the shared package validation over a synthetic path-to-bytes map.
-    ///
-    /// The map is authored here rather than read from anywhere; the recorded
-    /// source names the fixture the authored bytes were mutated from, which no
-    /// caller asserts about. Every caller asserts about validation outcomes,
-    /// which are decided by the map alone.
     fn validated_package(
         files: BTreeMap<String, Vec<u8>>,
     ) -> Result<ProfilePackage, ProfilePackageError> {
-        ProfilePackage::from_files(files, ProfilePackageSource::Directory(fixture_tree()))
+        ProfilePackage::from_files(files)
     }
 
     /// A writable copy of the fixture tree, rooted inside `temp`.
@@ -1428,16 +1409,13 @@ source = "assets/profile.txt"
 target = "docs/profile.txt"
 template = true
 "#;
-        let package = ProfilePackage::from_files(
-            BTreeMap::from([
-                (MANIFEST_FILE_NAME.to_string(), manifest.to_vec()),
-                (
-                    "assets/profile.txt".to_string(),
-                    b"profile={{jit:var:NAME}}\n".to_vec(),
-                ),
-            ]),
-            ProfilePackageSource::Directory(fixture_tree()),
-        )
+        let package = ProfilePackage::from_files(BTreeMap::from([
+            (MANIFEST_FILE_NAME.to_string(), manifest.to_vec()),
+            (
+                "assets/profile.txt".to_string(),
+                b"profile={{jit:var:NAME}}\n".to_vec(),
+            ),
+        ]))
         .expect("the variable package is valid");
         let package_hash = package.hashes().package.clone();
         let first = resolve_package(
@@ -1515,10 +1493,10 @@ name = "NAME"
 [[variable]]
 name = "NAME"
 "#;
-        let error = ProfilePackage::from_files(
-            BTreeMap::from([(MANIFEST_FILE_NAME.to_string(), manifest.to_vec())]),
-            ProfilePackageSource::Directory(fixture_tree()),
-        )
+        let error = ProfilePackage::from_files(BTreeMap::from([(
+            MANIFEST_FILE_NAME.to_string(),
+            manifest.to_vec(),
+        )]))
         .expect_err("duplicate declarations must fail at package read");
 
         assert!(matches!(
@@ -1811,7 +1789,7 @@ name = "NAME"
     #[test]
     fn test_from_directory_records_the_resolved_root_its_bytes_were_read_from() {
         // Two copies of one authored tree differ only in where they sit, so the
-        // recorded source follows the directory each package was read through
+        // recorded directory follows the directory each package was read through
         // rather than anything about the bytes, which are identical.
         let temp = TempDir::new().unwrap();
         let first = writable_package_tree(&temp);
@@ -1822,23 +1800,19 @@ name = "NAME"
 
         assert_eq!(first_package.hashes(), second_package.hashes());
         assert_eq!(
-            first_package.source(),
-            Some(&ProfilePackageSource::Directory(
-                fs::canonicalize(&first).unwrap()
-            ))
+            first_package.directory(),
+            Some(fs::canonicalize(&first).unwrap().as_path())
         );
         assert_eq!(
-            second_package.source(),
-            Some(&ProfilePackageSource::Directory(
-                fs::canonicalize(&second).unwrap()
-            ))
+            second_package.directory(),
+            Some(fs::canonicalize(&second).unwrap().as_path())
         );
-        assert_ne!(first_package.source(), second_package.source());
+        assert_ne!(first_package.directory(), second_package.directory());
     }
 
     #[test]
     fn test_from_directory_records_the_root_a_relative_argument_resolves_to() {
-        // The recorded source has to name the directory the walk anchored at,
+        // The recorded directory has to name the directory the walk anchored at,
         // so a package read through a relative or link-traversing argument
         // still reports where its bytes came from.
         let temp = TempDir::new().unwrap();
@@ -1849,8 +1823,8 @@ name = "NAME"
         assert_eq!(
             ProfilePackage::from_directory(&indirect)
                 .expect("valid package tree")
-                .source(),
-            Some(&ProfilePackageSource::Directory(resolved))
+                .directory(),
+            Some(resolved.as_path())
         );
     }
 
