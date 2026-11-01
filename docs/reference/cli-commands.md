@@ -627,8 +627,7 @@ the current JIT repository and applies a leftover redo record before planning or
 writing.
 
 Profile commands that select packages take one or more repeatable `--profile <DIR>` flags,
-each a package directory path relative to the worktree; an `id:` or `path:`
-prefix is refused.
+each a bare package directory path relative to the worktree.
 `jit init` accepts the same ordered selector stream. A selector is confined
 to the worktree, including when the data root is nested there.
 
