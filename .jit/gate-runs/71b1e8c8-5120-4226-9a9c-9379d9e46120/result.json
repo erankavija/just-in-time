@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-0a6fd04e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "755c579378ea25b0d4e924e7a9b8ca3951cf33e4",
+  "completed_at": "2026-11-01T18:22:32.322530724Z",
+  "duration_ms": 219916,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are satisfied in the attributed shipping tree; recorded CI gates passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0a6fd04e-03a5-4e61-8768-ed5aa24aaf77",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "71b1e8c8-5120-4226-9a9c-9379d9e46120",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T18:18:52.405694884Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fa75003ac, 59a70022, 770d1515, 7224633a, 70e105c2, bef742a1, ce3837cb, c91d90f8, 636ee2d0, 755c5793\nPolicy sources: AGENTS.md\nResolved items: @/gate/jit-validate (.jit/gates.toml); @/invariant/event-log, @/invariant/canonical-cutover, @/invariant/derived-state-coherence, @/invariant/semantic-test-assertions, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T18:15:40Z); docs-mechanical passed (exit 0, 2026-11-01T18:18:02Z); code-review pending before this run\nTruncation recovery: split truncated checker patches by file/range; inspected c36c6a393’s removed test paths; restricted tagged-merge reads to validation-impact paths\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are satisfied in the attributed shipping tree; recorded CI gates passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
