@@ -295,8 +295,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let created_issue_ids = batch_issue_ids(&context, defs.len());
         let mut issue_paths = created_issue_ids
             .iter()
-            .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-            .collect::<std::result::Result<Vec<_>, _>>()?;
+            .map(VirtualPath::issue_record)
+            .collect::<Vec<_>>();
         issue_paths.push(VirtualPath::ISSUES);
 
         with_mutation_session(&self.storage, &layout, "batch issue creation", |session| {

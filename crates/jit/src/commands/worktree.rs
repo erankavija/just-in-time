@@ -777,12 +777,17 @@ mod tests {
             (temp, paths)
         }
 
-        /// Write `issue` into the store at `data_root`.
-        fn seed_issue(data_root: &Path, issue: &Issue) {
-            let issues = data_root.join("issues");
-            std::fs::create_dir_all(&issues).expect("create the issue directory");
+        /// Write `issue` at its canonical path in the selected layout.
+        fn seed_issue(layout: &crate::repository_state::RepositoryLayout, issue: &Issue) {
+            let path = layout
+                .resolve(&crate::repository_state::VirtualPath::issue_record(
+                    &issue.id,
+                ))
+                .expect("resolve the issue record path");
+            std::fs::create_dir_all(path.parent().expect("issue record has a parent"))
+                .expect("create the issue directory");
             std::fs::write(
-                issues.join(format!("{}.json", issue.id)),
+                path,
                 crate::repository_state::serialize_issue(issue).expect("serialize the issue"),
             )
             .expect("write the issue record");
@@ -866,10 +871,20 @@ mod tests {
                 "Held by both stores identically".to_string(),
             );
 
-            seed_issue(&paths.local_jit, &local_only);
-            seed_issue(&paths.local_jit, &shared);
-            seed_issue(reference_root, &reference_only);
-            seed_issue(reference_root, &shared);
+            let local_layout =
+                crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)
+                    .expect("resolve the local repository layout");
+            let primary_root = paths
+                .primary_worktree_root()
+                .expect("resolve the primary worktree")
+                .expect("a linked checkout has a primary worktree");
+            let reference_layout =
+                crate::storage::discover_repository_layout(primary_root, reference_root)
+                    .expect("resolve the primary repository layout");
+            seed_issue(&local_layout, &local_only);
+            seed_issue(&local_layout, &shared);
+            seed_issue(&reference_layout, &reference_only);
+            seed_issue(&reference_layout, &shared);
 
             let conflicting = event("shared-event", &shared.id, "The linked checkout's value");
             seed_events(&paths.local_jit, std::slice::from_ref(&conflicting));
@@ -975,8 +990,16 @@ mod tests {
                 "Both checkouts hold this record".to_string(),
             );
             let events = [event("shared-event", &issue.id, "Both logs hold this")];
+            let local_layout =
+                crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)
+                    .unwrap();
+            let primary_root = paths.primary_worktree_root().unwrap().unwrap();
+            let reference_layout =
+                crate::storage::discover_repository_layout(primary_root, &reference_root).unwrap();
+            for layout in [&local_layout, &reference_layout] {
+                seed_issue(layout, &issue);
+            }
             for store in [paths.local_jit.as_path(), reference_root.as_path()] {
-                seed_issue(store, &issue);
                 seed_events(store, &events);
             }
 
@@ -1004,8 +1027,11 @@ mod tests {
                 shared_jit: primary.join(".git/jit"),
             };
             assert!(paths.is_main_worktree(), "the fixture models the primary");
+            let layout =
+                crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)
+                    .unwrap();
             seed_issue(
-                &paths.local_jit,
+                &layout,
                 &fixture_issue(
                     "Primary record".to_string(),
                     "The primary checkout's own store".to_string(),
@@ -1031,8 +1057,10 @@ mod tests {
             let temp = tempfile::TempDir::new().expect("create a temporary directory");
             let data_root = temp.path().join(".jit");
             std::fs::create_dir_all(&data_root).expect("create the store");
+            let layout =
+                crate::storage::discover_repository_layout(temp.path(), &data_root).unwrap();
             seed_issue(
-                &data_root,
+                &layout,
                 &fixture_issue(
                     "Untracked record".to_string(),
                     "Held by a store outside version control".to_string(),
