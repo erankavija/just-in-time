@@ -293,9 +293,19 @@ pub enum ProfileGraphError {
         requirement: String,
         other_version: String,
     },
-    /// The participating dependency graph contains a cycle.
+    /// The participating dependency graph contains a cycle, named as a closed
+    /// path whose first id repeats as the last.
     #[error("profile dependency cycle: {}", cycle.join(" -> "))]
     DependencyCycle { cycle: Vec<String> },
+    /// Two different package images claim one profile identity.
+    #[error(
+        "profile id '{id}' resolves to different package images '{first_hash}' and '{second_hash}'"
+    )]
+    ConflictingPackageIdentity {
+        id: String,
+        first_hash: String,
+        second_hash: String,
+    },
 }
 
 #[cfg(test)]

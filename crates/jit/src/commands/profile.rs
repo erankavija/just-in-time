@@ -137,20 +137,8 @@ pub enum ProfileResolutionError {
         /// Capture failure.
         source: PackageCaptureError,
     },
-}
-
-/// Failure composing the set of packages one application applies.
-///
-/// Both variants are raised while the closure is still being built, before the
-/// first package is applied, so a repository never carries part of a set it
-/// could not compose.
-#[derive(Debug, thiserror::Error)]
-pub enum ProfileDependencyError {
-    /// A declared dependency resolves through no route.
-    ///
-    /// The declaring package is named beside it because an adopter asked for
-    /// that one: a bare failure over the dependency would name a package they
-    /// never installed by name.
+    /// A declared dependency could not be loaded. The declaring package is
+    /// named because the adopter never asked for the dependency by name.
     #[error(
         "profile '{package}' declares a dependency on profile '{dependency}', \
          which cannot be resolved: {cause:#}"
@@ -160,70 +148,8 @@ pub enum ProfileDependencyError {
         package: String,
         /// Dependency that manifest names.
         dependency: String,
-        /// Why every resolution route refused it.
+        /// Why loading it failed.
         cause: anyhow::Error,
-    },
-    /// A dependency is present but outside the version range its declarer
-    /// requires.
-    #[error(
-        "profile '{package}' requires dependency '{dependency}' at '{required}', but the participating package provides '{found}'"
-    )]
-    DependencyVersionMismatch {
-        /// Package whose manifest declares the dependency.
-        package: String,
-        /// Dependency whose version did not satisfy the requirement.
-        dependency: String,
-        /// Authored dependency range.
-        required: String,
-        /// Resolved dependency version.
-        found: String,
-    },
-    /// The declared dependencies close a cycle, which has no application order.
-    #[error("profile dependency cycle: {}", .cycle.join(" -> "))]
-    DependencyCycle {
-        /// The cycle as a closed path: the first id repeats as the last.
-        cycle: Vec<String>,
-    },
-    /// The running engine is outside a participating package's compatibility
-    /// range.
-    #[error(
-        "profile '{package}' requires compatible JIT '{required}', but the running engine is '{actual}'"
-    )]
-    IncompatibleEngine {
-        /// Package whose compatibility range rejected the engine.
-        package: String,
-        /// Authored engine range.
-        required: String,
-        /// Running engine version.
-        actual: String,
-    },
-    /// Two participating packages declare an incompatibility that applies to
-    /// the other package's version.
-    #[error(
-        "profile '{package}' is incompatible with profile '{other}' (requirement '{requirement}', other version '{other_version}')"
-    )]
-    IncompatiblePackages {
-        /// Package declaring the incompatibility.
-        package: String,
-        /// Participating package named by the declaration.
-        other: String,
-        /// Authored incompatible-package range.
-        requirement: String,
-        /// Version of the other package.
-        other_version: String,
-    },
-    /// Two different package images claim one profile identity during graph
-    /// construction.
-    #[error(
-        "profile id '{id}' resolves to different package images '{first_hash}' and '{second_hash}'"
-    )]
-    ConflictingPackageIdentity {
-        /// Profile identity with multiple images.
-        id: String,
-        /// First package digest.
-        first_hash: String,
-        /// Second package digest.
-        second_hash: String,
     },
 }
 
@@ -924,7 +850,11 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
 
         let engine = EngineVersion::running()
             .map_err(|source| anyhow::anyhow!("running JIT engine version is invalid: {source}"))?;
-        ResolvedProfileGraph::resolve(packages, selected_ids, &engine).map_err(profile_graph_error)
+        Ok(ResolvedProfileGraph::resolve(
+            packages,
+            selected_ids,
+            &engine,
+        )?)
     }
 
     /// Extend `packages` with dependencies in canonical id order.
@@ -950,7 +880,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 }
                 let package = self
                     .resolve_dependency_package_from(&declaring, &dependency.id)
-                    .map_err(|cause| ProfileDependencyError::UnresolvableDependency {
+                    .map_err(|cause| ProfileResolutionError::UnresolvableDependency {
                         package: id.to_string(),
                         dependency: dependency.id.to_string(),
                         cause,
@@ -1220,7 +1150,7 @@ fn insert_candidate_package(
                     existing.hashes().package.clone(),
                 )
             };
-            return Err(ProfileDependencyError::ConflictingPackageIdentity {
+            return Err(ProfileGraphError::ConflictingPackageIdentity {
                 id: id.to_string(),
                 first_hash,
                 second_hash,
@@ -1241,60 +1171,6 @@ fn insert_candidate_package(
 fn package_source_key(package: &ProfilePackage) -> String {
     match package.source() {
         ProfilePackageSource::Directory(path) => path.to_string_lossy().into_owned(),
-    }
-}
-
-/// Convert the pure graph's typed refusal into the command-layer dependency
-/// error vocabulary, retaining every package named by the failed claim.
-fn profile_graph_error(error: ProfileGraphError) -> anyhow::Error {
-    match error {
-        ProfileGraphError::MissingDependency {
-            package,
-            dependency,
-        } => ProfileDependencyError::UnresolvableDependency {
-            package: package.clone(),
-            dependency: dependency.clone(),
-            cause: anyhow::anyhow!("profile graph is missing participating package '{dependency}'"),
-        }
-        .into(),
-        ProfileGraphError::DependencyVersionMismatch {
-            package,
-            dependency,
-            required,
-            found,
-        } => ProfileDependencyError::DependencyVersionMismatch {
-            package,
-            dependency,
-            required,
-            found,
-        }
-        .into(),
-        ProfileGraphError::DependencyCycle { cycle } => {
-            ProfileDependencyError::DependencyCycle { cycle }.into()
-        }
-        ProfileGraphError::IncompatibleEngine {
-            package,
-            required,
-            actual,
-        } => ProfileDependencyError::IncompatibleEngine {
-            package,
-            required,
-            actual,
-        }
-        .into(),
-        ProfileGraphError::IncompatiblePackages {
-            package,
-            other,
-            requirement,
-            other_version,
-        } => ProfileDependencyError::IncompatiblePackages {
-            package,
-            other,
-            requirement,
-            other_version,
-        }
-        .into(),
-        other => anyhow::anyhow!(other),
     }
 }
 
@@ -3506,8 +3382,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::DependencyCycle { cycle })
+                error.downcast_ref::<ProfileGraphError>(),
+                Some(ProfileGraphError::DependencyCycle { cycle })
                     if cycle.first() == cycle.last()
                         && cycle.iter().any(|id| id == "base")
                         && cycle.iter().any(|id| id == "workflow")
@@ -3533,8 +3409,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::UnresolvableDependency { package, dependency, .. })
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableDependency { package, dependency, .. })
                     if package == "workflow" && dependency == "absent-base"
             ),
             "the refusal must name both packages: {error:#}"
@@ -3576,8 +3452,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::DependencyVersionMismatch {
+                error.downcast_ref::<ProfileGraphError>(),
+                Some(ProfileGraphError::DependencyVersionMismatch {
                     package,
                     dependency,
                     ..
@@ -3608,8 +3484,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::IncompatibleEngine { package, .. })
+                error.downcast_ref::<ProfileGraphError>(),
+                Some(ProfileGraphError::IncompatibleEngine { package, .. })
                     if package == "future"
             ),
             "the incompatible package must be named: {error:#}"
@@ -3738,8 +3614,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::UnresolvableDependency { package, dependency, .. })
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableDependency { package, dependency, .. })
                     if package == "workflow" && dependency == "base"
             ),
             "the refusal must name both packages: {error:#}"
@@ -3787,8 +3663,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::UnresolvableDependency { package, dependency, .. })
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableDependency { package, dependency, .. })
                     if package == "workflow" && dependency == "base"
             ),
             "{error:#}"
@@ -3810,8 +3686,8 @@ template = true
 
         assert!(
             matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::UnresolvableDependency { dependency, .. })
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableDependency { dependency, .. })
                     if dependency == "base"
             ),
             "{error:#}"

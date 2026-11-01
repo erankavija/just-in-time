@@ -102,17 +102,14 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         return ErrorCode::ProfileConflict;
     }
     // Which package bytes a profile command reads, or which packages an
-    // application applies, could not be settled. Both are classified here,
-    // ahead of the source-chain searches below, because a location that is
-    // simply gone carries a NotFound I/O cause: taking that classification
-    // would report a repository whose record outlived its package as a missing
-    // repository or an absent profile, which is the reading the record exists
-    // to rule out.
+    // application applies, could not be settled. Classified ahead of the
+    // source-chain searches below, because a location that is simply gone
+    // carries a NotFound I/O cause.
     if error
         .downcast_ref::<crate::commands::ProfileResolutionError>()
         .is_some()
         || error
-            .downcast_ref::<crate::commands::ProfileDependencyError>()
+            .downcast_ref::<crate::profile::ProfileGraphError>()
             .is_some()
     {
         return ErrorCode::ProfileError;
@@ -483,18 +480,24 @@ pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
     // Stated rather than left to the fallback below, so this envelope and
     // [`classify`]'s classification of the same failure are read from
     // one decision.
+    if matches!(
+        error.downcast_ref::<crate::commands::ProfileResolutionError>(),
+        Some(crate::commands::ProfileResolutionError::UnresolvableDependency { .. })
+    ) || matches!(
+        error.downcast_ref::<crate::profile::ProfileGraphError>(),
+        Some(crate::profile::ProfileGraphError::MissingDependency { .. })
+    ) {
+        return Ok(command_json_error(error, ErrorCode::ProfileError)
+            .with_suggestion("Place the package it depends on beside it"));
+    }
     if error
         .downcast_ref::<crate::commands::ProfileResolutionError>()
         .is_some()
+        || error
+            .downcast_ref::<crate::profile::ProfileGraphError>()
+            .is_some()
     {
         return Ok(command_json_error(error, ErrorCode::ProfileError));
-    }
-    if error
-        .downcast_ref::<crate::commands::ProfileDependencyError>()
-        .is_some()
-    {
-        return Ok(command_json_error(error, ErrorCode::ProfileError)
-            .with_suggestion("Place the package it depends on beside it"));
     }
     // The single sanctioned downcast of the anyhow CLI transport to the typed
     // repository-state error: every refused profile decision — a target or a
@@ -1063,6 +1066,85 @@ mod repository_state_classifier_tests {
             !validator.is_valid(&serde_json::json!({ "conflicts": [{}] })),
             "the schema constrains each conflict entry"
         );
+    }
+
+    #[test]
+    fn test_every_profile_graph_error_variant_classifies_as_profile_error_with_its_exit_status() {
+        use crate::profile::ProfileGraphError as Graph;
+
+        let semver_error = || semver::Version::parse("not-semver").unwrap_err();
+        let text = |value: &str| value.to_string();
+        let variants = vec![
+            Graph::SelectedPackageMissing { id: text("a") },
+            Graph::InvalidPackageVersion {
+                package: text("a"),
+                value: text("x"),
+                source: semver_error(),
+            },
+            Graph::InvalidEngineRequirement {
+                package: text("a"),
+                value: text("x"),
+                source: semver_error(),
+            },
+            Graph::IncompatibleEngine {
+                package: text("a"),
+                required: text("x"),
+                actual: text("y"),
+            },
+            Graph::MissingDependency {
+                package: text("a"),
+                dependency: text("b"),
+            },
+            Graph::InvalidDependencyRequirement {
+                package: text("a"),
+                dependency: text("b"),
+                value: text("x"),
+                source: semver_error(),
+            },
+            Graph::DependencyVersionMismatch {
+                package: text("a"),
+                dependency: text("b"),
+                required: text("x"),
+                found: text("y"),
+            },
+            Graph::InvalidIncompatibilityRequirement {
+                package: text("a"),
+                other: text("b"),
+                value: text("x"),
+                source: semver_error(),
+            },
+            Graph::IncompatiblePackages {
+                package: text("a"),
+                other: text("b"),
+                requirement: text("x"),
+                other_version: text("y"),
+            },
+            Graph::DependencyCycle {
+                cycle: vec![text("a"), text("a")],
+            },
+            Graph::ConflictingPackageIdentity {
+                id: text("a"),
+                first_hash: text("x"),
+                second_hash: text("y"),
+            },
+        ];
+
+        for variant in variants {
+            let error = anyhow::Error::new(variant);
+            let json = profile_json_error(&error).expect("a graph refusal renders a JSON error");
+            for rendered in [classify(&error), json] {
+                assert_eq!(
+                    rendered.error.code,
+                    crate::output::ErrorCode::ProfileError,
+                    "{error}"
+                );
+                assert_eq!(
+                    rendered.exit_code(),
+                    crate::output::ExitCode::GenericError,
+                    "{error}"
+                );
+            }
+        }
     }
 
     #[test]

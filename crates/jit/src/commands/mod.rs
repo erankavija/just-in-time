@@ -85,9 +85,8 @@ pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueLocalUpdate, IssueOps};
 pub use item::{ItemListResult, ItemShowResult};
 pub use profile::{
-    ProfileApplyError, ProfileDependencyError, ProfileResolutionError, ProfileSelection,
-    ProfileSelector, ProfileSelectorError, ProfileVariableOptions, SelectedProfile,
-    UNCOMMITTED_TARGETS_RESOLUTION,
+    ProfileApplyError, ProfileResolutionError, ProfileSelection, ProfileSelector,
+    ProfileSelectorError, ProfileVariableOptions, SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use template::TemplateApplyResult;
