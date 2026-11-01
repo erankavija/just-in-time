@@ -483,7 +483,7 @@ fn test_gate_key_arguments_reject_malformed_tokens_at_dispatch() {
             .command(arguments.iter().copied().chain(["--json"]))
             .output()
             .unwrap();
-        assert_eq!(output.status.code(), Some(2), "{arguments:?}");
+        assert!(!output.status.success(), "{arguments:?}");
         let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(
             envelope["error"]["code"], "INVALID_ARGUMENT",

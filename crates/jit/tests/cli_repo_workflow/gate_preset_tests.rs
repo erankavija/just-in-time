@@ -78,7 +78,6 @@ fn test_project_defined_preset_create_list_show_apply() {
         vec!["ci"],
         "the listing reports the project's own presets and nothing else"
     );
-    assert_eq!(list["count"], 1);
     assert_eq!(presets[0]["gate_count"], 2);
     for absent in ["plan-review", "coverage-preview", "breakdown-review"] {
         let show = cli

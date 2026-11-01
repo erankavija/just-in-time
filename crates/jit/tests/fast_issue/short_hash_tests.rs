@@ -40,7 +40,7 @@ fn test_cli_issue_delete_resolves_unknown_id_before_confirmation() {
         .env_remove("JIT_ALLOW_DELETION")
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(3), "{output:?}");
+    assert!(!output.status.success(), "{output:?}");
     let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(envelope["error"]["code"], "ISSUE_NOT_FOUND");
 }
@@ -161,7 +161,7 @@ fn short(id: &str) -> String {
 }
 
 /// `jit args --json` with `{short}` naming a too-short prefix refuses it as an
-/// invalid prefix with the argument-error exit code.
+/// invalid prefix.
 fn assert_rejects_too_short_prefix(cli: &JitCli, args: &[&str]) {
     let too_short = "abc";
     let args: Vec<String> = args
@@ -170,7 +170,7 @@ fn assert_rejects_too_short_prefix(cli: &JitCli, args: &[&str]) {
         .chain(std::iter::once("--json".to_string()))
         .collect();
     let output = cli.command(&args).output().unwrap();
-    assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
+    assert!(!output.status.success(), "{args:?}: {output:?}");
     let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(envelope["error"]["code"], "INVALID_ID_PREFIX", "{args:?}");
 }

@@ -630,7 +630,7 @@ mod tests {
         );
 
         let result = exec.list_items(None).unwrap();
-        assert_eq!(result.count(), 3);
+        assert_eq!(result.items.len(), 3);
         // Qualified ids disambiguate the two REQ-01s by their issue scope.
         let qids: Vec<&str> = result
             .items
@@ -680,7 +680,7 @@ mod tests {
         let all = exec.list_items(None).unwrap();
         assert!(all.items.iter().any(|i| i.kind == "gate"));
         let requirements = exec.list_items(Some("requirement")).unwrap();
-        assert_eq!(requirements.count(), 2);
+        assert_eq!(requirements.items.len(), 2);
         assert!(requirements.items.iter().all(|i| i.kind == "requirement"));
     }
 
@@ -1232,7 +1232,7 @@ statement = \"Every dependency edge stays acyclic.\"
 
         // Both surface in the cross-repo list under the `@` project scope.
         let listed = exec.list_items(Some("policy")).unwrap();
-        assert_eq!(listed.count(), 2);
+        assert_eq!(listed.items.len(), 2);
     }
 
     #[test]
@@ -1282,7 +1282,7 @@ kind = \"advisory\"
             },
         );
         let result = exec.list_items(Some("invariant")).unwrap();
-        assert_eq!(result.count(), 2);
+        assert_eq!(result.items.len(), 2);
         let qids: Vec<&str> = result
             .items
             .iter()
@@ -1403,7 +1403,7 @@ stage = \"postcheck\"
             },
         );
         let result = exec.list_items(Some("gate")).unwrap();
-        assert_eq!(result.count(), 2);
+        assert_eq!(result.items.len(), 2);
         let qids: Vec<&str> = result
             .items
             .iter()
@@ -1509,7 +1509,7 @@ stage = \"postcheck\"
         // Both coexist in one unfiltered list with no DuplicateSelfId despite the
         // shared self-id (they differ by kind).
         let all = exec.list_items(None).unwrap();
-        assert_eq!(all.count(), 2);
+        assert_eq!(all.items.len(), 2);
     }
 
     #[test]
@@ -1526,7 +1526,7 @@ stage = \"postcheck\"
             },
         );
         let hits = exec.search_items("acyclic", Some("invariant")).unwrap();
-        assert_eq!(hits.count(), 1);
+        assert_eq!(hits.items.len(), 1);
         assert_eq!(hits.items[0].qualified_id, "@/invariant/sample-invariant");
     }
 
@@ -1562,7 +1562,7 @@ stage = \"postcheck\"
             .collect();
         // Only the two registry entries are invariants; the issue's missing-invariant line is
         // NOT among them (no markdown index for invariants).
-        assert_eq!(invariants.count(), 2);
+        assert_eq!(invariants.items.len(), 2);
         assert!(qids.contains(&"@/invariant/sample-invariant"));
         assert!(qids.contains(&"@/invariant/second-invariant"));
         assert!(!qids.iter().any(|q| q.ends_with("/missing-invariant")));
@@ -1617,7 +1617,7 @@ stage = \"postcheck\"
             .iter()
             .map(|i| i.qualified_id.as_str())
             .collect();
-        assert_eq!(result.count(), 2);
+        assert_eq!(result.items.len(), 2);
         assert!(qids.contains(&"@/invariant/sample-invariant"));
         assert!(qids.contains(&"@/invariant/second-invariant"));
         // The issue's missing-invariant line is NOT a project invariant (registry-first reads
@@ -1655,7 +1655,7 @@ stage = \"postcheck\"
         seed_issue(exec.storage(), issue);
         // No rejection: the kind resolves and indexes from the issue description.
         let result = exec.list_items(Some("tenet")).unwrap();
-        assert_eq!(result.count(), 1);
+        assert_eq!(result.items.len(), 1);
         assert_eq!(
             result.items[0].qualified_id,
             format!("@/issue/{short}/tenet/sample-invariant")

@@ -12,8 +12,7 @@ fn test_graph_downstream_json_output() {
     let json = cli.run_json(["graph", "downstream", &id1]).unwrap();
 
     assert_eq!(json["issue_id"], id1);
-    assert!(json["dependents"].is_array());
-    assert_eq!(json["count"], 1);
+    assert_eq!(json["dependents"].as_array().unwrap().len(), 1);
 }
 
 #[test]
@@ -30,8 +29,7 @@ fn test_graph_roots_json_output() {
 
     let json = cli.run_json(["graph", "roots"]).unwrap();
 
-    assert!(json["roots"].is_array());
-    assert_eq!(json["count"], 1);
+    assert_eq!(json["roots"].as_array().unwrap().len(), 1);
     assert_eq!(json["roots"][0]["id"], id1);
 }
 

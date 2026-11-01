@@ -62,7 +62,7 @@ fn test_story_item_list_decision_and_risk_coexist() {
         .run_json(["item", "list", "--kind", "decision"])
         .unwrap();
     assert_eq!(
-        json["count"].as_u64().unwrap(),
+        json["items"].as_array().unwrap().len(),
         1,
         "exactly one decision item expected"
     );
@@ -83,7 +83,7 @@ fn test_story_item_list_decision_and_risk_coexist() {
     // REQ-02: risk kind returns the risk.
     let json = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
     assert_eq!(
-        json["count"].as_u64().unwrap(),
+        json["items"].as_array().unwrap().len(),
         1,
         "exactly one risk item expected"
     );
@@ -276,7 +276,7 @@ fn test_story_markdown_sole_source_both_kinds() {
     let json = cli
         .run_json(["item", "list", "--kind", "decision"])
         .unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    assert_eq!(json["items"].as_array().unwrap().len(), 1);
     let dec_self_ids: Vec<&str> = json["items"]
         .as_array()
         .unwrap()
@@ -294,7 +294,7 @@ fn test_story_markdown_sole_source_both_kinds() {
 
     // Risk index now shows RISK-02, not RISK-01.
     let json = cli.run_json(["item", "list", "--kind", "risk"]).unwrap();
-    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    assert_eq!(json["items"].as_array().unwrap().len(), 1);
     let risk_self_ids: Vec<&str> = json["items"]
         .as_array()
         .unwrap()

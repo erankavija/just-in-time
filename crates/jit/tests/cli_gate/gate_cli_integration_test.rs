@@ -628,9 +628,7 @@ fn test_gate_list_json() {
         .clone();
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    // success field removed
     assert!(json["gates"].is_array());
-    assert!(json["count"].is_number());
 }
 
 #[test]

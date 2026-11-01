@@ -348,7 +348,7 @@ fn test_claim_acquire_stamps_claimed_at_and_logs_event() {
         .output()
         .unwrap();
     let events_json: Value = serde_json::from_slice(&events.stdout).unwrap();
-    assert_eq!(events_json["count"].as_u64().unwrap(), 1);
+    assert_eq!(events_json["events"].as_array().unwrap().len(), 1);
 
     // First-occurrence: re-acquiring as the same agent (release then re-acquire)
     // must not move claimed_at.

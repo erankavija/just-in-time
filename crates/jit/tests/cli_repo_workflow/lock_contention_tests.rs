@@ -99,5 +99,11 @@ fn test_concurrent_mutations_queue_behind_a_holder_under_the_default_wait() {
     contenders.into_iter().for_each(|contender| {
         succeeded(contender.wait_with_output().unwrap());
     });
-    assert_eq!(cli.run_json(["issue", "list"]).unwrap()["count"], 2);
+    assert_eq!(
+        cli.run_json(["issue", "list"]).unwrap()["issues"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
 }

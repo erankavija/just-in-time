@@ -24,8 +24,7 @@ fn test_gate_list_json_output() {
 
     let json = cli.run_json(["gate", "list"]).unwrap();
 
-    assert!(json["gates"].is_array());
-    assert_eq!(json["count"], 1);
+    assert_eq!(json["gates"].as_array().unwrap().len(), 1);
     assert_eq!(json["gates"][0]["key"], "test-gate");
     assert_eq!(json["gates"][0]["title"], "Test Gate");
     assert_eq!(json["gates"][0]["mode"], "auto");
@@ -62,8 +61,7 @@ fn test_gate_list_empty_json_output() {
 
     let json = cli.run_json(["gate", "list"]).unwrap();
 
-    assert!(json["gates"].is_array());
-    assert_eq!(json["count"], 0);
+    assert_eq!(json["gates"].as_array().unwrap().len(), 0);
 }
 
 #[test]
