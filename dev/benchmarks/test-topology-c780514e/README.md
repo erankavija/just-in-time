@@ -115,7 +115,7 @@ kill $(jobs -p); rm -rf target/tmp/load?; git checkout -- crates/jit/src/lib.rs
 
 ## Build footprint and suite clock before and after — e2764021, 7721a2a9
 
-Every "after" figure is at commit `de34a05906` and comes from one exclusive
+Every "after" figure is at commit `de34a0590` and comes from one exclusive
 build window on 2026-11-01, entered with `flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock`
 and `CARGO_INCREMENTAL=0`. Each run started at a one-minute load below 4.08 with 75 GB
 free. sccache was on at the `scripts/cargo-ci.sh` default: `RUSTC_WRAPPER` and
@@ -142,7 +142,7 @@ suite-build step, which is shown separately.
 
 | Run | Start load | Suite build | Test | Doctest | Suite clock |
 |---|---:|---:|---:|---:|---:|
-| Warm, first after a rebuild on main | 3.31 | 0.6 s | 12.8 s | 2.9 s | 15.8 s |
+| Warm, first of the window | 3.31 | 0.6 s | 12.8 s | 2.9 s | 15.8 s |
 | Warm 1 | 3.98 | 0.6 s | 21.1 s | 2.8 s | 24.0 s |
 | Warm 2 | 3.09 | 0.5 s | 12.0 s | 2.8 s | 14.7 s |
 | Warm 3 | 3.11 | 0.5 s | 11.9 s | 2.7 s | 14.7 s |
