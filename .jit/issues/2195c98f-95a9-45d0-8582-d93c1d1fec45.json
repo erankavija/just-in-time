@@ -33,7 +33,20 @@
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "holistic-review": {
+      "run_id": "f6918ce9-19ed-4a4d-a9f9-f3adcec07de5",
+      "status": "failed",
+      "updated_at": "2026-11-01T04:49:03.377500341Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "run_id": "a5d00b98-0383-45ab-b90f-c8536dd9d0ec",
+      "status": "passed",
+      "updated_at": "2026-11-01T04:44:39.421504132Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
   "labels": [
     "epic:semantic-types",
@@ -48,5 +61,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-11-01T04:44:13.130155125Z"
+  "updated_at": "2026-11-01T04:49:03.377500341Z"
 }
