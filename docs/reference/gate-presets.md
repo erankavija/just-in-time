@@ -32,8 +32,9 @@ configured gate key does not change their behavior:
 repository.
 - `issue_validation` runs declarative validation for the gated issue.
 - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label
-from the gated issue and runs scoped validation for that target. Its checker table
-must set `label_namespace`.
+from the gated issue, where the target is a full issue id or unique prefix, and
+runs scoped validation for that target. Its checker table must set
+`label_namespace`.
 - `rule_validation` names one configured graph rule with `rule` and evaluates it
 with the gated issue as its sole firing subject. The complete repository may be
 used for graph and identifier-resolution context, but unrelated issues cannot
