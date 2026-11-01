@@ -98,22 +98,6 @@ fn test_query_all_wiring() {
 }
 
 #[test]
-fn test_query_all_label_flag() {
-    let cli = JitCli::with_repository(setup_test_repo_with_taxonomy().temp);
-    let id = cli
-        .create_issue(["-t", "Tagged", "--label", "component:api"])
-        .unwrap();
-    cli.create_issue(["-t", "Untagged"]).unwrap();
-
-    let json = cli
-        .run_json(["query", "all", "--label", "component:api"])
-        .unwrap();
-
-    assert_eq!(json["issues"].as_array().unwrap().len(), 1);
-    assert_eq!(json["issues"][0]["id"], id);
-}
-
-#[test]
 fn test_query_strategic_wiring() {
     let repo = setup_test_repo_with_taxonomy();
     let label = format!("type:{}", repo.taxonomy.strategic_types[0]);

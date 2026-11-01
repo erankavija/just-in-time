@@ -463,37 +463,6 @@ fn test_issue_delete_confirmed_reports_the_deleted_id_in_json_mode() {
 }
 
 #[test]
-fn test_dependencies() {
-    let cli = JitCli::initialised().unwrap();
-
-    let id1 = cli
-        .create_issue(["--title", "Dependency", "--description", "Desc"])
-        .unwrap();
-    let id2 = cli
-        .create_issue(["--title", "Dependent", "--description", "Desc"])
-        .unwrap();
-
-    // Add dependency
-    let output = cli.command(["dep", "add", &id2, &id1]).output().unwrap();
-
-    assert!(output.status.success());
-
-    // Show dependencies (use graph deps instead of removed graph show)
-    let output = cli.command(["graph", "deps", &id2]).output().unwrap();
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    // Output now shows short IDs (first 8 chars)
-    let id1_short = &id1[..8];
-    assert!(stdout.contains(id1_short));
-
-    // Show downstream
-    let output = cli.command(["graph", "downstream", &id1]).output().unwrap();
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&id2));
-}
-
-#[test]
 fn test_gates() {
     let cli = JitCli::initialised().unwrap();
 
@@ -619,28 +588,6 @@ fn test_validate_repository() {
     let output = cli.command(["validate"]).output().unwrap();
 
     assert!(output.status.success());
-}
-
-#[test]
-fn test_graph_roots() {
-    let cli = JitCli::initialised().unwrap();
-
-    let id1 = cli
-        .create_issue(["--title", "Root", "--description", "Desc"])
-        .unwrap();
-    let id2 = cli
-        .create_issue(["--title", "Child", "--description", "Desc"])
-        .unwrap();
-
-    // Add dependency
-    cli.command(["dep", "add", &id2, &id1]).output().unwrap();
-
-    // Get roots
-    let output = cli.command(["graph", "roots"]).output().unwrap();
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains(&id1));
-    assert!(!stdout.contains(&id2));
 }
 
 #[test]

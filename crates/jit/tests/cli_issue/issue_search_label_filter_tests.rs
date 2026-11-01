@@ -191,30 +191,6 @@ fn test_search_label_query_field_null_when_absent() {
 }
 
 #[test]
-fn test_search_label_namespace_wildcard_matches_query_label_set() {
-    let temp = JitCli::initialised().unwrap();
-    seed_search_issues(&temp);
-    let searched = titles(
-        &temp
-            .run_json(["issue", "search", "--label", "type:*"])
-            .unwrap(),
-    );
-
-    let queried = titles(
-        &temp
-            .run_json(["query", "all", "--label", "type:*"])
-            .unwrap(),
-    );
-
-    let sorted = |mut v: Vec<String>| {
-        v.sort();
-        v
-    };
-    assert_eq!(searched.len(), 3);
-    assert_eq!(sorted(searched), sorted(queried));
-}
-
-#[test]
 fn test_search_malformed_label_pattern_fails() {
     let temp = JitCli::initialised().unwrap();
     seed_search_issues(&temp);

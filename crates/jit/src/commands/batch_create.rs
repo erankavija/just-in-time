@@ -1103,10 +1103,13 @@ mod tests {
         let defs = vec![def("a", &["b"]), def("b", &["a"])];
         let err = exec.batch_create_from_json(defs).unwrap_err();
         let verr = err.downcast_ref::<BatchValidationError>().unwrap();
-        assert!(verr
+        let cycle = verr
             .problems
             .iter()
-            .any(|p| matches!(p, BatchValidationProblem::Cycle { .. })));
+            .find(|p| matches!(p, BatchValidationProblem::Cycle { .. }))
+            .unwrap()
+            .to_string();
+        assert!(cycle.contains("cycle") && cycle.contains('a') && cycle.contains('b'));
         assert_eq!(exec.storage().list_issues().unwrap().len(), 0);
     }
 }

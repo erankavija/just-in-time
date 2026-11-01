@@ -147,9 +147,9 @@ A suite that runs in-process imports the shared harness from the `jit` library:
 use jit::test_harness::TestHarness;
 ```
 
-`test_query_interface_works_without_coordinator` in `fast_issue/test_no_coordinator.rs` is a
-worked example: it creates issues through the harness helpers, claims one through
-`h.executor`, and asserts what `query_ready` returns.
+`test_issue_lifecycle_works_without_coordinator` in `fast_issue/test_no_coordinator.rs` is a
+worked example: it creates, updates, claims and releases an issue through `h.executor`, and
+asserts the stored result.
 
 Run the whole suite with `cargo test --test fast_issue`, or one module with
 `cargo test --test fast_issue test_no_coordinator`.
@@ -477,8 +477,6 @@ its committed run is [dev/benchmarks/publication-cost-722878d4/](benchmarks/publ
 | `repo_discovery_tests::test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd` | 980 |
 | `repo_discovery_tests::test_nested_profile_init_keeps_data_and_assets_in_child` | 944 |
 | `repo_discovery_tests::test_relative_data_root_override_keeps_worktree_assets_at_discovered_root` | 939 |
-| `label_hierarchy_e2e_test::test_label_hierarchy_complete_workflow` | 824 |
-| `workflow_tests::test_workflow_complex_epic` | 710 |
 | `cross_substrate_generality_tests::test_all_four_kinds_through_one_generic_path` | 621 |
 | `derived_state_repair_tests::test_cli_validate_fix_profile_provenance_failures_are_zero_write` | 543 |
 | `failure_probe_fixture::test_failure_probe_fixture_reports_nonzero_status_for_each_setup_class` | 532 |
@@ -615,7 +613,7 @@ cargo test --test cli_query_graph query_tests
 cargo test --doc
 
 # A single test by name
-cargo test test_query_interface_works_without_coordinator
+cargo test test_issue_lifecycle_works_without_coordinator
 
 # With stdout captured from passing tests
 cargo test -- --nocapture

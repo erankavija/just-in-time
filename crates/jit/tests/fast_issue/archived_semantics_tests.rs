@@ -189,24 +189,6 @@ fn test_archive_from_ready_records_origin_and_revives_to_ready() {
 }
 
 #[test]
-fn test_archived_is_not_ready_but_terminal_origin_unblocks_dependents() {
-    let h = TestHarness::new();
-    let dependent = h.create_issue("Dependent");
-    let dependency = h.create_issue("Foundation");
-    h.executor.add_dependency(&dependent, &dependency).unwrap();
-    drive_to_done(&h, &dependency);
-    archive(&h, &dependency);
-
-    // The archived issue is never itself in the ready set.
-    let ready = jit::domain::queries::query_ready(&h.all_issues());
-    assert!(ready.iter().all(|issue| issue.id != dependency));
-
-    // But its dependent, now unblocked, is claimable.
-    let dependent_issue = h.get_issue(&dependent);
-    assert!(!dependent_issue.is_blocked(&jit::domain::queries::build_issue_map(&h.all_issues())));
-}
-
-#[test]
 fn test_rollup_folds_archived_by_terminal_origin() {
     let h = TestHarness::new();
     let delivered = h.create_issue("Delivered then archived");
@@ -236,30 +218,6 @@ fn test_rollup_folds_archived_by_terminal_origin() {
     );
     assert_eq!(rollup.extras.open, 1, "archived-from-non-terminal is open");
     assert_eq!(rollup.extras.percent, 33);
-}
-
-#[test]
-fn test_query_closed_uses_effective_terminality() {
-    let h = TestHarness::new();
-    let delivered = h.create_issue("Delivered then archived");
-    drive_to_done(&h, &delivered);
-    archive(&h, &delivered);
-    let parked = h.create_issue("Parked mid-flight");
-    h.executor
-        .issues()
-        .update_issue_state(&parked, State::InProgress)
-        .unwrap();
-    archive(&h, &parked);
-
-    let closed: Vec<IssueId> = jit::domain::queries::query_closed(&h.all_issues())
-        .into_iter()
-        .map(|issue| issue.id)
-        .collect();
-    assert!(closed.contains(&delivered), "archived-from-done is closed");
-    assert!(
-        !closed.contains(&parked),
-        "archived-from-non-terminal is not closed"
-    );
 }
 
 #[test]

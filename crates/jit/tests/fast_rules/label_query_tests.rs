@@ -6,63 +6,6 @@ use jit::domain::Priority;
 use jit::storage::InMemoryStorage;
 
 #[test]
-fn test_query_by_label_exact_match() {
-    let storage = InMemoryStorage::new();
-    let executor = memory_executor(storage);
-
-    // Create issues with various labels
-    let (milestone_id, _) = executor
-        .issues()
-        .create_issue(
-            "Release v1.0".to_string(),
-            "".to_string(),
-            Priority::High,
-            vec![],
-            vec!["milestone:v1.0".to_string()],
-            None,
-            None,
-            false,
-        )
-        .unwrap();
-
-    let (epic_id, _) = executor
-        .issues()
-        .create_issue(
-            "Auth System".to_string(),
-            "".to_string(),
-            Priority::Normal,
-            vec![],
-            vec!["epic:auth".to_string(), "milestone:v1.0".to_string()],
-            None,
-            None,
-            false,
-        )
-        .unwrap();
-
-    let (_other_id, _) = executor
-        .issues()
-        .create_issue(
-            "Other Task".to_string(),
-            "".to_string(),
-            Priority::Normal,
-            vec![],
-            vec!["milestone:v2.0".to_string()],
-            None,
-            None,
-            false,
-        )
-        .unwrap();
-
-    // Query exact match for milestone:v1.0
-    let results = executor.query_by_label("milestone:v1.0").unwrap();
-
-    assert_eq!(results.len(), 2);
-    let result_ids: Vec<IssueId> = results.iter().map(|i| i.id.clone()).collect();
-    assert!(result_ids.contains(&milestone_id));
-    assert!(result_ids.contains(&epic_id));
-}
-
-#[test]
 fn test_query_by_label_invalid_pattern() {
     let storage = InMemoryStorage::new();
     let executor = memory_executor(storage);

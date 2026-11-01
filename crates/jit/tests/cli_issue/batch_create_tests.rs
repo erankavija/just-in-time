@@ -2,7 +2,7 @@
 //!
 //! Exercises the end-to-end CLI: a valid file creates all issues + edges and
 //! returns the `{key:id}` map; each pre-validation failure (duplicate key,
-//! unknown dependency, cycle, invalid label/gate/type) fails and creates ZERO
+//! unknown dependency, invalid label/gate/type) fails and creates ZERO
 //! issues; created edges are asserted via `jit issue show --json`.
 
 use jit::test_cli::JitCli;
@@ -167,38 +167,6 @@ fn test_batch_create_unknown_dependency_fails_zero_created() {
         stderr.contains("ghost"),
         "stderr should name the ref: {stderr}"
     );
-    assert_eq!(count_issues(&temp), 0);
-}
-
-#[test]
-fn test_batch_create_cycle_fails_zero_created() {
-    let taxonomy = jit::test_taxonomy::setup_test_repo_with_taxonomy();
-    let temp = JitCli::with_repository(taxonomy.temp);
-    let file = write_batch(
-        &temp,
-        r#"[
-          { "key": "a", "title": "A", "depends_on": ["b"] },
-          { "key": "b", "title": "B", "depends_on": ["a"] }
-        ]"#,
-    );
-
-    let output = temp
-        .command([
-            "issue",
-            "batch-create",
-            "--from-json",
-            file.to_str().unwrap(),
-        ])
-        .output()
-        .unwrap();
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("cycle"),
-        "stderr should report a cycle: {stderr}"
-    );
-    // Both keys named in the cycle.
-    assert!(stderr.contains('a') && stderr.contains('b'));
     assert_eq!(count_issues(&temp), 0);
 }
 

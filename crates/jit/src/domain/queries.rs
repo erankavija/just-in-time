@@ -1305,6 +1305,15 @@ mod tests {
     }
 
     #[test]
+    fn test_issues_becoming_ready_holds_the_link_after_the_one_it_promotes() {
+        let done = state_issue(0, State::Done);
+        let next = dependent_of(1, &[&done]);
+        let after_next = dependent_of(2, &[&next]);
+        let expected = next.id.clone();
+        assert_eq!(issues_becoming_ready(&[done, next, after_next]), [expected]);
+    }
+
+    #[test]
     fn test_issues_becoming_ready_leaves_dependents_outside_backlog() {
         let dependency = state_issue(0, State::Done);
         let issues = std::iter::once(dependency.clone())
