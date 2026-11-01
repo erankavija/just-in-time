@@ -115,12 +115,13 @@ kill $(jobs -p); rm -rf target/tmp/load?; git checkout -- crates/jit/src/lib.rs
 
 ## Build footprint and suite clock before and after — e2764021, 7721a2a9
 
-Every "after" figure is at commit `de34a0590` and comes from one exclusive
-build window on 2026-11-01, entered with `flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock`
-and `CARGO_INCREMENTAL=0`. Each run started at a one-minute load below 4.08 with 75 GB
-free. sccache was on at the `scripts/cargo-ci.sh` default: `RUSTC_WRAPPER` and
-`CARGO_CI_NO_SCCACHE` were unset, and a daemon with no `TMPDIR` override served
-the runs. The before run records no opt-out, so it used the same default.
+All figures below come from exclusive build windows on 2026-11-01, entered with
+`flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock` and
+`CARGO_INCREMENTAL=0`, except the footprint before row. Each run started at a one-minute
+load below 4.08. sccache was on: after runs used the `scripts/cargo-ci.sh` default, and
+before runs set `RUSTC_WRAPPER=sccache`, the value that default selects at that commit.
+After is commit `de34a0590`; before is commit `0896fc29b`, measured in a seeded
+worktree with isolated build state.
 
 ### Build footprint
 
@@ -135,12 +136,10 @@ commit `0896fc29b`, command `./scripts/cargo-ci.sh`. After is
 
 ### Suite clock
 
-Before: warm 21.1 s (16.7 s test plus 4.4 s doctest), gate run `8e22dd96` at
-`0896fc29b`; 24-29.6 s after a rebuild. After: `./scripts/cargo-ci.sh`, with
-`touch crates/jit/src/lib.rs` before each rebuild run. The suite clock excludes the
-suite-build step, which is shown separately.
+After runs are `./scripts/cargo-ci.sh`, with `touch crates/jit/src/lib.rs` before each
+rebuild run. The suite clock excludes the suite build, which is shown separately.
 
-| Run | Start load | Suite build | Test | Doctest | Suite clock |
+| After | Start load | Suite build | Test | Doctest | Suite clock |
 |---|---:|---:|---:|---:|---:|
 | Warm, first of the window | 3.31 | 0.6 s | 12.8 s | 2.9 s | 15.8 s |
 | Warm 1 | 3.98 | 0.6 s | 21.1 s | 2.8 s | 24.0 s |
@@ -149,16 +148,38 @@ suite-build step, which is shown separately.
 | Rebuild 1 | 2.55 | 37.8 s | 12.0 s | 2.7 s | 14.7 s |
 | Rebuild 2 | 2.78 | 24.8 s | 12.4 s | 4.9 s | 17.3 s |
 
-Warm 1 ran while the host load climbed to 11.34 by its end, and is the only warm
-run above the before figure. The other warm runs are 14.7-15.8 s against 21.1 s, and
-the rebuild runs are 14.7-17.3 s against 24-29.6 s. The suite went from 4,674 tests
-and 61 doctests to 4,632 tests and 25 doctests.
+`./scripts/cargo-ci.sh` cannot give a clean before figure on today's host:
+`test_cargo_ci_selftest_fails_seeded_broken_merges` hangs at that commit through the cargo
+shim loop c882f1f8 fixed, hits the 20 s limit, and takes the suite clock to about 35.7 s.
+So before runs are `cargo nextest run --workspace -E 'not test(test_cargo_ci_selftest_fails_seeded_broken_merges)'`
+followed by `cargo test --doc --workspace`, with `touch crates/jit/src/lib.rs` and
+`cargo nextest run --workspace --no-run` before each rebuild run. That excludes one test of
+4,674; it took 3.99 s in the earlier gate run below, and ran in parallel with the rest.
+
+| Before | Start load | Suite build | Test | Doctest | Test plus doctest |
+|---|---:|---:|---:|---:|---:|
+| Warm 1 | 2.93 | — | 16.9 s | 4.2 s | 21.1 s |
+| Warm 2 | 3.96 | — | 16.9 s | 4.2 s | 21.1 s |
+| Warm 3 | 2.63 | — | 16.9 s | 4.2 s | 21.1 s |
+| Rebuild 1 | 3.38 | 24.8 s | 16.9 s | 4.3 s | 21.2 s |
+| Rebuild 2 | 2.62 | 24.9 s | 16.8 s | 4.2 s | 21.1 s |
+
+Those agree with the figures this work started from, which carry no recorded load: gate run
+`8e22dd96` at `0896fc29b` (`./scripts/cargo-ci.sh`) reported 21.1 s warm, and earlier
+runs 24-29.6 s after a rebuild.
+
+Warm 1 ran while the host load climbed to 11.34 by its end, and is the only after run
+above the before figure. The other after runs are 14.7-17.3 s against 21.1 s. The suite went
+from 4,674 tests and 61 doctests to 4,632 tests and 25 doctests.
 
 ### Per-test profile
 
-`PROFILE_TEST_SUITE_OUTPUT=<path> ./scripts/profile-test-suite.sh` at load 3.95, warm,
-recorded in [`suite-profile.json`](../suite-profile.json): 4,632 tests, none over 5 s.
-The slowest is `commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling`
-at 3.62 s; before, the slowest was `server_integration` `graceful_shutdown…force_closes`
-at 5.32 s. The doctest substep ran 2.7-2.9 s warm and at most 4.9 s across the runs above,
-each at load below 10; the before figure was 4.4 s.
+After: `PROFILE_TEST_SUITE_OUTPUT=<path> ./scripts/profile-test-suite.sh` at load 3.95, warm,
+recorded in [`suite-profile.json`](../suite-profile.json): 4,632 tests, none over 5 s. The
+slowest is `commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling`
+at 3.62 s. The doctest substep ran 2.7-2.9 s warm and at most 4.9 s across the runs above.
+
+Before: the filtered nextest command with `--message-format libtest-json-plus` at load 3.51,
+warm: 4,673 tests, the slowest being `server_integration`
+`test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero` at 5.32 s,
+with the doctest substep at 4.2-4.3 s.
