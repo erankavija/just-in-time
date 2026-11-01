@@ -1,0 +1,22 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-01T13:24:02.039097168Z",
+  "dependencies": [],
+  "description": "Bring gf2's stored records to canonical writer form so whole-repository `jit validate` passes there under the current binary. This repository owns the verified procedure; the rewrite itself runs in gf2 with its owner's approval.\n\n## Background\n\nRecord-fidelity validation rejects gf2's records written by older writers: event lines with an earlier key order, issue timestamps spelled `+00:00`, and one empty gate-run directory. Events are merged with `merge=union`, so rewriting the log on main while unmerged branches append to it can duplicate events unless each branch is canonicalized before it merges.\n\n## Success Criteria\n\n- [hard] REQ-01: A test on a clone with a real unmerged gf2 branch shows what merging produces after the rewrite, and the outcome is reported.\n- [hard] REQ-02: One per-branch script applies the gate-key rename and record canonicalization, covers gate-run records, and a second run changes nothing.\n- [hard] REQ-03: Whole-repository `jit validate` passes on gf2 main under the installed binary.\n\n## Notes\n\nThe rewrite and removal of the empty gate-run directory need approval from gf2's owner. No product repair path is added: records from older writers are repaired per repository.",
+  "documents": [],
+  "first_ready_at": "2026-11-01T13:24:02.039097168Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "1a6d25ac-88f1-402d-a3e0-8b89b1bb6455",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "component:validation"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Repair gf2's stored records to canonical writer form",
+  "updated_at": "2026-11-01T13:24:02.039097168Z"
+}

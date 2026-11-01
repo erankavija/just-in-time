@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-01T13:24:02.997122490Z",
+  "dependencies": [
+    "1a6d25ac-88f1-402d-a3e0-8b89b1bb6455"
+  ],
+  "description": "An adopter's gate using the built-in `repository_validation` checker can pass where `jit validate` fails, because the two compute validation differently. They must judge through one computation.\n\n## Background\n\n`jit validate` passes record-fidelity and materialization inputs to validation; the built-in checker calls the narrower entry point and skips them. This repository's own `repo-validate` gate runs `jit validate` as an exec command, so it sees the full verdict and hides the gap. Commit c36c6a393 removed tests of stored-record properties on the basis that the gate covers them, which is false for any repository using the built-in checker.\n\n## Success Criteria\n\n- [hard] REQ-01: The built-in `repository_validation` checker and whole-repository `jit validate` reach the same verdict over the same repository, through one computation.\n- [hard] REQ-02: A repository holding a record that does not reproduce fails the built-in checker.\n- [hard] REQ-03: Each property whose test c36c6a393 removed on that basis has one owning test that does not depend on this repository's live tracker.\n\n## Notes\n\nThis must land only after gf2 passes whole-repository validation on the installed binary, because 44 open gf2 issues require a gate using the built-in checker. The pure report function planned for repository validation is expected to absorb this code.",
+  "documents": [],
+  "first_ready_at": "2026-11-01T13:24:02.997122490Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "0a6fd04e-03a5-4e61-8768-ed5aa24aaf77",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "component:validation"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Judge the built-in repository validation checker and jit validate through one computation",
+  "updated_at": "2026-11-01T13:24:06.920689726Z"
+}

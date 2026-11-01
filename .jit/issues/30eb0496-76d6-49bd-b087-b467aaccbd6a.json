@@ -1,0 +1,40 @@
+{
+  "assignee": "agent:retired-tags",
+  "claimed_at": "2026-11-01T13:24:09.969804283Z",
+  "context": {},
+  "created_at": "2026-11-01T13:24:00.583506027Z",
+  "dependencies": [],
+  "description": "`jit validate` rejects every repository whose event log holds a `profile_applied` line, because the event was retired without its tag joining the tags readers skip. Three of the four known logs are unaffected by chance; gf2 holds five such lines and cannot pass whole-repository validation.\n\n## Background\n\nThe record-fidelity pass accepts a line outside the current event vocabulary only when its tag is listed as retired. `profile_applied` was written by earlier versions and later removed from the vocabulary. A census of the event tags on every branch of the four known repositories finds it to be the only removed tag missing from the list.\n\n## Success Criteria\n\n- [hard] REQ-01: Record-fidelity validation reports no drift for a `profile_applied` event line.\n- [hard] REQ-02: A tag that is neither cataloged nor retired is still reported as unknown.",
+  "documents": [],
+  "done_at": "2026-11-01T13:36:27.657554107Z",
+  "first_ready_at": "2026-11-01T13:24:00.583506027Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3219808a-d556-45af-aaa4-63e4cddbc38e",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:29:49.524484803Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "33a24fe9-13f5-4476-9d6e-df999f71c227",
+      "status": "passed",
+      "updated_at": "2026-11-01T13:32:24.321465987Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "30eb0496-76d6-49bd-b087-b467aaccbd6a",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "component:validation"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Accept retired profile_applied event lines in record fidelity",
+  "updated_at": "2026-11-01T13:36:27.657554107Z"
+}

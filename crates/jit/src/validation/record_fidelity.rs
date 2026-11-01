@@ -13,7 +13,11 @@ use anyhow::Result;
 use serde_json::Value;
 
 /// Tags earlier versions wrote, which the log keeps and readers skip.
-const RETIRED_EVENT_TAGS: [&str; 2] = ["document_archived", "lifecycle_timestamps_backfilled"];
+const RETIRED_EVENT_TAGS: [&str; 3] = [
+    "document_archived",
+    "lifecycle_timestamps_backfilled",
+    "profile_applied",
+];
 
 /// One message per stored record that does not reproduce. What fails to parse
 /// or is absent from `image` is the records pass's finding.
@@ -232,6 +236,12 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         assert_eq!(event_log_drift(log.as_bytes()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_event_log_drift_is_empty_over_a_profile_applied_line() {
+        let line = r#"{"id":"39dc3e16-4985-440d-a1f3-ca63416ec1cd","profile_id":"jit-default","timestamp":"2026-08-05T12:01:27.128206959Z","type":"profile_applied"}"#;
+        assert_eq!(event_log_drift(line.as_bytes()), Vec::<String>::new());
     }
 
     #[test]
