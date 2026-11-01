@@ -1887,7 +1887,7 @@ mod tests {
     use crate::profile::{ProfileContributionChange, ProfilePlanStatus, ProfileTargetAction};
     use crate::repository_state::{
         Contribution, ContributionConflictOwner, ContributionIdentity, MapEntryTarget,
-        ProfilePackageId, ProfileTargetConflict, ProfileTargetConflictEntry, ProfileTargetSubject,
+        ProfileTargetConflict, ProfileTargetConflictEntry, ProfileTargetSubject,
         RepositoryStateError, RootRelativePath, ScalarTarget, SetStringTarget,
     };
     use crate::storage::JsonFileStorage;
@@ -3721,8 +3721,8 @@ template = true
         assert_eq!(
             owners,
             vec![
-                ContributionConflictOwner::Package(ProfilePackageId::new("base")),
-                ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+                ContributionConflictOwner::Package(ProfileId::try_from("base").unwrap()),
+                ContributionConflictOwner::Package(ProfileId::try_from("workflow").unwrap()),
             ]
         );
         for path in ["docs/base.txt", "docs/workflow.txt"] {
@@ -3760,8 +3760,10 @@ template = true
                 entry.conflict,
                 ProfileTargetConflict::Contested {
                     owners: vec![
-                        ContributionConflictOwner::Package(ProfilePackageId::new("base")),
-                        ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+                        ContributionConflictOwner::Package(ProfileId::try_from("base").unwrap()),
+                        ContributionConflictOwner::Package(
+                            ProfileId::try_from("workflow").unwrap()
+                        ),
                     ]
                 }
             );

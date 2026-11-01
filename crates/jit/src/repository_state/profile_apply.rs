@@ -206,7 +206,7 @@ impl std::fmt::Display for ContributionIdentity {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProfileContributionClaim {
     /// Package that contributes the definition.
-    pub(crate) package_id: ProfilePackageId,
+    pub(crate) package_id: ProfileId,
     /// Fully resolved semantic definition.
     pub(crate) contribution: Contribution,
 }
@@ -219,14 +219,14 @@ pub struct ComposedContribution {
     /// The shared resolved definition.
     pub definition: Contribution,
     /// Every package owning `definition`, sorted by package identity.
-    pub owners: Vec<ProfilePackageId>,
+    pub owners: Vec<ProfileId>,
 }
 
 /// Origin of one differing definition in a semantic contribution conflict.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum ContributionConflictOwner {
     /// A package being applied authored one of the definitions.
-    Package(ProfilePackageId),
+    Package(ProfileId),
 }
 
 impl std::fmt::Display for ContributionConflictOwner {
@@ -512,32 +512,6 @@ pub struct ProfileRegionClaim {
     pub content: Vec<u8>,
 }
 
-/// Stable semantic identity of a profile package.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
-#[serde(transparent)]
-#[schemars(with = "String")]
-pub struct ProfilePackageId(String);
-
-impl ProfilePackageId {
-    /// Construct an identity from a validated package manifest identifier.
-    pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
-    }
-
-    /// Borrow the package identifier.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for ProfilePackageId {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(formatter)
-    }
-}
-
 /// Why one profile-owned target or declaration cannot be published.
 ///
 /// Only the packages being applied are parties to a conflict; the repository's
@@ -679,7 +653,7 @@ impl ProfileTargetConflictsError {
 #[derive(Clone)]
 pub struct ProfileClaims {
     /// Package that authored these claims.
-    pub package_id: ProfilePackageId,
+    pub package_id: ProfileId,
     /// Fully resolved semantic contributions that retain their package owner.
     pub contributions: Vec<ProfileContributionClaim>,
     pub assets: Vec<ProfileAssetClaim>,
@@ -853,8 +827,7 @@ pub(crate) struct ProfileTargetDecision {
 pub(super) fn contested_asset_targets<'a>(
     selection: impl IntoIterator<Item = &'a ProfileClaims>,
 ) -> BTreeMap<VirtualPath, Vec<ContributionConflictOwner>> {
-    let mut declared =
-        BTreeMap::<&VirtualPath, Vec<(&ProfilePackageId, &ProfileAssetClaim)>>::new();
+    let mut declared = BTreeMap::<&VirtualPath, Vec<(&ProfileId, &ProfileAssetClaim)>>::new();
     for claims in selection {
         for asset in &claims.assets {
             declared
@@ -1143,7 +1116,7 @@ fn contribution_disposition(
 
 fn owned_composed_contributions(
     contributions: Vec<ComposedContribution>,
-    package_id: &ProfilePackageId,
+    package_id: &ProfileId,
 ) -> Vec<ComposedContribution> {
     contributions
         .into_iter()
@@ -1912,7 +1885,7 @@ mod tests {
 
     fn contribution_claim(package: &str, contribution: Contribution) -> ProfileContributionClaim {
         ProfileContributionClaim {
-            package_id: ProfilePackageId::new(package),
+            package_id: ProfileId::try_from(package).unwrap(),
             contribution,
         }
     }
@@ -1920,7 +1893,9 @@ mod tests {
     fn package_owners(packages: &[&str]) -> Vec<ContributionConflictOwner> {
         packages
             .iter()
-            .map(|package| ContributionConflictOwner::Package(ProfilePackageId::new(*package)))
+            .map(|package| {
+                ContributionConflictOwner::Package(ProfileId::try_from(*package).unwrap())
+            })
             .collect()
     }
 
@@ -1932,7 +1907,7 @@ mod tests {
         bytes: &[u8],
     ) -> ProfileClaims {
         ProfileClaims {
-            package_id: ProfilePackageId::new(package),
+            package_id: ProfileId::try_from(package).unwrap(),
             contributions: Vec::new(),
             assets: targets
                 .iter()
@@ -2047,8 +2022,8 @@ mod tests {
         assert_eq!(
             composed[0].owners,
             vec![
-                ProfilePackageId::new("base"),
-                ProfilePackageId::new("workflow")
+                ProfileId::try_from("base").unwrap(),
+                ProfileId::try_from("workflow").unwrap()
             ]
         );
     }
@@ -2086,7 +2061,7 @@ mod tests {
         assert_eq!(composed.len(), 2);
         assert!(composed
             .iter()
-            .all(|contribution| contribution.owners == [ProfilePackageId::new("workflow")]));
+            .all(|contribution| contribution.owners == [ProfileId::try_from("workflow").unwrap()]));
     }
 
     /// The repository is never a conflict party: a registry already declaring

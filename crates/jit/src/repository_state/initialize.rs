@@ -1127,7 +1127,7 @@ mod tests {
             .unwrap(),
             target_hashes: BTreeMap::new(),
             claims: crate::repository_state::ProfileClaims {
-                package_id: crate::repository_state::ProfilePackageId::new(id),
+                package_id: ProfileId::try_from(id).unwrap(),
                 contributions: Vec::new(),
                 assets: Vec::new(),
                 regions: Vec::new(),

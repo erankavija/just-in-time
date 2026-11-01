@@ -665,12 +665,12 @@ mod tests {
     use crate::config::ProjectName;
     use crate::declarations::rules::RuleSet;
     use crate::declarations::GateRegistry;
+    use crate::domain::identity::ProfileId;
     use crate::repository_state::{
         compare_materializations, derive_materialization, repair_target_paths, CaptureBudget,
         CaptureSpec, CapturedBytes, InitializationScaffold, MaterializationDriftKind,
         MaterializationPlan, MaterializationRequest, MutationContext, ProfileApplicationInput,
-        ProfileClaims, ProfilePackageId, RepositoryAction, RepositoryImage, RepositoryLayout,
-        RepositoryRootEvidence,
+        ProfileClaims, RepositoryAction, RepositoryImage, RepositoryLayout, RepositoryRootEvidence,
     };
     use std::collections::BTreeMap;
 
@@ -1000,7 +1000,7 @@ kind = "advisory"
             variables: crate::profile::ResolvedVariables::default(),
             target_hashes: BTreeMap::new(),
             claims: ProfileClaims {
-                package_id: ProfilePackageId::new("identity-test"),
+                package_id: ProfileId::try_from("identity-test").unwrap(),
                 contributions: Vec::new(),
                 assets: Vec::new(),
                 regions: Vec::new(),
