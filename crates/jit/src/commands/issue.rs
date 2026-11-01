@@ -672,34 +672,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
         })
     }
 
-    /// Update issue state, running prechecks before a transition to in_progress.
-    ///
-    /// Returns warnings (e.g., lease warnings) if any.
-    ///
-    /// Note: this state-only transition path (used by `jit claim` → in_progress)
-    /// intentionally does NOT run `.jit/rules.toml` local-rule enforcement:
-    /// `claim` carries no content edits. Local rules are enforced on the
-    /// content-bearing write paths (`create_issue`, `update_issue`, bulk update)
-    /// from their captured declarations. Transition-time GRAPH-rule enforcement (CC-2) and
-    /// the actual state mutation/publication are delegated to captured transition
-    /// derivation (which skips enforcement for
-    /// `Rejected`), so this path never sets `issue.state` directly.
-    pub fn update_issue_state(&self, id: &IssueId, new_state: State) -> Result<Vec<String>>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        Ok(self
-            .exec
-            .publish_captured_state_transition(
-                id,
-                new_state,
-                false,
-                new_state == State::Done,
-                true,
-            )?
-            .warnings)
-    }
-
     /// Reject an issue, recording `reason` as its `resolution:` label and
     /// promoting each dependent it unblocks, all in one redo record. A `reason` that cannot form a valid label is refused
     /// before anything is written. Rejection bypasses rule enforcement, so
@@ -1617,9 +1589,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap();
 
         // Transition to Rejected should succeed without passing gates
-        let result = executor
-            .issues()
-            .update_issue_state(&issue_id, State::Rejected);
+        let result = crate::test_utils::transition_issue(&executor, &issue_id, State::Rejected);
         assert!(
             result.is_ok(),
             "Rejected state should bypass gate validation"
@@ -1656,9 +1626,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         // Transition to Rejected should succeed even with unmet dependencies
-        let result = executor
-            .issues()
-            .update_issue_state(&issue_id, State::Rejected);
+        let result = crate::test_utils::transition_issue(&executor, &issue_id, State::Rejected);
         assert!(
             result.is_ok(),
             "Rejected state should bypass dependency checks"
@@ -1691,7 +1659,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap();
 
         // Transition to Done should fail (gates not passed)
-        let result = executor.issues().update_issue_state(&issue_id, State::Done);
+        let result = crate::test_utils::transition_issue(&executor, &issue_id, State::Done);
         assert!(
             result.is_err(),
             "Done state should still enforce gate validation"
@@ -1725,7 +1693,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // First `--state done`: a genuine in_progress -> gated transition, which
         // should persist and emit exactly one state-change event.
-        let first = executor.issues().update_issue_state(&issue_id, State::Done);
+        let first = crate::test_utils::transition_issue(&executor, &issue_id, State::Done);
         assert!(first.is_err(), "unpassed gates should block done");
         let gated = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(gated.state, State::Gated);
@@ -1736,7 +1704,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         // Retry `--state done` on the already-gated issue. It must still report
         // the blocking gates, but must NOT append another state-change event or
         // bump updated_at (the no-op gated -> gated audit-log corruption).
-        let retry = executor.issues().update_issue_state(&issue_id, State::Done);
+        let retry = crate::test_utils::transition_issue(&executor, &issue_id, State::Done);
         assert!(retry.is_err(), "retry should still report blocking gates");
 
         let after = executor.storage.load_issue(&issue_id).unwrap();

@@ -4120,7 +4120,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         // Try to start work - should run prechecks
         executor
             .issues()
-            .update_issue_state(&issue_id, State::InProgress)
+            .claim_issue(&issue_id, "agent:worker".parse().unwrap())
             .unwrap();
 
         // Verify prechecks ran and issue transitioned
@@ -4161,10 +4161,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 },
             )
             .unwrap();
-        executor
-            .issues()
-            .update_issue_state(&issue_id, State::Ready)
-            .unwrap();
+        crate::test_utils::transition_issue(&executor, &issue_id, State::Ready).unwrap();
 
         let root = repo.path().join(".jit/gate-runs");
         for index in 0..257 {
@@ -4191,7 +4188,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         executor
             .issues()
-            .update_issue_state(&issue_id, State::InProgress)
+            .claim_issue(&issue_id, "agent:worker".parse().unwrap())
             .unwrap();
 
         let issue = executor.storage.load_issue(&issue_id).unwrap();
@@ -4229,15 +4226,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 },
             )
             .unwrap();
-        executor
-            .issues()
-            .update_issue_state(&issue_id, State::Ready)
-            .unwrap();
+        crate::test_utils::transition_issue(&executor, &issue_id, State::Ready).unwrap();
         write_corrupt_gate_run(repo.path());
 
         executor
             .issues()
-            .update_issue_state(&issue_id, State::InProgress)
+            .claim_issue(&issue_id, "agent:worker".parse().unwrap())
             .unwrap();
 
         let issue = executor.storage.load_issue(&issue_id).unwrap();
@@ -4291,7 +4285,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         // Try to start work - should fail
         let result = executor
             .issues()
-            .update_issue_state(&issue_id, State::InProgress);
+            .claim_issue(&issue_id, "agent:worker".parse().unwrap());
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("precheck"));
 
@@ -4330,14 +4324,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 },
             )
             .unwrap();
-        executor
-            .issues()
-            .update_issue_state(&issue_id, State::Ready)
-            .unwrap();
+        crate::test_utils::transition_issue(&executor, &issue_id, State::Ready).unwrap();
 
         executor
             .issues()
-            .update_issue_state(&issue_id, State::InProgress)
+            .claim_issue(&issue_id, "agent:worker".parse().unwrap())
             .unwrap();
 
         assert_eq!(
@@ -4364,7 +4355,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     /// A broad precheck remains stable when the issue has document references.
     #[test]
-    fn test_update_issue_state_broad_precheck_over_issue_documents_records_a_stable_run() {
+    fn test_claim_broad_precheck_over_issue_documents_records_a_stable_run() {
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let config = format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
@@ -4387,14 +4378,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         executor
             .add_document_reference(&issue_id, "dev/notes.md", None, None, None, true)
             .unwrap();
-        executor
-            .issues()
-            .update_issue_state(&issue_id, State::Ready)
-            .unwrap();
+        crate::test_utils::transition_issue(&executor, &issue_id, State::Ready).unwrap();
 
         executor
             .issues()
-            .update_issue_state(&issue_id, State::InProgress)
+            .claim_issue(&issue_id, "agent:worker".parse().unwrap())
             .unwrap();
 
         let runs = executor

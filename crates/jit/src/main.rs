@@ -3461,7 +3461,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
 
                 match executor.update_gate(&key, update) {
-                    Ok(gate) => {
+                    Ok((gate, warnings)) => {
+                        for warning in warnings {
+                            output_ctx.print_warning(&warning)?;
+                        }
                         if json {
                             use jit::output::JsonOutput;
                             let msg = format!("Updated gate '{}'", gate.key);

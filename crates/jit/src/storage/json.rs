@@ -811,14 +811,17 @@ impl JsonFileStorage {
     /// Load every issue the aggregated membership names, under an
     /// already-held `.index.lock`.
     ///
-    /// This is the enumeration both read-all paths share: an id the fallback
-    /// chain cannot load is skipped rather than failing the read.
+    /// An id whose record vanished since membership was read is skipped; a
+    /// record that exists and cannot be read or parsed fails the listing,
+    /// naming it, so a listing never hides an issue.
     fn read_member_issues(&self) -> Result<Vec<Issue>> {
-        Ok(self
-            .load_aggregated_issue_ids()?
+        self.load_aggregated_issue_ids()?
             .iter()
-            .filter_map(|id| self.load_issue(id).ok())
-            .collect())
+            .filter_map(|id| match self.load_issue(id) {
+                Err(error) if error.downcast_ref::<IssueNotFoundError>().is_some() => None,
+                loaded => Some(loaded),
+            })
+            .collect()
     }
 
     /// Load an issue from the main worktree's `.jit/` directory.
@@ -2143,6 +2146,30 @@ mod tests {
 
             assert!(listed.iter().any(|listed| listed.id == issue.id));
             assert_eq!(before, after);
+        }
+
+        #[test]
+        fn test_list_issues_fails_naming_a_record_it_cannot_parse() {
+            let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
+            let sound = crate::test_utils::fixture_issue("Sound".to_string(), String::new());
+            let broken = crate::test_utils::fixture_issue("Broken".to_string(), String::new());
+            seed_issue_preimage(&storage, &sound);
+            seed_issue_preimage(&storage, &broken);
+            let broken_path = storage
+                .path_layout()
+                .unwrap()
+                .resolve(&VirtualPath::issue_record(&broken.id))
+                .unwrap();
+            fs::write(&broken_path, "{ not an issue").unwrap();
+
+            let error = storage
+                .list_issues()
+                .expect_err("a listing must not hide an unparseable record");
+
+            assert!(
+                format!("{error:#}").contains(broken.id.as_str()),
+                "the failure names the record: {error:#}"
+            );
         }
 
         #[test]

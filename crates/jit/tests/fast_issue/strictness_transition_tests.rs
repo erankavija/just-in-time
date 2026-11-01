@@ -66,7 +66,7 @@ fn test_warn_graph_rule_blocks_transition_under_strict() {
         },
     );
     let epic = seed_epic(&executor);
-    let result = executor.issues().update_issue_state(&epic, State::Done);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Done);
     assert!(
         result.is_err(),
         "strict must block the done transition on a warning-only graph violation"
@@ -89,7 +89,7 @@ fn test_warn_graph_rule_does_not_block_transition_under_loose() {
         },
     );
     let epic = seed_epic(&executor);
-    let result = executor.issues().update_issue_state(&epic, State::Done);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Done);
     assert!(
         result.is_ok(),
         "loose must allow the transition; a warning does not block: {result:?}"
@@ -110,7 +110,7 @@ fn test_enforced_graph_rule_blocks_transition_under_loose() {
         },
     );
     let epic = seed_epic(&executor);
-    let result = executor.issues().update_issue_state(&epic, State::Done);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Done);
     assert!(
         result.is_err(),
         "loose must block the done transition on an enforced-error graph violation"
@@ -129,7 +129,7 @@ fn test_enforced_graph_rule_allowed_under_permissive() {
         },
     );
     let epic = seed_epic(&executor);
-    let result = executor.issues().update_issue_state(&epic, State::Done);
+    let result = jit::test_utils::transition_issue(&executor, &epic, State::Done);
     assert!(
         result.is_ok(),
         "permissive must downgrade even an enforced-error graph violation: {result:?}"

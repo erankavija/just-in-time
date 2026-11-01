@@ -3659,12 +3659,9 @@ depends_on = ["planning"]
     #[test]
     fn test_capture_mutation_preflight_precheck_transition_reads_base_in_one_round() {
         let (executor, target_id, mut counter) = counted_session();
-        let start = crate::commands::CapturedLifecycleMutation::State {
+        let start = crate::commands::CapturedLifecycleMutation::Claim {
             issue_id: target_id.clone(),
-            target: crate::domain::State::InProgress,
-            force: false,
-            divert_unpassed_gates: false,
-            enforce_lease: false,
+            assignee: "agent:worker".parse().unwrap(),
         };
 
         let preflight = executor

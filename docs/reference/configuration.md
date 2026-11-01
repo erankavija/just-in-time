@@ -498,8 +498,8 @@ commands all resolve it by this rule; environment variables do not change it.
 
 `jit issue update --filter` checks every matched issue and refuses the whole
 operation before writing, naming the leased ones.
-`jit gate remove` refuses when another agent leases an issue that requires the
-gate.
+`jit gate remove` and `jit gate update` refuse when another agent leases an
+issue that requires the gate.
 
 Some writes reach a leased issue without the check: `jit issue release`
 (timeout recovery with a required reason; its event names who released),

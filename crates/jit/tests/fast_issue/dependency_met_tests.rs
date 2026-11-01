@@ -11,10 +11,7 @@ use jit::test_harness::TestHarness;
 
 /// Reject an issue outright, the way `jit issue reject` does.
 fn reject(h: &TestHarness, id: &IssueId) {
-    h.executor
-        .issues()
-        .update_issue_state(id, State::Rejected)
-        .unwrap();
+    jit::test_utils::transition_issue(&h.executor, id, State::Rejected).unwrap();
 }
 
 #[test]
@@ -25,10 +22,7 @@ fn test_transition_to_ready_allows_rejected_dependency() {
     h.executor.add_dependency(&dependent, &dependency).unwrap();
     reject(&h, &dependency);
 
-    h.executor
-        .issues()
-        .update_issue_state(&dependent, State::Ready)
-        .unwrap();
+    jit::test_utils::transition_issue(&h.executor, &dependent, State::Ready).unwrap();
 
     assert_eq!(h.get_issue(&dependent).state, State::Ready);
 }
@@ -41,14 +35,8 @@ fn test_transition_to_done_allows_rejected_dependency() {
     h.executor.add_dependency(&dependent, &dependency).unwrap();
     reject(&h, &dependency);
 
-    h.executor
-        .issues()
-        .update_issue_state(&dependent, State::InProgress)
-        .unwrap();
-    h.executor
-        .issues()
-        .update_issue_state(&dependent, State::Done)
-        .unwrap();
+    jit::test_utils::transition_issue(&h.executor, &dependent, State::InProgress).unwrap();
+    jit::test_utils::transition_issue(&h.executor, &dependent, State::Done).unwrap();
 
     assert_eq!(h.get_issue(&dependent).state, State::Done);
 }
@@ -82,10 +70,7 @@ fn test_claim_next_skips_issue_with_unmet_dependency() {
     let dependency = h.create_issue("Live upstream");
     h.executor.add_dependency(&dependent, &dependency).unwrap();
     // The upstream leaves the ready set itself, so only `dependent` could match.
-    h.executor
-        .issues()
-        .update_issue_state(&dependency, State::InProgress)
-        .unwrap();
+    jit::test_utils::transition_issue(&h.executor, &dependency, State::InProgress).unwrap();
 
     let result = h
         .executor
