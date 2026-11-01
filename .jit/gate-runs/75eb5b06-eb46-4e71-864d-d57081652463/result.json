@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4afb5cc34420c9327b4343d93d550e3212f10c18",
+  "completed_at": "2026-11-01T14:16:45.282216986Z",
+  "duration_ms": 270398,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are met; the prior documentation finding is corrected.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5f71a48d-16d4-442d-96e4-1fa10f4aed80",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "75eb5b06-eb46-4e71-864d-d57081652463",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T14:12:14.883299012Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8ffd504de, aae8ed2b, 3ff7246e, 8ad68fab, 27690e87, ea3d31c, cce53ea, 4afb5cc (all `jit:5f71a48d`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/5f71a48d/requirement/REQ-01–REQ-04 (.jit issue description, markdown-first); @/invariant/label-format, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-11-01T14:11:49Z); prior code-review failed (exit 1), and its comma-label grammar finding is corrected in the current tree\nTruncation recovery: Re-read affected commits and current implementation, tests, CLI dispatch, identity parsing, and documentation in bounded path/range queries after combined output truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; the prior documentation finding is corrected.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
