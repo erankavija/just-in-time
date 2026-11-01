@@ -16,24 +16,14 @@ pub mod package_capture;
 mod repository_package;
 mod variables;
 mod wire;
-// Repository-local check seam: this checkout's packaged contributions bound to
-// the registry entries they restate, plus the report shape that and the
-// template-region drift assertion share. Neither has a production caller, and
-// both build with dev-dependencies active, so gating them on the same pair
-// keeps them out of an adopter build entirely.
-#[cfg(any(test, feature = "test-support"))]
-pub mod contribution_drift;
-#[cfg(any(test, feature = "test-support"))]
-pub mod drift_report;
 // Repository-local generator seam: the render of this repository's generated
-// template region has two consumers, the artifact registry the `regenerate`
+// registry regions has two consumers, the artifact registry the `regenerate`
 // example publishes through and the `package-drift` example's check, and no
-// production caller. Both build
-// with dev-dependencies active, which turns on `test-support` through the
-// crate's own self-edge, so gating the module on that pair keeps it out of an
-// adopter build entirely rather than shipping it as unreachable surface.
+// production caller. Both build with dev-dependencies active, which turns on
+// `test-support` through the crate's own self-edge, so gating the module on that
+// pair keeps it out of an adopter build entirely.
 #[cfg(any(test, feature = "test-support"))]
-pub mod template_region;
+pub mod registry_region;
 
 pub(crate) use application::SelectionObservation;
 pub use application::{

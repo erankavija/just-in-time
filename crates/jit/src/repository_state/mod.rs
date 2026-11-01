@@ -162,11 +162,6 @@ pub use profile_apply::{
 pub(crate) use profile_apply::{
     profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
 };
-// The declared value of one contribution as JSON: the packaged-carrier
-// comparison in `profile::contribution_drift` — a repository-local check seam —
-// is its only caller.
-#[cfg(any(test, feature = "test-support"))]
-pub(crate) use profile_apply::contributed_json_value;
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
 };
