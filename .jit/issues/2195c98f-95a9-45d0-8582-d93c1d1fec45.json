@@ -28,8 +28,16 @@
       "format": "markdown",
       "label": "Session 3 handoff",
       "path": "dev/active/2195c98f-semantic-types/handoff-2.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/2195c98f-semantic-types/completion-report.md"
     }
   ],
+  "done_at": "2026-11-01T05:30:03.966921533Z",
   "first_ready_at": "2026-10-20T20:12:36.610884572Z",
   "gates_required": [
     "repo-validate",
@@ -61,7 +69,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-11-01T05:28:45.465794931Z"
+  "updated_at": "2026-11-01T05:30:04.386688398Z"
 }

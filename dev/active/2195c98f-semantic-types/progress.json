@@ -658,7 +658,9 @@
     },
     "83413035",
     "2ac34492",
-    "1a3db2c3"
+    "1a3db2c3",
+    "64420cff",
+    "592d663e"
   ],
   "escalations": [
     {
@@ -1571,6 +1573,55 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "generic hierarchy retype"
+    },
+    {
+      "issue": "855d027d",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "well-specified path sweep"
+    },
+    {
+      "issue": "79aa3aa7",
+      "vendor": "claude",
+      "model": "opus",
+      "effort": "default",
+      "reason": "contract-setting GateRunId"
+    },
+    {
+      "issue": "2ac34492",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "narrow option removal"
+    },
+    {
+      "issue": "417be079",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "wide gate-key retype"
+    },
+    {
+      "issue": "1a3db2c3",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "generic graph retype"
+    },
+    {
+      "issue": "64420cff",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "class sweep"
+    },
+    {
+      "issue": "592d663e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "narrow type replacement"
     }
   ],
   "surfaced_pitfalls": [
@@ -1655,7 +1706,7 @@
     "A branch's first cargo-ci after a main merge can fail crate_source_digest self-check from a stale target; cargo clean -p jit in that worktree and re-land.",
     "cargo clean -p jit before every gated cargo-ci: merging main leaves a stale compiled-in source digest often enough to cost a gate cycle per landing."
   ],
-  "session_note": "Session 6 (lead just-in-time-ad): 7abcc22d landed; next wave 0102769f, 488eb3c1, ce2bdbb0, 83413035. Escalations go to just-in-time-c9 per invoker rule.",
+  "session_note": "Session 6: epic complete. See completion-report.md.",
   "decisions": [
     {
       "issue": "8acca4f4",
@@ -1683,7 +1734,8 @@
     "5dd29767",
     "83d04069",
     "8c40d01b",
-    "9537f74b"
+    "9537f74b",
+    "e2651d77"
   ],
   "session_rules": [
     "Session 4 (invoker): do not stop to ask questions; record any escalation as blocked for the next session; write the handoff when all remaining work waits on invoker input; check workers every 30 min.",
