@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "77ab6fd3-acc5-4c34-8d18-53a3c3ca1c38",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:16:09.230983934Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e9e14d6e-9e9f-4e69-9bd2-6f8caef0de64",
+      "status": "passed",
+      "updated_at": "2026-11-01T18:18:49.761045722Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "03ce8d2c-98f7-4ab6-bcae-08406bb3b5c1",
   "labels": [
     "epic:lead-friction",
@@ -22,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Query all silently skips malformed records",
-  "updated_at": "2026-11-01T17:47:08.460597135Z"
+  "updated_at": "2026-11-01T18:18:49.761045722Z"
 }

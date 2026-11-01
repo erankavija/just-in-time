@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0e02052cd2db1dab8ee9bd52b1350f97f995861e",
+  "completed_at": "2026-11-01T18:21:18.899961114Z",
+  "duration_ms": 308920,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/fast_issue/dependency_met_tests.rs",
+        "id": "F1",
+        "line": 25,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "The rejected-dependency Ready-transition test targets a dependent already auto-promoted to Ready."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/fast_issue/archived_semantics_tests.rs",
+        "id": "F2",
+        "line": 48,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "Archived-terminal dependency tests target dependents already auto-promoted to Ready and no longer exercise archived dependency satisfaction."
+      }
+    ],
+    "summary": "Two rewritten transition tests are vacuous after terminal-state auto-promotion.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0838348a-2fb7-4a57-a75c-c3a7f1252f42",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e6531d78-66fc-4c4a-b55f-dfea69fd84bc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T18:16:09.979555600Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10588 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19853-7aa5-7342-9bf7-2c8a4f1de9e9\n--------\nuser\n--- 10575 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: d464fd863; 0e02052cd  \nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml  \nResolved items: @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/gate-semantics, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)  \nGate evidence: cargo-ci passed (exit code none, reused); code-review pending  \nTruncation recovery: reread each changed source/test file, merge-only delta, helper/current test sections, and governing registry entries in bounded calls  \n\n1. [blocking][issue-impact] `crates/jit/tests/fast_issue/dependency_met_tests.rs:25` no longer verifies that a rejected dependency permits a blocked dependent to transition to `Ready`. The new helper uses `update_issue`, which auto-promotes dependents after the rejection at line 23; the line-25 request therefore targets an already-`Ready` issue. Preserve a blocked dependent before exercising the transition. References: @/invariant/orthogonal-tests.\n\n2. [blocking][issue-impact] `crates/jit/tests/fast_issue/archived_semantics_tests.rs:48` (and the equivalent rejected-origin case at line 124) no longer proves that an archived terminal dependency satisfies a dependent. `drive_to_done`/the rejection helper promote the dependent before archival, so each subsequent `Ready` update observes an already-`Ready` issue. Set up a still-blocked dependent before testing the archived state’s transition behavior. References: @/invariant/orthogonal-tests.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two rewritten transition tests are vacuous after terminal-state auto-promotion.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The rejected-dependency Ready-transition test targets a dependent already auto-promoted to Ready.\",\"file\":\"crates/jit/tests/fast_issue/dependency_met_tests.rs\",\"line\":25,\"references\":[\"@/invariant/orthogonal-tests\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Archived-terminal dependency tests target dependents already auto-promoted to Ready and no longer exercise archived dependency satisfaction.\",\"file\":\"crates/jit/tests/fast_issue/archived_semantics_tests.rs\",\"line\":48,\"references\":[\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
