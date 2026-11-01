@@ -21,7 +21,9 @@ use jit::cli::{
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, ProfileCommands,
     ProjectCommands,
 };
-use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
+use jit::commands::{
+    parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
+};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -466,12 +468,11 @@ fn invalid_argument(message: String, json: bool) -> anyhow::Error {
 }
 
 /// Parse the one ordered selector stream accepted by profile commands.
-fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<ProfileSelector>> {
+fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<PathBuf>> {
     values
         .iter()
         .map(|value| {
-            value
-                .parse::<ProfileSelector>()
+            parse_profile_selector(value)
                 .map_err(|error| invalid_argument(format!("{error}"), json))
         })
         .collect()

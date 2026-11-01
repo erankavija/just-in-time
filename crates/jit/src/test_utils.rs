@@ -5,7 +5,6 @@
 #![cfg(any(test, feature = "test-support"))]
 
 use crate::commands::CommandExecutor;
-use crate::commands::ProfileSelector;
 use crate::config::ItemKindConfig;
 use crate::domain::{identity::IssueId, DocumentReference};
 use crate::profile::{capture_package_tree, ProfilePackage, ProfilePackageModel};
@@ -350,7 +349,7 @@ fn initialize_profiled_repository_fixture(
     let layout = storage.repository_layout();
     let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
     let selection = executor.select_profiles(
-        &[ProfileSelector::path(&selected)],
+        &[PathBuf::from(&selected)],
         &crate::commands::ProfileVariableOptions::default(),
     )?;
     executor.initialize_fresh_repository(repository, Some(&selection))?;
@@ -1311,7 +1310,7 @@ pub fn profile_package_fixture(name: &str) -> PathBuf {
 /// apply` does.
 pub fn apply_selected_packages<S: IssueStore + crate::storage::RepositoryStateStore>(
     executor: &CommandExecutor<S>,
-    selectors: &[crate::commands::ProfileSelector],
+    selectors: &[PathBuf],
 ) -> Result<crate::profile::ProfileComposedApplyResult> {
     executor
         .select_profiles(
@@ -1342,12 +1341,11 @@ pub fn transition_issue<S: IssueStore + crate::storage::RepositoryStateStore>(
 }
 
 /// The selector naming the directory `package` was read from.
-fn selector_of(package: &crate::profile::ProfilePackage) -> crate::commands::ProfileSelector {
-    crate::commands::ProfileSelector::path(
-        package
-            .directory()
-            .expect("the selector names a package read from a directory"),
-    )
+fn selector_of(package: &crate::profile::ProfilePackage) -> PathBuf {
+    package
+        .directory()
+        .expect("the selector names a package read from a directory")
+        .to_path_buf()
 }
 
 /// Apply `package` and the packages it depends on.
@@ -1713,9 +1711,7 @@ mod tests {
                 .with_layout(discover_repository_layout(&reference, &jit_root).unwrap());
             let selection = executor
                 .select_profiles(
-                    &[ProfileSelector::path(
-                        reference.join(package_directory).join(spec.id),
-                    )],
+                    &[reference.join(package_directory).join(spec.id)],
                     &crate::commands::ProfileVariableOptions::default(),
                 )
                 .unwrap();

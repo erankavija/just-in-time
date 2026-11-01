@@ -26,7 +26,6 @@ use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 /// Project one run's dependency-first per-package answers onto the ordered root
 /// observations the caller made.
@@ -67,14 +66,6 @@ pub(super) fn selection_profile_results(
     Ok(ProfileComposedApplyResult::new(observations))
 }
 
-/// One ordered profile selection from the command boundary: the package
-/// directory, resolved relative to the repository worktree.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ProfileSelector {
-    /// A package directory, resolved relative to the repository worktree.
-    Path(PathBuf),
-}
-
 /// A malformed `--profile` selector.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ProfileSelectorError {
@@ -91,26 +82,17 @@ pub enum ProfileSelectorError {
     EmptyPath,
 }
 
-impl FromStr for ProfileSelector {
-    type Err = ProfileSelectorError;
-
-    fn from_str(selector: &str) -> Result<Self, Self::Err> {
-        if selector.is_empty() {
-            Err(ProfileSelectorError::EmptyPath)
-        } else if selector.starts_with("id:") || selector.starts_with("path:") {
-            Err(ProfileSelectorError::TaggedSelector {
-                selector: selector.to_string(),
-            })
-        } else {
-            Ok(Self::path(selector))
-        }
-    }
-}
-
-impl ProfileSelector {
-    /// Construct a selector from a worktree-relative or absolute spelling.
-    pub fn path(path: impl Into<PathBuf>) -> Self {
-        Self::Path(path.into())
+/// Parse one `--profile` value into the package directory it names, resolved
+/// later relative to the repository worktree.
+pub fn parse_profile_selector(selector: &str) -> Result<PathBuf, ProfileSelectorError> {
+    if selector.is_empty() {
+        Err(ProfileSelectorError::EmptyPath)
+    } else if selector.starts_with("id:") || selector.starts_with("path:") {
+        Err(ProfileSelectorError::TaggedSelector {
+            selector: selector.to_string(),
+        })
+    } else {
+        Ok(PathBuf::from(selector))
     }
 }
 
@@ -318,10 +300,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     /// Resolve every selector in occurrence order before any package is applied.
     ///
     /// A repeated selector reads its package once.
-    fn resolve_profile_selectors(
-        &self,
-        selectors: &[ProfileSelector],
-    ) -> Result<Vec<ProfilePackage>> {
+    fn resolve_profile_selectors(&self, selectors: &[PathBuf]) -> Result<Vec<ProfilePackage>> {
         #[cfg(test)]
         crate::profile::selection_probe::record(
             crate::profile::selection_probe::SelectionStage::SelectorResolution,
@@ -330,8 +309,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let mut read = BTreeMap::<PathBuf, ProfilePackage>::new();
         selectors
             .iter()
-            .map(|selector| {
-                let ProfileSelector::Path(location) = selector;
+            .map(|location| {
                 let directory = supplied_package_directory(location, &layout)?;
                 if let Some(package) = read.get(&directory) {
                     return Ok(package.clone());
@@ -633,7 +611,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     }
 
     /// Inspect every selected profile package in selector occurrence order.
-    pub fn show_profiles(&self, selectors: &[ProfileSelector]) -> Result<ProfileShowResult> {
+    pub fn show_profiles(&self, selectors: &[PathBuf]) -> Result<ProfileShowResult> {
         let layout = self.require_layout()?;
         let profiles = self
             .resolve_profile_selectors(selectors)?
@@ -671,7 +649,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
     /// and a package that cannot be resolved or composed.
     pub fn select_profiles(
         &self,
-        selectors: &[ProfileSelector],
+        selectors: &[PathBuf],
         options: &ProfileVariableOptions,
     ) -> Result<ProfileSelection> {
         let roots = self.resolve_profile_selectors(selectors)?;
@@ -1572,7 +1550,7 @@ mod tests {
     /// Apply `selectors` the way `jit profile apply` does.
     fn apply_selected(
         executor: &CommandExecutor<JsonFileStorage>,
-        selectors: &[ProfileSelector],
+        selectors: &[PathBuf],
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
         executor
@@ -1583,7 +1561,7 @@ mod tests {
     /// Resolve `selector` to the one package it names.
     fn resolved_selector(
         executor: &CommandExecutor<JsonFileStorage>,
-        selector: &ProfileSelector,
+        selector: &PathBuf,
     ) -> Result<ProfilePackage> {
         executor
             .resolve_profile_selectors(std::slice::from_ref(selector))
@@ -1622,7 +1600,7 @@ mod tests {
     /// Rehearse `selectors` the way `jit profile apply --dry-run` does.
     fn plan_selected(
         executor: &CommandExecutor<JsonFileStorage>,
-        selectors: &[ProfileSelector],
+        selectors: &[PathBuf],
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
         executor
@@ -1633,7 +1611,7 @@ mod tests {
     /// Report `selectors` the way `jit profile diff` does.
     fn diff_selected(
         executor: &CommandExecutor<JsonFileStorage>,
-        selectors: &[ProfileSelector],
+        selectors: &[PathBuf],
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
         executor
@@ -1642,11 +1620,11 @@ mod tests {
     }
 
     /// Select a package through the worktree location it was read from.
-    fn package_selector(package: &ProfilePackage) -> ProfileSelector {
-        let path = package
+    fn package_selector(package: &ProfilePackage) -> PathBuf {
+        package
             .directory()
-            .expect("the fixture package was read from a directory");
-        ProfileSelector::path(path)
+            .expect("the fixture package was read from a directory")
+            .to_path_buf()
     }
 
     /// The profile ids this repository's audit log records as applied, in the
@@ -1875,7 +1853,7 @@ mod tests {
         let executor = file_executor(temp.path()).unwrap();
         let supplied = package_read_from(&temp, "vendor/supplied");
 
-        let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
+        let selector = temp.path().join("vendor/supplied");
         let resolved = resolved_selector(&executor, &selector).unwrap();
 
         assert_eq!(resolved.hashes(), supplied.hashes());
@@ -2026,17 +2004,15 @@ mod tests {
     #[test]
     fn test_profile_selector_parse_reads_a_bare_directory_path() {
         assert_eq!(
-            "packages/workflow".parse::<ProfileSelector>(),
-            Ok(ProfileSelector::path("packages/workflow"))
+            parse_profile_selector("packages/workflow"),
+            Ok(PathBuf::from("packages/workflow"))
         );
     }
 
     #[test]
     fn test_profile_selector_parse_refuses_a_retired_tag_naming_the_bare_path_form() {
         for selector in ["id:workflow", "path:packages/workflow", "path:"] {
-            let error = selector
-                .parse::<ProfileSelector>()
-                .expect_err("a tagged selector is refused");
+            let error = parse_profile_selector(selector).expect_err("a tagged selector is refused");
             assert!(
                 matches!(&error, ProfileSelectorError::TaggedSelector { selector: given } if given == selector),
                 "{error}"
@@ -2051,7 +2027,7 @@ mod tests {
     #[test]
     fn test_profile_selector_parse_refuses_an_empty_path() {
         assert_eq!(
-            "".parse::<ProfileSelector>(),
+            parse_profile_selector(""),
             Err(ProfileSelectorError::EmptyPath)
         );
     }
@@ -2061,7 +2037,7 @@ mod tests {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
         let package = package_read_from(&temp, "vendor/supplied");
-        let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
+        let selector = temp.path().join("vendor/supplied");
         let resolved = resolved_selector(&executor, &selector).unwrap();
         assert_eq!(resolved.model().id, package.model().id);
     }
@@ -2071,7 +2047,7 @@ mod tests {
         let (temp, _) = setup_test_repo().unwrap();
         let executor = file_executor(temp.path()).unwrap();
 
-        let selector = ProfileSelector::path(temp.path().join("vendor/absent"));
+        let selector = temp.path().join("vendor/absent");
         let error = resolved_selector(&executor, &selector).unwrap_err();
 
         assert!(
@@ -2905,7 +2881,7 @@ template = true
         let storage = executor.storage().clone();
         package_read_from(&temp, FIXTURE_LOCATION);
         let before = storage.read_events().unwrap();
-        let selector = ProfileSelector::path(FIXTURE_LOCATION);
+        let selector = PathBuf::from(FIXTURE_LOCATION);
 
         let result = plan_selected(
             &executor,
@@ -4308,7 +4284,7 @@ template = true
     fn dependent_selection(
         temp: &TempDir,
         executor: &CommandExecutor<JsonFileStorage>,
-    ) -> (ProfileSelector, usize) {
+    ) -> (PathBuf, usize) {
         package_declaring(temp, "vendor/base", "base", &[]);
         let root = package_declaring(temp, "vendor/workflow", "workflow", &["base"]);
         let closure = selected_closure(executor, &root).unwrap().len();
@@ -4321,15 +4297,15 @@ template = true
         let executor = file_executor(temp.path()).unwrap();
         let (absolute, closure) = dependent_selection(&temp, &executor);
         let selectors = vec![
-            ProfileSelector::path("vendor/workflow"),
+            PathBuf::from("vendor/workflow"),
             absolute,
-            ProfileSelector::path("vendor/./workflow/"),
+            PathBuf::from("vendor/./workflow/"),
         ];
         #[cfg(unix)]
         let selectors = {
             std::os::unix::fs::symlink("vendor", temp.path().join("alias")).unwrap();
             let mut selectors = selectors;
-            selectors.push(ProfileSelector::path("alias/workflow"));
+            selectors.push(PathBuf::from("alias/workflow"));
             selectors
         };
         let (planned, stages) = selection_probe::observe(|| {
@@ -4348,10 +4324,7 @@ template = true
         for spelling in ["vendor/../vendor/workflow", "vendor/workflow/../workflow"] {
             for location in [PathBuf::from(spelling), temp.path().join(spelling)] {
                 let (result, stages) = selection_probe::observe(|| {
-                    executor.select_profiles(
-                        &[ProfileSelector::path(location)],
-                        &ProfileVariableOptions::default(),
-                    )
+                    executor.select_profiles(&[location], &ProfileVariableOptions::default())
                 });
 
                 let error = result.err().expect("parent traversal must remain rejected");
@@ -4374,7 +4347,7 @@ template = true
         std::os::unix::fs::symlink("workflow", temp.path().join("vendor/alias")).unwrap();
 
         let result = executor.select_profiles(
-            &[selector, ProfileSelector::path("vendor/alias")],
+            &[selector, PathBuf::from("vendor/alias")],
             &ProfileVariableOptions::default(),
         );
 
@@ -4400,7 +4373,7 @@ template = true
         std::os::unix::fs::symlink(outside.path(), temp.path().join("outside")).unwrap();
 
         let result = executor.select_profiles(
-            &[ProfileSelector::path("outside/vendor/workflow")],
+            &[PathBuf::from("outside/vendor/workflow")],
             &ProfileVariableOptions::default(),
         );
 
