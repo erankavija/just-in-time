@@ -96,7 +96,7 @@
           "title": "Archive derived documents with their issue",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "f9ab44aa-1df9-49f7-a335-2a3c2880ac06",
@@ -166,7 +166,7 @@
           "title": "Give issue rejection one command form",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         }
       ],
       "note": "da12ad66 waits on 5f71a48d"
@@ -188,7 +188,7 @@
           "title": "Show word status markers in documented command output",
           "classification": "documentation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -248,7 +248,7 @@
           "title": "Build one profile selection per invocation",
           "classification": "implementation",
           "model": "opus",
-          "status": "paused; merge approved; latest full gate pending"
+          "status": "done"
         }
       ]
     },
@@ -473,7 +473,7 @@
           "title": "Refuse a profile apply over uncommitted target changes",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "done"
         }
       ],
       "note": "waits on f4d9502a (steward re-home pending)"
@@ -570,7 +570,8 @@
   "resource_policy": "steward: <=1 live worktree, dispatch only with >=60GB free, CARGO_INCREMENTAL=0, full gates under turnstile+exclusive flock, other cargo under turnstile+shared flock",
   "notes": [
     "2026-10-22 Codex resumed existing abe963dd deb013162; no recorded gates. Preliminary review found equivalent relative/absolute selectors repeat model validation; focused regression/fix underway in existing worktree. Waiting for 63c11d08 import cutover before main integration and full gates. Earlier ready d5966ba2, 7f9268ed and 5c0bd3ad remain unfinished and must be reconciled before successor dispatch. Preserve unrelated worktrees and failed gate evidence.",
-    "2026-10-23 paused for user handoff. See handoff-4.md. Owning branch checkpoint 01f148ba4 includes main through ba02afa0d. Timeout d3a0da67 preserved in e00b10914; subsequent compile-only check passed in 34.19s, final cargo-ci not launched. No active workers/builds/locks; main/build window released. Explicit merge approval retained, no merge performed. Future bounded workers Luna xhigh; no new worktrees/caches; all builds incremental=0."
+    "2026-10-23 paused for user handoff. See handoff-4.md. Owning branch checkpoint 01f148ba4 includes main through ba02afa0d. Timeout d3a0da67 preserved in e00b10914; subsequent compile-only check passed in 34.19s, final cargo-ci not launched. No active workers/builds/locks; main/build window released. Explicit merge approval retained, no merge performed. Future bounded workers Luna xhigh; no new worktrees/caches; all builds incremental=0.",
+    "2026-11-01 session aa resumed under invoker just-in-time-c9 (user chose the epic; all open issues in scope). Closed: 7f9268ed, abe963dd, d5966ba2, ddca5431, 81664a6a, 07663984, 3a3b86cf, 5f71a48d, 5f82e09a, 9c008d2d, da12ad66. Added: 9c008d2d, c47d78c8, 17fbcf25, d7cce445 (from f4d9502a). In flight: profile-a batch (5c0bd3ad, 1b0c2b75, ab797eed) in agent-profile-a; aeafc378 option D plus 17fbcf25 in agent-aeafc378-d (fallback branch worktree-agent-aeafc378 dropped once D lands); d7cce445 and c47d78c8 step 1 in agent-c47d78c8. Landing helpers in this session's scratchpad; lease as agent:worker and run gates as JIT_AGENT_ID=agent:worker."
   ],
   "latest_handoff": "handoff-4.md"
 }
