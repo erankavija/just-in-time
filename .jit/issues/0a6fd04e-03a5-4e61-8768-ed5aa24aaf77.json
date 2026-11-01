@@ -23,7 +23,7 @@
     "component:validation"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Judge the built-in repository validation checker and jit validate through one computation",
-  "updated_at": "2026-11-01T14:09:36.147204796Z"
+  "updated_at": "2026-11-01T15:20:12.527057319Z"
 }

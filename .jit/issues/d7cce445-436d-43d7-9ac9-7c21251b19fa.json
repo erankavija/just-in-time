@@ -15,7 +15,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "259bfae8-7d99-4328-be6e-d60dfae48fb5",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:16:59.156854546Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d7cce445-436d-43d7-9ac9-7c21251b19fa",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Issue reads stop consulting git HEAD",
-  "updated_at": "2026-11-01T14:26:00.159916267Z"
+  "updated_at": "2026-11-01T15:16:59.156854546Z"
 }

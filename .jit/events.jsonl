@@ -22230,3 +22230,8 @@
 {"gate_key":"cargo-ci","id":"29355cde-24b9-4eff-a2d0-7e189b52c767","issue_id":"aeafc378-3073-4b32-be1b-53a05b656168","timestamp":"2026-11-01T15:09:30.483524410Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"0274a2c8-47ee-41e0-b71c-d5eb85dcacc7","issue_id":"aeafc378-3073-4b32-be1b-53a05b656168","timestamp":"2026-11-01T15:14:41.424705945Z","type":"gate_failed","updated_by":"auto:executor"}
 {"fields":["description"],"id":"2a59e9d2-dfbb-4d85-b1e9-3d83dead03b3","issue_id":"aeafc378-3073-4b32-be1b-53a05b656168","timestamp":"2026-11-01T15:15:29.220042811Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"cargo-ci","id":"bc63b8e3-7601-4283-a1ee-030afa9356e0","issue_id":"d7cce445-436d-43d7-9ac9-7c21251b19fa","timestamp":"2026-11-01T15:16:59.156854546Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"6e3fed8f-3b9f-499d-9cb8-823cf3459dd8","issue_id":"c47d78c8-f74b-4659-9d48-e5cbb50b1bab","timestamp":"2026-11-01T15:16:59.905264026Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"ready","id":"00fb29fb-4a92-422b-98af-5809edefa022","issue_id":"1a6d25ac-88f1-402d-a3e0-8b89b1bb6455","timestamp":"2026-11-01T15:20:11.156693054Z","to":"done","type":"issue_state_changed"}
+{"id":"0272d474-3630-49cc-9354-b40b9681b65d","issue_id":"1a6d25ac-88f1-402d-a3e0-8b89b1bb6455","timestamp":"2026-11-01T15:20:11.156693054Z","type":"issue_completed"}
+{"from":"backlog","id":"ec54988a-ef8f-44b6-ab4c-4c901f24f3cd","issue_id":"0a6fd04e-03a5-4e61-8768-ed5aa24aaf77","timestamp":"2026-11-01T15:20:12.527057319Z","to":"ready","type":"issue_state_changed"}

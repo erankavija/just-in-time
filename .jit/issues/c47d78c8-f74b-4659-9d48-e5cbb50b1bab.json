@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2961ff41-b67b-491e-b577-a9fb08a47f09",
+      "status": "passed",
+      "updated_at": "2026-11-01T15:16:59.905264026Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c47d78c8-f74b-4659-9d48-e5cbb50b1bab",
   "labels": [
     "epic:lead-friction",
@@ -25,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derive issue membership from the issue files",
-  "updated_at": "2026-11-01T14:26:01.078083221Z"
+  "updated_at": "2026-11-01T15:16:59.905264026Z"
 }
