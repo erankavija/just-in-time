@@ -2478,11 +2478,13 @@ unique = false
         assert_eq!(response.text(), "");
     }
 
-    /// Every issue-scoped document read, and the search universe, accept a
-    /// file under the issue's artifact directory that no link names.
+    /// Every surface reporting an issue's documents reports one set: explicit
+    /// links, then files under the issue's artifact directory.
     #[tokio::test]
-    async fn test_issue_reads_report_a_derived_document_in_the_list_and_the_single_read() {
+    async fn test_every_issue_surface_reports_the_same_documents() {
+        use jit::declarations::{GateChecker, GateMode, GateStage};
         use jit::domain::Priority;
+        use std::collections::HashMap;
 
         let (temp, executor) =
             setup_test_repo_with_config("[documentation]\nissue_scoped_areas = [\"notes\"]\n")
@@ -2490,7 +2492,7 @@ unique = false
         let (id, _) = executor
             .issues()
             .create_issue(
-                "Derived document reads".to_string(),
+                "Documents on every surface".to_string(),
                 "desc".to_string(),
                 Priority::Normal,
                 vec![],
@@ -2504,9 +2506,42 @@ unique = false
             .resolve_issue_artifact_directory(&id, "notes")
             .unwrap()
             .directory;
-        let doc_rel = format!("{directory}/plan.md");
+        let derived = format!("{directory}/plan.md");
         std::fs::create_dir_all(temp.path().join(&directory)).unwrap();
-        std::fs::write(temp.path().join(&doc_rel), "plan\n").unwrap();
+        std::fs::write(temp.path().join(&derived), "plan\n").unwrap();
+        executor
+            .add_document_reference(&id, "linked.md", None, Some("Linked"), Some("design"), true)
+            .unwrap();
+        let observed = temp.path().join("observed-issue-docs.json");
+        let gate_key = "docs-gate".parse().unwrap();
+        executor
+            .define_gate(
+                &gate_key,
+                "Docs".to_string(),
+                "Records JIT_ISSUE_DOCS".to_string(),
+                GateStage::Postcheck,
+                GateMode::Auto,
+                Some(GateChecker::Exec {
+                    command: format!("printf '%s' \"$JIT_ISSUE_DOCS\" > {}", observed.display()),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                100,
+            )
+            .unwrap();
+        executor.add_gate(&id, &gate_key).unwrap();
+        executor.check_gate(&id, &gate_key).unwrap();
+
+        let listed_by_doc_list =
+            serde_json::to_value(executor.list_document_references(&id).unwrap()).unwrap();
+        let shown = executor
+            .issues()
+            .show_response(executor.issues().show_issue(&id).unwrap())
+            .unwrap();
         let state = AppState {
             executor: Arc::new(executor),
             tracker: Arc::new(ChangeTracker::new(16)),
@@ -2514,14 +2549,47 @@ unique = false
             shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
-
-        let issue: serde_json::Value = server.get(&format!("/issues/{id}")).await.json();
+        let single: serde_json::Value = server.get(&format!("/issues/{id}")).await.json();
         let listed: serde_json::Value = server.get("/issues").await.json();
 
-        assert_eq!(issue["documents"][0]["path"], doc_rel.as_str());
-        assert_eq!(listed[0]["documents"], issue["documents"]);
+        let entries = |documents: &serde_json::Value| {
+            documents
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|document| {
+                    (
+                        document["path"].as_str().unwrap().to_string(),
+                        document["doc_type"].as_str().map(str::to_string),
+                        document["label"].as_str().map(str::to_string),
+                    )
+                })
+                .collect::<std::collections::BTreeSet<_>>()
+        };
+        let expected = entries(&listed_by_doc_list["documents"]);
+        assert!(expected.contains(&(derived, None, None)));
+        assert!(expected.contains(&(
+            "linked.md".to_string(),
+            Some("design".to_string()),
+            Some("Linked".to_string())
+        )));
+        let received: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(observed).unwrap()).unwrap();
+        for (surface, documents) in [
+            (
+                "issue show",
+                serde_json::to_value(&shown.documents).unwrap(),
+            ),
+            ("GET /issues/:id", single["documents"].clone()),
+            ("GET /issues", listed[0]["documents"].clone()),
+            ("JIT_ISSUE_DOCS", received),
+        ] {
+            assert_eq!(entries(&documents), expected, "{surface}");
+        }
     }
 
+    /// Every issue-scoped document read, and the search universe, accept a
+    /// file under the issue's artifact directory that no link names.
     #[tokio::test]
     async fn test_document_reads_serve_a_derived_document_without_a_link() {
         use jit::domain::Priority;
