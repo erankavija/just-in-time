@@ -808,3 +808,29 @@ roots = [
 ]
 
 [gates.reserved]
+
+[[gates]]
+version = 1
+key = "worktree-cache-test"
+title = "Worktree cache seed and harvest test suite"
+description = "Runs the jit-execution-lead skill's test-worktree-cache.sh, which drives dispatch-worker-worktree.sh and reclaim-worker-worktree.sh over a fixture repository and pool it owns. Any non-zero exit fails the gate, including exit 2 for a missing git, rsync, stat or diff."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = "./.agents/skills/jit-execution-lead/scripts/test-worktree-cache.sh"
+timeout_seconds = 120
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = [
+  ".agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh",
+  ".agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh",
+  ".agents/skills/jit-execution-lead/scripts/test-worktree-cache.sh",
+]
+
+[gates.reserved]
