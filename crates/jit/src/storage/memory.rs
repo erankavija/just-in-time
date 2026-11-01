@@ -411,22 +411,6 @@ impl InMemoryStorage {
         }
     }
 
-    /// Publish a malformed fixture as a captured `File` entry.
-    #[cfg(test)]
-    fn put_data_entry(state: &mut MemoryRepositoryState, vpath: VirtualPath, bytes: Vec<u8>) {
-        let object = vpath.relative().as_str().to_owned();
-        let content = CapturedBytes::new(object, bytes).expect("entry identity is hashable");
-        Self::mark_data_root_existing(state);
-        Self::ensure_ancestor_dirs(state, &vpath);
-        state.entries.insert(
-            vpath,
-            RepositoryEntry::File {
-                content,
-                mode: FileMode::Regular,
-            },
-        );
-    }
-
     /// Model a `Directory` entry for every ancestor of `vpath` up to (but not
     /// including) the data root, so the aggregate image reflects the directory
     /// tree a real repository carries. A mutation session verifies that
@@ -1037,10 +1021,6 @@ mod tests {
                 identity: identity(),
                 mode: FileMode::Executable,
             },
-            "file" => RepositoryEntry::File {
-                content: captured(b"not a directory"),
-                mode: FileMode::Regular,
-            },
             "symlink" => RepositoryEntry::Symlink {
                 target: captured(b"elsewhere"),
                 mode: FileMode::Regular,
@@ -1055,68 +1035,8 @@ mod tests {
     }
 
     #[test]
-    fn test_gate_run_readers_match_only_exact_result_shape_and_name_malformed_path() {
-        let storage = InMemoryStorage::new();
-        let nested = VirtualPath::data(format!(
-            "{}/outer/nested/result.json",
-            VirtualPath::GATE_RUNS.relative().as_str()
-        ))
-        .unwrap();
-        let canonical = InMemoryStorage::gate_run_vpath("corrupt-run").unwrap();
-        let mut state = storage.repository_state();
-        InMemoryStorage::put_data_entry(&mut state, nested, b"{ nested".to_vec());
-        drop(state);
-        assert!(storage
-            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-            .unwrap()
-            .is_empty());
-
-        let mut state = storage.repository_state();
-        InMemoryStorage::put_data_entry(&mut state, canonical, b"{ corrupt".to_vec());
-        drop(state);
-
-        let load_error = storage.load_gate_run_result("corrupt-run").unwrap_err();
-        let record_path = format!(
-            "{}/corrupt-run/result.json",
-            VirtualPath::GATE_RUNS.relative().as_str()
-        );
-        assert!(format!("{load_error:#}").contains(&record_path));
-        let list_error = storage
-            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-            .unwrap_err();
-        assert!(format!("{list_error:#}").contains(&record_path));
-    }
-
-    #[test]
-    fn test_gate_run_readers_reject_non_file_result_object() {
-        let storage = InMemoryStorage::new();
-        let path = InMemoryStorage::gate_run_vpath("directory-run").unwrap();
-        let mut state = storage.repository_state();
-        InMemoryStorage::ensure_ancestor_dirs(&mut state, &path);
-        state.entries.insert(
-            path,
-            RepositoryEntry::Directory {
-                identity: EntryIdentity::for_bytes("directory-run", b"directory").unwrap(),
-                mode: FileMode::Executable,
-            },
-        );
-        drop(state);
-
-        for error in [
-            storage.load_gate_run_result("directory-run").unwrap_err(),
-            storage
-                .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-                .unwrap_err(),
-        ] {
-            let message = format!("{error:#}");
-            assert!(message.contains("directory-run/result.json"));
-            assert!(message.contains("ordinary file"));
-        }
-    }
-
-    #[test]
     fn test_gate_run_readers_validate_gate_runs_root_parent_kinds() {
-        for kind in ["absent", "directory", "file", "symlink", "unsupported"] {
+        for kind in ["absent", "symlink", "unsupported"] {
             let storage = InMemoryStorage::new();
             storage
                 .repository_state()
@@ -1125,7 +1045,7 @@ mod tests {
 
             let loaded = storage.load_gate_run_result("run-one");
             let listed = storage.list_gate_runs_for_issue(&crate::test_utils::issue_id(2));
-            if matches!(kind, "absent" | "directory") {
+            if kind == "absent" {
                 assert!(loaded
                     .unwrap_err()
                     .downcast_ref::<GateRunNotFoundError>()
@@ -1140,7 +1060,7 @@ mod tests {
 
     #[test]
     fn test_gate_run_readers_validate_canonical_run_directory_parent_kinds() {
-        for kind in ["absent", "directory", "file", "symlink", "unsupported"] {
+        for kind in ["absent", "directory", "symlink", "unsupported"] {
             let storage = InMemoryStorage::new();
             let root = VirtualPath::GATE_RUNS;
             let run_dir = InMemoryStorage::gate_run_directory_vpath("run-one").unwrap();

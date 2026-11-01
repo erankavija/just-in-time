@@ -22,7 +22,7 @@ use crate::repository_state::{
 use crate::storage::{
     discover_repository_layout, AmbiguousIdError, GateRunNotFoundError, InMemoryStorage,
     IssueNotFoundError, IssueStore, JsonFileStorage, PathReadError, PresetNotFoundError,
-    RepositoryStateStore,
+    RepositoryStateStore, RepositoryStateStoreError,
 };
 use crate::test_harness::git::GitRepository;
 use std::cell::Cell;
@@ -710,6 +710,158 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
     );
 }
 
+/// A record under the gate-run root, whatever its shape.
+fn gate_run_entry(relative: &str) -> VirtualPath {
+    VirtualPath::data(format!(
+        "{}/{relative}",
+        VirtualPath::GATE_RUNS.relative().as_str()
+    ))
+    .unwrap()
+}
+
+fn test_gate_run_readers_name_a_malformed_result<B: Backend>() {
+    let path = gate_run_entry("corrupt-run/result.json");
+    let repository = Repository::<B>::seeded(&[(path.clone(), "{ corrupt".to_string())]);
+
+    for error in [
+        repository
+            .store
+            .load_gate_run_result("corrupt-run")
+            .unwrap_err(),
+        repository
+            .store
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+            .unwrap_err(),
+    ] {
+        assert!(
+            format!("{error:#}").contains(path.relative().as_str()),
+            "{error:#}"
+        );
+    }
+}
+
+/// Only a result directly under its run directory is a run: a deeper file and a
+/// file beside the run directories list nothing, and naming the latter is
+/// refused.
+fn test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape<B: Backend>() {
+    let repository = Repository::<B>::seeded(&[
+        (
+            gate_run_entry("outer/nested/result.json"),
+            "{ corrupt".to_string(),
+        ),
+        (gate_run_entry("direct-file"), "root clutter".to_string()),
+    ]);
+
+    assert!(repository
+        .store
+        .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+        .unwrap()
+        .is_empty());
+    let named = repository
+        .store
+        .load_gate_run_result("direct-file")
+        .unwrap_err();
+    assert!(
+        format!("{named:#}").contains("ordinary directory"),
+        "{named:#}"
+    );
+}
+
+fn test_gate_run_readers_refuse_a_file_as_the_gate_run_root<B: Backend>() {
+    let repository =
+        Repository::<B>::seeded(&[(VirtualPath::GATE_RUNS, "not a directory".to_string())]);
+
+    for error in [
+        repository
+            .store
+            .load_gate_run_result("run-one")
+            .unwrap_err(),
+        repository
+            .store
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(2))
+            .unwrap_err(),
+    ] {
+        assert!(
+            format!("{error:#}").contains("ordinary directory"),
+            "{error:#}"
+        );
+    }
+}
+
+fn test_gate_run_readers_refuse_a_directory_as_a_result<B: Backend>() {
+    let repository = Repository::<B>::seeded(&[(
+        gate_run_entry("directory-run/result.json/inner"),
+        String::new(),
+    )]);
+
+    for error in [
+        repository
+            .store
+            .load_gate_run_result("directory-run")
+            .unwrap_err(),
+        repository
+            .store
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+            .unwrap_err(),
+    ] {
+        let message = format!("{error:#}");
+        assert!(message.contains("directory-run/result.json"), "{message}");
+        assert!(message.contains("ordinary file"), "{message}");
+    }
+}
+
+/// A plan applies only against the image it was built over, even when the
+/// images agree on every path the plan writes.
+fn test_apply_admits_a_plan_only_against_its_exact_image<B: Backend>() {
+    let target = VirtualPath::data("target.txt").unwrap();
+    let evidence = VirtualPath::data("evidence.txt").unwrap();
+    let repository = Repository::<B>::seeded(&[(evidence.clone(), "image-a".to_string())]);
+    let layout = repository.layout();
+    let budget = CaptureBudget {
+        max_listings: 8,
+        max_bytes: 1024 * 1024,
+        max_depth: 8,
+    };
+    let spec = || CaptureSpec::new([target.clone(), evidence.clone()], budget).unwrap();
+    let delta = RepositoryDelta::new(
+        &layout,
+        vec![RepositoryAction::write_file(
+            target.clone(),
+            RepositoryActionOwner::RepositoryStateMutation,
+            ExpectedPreimage::Absent,
+            b"materialized".to_vec(),
+            FileMode::Regular,
+        )],
+    )
+    .unwrap();
+    let image_a = repository
+        .store
+        .open_mutation_session(layout.clone())
+        .unwrap()
+        .capture(spec())
+        .unwrap();
+    let plan_a = MaterializationPlan::new(&image_a, delta.clone());
+    assert_eq!(plan_a.image(), &image_a);
+
+    repository.write(&evidence, b"image-b");
+    let mut session = repository.store.open_mutation_session(layout).unwrap();
+    let image_b = session.capture(spec()).unwrap();
+
+    assert_eq!(
+        image_a.entry(&target).unwrap(),
+        image_b.entry(&target).unwrap()
+    );
+    assert_ne!(plan_a.image(), &image_b);
+    assert!(matches!(
+        session.apply(&plan_a),
+        Err(RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+    let outcome = session
+        .apply(&MaterializationPlan::new(&image_b, delta.clone()))
+        .unwrap();
+    assert_eq!(outcome.actions_applied, delta.actions().len());
+}
+
 fn test_root_is_shared_by_clones_and_names_the_data_root_when_file_backed<B: Backend>() {
     let repository = Repository::<B>::empty();
     let store = &repository.store;
@@ -1051,6 +1203,11 @@ conformance_suite!(
         test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found,
         test_list_gate_runs_for_issue_lists_only_that_issues_runs,
         test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_digest,
+        test_gate_run_readers_name_a_malformed_result,
+        test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape,
+        test_gate_run_readers_refuse_a_file_as_the_gate_run_root,
+        test_gate_run_readers_refuse_a_directory_as_a_result,
+        test_apply_admits_a_plan_only_against_its_exact_image,
         test_root_is_shared_by_clones_and_names_the_data_root_when_file_backed,
         test_read_repo_file_reads_present_files_and_refuses_unsafe_paths,
         test_gate_presets_list_and_get_the_declared_presets,
