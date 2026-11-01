@@ -21698,3 +21698,7 @@
 {"from":"backlog","id":"14ea5c7b-5d62-489b-b619-5b0c452e65ab","issue_id":"93b7f1dd-109a-4b89-a0e5-0427b3b645e1","timestamp":"2026-11-01T02:56:44.078509714Z","to":"ready","type":"issue_state_changed"}
 {"from":"ready","id":"e841c2b6-e842-4218-8f8c-706ea7c50820","issue_id":"417be079-1de3-43e3-816a-03f4a70e2f63","timestamp":"2026-11-01T02:57:11.912539337Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"b0a7729a-b01a-4474-ac39-46b2c0348f2e","issue_id":"417be079-1de3-43e3-816a-03f4a70e2f63","timestamp":"2026-11-01T02:57:11.912539337Z","type":"issue_claimed"}
+{"fields":["description"],"id":"876f2dda-bd8d-4638-a6cf-ff88ef00fbc5","issue_id":"417be079-1de3-43e3-816a-03f4a70e2f63","timestamp":"2026-11-01T03:46:17.019349411Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["description"],"id":"f3b58173-3c0a-48dd-9be3-ba9c3e6a8a90","issue_id":"e2651d77-d171-483a-9a21-90c70885a6ae","timestamp":"2026-11-01T03:46:17.351817295Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"6bae566e-0b9f-4f40-a14b-95e422b41226","issue_id":"952ed1e7-2d3c-4d57-8851-ca3a91babcb0","priority":"normal","timestamp":"2026-11-01T03:47:53.341498536Z","title":"Tests stop reading the live tracker","type":"issue_created"}
+{"fields":["dependencies"],"id":"18484d00-2796-4389-86a8-bfe4dccee8b8","issue_id":"c780514e-8491-40a7-8844-3974bba91257","timestamp":"2026-11-01T03:47:54.518476310Z","type":"issue_updated","updated_by":"dependency-add"}
