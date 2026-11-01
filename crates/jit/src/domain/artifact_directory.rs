@@ -84,6 +84,19 @@ pub fn resolve_artifact_directory(
         })
 }
 
+/// The directories `issue` owns, one per declared issue-scoped area.
+pub fn owned_artifact_directories(
+    issue: &Issue,
+    documentation: &DocumentationConfig,
+    hierarchy: &HierarchyConfig,
+) -> Vec<String> {
+    documentation
+        .issue_scoped_areas()
+        .iter()
+        .filter_map(|area| resolve_artifact_directory(issue, area, documentation, hierarchy).ok())
+        .collect()
+}
+
 /// The documents `issue` owns by location: every path in `files` lying beneath
 /// the directory the issue owns in a declared issue-scoped area.
 ///
@@ -100,11 +113,7 @@ pub fn derive_issue_documents(
     documentation: &DocumentationConfig,
     hierarchy: &HierarchyConfig,
 ) -> Vec<DocumentReference> {
-    let directories = documentation
-        .issue_scoped_areas()
-        .iter()
-        .filter_map(|area| resolve_artifact_directory(issue, area, documentation, hierarchy).ok())
-        .collect::<Vec<_>>();
+    let directories = owned_artifact_directories(issue, documentation, hierarchy);
     let linked = issue
         .documents
         .iter()

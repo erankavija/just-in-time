@@ -40,11 +40,11 @@ jit issue create --title "Task B"  # → d4e5f6
 jit issue create --title "Task C"  # → g7h8i9
 
 # Build dependency chain: A ← B ← C
-jit dep add a1b2c3 d4e5f6  # A depends on B ✓
-jit dep add d4e5f6 g7h8i9  # B depends on C ✓
+jit dep add a1b2c3 d4e5f6  # A depends on B
+jit dep add d4e5f6 g7h8i9  # B depends on C
 
 # Try to create a cycle: C ← A
-jit dep add g7h8i9 a1b2c3  # ✗ ERROR: Cycle detected
+jit dep add g7h8i9 a1b2c3  # fails: Cycle detected
 ```
 
 **Why this matters:**
@@ -258,21 +258,21 @@ jit issue create --title "Task 2"
 jit dep add <task1> <task2>
 jit query available
 jit issue claim <task2> agent:worker-1
-# ✓ All basic operations and issue assignment work (task2 has no unmet dependencies)
+# All basic operations and issue assignment work (task2 has no unmet dependencies)
 
 jit claim acquire <task2> --agent-id agent:worker-1
-# ✗ Error: Claims and leases require a git repository (exit code 10)
+# fails with exit code 10: Claims and leases require a git repository
 
 # git init alone is not enough - HEAD must resolve to a commit
 git init
 git config user.email "you@example.com"
 git config user.name "Your Name"
 jit claim acquire <task2> --agent-id agent:worker-1
-# ✗ Error: Claims and leases require a git repository (exit code 10) - no commits yet
+# fails with exit code 10: HEAD has no commit yet
 
 git commit --allow-empty -m "Initial commit"
 jit claim acquire <task2> --agent-id agent:worker-1
-# ✓ Advisory lease acquired
+# Acquired lease: <lease-id>
 
 mkdir -p path/to
 echo "Initial design notes" > path/to/design.md
@@ -281,7 +281,7 @@ git add -A && git commit -m "Add design doc"
 echo "Revised notes" >> path/to/design.md
 git add -A && git commit -m "Revise design doc"
 jit doc show <task2> path/to/design.md --at HEAD~1
-# ✓ Shows the version from before the revision
+# Shows the version from before the revision
 ```
 
 **Design rationale:**
@@ -306,7 +306,7 @@ A process always sees its own updates immediately:
 # Same process (shell session)
 jit issue update abc123 --state in_progress
 jit issue show abc123
-# ✓ Shows in_progress immediately
+# Shows in_progress immediately
 ```
 
 **2. Scoped atomic operations**
@@ -330,7 +330,7 @@ Different processes see updates after file operations complete:
 # Terminal 1                     # Terminal 2
 jit issue update abc --state done
                                  jit query available
-                                 # ✓ Sees updated state (file reread)
+                                 # Sees updated state (file reread)
 ```
 
 ### What JIT Does NOT Guarantee
@@ -385,7 +385,7 @@ done
 ```bash
 # Assuming state without claiming
 state=$(jit issue show abc123 --json | jq -r '.state')
-# ✗ State may change before next operation
+# State may change before next operation
 jit issue update abc123 --state in_progress  # Race condition!
 
 # Better: claim to record ownership; for guaranteed exclusivity acquire a lease
@@ -534,9 +534,9 @@ generated source of that value.
 ```bash
 jit claim list
 Lease: b53beeba-32f2-4671-a407-2d94e4d13d41
-  Issue: abc123
-  Agent: agent:worker-1
-  Expires: <timestamp in the past> ⚠️ STALE
+  Issue:    abc123
+  Agent:    agent:worker-1
+  Expires:  <timestamp in the past> (0 seconds remaining)
 ```
 
 **Recovery:**
@@ -613,8 +613,8 @@ Warning: External URL not validated: https://example.com/diagram.png
   Referenced in: dev/design.md
 
 # Core functionality still works
-jit query available  # ✓ Works
-jit issue update abc123 --state done  # ✓ Works
+jit query available  # succeeds
+jit issue update abc123 --state done  # succeeds
 ```
 
 **Mitigation:** Download critical assets locally using per-document asset pattern.
@@ -656,8 +656,8 @@ jit validate --leases
 
 # Auto-fix what is mechanically fixable
 jit validate --fix
-# ✓ Applies repairable rule/graph/state fixes and derived-state repairs
-# ✓ Publishes derived repairs recoverably; ambiguous ownership writes nothing
+# Applies repairable rule/graph/state fixes and derived-state repairs
+# Publishes derived repairs recoverably; ambiguous ownership writes nothing
 ```
 
 ## See Also

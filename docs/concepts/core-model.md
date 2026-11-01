@@ -631,18 +631,30 @@ jit issue update $ISSUE --state done
 ```bash
 $ jit issue update abc123 --state done
 Error: Gate validation failed: Cannot transition to 'done': 2 gate(s) not passed
+
+Blockers:
+  - tests [pending]
+  - code-review [pending]
+
+To fix:
+  - jit gate status-all abc123
+  - jit gate evaluate abc123 tests
+  - jit gate status abc123 tests --all  # run history
+  - jit gate evaluate abc123 code-review --by <attestor>
+  - jit gate status abc123 code-review --all  # run history
+
 Issue automatically transitioned to 'gated' and will move to 'done' when all gates pass.
 
 # Fix and evaluate gates
 $ jit gate evaluate abc123 tests
-✓ tests passed
+Passed gate 'tests' for issue abc123
 
 $ jit gate evaluate abc123 code-review --by human:alice
-✓ code-review passed
+Passed gate 'code-review' for issue abc123
 
 # Once every required status is green, retry completion.
 $ jit issue update abc123 --state done
-✓ Issue transitioned to 'done'
+Updated issue: abc123
 ```
 
 Passing a manual gate may auto-transition an already `gated` issue when it
@@ -782,7 +794,7 @@ gate statuses before entering this state.
 **Rejected**: Closure outcome for work not implemented. It bypasses dependency
 and gate checks. Common reasons: duplicate, won't-fix, invalid, out-of-scope.
 
-**Archived**: A retired issue, parked out of active views. Reachable from any state, and **terminality-preserving**: it records the state it was entered from (its origin) and keeps whatever that state meant for dependents. An issue archived from a terminal state (`Done`/`Rejected`) stays effectively terminal — it keeps satisfying its dependents and counts toward delivery in container rollups by its origin. An issue archived from a non-terminal state does not satisfy dependents and counts as open. Archived issues are never themselves in the readiness set. Reviving an archived issue restores its recorded origin state exactly (a completed issue archived from `Done` revives only to `Done`), so the archive round-trip cannot move work back into an active state. `Archived` is a lifecycle state and is distinct from `jit archive`, which relocates linked documents on disk (see [Archive planning and execution](../reference/cli-commands.md#archive-planning-and-execution)).
+**Archived**: A retired issue, parked out of active views. Reachable from any state, and **terminality-preserving**: it records the state it was entered from (its origin) and keeps whatever that state meant for dependents. An issue archived from a terminal state (`Done`/`Rejected`) stays effectively terminal — it keeps satisfying its dependents and counts toward delivery in container rollups by its origin. An issue archived from a non-terminal state does not satisfy dependents and counts as open. Archived issues are never themselves in the readiness set. Reviving an archived issue restores its recorded origin state exactly (a completed issue archived from `Done` revives only to `Done`), so the archive round-trip cannot move work back into an active state. `Archived` is a lifecycle state and is distinct from `jit archive`, which relocates linked and location-owned documents on disk (see [Archive planning and execution](../reference/cli-commands.md#archive-planning-and-execution)).
 
 ### Completion and Rejection Outcomes
 

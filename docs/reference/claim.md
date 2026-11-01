@@ -363,7 +363,7 @@ Lease: b53beeba-32f2-4671-a407-2d94e4d13d41
 
 For stale indefinite leases:
 ```
-  ⚠️  STALE: Lease marked stale (no heartbeat for 75 minutes)
+  STALE: Lease marked stale (no heartbeat for 75 minutes)
      Use 'jit claim heartbeat b53beeba-32f2-4671-a407-2d94e4d13d41' to refresh
 ```
 

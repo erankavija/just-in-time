@@ -216,7 +216,8 @@ jit archive container 2f84c930 --execute --json
 Both target forms use the same planner. Without `--execute`, they are read-only.
 A document target
 includes its recursively supported local bundle. A container target includes
-documents attached to the container and its resolved-hierarchy descendants;
+documents attached to the container and its resolved-hierarchy descendants,
+plus the files under their artifact directories, which they own by location;
 ordinary sequencing dependencies do not define membership.
 
 Human output reports the same target, policy status, eligibility, action counts,
@@ -3973,16 +3974,16 @@ ISSUE_ID=$1
 
 # tests and clippy are automated gates: evaluate runs their checkers.
 if jit gate evaluate "$ISSUE_ID" tests --quiet; then
-  echo "✓ Tests passed for $ISSUE_ID"
+  echo "ok: Tests passed for $ISSUE_ID"
 else
-  echo "✗ Tests failed for $ISSUE_ID"
+  echo "error: Tests failed for $ISSUE_ID"
   exit 1
 fi
 
 if jit gate evaluate "$ISSUE_ID" clippy --quiet; then
-  echo "✓ Clippy passed for $ISSUE_ID"
+  echo "ok: Clippy passed for $ISSUE_ID"
 else
-  echo "✗ Clippy failed for $ISSUE_ID"
+  echo "error: Clippy failed for $ISSUE_ID"
   exit 1
 fi
 ```
