@@ -175,9 +175,12 @@ from 4,674 tests and 61 doctests to 4,632 tests and 25 doctests.
 ### Per-test profile
 
 After: `PROFILE_TEST_SUITE_OUTPUT=<path> ./scripts/profile-test-suite.sh` at load 3.95, warm,
-recorded in [`suite-profile.json`](../suite-profile.json): 4,632 tests, none over 5 s. The
-slowest is `commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling`
+at `de34a0590`: 4,632 tests, none over 5 s. The slowest is
+`commands::document::tests::test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling`
 at 3.62 s. The doctest substep ran 2.7-2.9 s warm and at most 4.9 s across the runs above.
+The same command at `613a46025`, from a clean checkout, at load 3.15, is recorded in
+[`suite-profile.json`](../suite-profile.json): 4,633 tests, none over 5 s, the same test
+slowest at 3.81 s. `cargo test --doc --workspace` there took 2.7 s, with load 9.81 at its end.
 
 Before: the filtered nextest command with `--message-format libtest-json-plus` at load 3.51,
 warm: 4,673 tests, the slowest being `server_integration`
