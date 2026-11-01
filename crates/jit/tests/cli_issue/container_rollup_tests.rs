@@ -398,7 +398,6 @@ fn test_query_count_whole_repo() {
     assert_eq!(json["total"], 2);
     assert_eq!(json["done"], 1);
     assert_eq!(json["percent"], 50);
-    assert_eq!(json["count"], 7);
     assert_eq!(json["by_state"].as_array().unwrap().len(), 7);
 }
 

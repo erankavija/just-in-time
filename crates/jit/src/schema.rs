@@ -580,8 +580,28 @@ impl CommandSchema {
                 Some(schema_to_value::<IssueChildrenResponse>()),
                 "IssueChildrenResponse",
             ),
+            "issue_progress" => (
+                Some(schema_to_value::<ContainerProgressResponse>()),
+                "ContainerProgressResponse",
+            ),
 
             // Gate commands
+            "gate_status" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<GateRunSummary>(),
+                        schema_to_value::<GateRunHistoryResponse>(),
+                        schema_to_value::<GateFlatReportResponse>(),
+                        schema_to_value::<GateFindingsResponse>(),
+                        { "type": "null" },
+                    ],
+                    "description": "Default shape: the gate's latest run. With --all or \
+                        --limit: the count-wrapped run history. With --stdout, --stderr or \
+                        --tail: the stored report text. With --findings: the structured \
+                        findings and verdict. null when the selected gate has not run."
+                });
+                (Some(union), "GateRunSummary")
+            }
             "gate_status-all" => (
                 Some(schema_to_value::<GateCheckAllResponse>()),
                 "GateCheckAllResponse",
@@ -630,6 +650,11 @@ impl CommandSchema {
             // `query blocked` is the one query whose --full variant is NOT a
             // record dump: both shapes build on MinimalIssue and carry no
             // gate-list fields; a blocking gate appears only as a reason.
+            "query_count" => (Some(schema_to_value::<StateRollup>()), "StateRollup"),
+            "query_divergence" => (
+                Some(schema_to_value::<DivergenceResponse>()),
+                "DivergenceResponse",
+            ),
             "query_blocked" => {
                 let union = json!({
                     "oneOf": [

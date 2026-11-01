@@ -214,7 +214,7 @@ fn test_query_divergence_flags_unbacked_membership_label() {
     cli.run(["dep", "add", &epic, &inside]).unwrap();
 
     let doc = cli.run_json(["query", "divergence"]).unwrap();
-    assert_eq!(doc["count"], 1);
+    assert_eq!(doc["divergences"].as_array().unwrap().len(), 1);
     assert_eq!(doc["divergences"][0]["id"], stray);
     assert_eq!(doc["divergences"][0]["label"], membership);
 }
