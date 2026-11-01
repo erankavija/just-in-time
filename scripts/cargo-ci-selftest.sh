@@ -31,7 +31,9 @@ set -uo pipefail
 #   ignored-doctest a merge holding out an ```ignore``` doctest  -> excluded-tests fails
 #
 # The exit-status classifier (0/1/75) is driven through `cargo-ci.sh --classify`
-# over synthetic step output and load samples, one assertion per exit path.
+# over synthetic step output and load samples, one assertion per exit path. A
+# compiler wrapper that cannot run exits 75 before any step, driven through
+# wrappers this self-test owns.
 #
 # The signature and stale-expect scenarios also assert that `cargo build
 # --workspace` SUCCEEDS on the same tree: that is the recorded reason a
@@ -63,6 +65,9 @@ gate="$here/cargo-ci.sh"
 scratch=$(mktemp -d)
 cleanup() { rm -rf "$scratch"; }
 trap cleanup EXIT
+
+# Fixtures select their own wrapper, so the host's cannot decide their outcome.
+unset RUSTC_WRAPPER
 
 fail=0
 real_cargo_version=$(cargo --version)
@@ -250,6 +255,68 @@ EOF
   check "build lock: timeout names the duration and lock" \
     grep -qF "timed out after 0.01s waiting for $fixture/build.lock" "$fixture/out"
   check "build lock: timeout never starts the child" test ! -e "$fixture/ran"
+}
+
+# A wrapper that cannot run is the environment, whichever way it was selected
+# and whichever entry point reaches it. The sccache stand-in answers version
+# queries and fails every compile, as a daemon with a deleted TMPDIR does.
+test_unrunnable_compiler_wrapper() {
+  local fixture="$scratch/wrapper" out="$scratch/wrapper/gate.out" rc
+  local cargo_ran="$fixture/cargo-ran" missing="$fixture/missing-wrapper"
+  mkdir -p "$fixture/bin"
+  cat >"$fixture/bin/cargo" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "--version" ]; then
+  echo "cargo 1.90.0 (selftest fixture)"
+  exit 0
+fi
+printf '%s\n' "$*" >"$SELFTEST_CARGO_RAN"
+EOF
+  cat >"$fixture/bin/sccache" <<'EOF'
+#!/usr/bin/env bash
+case " $* " in
+  *" -vV "*) exec "$@" ;;
+esac
+echo "sccache: error: Failed to create temp dir" >&2
+exit 254
+EOF
+  cat >"$fixture/passthrough-wrapper" <<'EOF'
+#!/usr/bin/env bash
+exec "$@"
+EOF
+  chmod +x "$fixture/bin/cargo" "$fixture/bin/sccache" "$fixture/passthrough-wrapper"
+
+  echo
+  echo "== compiler wrapper: one that cannot run is an environment fault =="
+  env -u CARGO_CI_NO_SCCACHE PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 \
+    SELFTEST_CARGO_RAN="$cargo_ran" "$gate" >"$out" 2>&1
+  rc=$?
+  check "selected sccache fails compiles: the gate exits with the infrastructure status" \
+    test "$rc" -eq 75
+  check "selected sccache fails compiles: the diagnosis names the wrapper" \
+    grep -qF "compiler wrapper 'sccache'" "$out"
+  check "selected sccache fails compiles: the diagnosis carries the wrapper's error" \
+    grep -qF "Failed to create temp dir" "$out"
+  check "selected sccache fails compiles: no verdict on repository content" \
+    test "$(grep -c 'repository content' "$out")" -eq 0
+  check "selected sccache fails compiles: no Cargo command runs" test ! -e "$cargo_ran"
+
+  env PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 \
+    RUSTC_WRAPPER="$missing" SELFTEST_CARGO_RAN="$cargo_ran" \
+    "$gate" --cargo selftest >"$out" 2>&1
+  rc=$?
+  check "operator wrapper is missing: focused Cargo mode exits with the infrastructure status" \
+    test "$rc" -eq 75
+  check "operator wrapper is missing: the diagnosis names the wrapper" \
+    grep -qF "compiler wrapper '$missing'" "$out"
+  check "operator wrapper is missing: Cargo never runs" test ! -e "$cargo_ran"
+
+  env PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 \
+    RUSTC_WRAPPER="$fixture/passthrough-wrapper" SELFTEST_CARGO_RAN="$cargo_ran" \
+    "$gate" --cargo selftest >"$out" 2>&1
+  rc=$?
+  check "healthy wrapper: the check lets the Cargo command run" \
+    test "$rc" -eq 0 -a -e "$cargo_ran"
 }
 
 # --- fixture construction ----------------------------------------------------
@@ -528,14 +595,15 @@ stale_expect_worker() { signature_worker "$1"; }
 # fixture builds into its own throwaway target rather than into a target
 # directory this run inherited, and the host-wide build lock is skipped: this
 # self-test itself runs inside a gate run that already holds that lock, and the
-# fixture is far too small to need it.
+# fixture is far too small to need it. These fixtures compile for real, so they
+# opt out of sccache: the host daemon's health is no part of their verdict.
 run_gate_script() { # run_gate_script <script> <repo> <output-file> [VAR=value ...]
   local script="$1" repo="$2" out="$3"
   shift 3
   (
     cd "$repo" || exit 3
     unset CARGO_TARGET_DIR
-    env CARGO_CI_NO_LOCK=1 "$@" "$script"
+    env CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 "$@" "$script"
   ) >"$out" 2>&1
 }
 
@@ -718,6 +786,7 @@ echo "== wrong-nextest-version: the gate must fail before its first step =="
 test_wrong_nextest_version_fails_fast
 test_classifier_exit_paths
 test_build_lock_status_propagation
+test_unrunnable_compiler_wrapper
 
 run_scenario healthy "healthy_mainline" "healthy_worker" pass
 run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail

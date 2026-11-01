@@ -328,12 +328,12 @@ if [[ $# -eq 0 && -z "${PROFILE_TEST_SUITE_LOCKED:-}" ]]; then
   build_lock="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
   lock_timeout="${CARGO_CI_LOCK_TIMEOUT:-1800}"
   if command -v flock >/dev/null 2>&1; then
-    if ! flock -n -o "$build_lock" true 2>/dev/null; then
-      printf 'profile-test-suite: another build holds %s; waiting up to %ss\n' "$build_lock" "$lock_timeout" >&2
-    fi
     lock_status=0
     exec {build_lock_fd}>"$build_lock"
-    flock -w "$lock_timeout" -E 75 "$build_lock_fd" || lock_status=$?
+    if ! flock -n "$build_lock_fd" 2>/dev/null; then
+      printf 'profile-test-suite: another build holds %s; waiting up to %ss\n' "$build_lock" "$lock_timeout" >&2
+      flock -w "$lock_timeout" -E 75 "$build_lock_fd" || lock_status=$?
+    fi
     if [[ $lock_status -eq 75 ]]; then
       printf 'ERROR: profile-test-suite: timed out after %ss waiting for %s\n' "$lock_timeout" "$build_lock" >&2
       exit 2
