@@ -351,12 +351,12 @@ impl GateState {
     /// The run of `gate_key` among `runs` this status was projected from.
     pub fn projected_run<'a>(
         &self,
-        gate_key: &str,
+        gate_key: &GateKey,
         runs: &'a [GateRunResult],
     ) -> Option<&'a GateRunResult> {
         let run_id = self.run_id.as_ref()?;
         runs.iter()
-            .find(|run| &run.run_id == run_id && run.gate_key.as_str() == gate_key)
+            .find(|run| &run.run_id == run_id && &run.gate_key == gate_key)
     }
 }
 
@@ -380,9 +380,9 @@ pub struct Issue {
     /// IDs of issues that must be done first
     pub dependencies: Vec<IssueId>,
     /// Gate keys that must pass before ready/done
-    pub gates_required: Vec<String>,
+    pub gates_required: Vec<GateKey>,
     /// Current status of each required gate
-    pub gates_status: HashMap<String, GateState>,
+    pub gates_status: HashMap<GateKey, GateState>,
     /// Flexible key-value storage for agent-specific data
     pub context: HashMap<String, String>,
     /// References to design documents, notes, and artifacts
@@ -451,8 +451,8 @@ struct IssueWire {
     priority: Priority,
     assignee: Option<Assignee>,
     dependencies: Vec<IssueId>,
-    gates_required: Vec<String>,
-    gates_status: HashMap<String, GateState>,
+    gates_required: Vec<GateKey>,
+    gates_status: HashMap<GateKey, GateState>,
     context: HashMap<String, String>,
     documents: Vec<DocumentReference>,
     labels: Vec<String>,
@@ -599,7 +599,7 @@ impl Issue {
     /// Get list of unpassed gates
     ///
     /// Returns a vector of gate keys that have not yet passed.
-    pub fn get_unpassed_gates(&self) -> Vec<String> {
+    pub fn get_unpassed_gates(&self) -> Vec<GateKey> {
         self.gates_required
             .iter()
             .filter(|gate_key| !matches!(self.gates_status.get(*gate_key), Some(gate_state) if gate_state.status == GateStatus::Passed))
@@ -2153,7 +2153,7 @@ mod tests {
     #[test]
     fn test_issue_not_blocked_by_unpassed_gate() {
         let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
-        issue.gates_required.push("review".to_string());
+        issue.gates_required.push("review".parse().unwrap());
 
         let resolved = HashMap::new();
 
@@ -2166,9 +2166,9 @@ mod tests {
     #[test]
     fn test_issue_not_blocked_by_pending_gate() {
         let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
-        issue.gates_required.push("review".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Pending,
                 updated_by: None,
@@ -2188,9 +2188,9 @@ mod tests {
     #[test]
     fn test_issue_not_blocked_by_failed_gate() {
         let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
-        issue.gates_required.push("review".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Failed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
@@ -2210,9 +2210,9 @@ mod tests {
     #[test]
     fn test_issue_not_blocked_when_gate_passed() {
         let mut issue = fixture_issue("Test".to_string(), "Desc".to_string());
-        issue.gates_required.push("review".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
@@ -2368,9 +2368,9 @@ mod tests {
     fn test_gated_issue_should_auto_transition_to_done_when_gates_pass() {
         let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
-        issue.gates_required.push("review".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
@@ -2386,9 +2386,9 @@ mod tests {
     fn test_gated_issue_should_not_transition_to_done_when_gates_pending() {
         let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
-        issue.gates_required.push("review".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Pending,
                 updated_by: None,
@@ -2404,9 +2404,9 @@ mod tests {
     fn test_gated_issue_should_not_transition_to_done_when_gates_failed() {
         let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::Gated;
-        issue.gates_required.push("review".to_string());
+        issue.gates_required.push("review".parse().unwrap());
         issue.gates_status.insert(
-            "review".to_string(),
+            "review".parse().unwrap(),
             GateState {
                 status: GateStatus::Failed,
                 updated_by: Some("ci:tests".parse().unwrap()),

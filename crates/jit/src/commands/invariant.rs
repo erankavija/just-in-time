@@ -67,14 +67,17 @@ mod tests {
     use crate::storage::InMemoryStorage;
 
     /// Seed a gate registry holding a manual postcheck gate per key.
-    fn seed_manual_gates(storage: &InMemoryStorage, gate_keys: &[&str]) {
+    fn seed_manual_gates(
+        storage: &InMemoryStorage,
+        gate_keys: &[crate::domain::identity::GateKey],
+    ) {
         let mut registry = GateRegistry::default();
         for key in gate_keys {
             registry.gates.insert(
-                (*key).parse().unwrap(),
+                key.clone(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: (*key).parse().unwrap(),
+                    key: key.clone(),
                     title: (*key).to_string(),
                     description: String::new(),
                     stage: crate::declarations::GateStage::Postcheck,
@@ -126,7 +129,7 @@ mod tests {
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
         let storage = InMemoryStorage::new();
-        seed_manual_gates(&storage, &["code-review"]);
+        seed_manual_gates(&storage, &["code-review".parse().unwrap()]);
         let executor = memory_executor_declaring(
             storage,
             MemoryDeclarations {
@@ -150,7 +153,7 @@ mod tests {
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
         let storage = InMemoryStorage::new();
-        seed_manual_gates(&storage, &["code-review"]);
+        seed_manual_gates(&storage, &["code-review".parse().unwrap()]);
         let executor = memory_executor_declaring(
             storage,
             MemoryDeclarations {

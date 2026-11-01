@@ -307,7 +307,10 @@ fn render_assertion(
             // present (an empty list means "all of the issue's gates_required").
             let mut parts = vec![format!("max-age-hours = {max_age_hours}")];
             if !gates.is_empty() {
-                let rendered: Vec<String> = gates.iter().map(|g| toml_basic_string(g)).collect();
+                let rendered: Vec<String> = gates
+                    .iter()
+                    .map(|g| toml_basic_string(g.as_str()))
+                    .collect();
                 parts.push(format!("gates = [{}]", rendered.join(", ")));
             }
             format!("{{ gate-recency = {{ {} }} }}", parts.join(", "))

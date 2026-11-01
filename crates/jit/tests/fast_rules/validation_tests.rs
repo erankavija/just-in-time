@@ -215,7 +215,7 @@ fn test_validation_detects_invalid_gate_reference() {
             "Task".to_string(),
             "".to_string(),
             Priority::Normal,
-            vec!["nonexistent-gate".to_string()],
+            vec!["nonexistent-gate".parse().unwrap()],
             vec![],
             None,
             None,

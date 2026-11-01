@@ -38,6 +38,7 @@
 //! Evaluation is a deterministic function of the issue slice. The caller reads
 //! the store; nothing here touches the filesystem.
 
+use crate::domain::identity::GateKey;
 use std::collections::BTreeSet;
 
 use chrono::{DateTime, Utc};
@@ -1210,7 +1211,7 @@ fn depends_on_target(
 fn evaluate_gate_recency(
     rule: &Rule,
     max_age_hours: u64,
-    gates: &[String],
+    gates: &[GateKey],
     issues: &[Issue],
     now: DateTime<Utc>,
 ) -> Vec<GraphFinding> {
@@ -1244,7 +1245,7 @@ fn evaluate_gate_recency(
         .filter(|issue| rule.when.matches(issue))
         .flat_map(|issue| {
             // Empty `gates` means "all of the issue's gates_required".
-            let checked: Vec<&String> = if gates.is_empty() {
+            let checked: Vec<&GateKey> = if gates.is_empty() {
                 issue.gates_required.iter().collect()
             } else {
                 gates.iter().collect()
@@ -2733,12 +2734,12 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     }
 
     /// A done issue requiring `gate`, last recorded `hours_ago` before [`fixed_now`].
-    fn issue_with_gate(gate: &str, hours_ago: i64) -> Issue {
+    fn issue_with_gate(gate: &GateKey, hours_ago: i64) -> Issue {
         let mut i = issue("work", &[]);
         i.state = State::Done;
-        i.gates_required = vec![gate.to_string()];
+        i.gates_required = vec![gate.clone()];
         i.gates_status.insert(
-            gate.to_string(),
+            gate.clone(),
             GateState {
                 status: GateStatus::Passed,
                 updated_by: Some("ci:x".parse().unwrap()),
@@ -2753,7 +2754,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     fn test_gate_recency_fresh_result_passes() {
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
         // Recorded 1 day ago — well within 7 days.
-        let i = issue_with_gate("code-review", 24);
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 24);
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -2770,7 +2771,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     fn test_gate_recency_stale_result_reports_age_in_days() {
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
         // Recorded 10 days ago — exceeds 7.
-        let i = issue_with_gate("code-review", 10 * 24);
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 10 * 24);
         let id = i.id.clone();
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -2796,7 +2797,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         // Issue requires the gate but has no recorded status.
         let mut i = issue("work", &[]);
         i.state = State::Done;
-        i.gates_required = vec!["code-review".to_string()];
+        i.gates_required = vec!["code-review".parse().unwrap()];
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -2817,9 +2818,9 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     fn test_gate_recency_default_gates_checks_all_required() {
         // No `gates` filter -> every gate in gates_required is checked.
         let rule = recency_rule("max-age-days = 7");
-        let mut i = issue_with_gate("code-review", 10 * 24); // stale
-                                                             // A second required gate with no recorded result.
-        i.gates_required.push("security".to_string());
+        let mut i = issue_with_gate(&"code-review".parse().unwrap(), 10 * 24); // stale
+                                                                               // A second required gate with no recorded result.
+        i.gates_required.push("security".parse().unwrap());
         let rules = vec![&rule];
         let mut findings = evaluate_graph(
             &rules,
@@ -2866,7 +2867,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     fn test_gate_recency_hours_unit_in_message() {
         // A sub-day max renders age and limit in hours.
         let rule = recency_rule("max-age-hours = 12, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 30); // 30h old > 12h
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 30); // 30h old > 12h
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -2887,7 +2888,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     fn test_gate_recency_is_deterministic_under_injected_clock() {
         // Same inputs + same `now` -> identical findings (no wall-clock read).
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 10 * 24);
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 10 * 24);
         let rules = vec![&rule];
         let a = evaluate_graph(
             &rules,
@@ -2915,7 +2916,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         // whose displayed age equals the displayed max. Ceiling division renders
         // the age as 8 so it is strictly greater than the max.
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 180); // 180h > 168h, < 192h
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 180); // 180h > 168h, < 192h
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -2937,7 +2938,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         // Exact boundary: age == max-age (7 days == 168h) is NOT stale (the check
         // is strictly greater-than), so no finding is produced.
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 7 * 24); // exactly 168h
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 7 * 24); // exactly 168h
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -2958,7 +2959,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         // Just over the boundary: 169h > 168h is stale, and the rendered age (8)
         // exceeds the rendered max (7).
         let rule = recency_rule("max-age-days = 7, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 7 * 24 + 1); // 169h
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 7 * 24 + 1); // 169h
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -2979,7 +2980,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
     fn test_gate_recency_exact_max_age_hours_is_fresh() {
         // N3 boundary (hours unit): age == max-age-hours is fresh, no finding.
         let rule = recency_rule("max-age-hours = 12, gates = [\"code-review\"]");
-        let i = issue_with_gate("code-review", 12); // exactly 12h
+        let i = issue_with_gate(&"code-review".parse().unwrap(), 12); // exactly 12h
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3075,7 +3076,7 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         // Required gates do not cover criteria; the rule requires a check label.
         let rule = ctc_rule("check-namespace = \"checks\"");
         let mut initiative = initiative_with_sc(&["[hard] REQ-01: do the thing"]);
-        initiative.gates_required = vec!["manual-review".to_string()];
+        initiative.gates_required = vec!["manual-review".parse().unwrap()];
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,

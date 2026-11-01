@@ -4,6 +4,7 @@
 //! without requiring storage access. These are pure functions that can be used
 //! independently of the CLI orchestration layer.
 
+use crate::domain::identity::GateKey;
 use crate::domain::identity::IssueId;
 use crate::domain::{is_dependency_met, GateStatus, Issue, Priority, State};
 use std::cmp::Reverse;
@@ -141,7 +142,7 @@ pub enum BlockingReason {
     /// evaluated.
     Gate {
         /// The required gate key.
-        key: String,
+        key: GateKey,
         /// Current gate status.
         status: GateStatus,
     },
@@ -983,9 +984,9 @@ mod tests {
         blocked.id = crate::test_utils::issue_id(64);
         blocked.state = State::Backlog;
         blocked.dependencies = vec![issue_id(63)];
-        blocked.gates_required = vec!["never-run".to_string(), "failed".to_string()];
+        blocked.gates_required = vec!["never-run".parse().unwrap(), "failed".parse().unwrap()];
         blocked.gates_status.insert(
-            "failed".to_string(),
+            "failed".parse().unwrap(),
             GateState {
                 status: GateStatus::Failed,
                 updated_by: None,
@@ -1000,11 +1001,11 @@ mod tests {
         assert_eq!(result.len(), 1);
         let reasons = &result[0].1;
         assert!(reasons.contains(&BlockingReason::Gate {
-            key: "never-run".to_string(),
+            key: "never-run".parse().unwrap(),
             status: GateStatus::Pending,
         }));
         assert!(reasons.contains(&BlockingReason::Gate {
-            key: "failed".to_string(),
+            key: "failed".parse().unwrap(),
             status: GateStatus::Failed,
         }));
         assert!(reasons
@@ -1053,7 +1054,7 @@ mod tests {
     #[test]
     fn test_query_ready_includes_ready_issue_with_unpassed_required_gates() {
         let mut issue = state_issue(0, State::Ready);
-        issue.gates_required = vec!["tests".into()];
+        issue.gates_required = vec!["tests".parse().unwrap()];
         assert_eq!(
             ids_of(&query_ready(std::slice::from_ref(&issue))),
             [&issue.id]

@@ -200,25 +200,31 @@ mod tests {
         .unwrap();
         assert_eq!(registry.gates.len(), 5);
         assert!(matches!(
-            registry.gates["repository-policy"].checker.as_ref(),
+            registry.gates[&"repository-policy".parse().unwrap()]
+                .checker
+                .as_ref(),
             Some(GateChecker::RepositoryValidation)
         ));
         assert!(matches!(
-            registry.gates["work-item-policy"].checker.as_ref(),
+            registry.gates[&"work-item-policy".parse().unwrap()]
+                .checker
+                .as_ref(),
             Some(GateChecker::IssueValidation)
         ));
         assert!(matches!(
-            registry.gates["container-coverage"].checker.as_ref(),
+            registry.gates[&"container-coverage".parse().unwrap()].checker.as_ref(),
             Some(GateChecker::LabelTargetValidation {
                 label_namespace
             }) if label_namespace == "covers"
         ));
         assert!(matches!(
-            registry.gates["selected-rule"].checker.as_ref(),
+            registry.gates[&"selected-rule".parse().unwrap()].checker.as_ref(),
             Some(GateChecker::RuleValidation { rule }) if rule == "coverage-preview"
         ));
         assert!(matches!(
-            registry.gates["external-review"].checker.as_ref(),
+            registry.gates[&"external-review".parse().unwrap()]
+                .checker
+                .as_ref(),
             Some(GateChecker::ReviewPlaceholder)
         ));
     }

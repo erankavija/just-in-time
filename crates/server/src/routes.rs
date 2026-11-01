@@ -957,7 +957,7 @@ async fn list_gates<S: IssueStore>(
 
 /// Get a single gate definition by key
 async fn get_gate_definition<S: IssueStore>(
-    Path(key): Path<String>,
+    Path(key): Path<jit::domain::identity::GateKey>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateDefinition>, StatusCode> {
     state
@@ -973,7 +973,7 @@ async fn get_gate_definition<S: IssueStore>(
 /// Query parameters for gate runs
 #[derive(Debug, Deserialize)]
 struct GateRunsQuery {
-    gate_key: Option<String>,
+    gate_key: Option<jit::domain::identity::GateKey>,
 }
 
 /// List gate run results for an issue (summaries without stdout/stderr for passing runs).
@@ -985,7 +985,7 @@ async fn list_gate_runs<S: IssueStore>(
     let id = resolve_issue_path_id(&state.executor, &id)?;
     let runs = state
         .executor
-        .list_gate_runs(&id, params.gate_key.as_deref())
+        .list_gate_runs(&id, params.gate_key.as_ref())
         .map_err(|e| {
             tracing::error!("Failed to list gate runs for {}: {:?}", id, e);
             StatusCode::NOT_FOUND
@@ -1225,6 +1225,29 @@ mod tests {
         ));
         let response = server.get("/issues/abc").await;
         response.assert_status(StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_gate_key_routes_reject_malformed_tokens_at_extraction() {
+        let (server, id, _) = dependent_pair_server();
+        server
+            .get("/gates/Bad_Key")
+            .await
+            .assert_status(StatusCode::BAD_REQUEST);
+        server
+            .get("/gates/unknown-gate")
+            .await
+            .assert_status(StatusCode::NOT_FOUND);
+        server
+            .get(&format!("/issues/{id}/gate-runs"))
+            .add_query_param("gate_key", "Bad_Key")
+            .await
+            .assert_status(StatusCode::BAD_REQUEST);
+        server
+            .get(&format!("/issues/{id}/gate-runs"))
+            .add_query_param("gate_key", "unknown-gate")
+            .await
+            .assert_status_ok();
     }
 
     #[tokio::test]

@@ -227,7 +227,7 @@ fn issue_created(event_id: &str) -> Event {
 fn executed_run(
     run_id: &GateRunId,
     issue_id: &crate::domain::identity::IssueId,
-    gate_key: &str,
+    gate_key: &crate::domain::identity::GateKey,
     second: i64,
     digest: Option<InputsDigest>,
 ) -> GateRunResult {
@@ -238,7 +238,7 @@ fn executed_run(
         ..GateRunResult::attestation(
             run_id,
             issue_id,
-            &gate_key.parse().unwrap(),
+            gate_key,
             GateStage::Postcheck,
             GateStatus::Passed,
             None,
@@ -565,7 +565,7 @@ fn test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found<B
     let run = executed_run(
         &crate::test_utils::gate_run_id(1),
         &crate::test_utils::issue_id(163),
-        "tests",
+        &"tests".parse().unwrap(),
         10,
         None,
     );
@@ -595,21 +595,21 @@ fn test_list_gate_runs_for_issue_lists_only_that_issues_runs<B: Backend>() {
         executed_run(
             &crate::test_utils::gate_run_id(3),
             &crate::test_utils::issue_id(153),
-            "tests",
+            &"tests".parse().unwrap(),
             10,
             None,
         ),
         executed_run(
             &crate::test_utils::gate_run_id(4),
             &crate::test_utils::issue_id(153),
-            "lint",
+            &"lint".parse().unwrap(),
             20,
             None,
         ),
         executed_run(
             &crate::test_utils::gate_run_id(5),
             &crate::test_utils::issue_id(154),
-            "tests",
+            &"tests".parse().unwrap(),
             30,
             None,
         ),
@@ -646,7 +646,7 @@ fn test_list_gate_runs_for_issue_ignores_a_directory_not_named_by_a_run_id<B: Ba
     let run = executed_run(
         &crate::test_utils::gate_run_id(1),
         &issue,
-        "tests",
+        &"tests".parse().unwrap(),
         10,
         None,
     );
@@ -671,7 +671,7 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
         ..executed_run(
             &crate::test_utils::gate_run_id(6),
             &crate::test_utils::issue_id(153),
-            "tests",
+            &"tests".parse().unwrap(),
             50,
             Some(digest.clone()),
         )
@@ -681,7 +681,7 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
         ..executed_run(
             &crate::test_utils::gate_run_id(7),
             &crate::test_utils::issue_id(153),
-            "tests",
+            &"tests".parse().unwrap(),
             40,
             Some(digest.clone()),
         )
@@ -691,7 +691,7 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
         ..executed_run(
             &crate::test_utils::gate_run_id(8),
             &crate::test_utils::issue_id(154),
-            "tests",
+            &"tests".parse().unwrap(),
             30,
             Some(digest.clone()),
         )
@@ -700,7 +700,7 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
         executed_run(
             &crate::test_utils::gate_run_id(9),
             &crate::test_utils::issue_id(153),
-            "tests",
+            &"tests".parse().unwrap(),
             10,
             Some(digest.clone()),
         ),
@@ -710,14 +710,14 @@ fn test_find_reusable_gate_run_selects_the_latest_executed_verdict_over_the_dige
         executed_run(
             &crate::test_utils::gate_run_id(10),
             &crate::test_utils::issue_id(153),
-            "tests",
+            &"tests".parse().unwrap(),
             60,
             Some(other),
         ),
         executed_run(
             &crate::test_utils::gate_run_id(11),
             &crate::test_utils::issue_id(153),
-            "lint",
+            &"lint".parse().unwrap(),
             70,
             Some(digest.clone()),
         ),

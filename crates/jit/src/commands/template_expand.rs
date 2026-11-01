@@ -21,6 +21,7 @@
 //! ([`resolve_artifact_directory`](crate::domain::artifact_directory::resolve_artifact_directory))
 //! for the area the node declares.
 
+use crate::domain::identity::GateKey;
 use std::collections::BTreeMap;
 
 use anyhow::{anyhow, Result};
@@ -65,7 +66,7 @@ pub struct PlannedNode {
     /// Final label set (inherited membership labels + own `type:` + interpolated).
     pub labels: Vec<String>,
     /// Gate names to attach (each a gate preset OR a registry gate key).
-    pub gates: Vec<String>,
+    pub gates: Vec<GateKey>,
     /// Priority inherited from the container.
     pub priority: Priority,
 }
@@ -76,7 +77,7 @@ pub struct AnchorGates {
     /// Full id of the issue bound to the anchor.
     pub anchor_issue_id: IssueId,
     /// Gate names to attach to it.
-    pub gates: Vec<String>,
+    pub gates: Vec<GateKey>,
 }
 
 /// The complete, storage-free description of what applying a template does.
@@ -877,7 +878,10 @@ applies_to = ["epic"]
             delta.creates[0].description,
             format!("Plan Auth epic. Doc: dev/active/{}-plan.md.", container.id)
         );
-        assert_eq!(delta.creates[0].gates, vec!["plan-review".to_string()]);
+        assert_eq!(
+            delta.creates[0].gates,
+            vec!["plan-review".parse::<GateKey>().unwrap()]
+        );
         assert!(delta.creates[1]
             .labels
             .contains(&format!("brackets:{}", container.short_id())));
@@ -925,7 +929,7 @@ applies_to = ["epic"]
                 anchor_issue_id: crate::test_utils::issue_id(
                     0x9129_512f_befc_1e85_08dc_7963_1590_ce6c
                 ),
-                gates: vec!["repo-validate".to_string()],
+                gates: vec!["repo-validate".parse().unwrap()],
             }]
         );
     }

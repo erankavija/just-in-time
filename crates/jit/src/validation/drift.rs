@@ -42,6 +42,7 @@
 //! `.jit/config.toml` declares under `[item_kinds]`.
 
 use crate::declarations::invariants::Invariant;
+use crate::domain::identity::GateKey;
 use crate::domain::item::{parse_kind_segmented_address, AddressScope};
 use std::collections::BTreeSet;
 
@@ -101,16 +102,16 @@ impl DriftFinding {
 /// `unloadable` flag set (REQ-01 covers a binding naming a missing OR
 /// unloadable target).
 #[derive(Debug, Clone, Copy)]
-pub enum SourceState<'a> {
+pub enum SourceState<'a, T> {
     /// The source loaded; the contained set names every entry it declares.
-    Loaded(&'a BTreeSet<&'a str>),
+    Loaded(&'a BTreeSet<T>),
     /// The source failed to load; its entries cannot be enumerated.
     Unloadable,
 }
 
-impl SourceState<'_> {
+impl<T: Ord> SourceState<'_, T> {
     /// Whether the loaded source contains `name` (always `false` when unloadable).
-    pub fn contains(&self, name: &str) -> bool {
+    pub fn contains(&self, name: &T) -> bool {
         match self {
             SourceState::Loaded(set) => set.contains(name),
             SourceState::Unloadable => false,
@@ -139,6 +140,7 @@ impl SourceState<'_> {
 /// # Examples
 ///
 /// ```
+/// use jit::domain::identity::GateKey;
 /// use jit::validation::drift::{enforcement_drift, SourceState};
 /// use jit::declarations::invariants::InvariantRegistry;
 /// use std::collections::BTreeSet;
@@ -148,7 +150,7 @@ impl SourceState<'_> {
 ///      enforced-by = \"@/rule/coverage-preview\"\n",
 /// )
 /// .unwrap();
-/// let gates: BTreeSet<&str> = BTreeSet::new();
+/// let gates: BTreeSet<GateKey> = BTreeSet::new();
 /// // The rule set failed to parse; the gate registry loaded (and is empty).
 /// let findings = enforcement_drift(
 ///     &reg.invariants,
@@ -162,14 +164,14 @@ impl SourceState<'_> {
 /// ```
 pub fn enforcement_drift(
     invariants: &[Invariant],
-    rules: SourceState<'_>,
-    gates: SourceState<'_>,
+    rules: SourceState<'_, &str>,
+    gates: SourceState<'_, GateKey>,
 ) -> Vec<DriftFinding> {
     invariants
         .iter()
         .filter_map(|inv| {
             let binding = inv.enforced_by.as_deref()?;
-            resolve_binding(binding, rules, gates).map(|unloadable| DriftFinding {
+            resolve_binding(binding, &rules, &gates).map(|unloadable| DriftFinding {
                 invariant_id: inv.id.clone(),
                 subject: binding.to_string(),
                 unloadable,
@@ -193,21 +195,30 @@ pub fn enforcement_drift(
 /// non-project scope, or a kind other than `rule`/`gate` — is unconditionally
 /// unresolved with `unloadable: false`: the defect is in the binding's FORM, not
 /// in a source failing to load.
-fn resolve_binding(binding: &str, rules: SourceState<'_>, gates: SourceState<'_>) -> Option<bool> {
+fn resolve_binding(
+    binding: &str,
+    rules: &SourceState<'_, &str>,
+    gates: &SourceState<'_, GateKey>,
+) -> Option<bool> {
     let Ok(addr) = parse_kind_segmented_address(binding) else {
         return Some(false);
     };
     if addr.scope != AddressScope::Project {
         return Some(false);
     }
-    let source = match addr.kind.as_str() {
-        "rule" => rules,
-        "gate" => gates,
-        _ => return Some(false),
-    };
-    match source {
-        SourceState::Loaded(set) => (!set.contains(addr.self_id.as_str())).then_some(false),
-        SourceState::Unloadable => Some(true),
+    match addr.kind.as_str() {
+        "rule" => match rules {
+            SourceState::Loaded(set) => (!set.contains(addr.self_id.as_str())).then_some(false),
+            SourceState::Unloadable => Some(true),
+        },
+        "gate" => match gates {
+            SourceState::Loaded(set) => addr
+                .self_id
+                .parse::<GateKey>()
+                .map_or(Some(false), |key| (!set.contains(&key)).then_some(false)),
+            SourceState::Unloadable => Some(true),
+        },
+        _ => Some(false),
     }
 }
 
@@ -227,7 +238,7 @@ mod tests {
                      enforced-by = \"@/rule/ghost-rule\"\n",
         );
         let rules: BTreeSet<&str> = BTreeSet::new();
-        let gates: BTreeSet<&str> = BTreeSet::new();
+        let gates: BTreeSet<GateKey> = BTreeSet::new();
         let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
@@ -247,7 +258,7 @@ mod tests {
                      enforced-by = \"@/rule/dag-no-cycles\"\n",
         );
         let rules: BTreeSet<&str> = ["dag-no-cycles"].into_iter().collect();
-        let gates: BTreeSet<&str> = BTreeSet::new();
+        let gates: BTreeSet<GateKey> = BTreeSet::new();
         let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
@@ -264,7 +275,10 @@ mod tests {
                      enforced-by = \"@/gate/code-review\"\n",
         );
         let rules: BTreeSet<&str> = BTreeSet::new();
-        let gates: BTreeSet<&str> = ["code-review"].into_iter().collect();
+        let gates: BTreeSet<GateKey> = ["code-review"]
+            .into_iter()
+            .map(|key| key.parse().unwrap())
+            .collect();
         let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
@@ -282,7 +296,10 @@ mod tests {
                      enforced-by = \"@/rule/rule-a\"\n",
         );
         let rules: BTreeSet<&str> = ["rule-a", "rule-b"].into_iter().collect();
-        let gates: BTreeSet<&str> = ["gate-x"].into_iter().collect();
+        let gates: BTreeSet<GateKey> = ["gate-x"]
+            .into_iter()
+            .map(|key| key.parse().unwrap())
+            .collect();
         let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
@@ -300,7 +317,7 @@ mod tests {
             "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"advisory\"\n",
         );
         let rules: BTreeSet<&str> = ["only-rule"].into_iter().collect();
-        let gates: BTreeSet<&str> = BTreeSet::new();
+        let gates: BTreeSet<GateKey> = BTreeSet::new();
         let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
@@ -327,7 +344,7 @@ mod tests {
                      enforced-by = \"@/rule/ghost\"\n",
         );
         let rules: BTreeSet<&str> = ["real-rule"].into_iter().collect();
-        let gates: BTreeSet<&str> = BTreeSet::new();
+        let gates: BTreeSet<GateKey> = BTreeSet::new();
         let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
@@ -348,7 +365,7 @@ mod tests {
                      enforced-by = \"@/definition/label-format\"\n",
         );
         let rules: BTreeSet<&str> = ["label-format"].into_iter().collect();
-        let gates: BTreeSet<&str> = BTreeSet::new();
+        let gates: BTreeSet<GateKey> = BTreeSet::new();
         let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
@@ -368,7 +385,10 @@ mod tests {
                      enforced-by = \"cargo-ci\"\n",
         );
         let rules: BTreeSet<&str> = BTreeSet::new();
-        let gates: BTreeSet<&str> = ["cargo-ci"].into_iter().collect();
+        let gates: BTreeSet<GateKey> = ["cargo-ci"]
+            .into_iter()
+            .map(|key| key.parse().unwrap())
+            .collect();
         let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
@@ -387,7 +407,7 @@ mod tests {
                      enforced-by = \"legacy:old-rule\"\n",
         );
         let rules: BTreeSet<&str> = ["old-rule"].into_iter().collect();
-        let gates: BTreeSet<&str> = BTreeSet::new();
+        let gates: BTreeSet<GateKey> = BTreeSet::new();
         let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
@@ -407,7 +427,7 @@ mod tests {
             "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"@/rule/bad-rule\"\n",
         );
-        let gates: BTreeSet<&str> = BTreeSet::new();
+        let gates: BTreeSet<GateKey> = BTreeSet::new();
         let findings = enforcement_drift(
             &r.invariants,
             SourceState::Unloadable,

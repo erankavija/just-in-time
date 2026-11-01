@@ -22,7 +22,7 @@ use jit::cli::{
     ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
-use jit::domain::identity::{IssueId, IssueIdPrefix};
+use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
@@ -410,6 +410,19 @@ fn resolve_gate_key(
     }
 }
 
+fn parse_gate_key(value: String, json: bool) -> Result<GateKey> {
+    value
+        .parse::<GateKey>()
+        .map_err(|error| invalid_argument(error.to_string(), json))
+}
+
+fn parse_gate_keys(values: Vec<String>, json: bool) -> Result<Vec<GateKey>> {
+    values
+        .into_iter()
+        .map(|value| parse_gate_key(value, json))
+        .collect()
+}
+
 /// [`resolve_gate_key`] with `--json`-aware error rendering. On the both/neither
 /// error, a `--json` caller emits a machine-readable `INVALID_ARGUMENT` JSON
 /// error (exit 2) instead of letting the plain-text error bubble to the top-level
@@ -419,9 +432,9 @@ fn resolve_gate_key_for(
     flag: Option<String>,
     command: &str,
     json: bool,
-) -> Result<String> {
+) -> Result<GateKey> {
     match resolve_gate_key(positional, flag, command) {
-        Ok(key) => Ok(key),
+        Ok(key) => parse_gate_key(key, json),
         Err(e) => {
             if json {
                 let json_error = command_json_error(&e, jit::output::ErrorCode::InvalidArgument);
@@ -795,11 +808,11 @@ fn resolve_optional_gate_key(
     positional: Option<String>,
     flag: Option<String>,
     json: bool,
-) -> Result<Option<String>> {
+) -> Result<Option<GateKey>> {
     match (positional, flag) {
         (None, None) => Ok(None),
-        (Some(pos), None) => Ok(Some(pos)),
-        (None, Some(flag_val)) => Ok(Some(flag_val)),
+        (Some(pos), None) => parse_gate_key(pos, json).map(Some),
+        (None, Some(flag_val)) => parse_gate_key(flag_val, json).map(Some),
         (Some(_), Some(_)) => Err(invalid_argument(
             "provide the gate key as a positional argument OR via --gate, not both.".to_string(),
             json,
@@ -2048,6 +2061,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     force,
                     orphan,
                 } => {
+                    let gate = parse_gate_keys(gate, json)?;
+
                     // Clap guarantees exactly one of the two title forms is set.
                     let title = positional_title
                         .or(title)
@@ -2574,6 +2589,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     content_format,
                     force,
                 } => {
+                    let add_gate = parse_gate_keys(add_gate, json)?;
+                    let remove_gate = parse_gate_keys(remove_gate, json)?;
+
                     let output_ctx = OutputContext::new(quiet, json);
 
                     // Batch-mode argument guards are usage errors (exit 2), the
@@ -3250,6 +3268,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 env,
                 priority,
             } => {
+                let key = parse_gate_key(key, json)?;
+
                 use jit::declarations::GateChecker;
 
                 // `--auto` is a convenience spelling of `--mode auto`; it wins
@@ -3312,7 +3332,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 });
 
                 match executor.define_gate(
-                    key.clone(),
+                    &key,
                     title.clone(),
                     description.clone(),
                     stage,
@@ -3364,6 +3384,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 clear_env,
                 priority,
             } => {
+                let key = parse_gate_key(key, json)?;
+
                 use jit::commands::{FieldEdit, GateUpdate};
 
                 let output_ctx = OutputContext::new(quiet, json);
@@ -3521,73 +3543,80 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                 }
             }
-            GateCommands::Show { key } => match executor.show_gate_definition(&key) {
-                Ok(gate) => {
-                    if json {
-                        use jit::output::JsonOutput;
-                        let msg = format!("Gate {}: {}", gate.key, gate.title);
-                        let output = JsonOutput::success(gate).with_message(msg);
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        println!("Gate: {}", gate.key);
-                        println!("  Title: {}", gate.title);
-                        println!("  Description: {}", gate.description);
-                        println!("  Stage: {}", gate.stage);
-                        println!("  Mode: {}", gate.mode);
-                        if let Some(checker) = gate.checker {
-                            match checker {
-                                jit::declarations::GateChecker::Exec {
-                                    command,
-                                    timeout_seconds,
-                                    working_dir,
-                                    ..
-                                } => {
-                                    println!("  Checker:");
-                                    println!("    Command: {}", command);
-                                    println!("    Timeout: {}s", timeout_seconds);
-                                    if let Some(wd) = working_dir {
-                                        println!("    Working dir: {}", wd);
+            GateCommands::Show { key } => {
+                let key = parse_gate_key(key, json)?;
+                match executor.show_gate_definition(&key) {
+                    Ok(gate) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            let msg = format!("Gate {}: {}", gate.key, gate.title);
+                            let output = JsonOutput::success(gate).with_message(msg);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("Gate: {}", gate.key);
+                            println!("  Title: {}", gate.title);
+                            println!("  Description: {}", gate.description);
+                            println!("  Stage: {}", gate.stage);
+                            println!("  Mode: {}", gate.mode);
+                            if let Some(checker) = gate.checker {
+                                match checker {
+                                    jit::declarations::GateChecker::Exec {
+                                        command,
+                                        timeout_seconds,
+                                        working_dir,
+                                        ..
+                                    } => {
+                                        println!("  Checker:");
+                                        println!("    Command: {}", command);
+                                        println!("    Timeout: {}s", timeout_seconds);
+                                        if let Some(wd) = working_dir {
+                                            println!("    Working dir: {}", wd);
+                                        }
                                     }
-                                }
-                                jit::declarations::GateChecker::RepositoryValidation => {
-                                    println!("  Checker: repository validation (built-in)");
-                                }
-                                jit::declarations::GateChecker::IssueValidation => {
-                                    println!("  Checker: issue validation (built-in)");
-                                }
-                                jit::declarations::GateChecker::LabelTargetValidation {
-                                    label_namespace,
-                                } => {
-                                    println!(
+                                    jit::declarations::GateChecker::RepositoryValidation => {
+                                        println!("  Checker: repository validation (built-in)");
+                                    }
+                                    jit::declarations::GateChecker::IssueValidation => {
+                                        println!("  Checker: issue validation (built-in)");
+                                    }
+                                    jit::declarations::GateChecker::LabelTargetValidation {
+                                        label_namespace,
+                                    } => {
+                                        println!(
                                         "  Checker: label-target validation (built-in, namespace: {})",
                                         label_namespace
                                     );
-                                }
-                                jit::declarations::GateChecker::RuleValidation { rule } => {
-                                    println!(
-                                        "  Checker: rule validation (built-in, rule: {})",
-                                        rule
-                                    );
-                                }
-                                jit::declarations::GateChecker::ReviewPlaceholder => {
-                                    println!("  Checker: WARNING — external review placeholder");
+                                    }
+                                    jit::declarations::GateChecker::RuleValidation { rule } => {
+                                        println!(
+                                            "  Checker: rule validation (built-in, rule: {})",
+                                            rule
+                                        );
+                                    }
+                                    jit::declarations::GateChecker::ReviewPlaceholder => {
+                                        println!(
+                                            "  Checker: WARNING — external review placeholder"
+                                        );
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                Err(e) => {
-                    if json {
-                        use jit::output::JsonError;
-                        let json_error = JsonError::gate_not_found(&key);
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error = JsonError::gate_not_found(&key);
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
-            },
+            }
             GateCommands::Remove { key } => {
+                let key = parse_gate_key(key, json)?;
+
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.remove_gate_definition(&key) {
                     Ok(_) => {
@@ -3730,7 +3759,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let id = resolve_issue_arg(&storage, &id)
                         .or_else(|e| report_gate_check_error(e, json))?;
                     let runs = executor
-                        .list_gate_runs(&id, gate_filter.as_deref())
+                        .list_gate_runs(&id, gate_filter.as_ref())
                         .or_else(|e| report_gate_check_error(e, json))?;
                     // list_gate_runs already returns newest-first; apply the
                     // status filter and the --limit cap on top of that order.
@@ -3824,7 +3853,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         Err(e) => return report_gate_check_error(e, json),
                     }
                 } else {
-                    let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate status", json)?;
+                    let gate_key = resolve_gate_key(gate_key, gate_flag, "gate status")
+                        .map_err(|error| invalid_argument(error.to_string(), json))?;
 
                     // Transposed-argument guard. The canonical form is
                     // `jit gate status <issue> <gate-key>`. If <id> is not an issue but
@@ -3867,6 +3897,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             return report_gate_check_error(e, json);
                         }
                     };
+
+                    let gate_key = parse_gate_key(gate_key, json)?;
 
                     match executor.get_last_gate_run(&id, &gate_key) {
                         Ok(Some(result)) => {
@@ -3922,7 +3954,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     .count();
                 // Pending keys across all required gates (auto never run, manual
                 // never attested), preserving priority order.
-                let not_run: Vec<String> = gate_statuses
+                let not_run: Vec<GateKey> = gate_statuses
                     .iter()
                     .filter(|(_, s)| *s == GateStatus::Pending)
                     .map(|(key, _)| key.clone())
@@ -3979,15 +4011,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 } else {
                     let _ = output_ctx.print_info(format!("Gate readiness for issue {}:", id));
                     // Gate keys that have a recorded run to print in detail.
-                    let with_runs: std::collections::HashSet<&str> =
-                        results.iter().map(|r| r.gate_key.as_str()).collect();
+                    let with_runs: std::collections::HashSet<&GateKey> =
+                        results.iter().map(|r| &r.gate_key).collect();
                     for result in &results {
                         print_gate_run_details(result);
                     }
                     // Cover every required gate not shown above (gates without a
                     // recorded run) so a strict nonzero exit is explained.
                     for (gate_key, status) in &gate_statuses {
-                        if with_runs.contains(gate_key.as_str()) {
+                        if with_runs.contains(gate_key) {
                             continue;
                         }
                         match status {
@@ -4014,6 +4046,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             GateCommands::Add { id, gate_keys } => {
+                let gate_keys = parse_gate_keys(gate_keys, json)?;
+
                 let output_ctx = OutputContext::new(quiet, json);
                 match resolve_issue_arg(&storage, &id)
                     .and_then(|full_id| executor.add_gates(&full_id, &gate_keys))
@@ -4091,7 +4125,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate evaluate", json)?;
                 let output_ctx = OutputContext::new(quiet, json);
                 match resolve_issue_arg(&storage, &id)
-                    .and_then(|full_id| executor.pass_gate(&full_id, gate_key.clone(), by, force))
+                    .and_then(|full_id| executor.pass_gate(&full_id, &gate_key, by, force))
                 {
                     Ok(outcome) => {
                         // Print warnings first
@@ -4189,6 +4223,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 by,
                 force,
             } => {
+                let gate_key = parse_gate_key(gate_key, json)?;
+
                 use jit::output::BatchTarget;
 
                 let output_ctx = OutputContext::new(quiet, json);
@@ -4308,9 +4344,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             GateCommands::Fail { id, gate_key, by } => {
+                let gate_key = parse_gate_key(gate_key, json)?;
+
                 let output_ctx = OutputContext::new(quiet, json);
                 match resolve_issue_arg(&storage, &id)
-                    .and_then(|full_id| executor.fail_gate(&full_id, gate_key.clone(), by))
+                    .and_then(|full_id| executor.fail_gate(&full_id, &gate_key, by))
                 {
                     Ok(warnings) => {
                         // Print warnings first
@@ -4464,6 +4502,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     no_postcheck,
                     except,
                 } => {
+                    let except = parse_gate_keys(except, json)?;
+
                     use jit::output::{ErrorCode, JsonError, JsonOutput};
 
                     let mut results = Vec::new();
@@ -4540,7 +4580,16 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 for warning in warnings {
                                     eprintln!("Warning ({}): {}", id, warning);
                                 }
-                                println!("  {} - gates added: {}", id, result.added.join(", "));
+                                println!(
+                                    "  {} - gates added: {}",
+                                    id,
+                                    result
+                                        .added
+                                        .iter()
+                                        .map(ToString::to_string)
+                                        .collect::<Vec<_>>()
+                                        .join(", ")
+                                );
                             }
                         }
                         if !errors.is_empty() {

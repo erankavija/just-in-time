@@ -403,7 +403,7 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
         .is_some());
     executor
         .define_gate(
-            "repo-validate".to_string(),
+            &"repo-validate".parse().unwrap(),
             "Repo Validate".to_string(),
             "Whole-repository validation must pass".to_string(),
             GateStage::Postcheck,

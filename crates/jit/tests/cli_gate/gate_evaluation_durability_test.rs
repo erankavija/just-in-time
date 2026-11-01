@@ -37,7 +37,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
         .expect("initialize fresh repository");
     executor
         .define_gate(
-            "durability-check".to_string(),
+            &"durability-check".parse().unwrap(),
             "Durability check".to_string(),
             "Durability check".to_string(),
             GateStage::Postcheck,
@@ -70,11 +70,11 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
     // Attaching the gate after creation records its explicit `pending` state, so
     // the assertions below read a recorded verdict rather than an absent key.
     executor
-        .add_gate(&issue_id, "durability-check".to_string())
+        .add_gate(&issue_id, &"durability-check".parse().unwrap())
         .expect("require the durability gate on the issue");
 
     let evaluated = executor
-        .check_gate(&issue_id, "durability-check")
+        .check_gate(&issue_id, &"durability-check".parse().unwrap())
         .expect("the automated gate evaluates");
     assert_eq!(evaluated.status, GateRunStatus::Passed);
 
@@ -85,7 +85,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
         .load_issue(&issue_id)
         .expect("load the issue the evaluation changed");
     assert_eq!(
-        recorded.gates_status["durability-check"].status,
+        recorded.gates_status[&"durability-check".parse().unwrap()].status,
         GateStatus::Passed,
         "the evaluation's verdict must be durable on the issue"
     );

@@ -379,12 +379,12 @@ fn test_gated_diversion_runs_before_graph_enforcement() {
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
-    issue.gates_required = vec!["tests".to_string()];
+    issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
     // Register the gate so it is a valid reference, leaving it unpassed.
-    executor.add_gate(&epic, "tests".to_string()).unwrap();
+    executor.add_gate(&epic, &"tests".parse().unwrap()).unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -444,10 +444,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
-    issue.gates_required = vec!["tests".to_string()];
+    issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
-    executor.add_gate(&epic, "tests".to_string()).unwrap();
+    executor.add_gate(&epic, &"tests".parse().unwrap()).unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -504,10 +504,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
-    issue.gates_required = vec!["tests".to_string()];
+    issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
-    executor.add_gate(&epic, "tests".to_string()).unwrap();
+    executor.add_gate(&epic, &"tests".parse().unwrap()).unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -563,10 +563,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::InProgress;
-    issue.gates_required = vec!["tests".to_string()];
+    issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
-    executor.add_gate(&epic, "tests".to_string()).unwrap();
+    executor.add_gate(&epic, &"tests".parse().unwrap()).unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -646,9 +646,9 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
     let mut issue = crate::fixture_issue("Epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Gated;
-    issue.gates_required = vec!["tests".to_string()];
+    issue.gates_required = vec!["tests".parse().unwrap()];
     issue.gates_status.insert(
-        "tests".to_string(),
+        "tests".parse().unwrap(),
         GateState {
             status: GateStatus::Passed,
             updated_by: Some("ci:test".parse().unwrap()),

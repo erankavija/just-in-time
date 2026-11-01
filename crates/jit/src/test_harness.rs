@@ -4,6 +4,7 @@
 //! Uses in-memory storage for 10-100x faster test execution.
 
 use crate::commands::CommandExecutor;
+use crate::domain::identity::GateKey;
 use crate::domain::identity::IssueId;
 use crate::domain::{Issue, Priority, State};
 
@@ -148,7 +149,7 @@ impl TestHarness {
     }
 
     /// Create an issue with gates
-    pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> IssueId {
+    pub fn create_issue_with_gates(&self, title: &str, gates: Vec<GateKey>) -> IssueId {
         let (id, _) = self
             .executor
             .issues()
@@ -169,7 +170,7 @@ impl TestHarness {
     /// Define a postcheck gate through the production definition path.
     pub fn add_gate(
         &self,
-        key: &str,
+        key: &GateKey,
         title: &str,
         description: &str,
         mode: crate::declarations::GateMode,
@@ -177,7 +178,7 @@ impl TestHarness {
     ) {
         self.executor
             .define_gate(
-                key.to_string(),
+                key,
                 title.to_string(),
                 description.to_string(),
                 crate::declarations::GateStage::Postcheck,
@@ -235,8 +236,8 @@ pub fn seed_memory_gate_registry(
 /// its own gate registry, so a case that applies a template declares these in
 /// the repository first. Reading them from the template is what keeps a changed
 /// declaration from needing an edit beside it.
-pub fn template_gate_keys(template: &crate::templates::GraphTemplate) -> Vec<String> {
-    let mut keys: Vec<String> = template
+pub fn template_gate_keys(template: &crate::templates::GraphTemplate) -> Vec<GateKey> {
+    let mut keys: Vec<GateKey> = template
         .nodes
         .iter()
         .flat_map(|node| node.gates.iter())
@@ -259,10 +260,7 @@ pub fn seed_memory_template_gates(
     template: &crate::templates::GraphTemplate,
 ) {
     let keys = template_gate_keys(template);
-    seed_memory_gate_keys(
-        storage,
-        &keys.iter().map(String::as_str).collect::<Vec<_>>(),
-    );
+    seed_memory_gate_keys(storage, &keys);
 }
 
 /// Declare `keys` as manual postcheck gates in the in-memory gate registry.
@@ -272,14 +270,14 @@ pub fn seed_memory_template_gates(
 /// declares them through this one seeder rather than authoring a registry per
 /// case (`@/invariant/shared-test-contracts`). The whole registry is replaced,
 /// so a case that needs a specific definition seeds one itself.
-pub fn seed_memory_gate_keys(storage: &InMemoryStorage, keys: &[&str]) {
+pub fn seed_memory_gate_keys(storage: &InMemoryStorage, keys: &[GateKey]) {
     let mut registry = crate::declarations::GateRegistry::default();
     registry.gates.extend(keys.iter().map(|key| {
         (
-            (*key).parse().unwrap(),
+            key.clone(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: (*key).parse().unwrap(),
+                key: key.clone(),
                 title: format!("{key} gate"),
                 description: format!("Repository-declared {key} gate"),
                 stage: crate::declarations::GateStage::Postcheck,

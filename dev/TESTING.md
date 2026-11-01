@@ -108,18 +108,18 @@ impl TestHarness {
     pub fn with_item_kinds(self) -> Self;
 
     // Issue creation helpers
-    pub fn create_issue(&self, title: &str) -> String;
-    pub fn create_issue_with_desc(&self, title: &str, desc: &str) -> String;
-    pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> String;
-    pub fn create_ready_issue(&self, title: &str) -> String;
-    pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> String;
+    pub fn create_issue(&self, title: &str) -> IssueId;
+    pub fn create_issue_with_desc(&self, title: &str, desc: &str) -> IssueId;
+    pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> IssueId;
+    pub fn create_ready_issue(&self, title: &str) -> IssueId;
+    pub fn create_issue_with_gates(&self, title: &str, gates: Vec<GateKey>) -> IssueId;
 
     // Gate setup
-    pub fn add_gate(&self, key: &str, title: &str, description: &str, mode: GateMode, checker: Option<GateChecker>);
+    pub fn add_gate(&self, key: &GateKey, title: &str, description: &str, mode: GateMode, checker: Option<GateChecker>);
 
     // Queries
     pub fn all_issues(&self) -> Vec<Issue>;
-    pub fn get_issue(&self, id: &str) -> Issue;
+    pub fn get_issue(&self, id: &IssueId) -> Issue;
 }
 
 impl Default for TestHarness { /* delegates to new() */ }

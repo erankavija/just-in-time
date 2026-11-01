@@ -5,6 +5,7 @@ use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
 use crate::domain::gate_findings::{
     FindingDisposition, FindingOrigin, FindingSeverity, GateFinding, GateFindings,
 };
+use crate::domain::identity::GateKey;
 use crate::domain::identity::GateRunId;
 use crate::domain::{
     Assignee, GateContext, GateEvaluationStability, GateRunResult, GateRunStatus, GateStatus,
@@ -202,12 +203,12 @@ fn checker_needs_validation_image(checker: &crate::declarations::GateChecker) ->
 fn required_automated_gate<'a>(
     issue: &Issue,
     registry: &'a crate::declarations::GateRegistry,
-    gate_key: &str,
+    gate_key: &GateKey,
 ) -> Result<&'a crate::declarations::GateDefinition> {
     if !issue.gates_required.iter().any(|key| key == gate_key) {
         return Err(super::gate::GateNotRequiredError {
             issue_id: issue.id.clone(),
-            gate_key: gate_key.to_string(),
+            gate_key: gate_key.clone(),
         }
         .into());
     }
@@ -249,7 +250,7 @@ pub(super) fn gate_state_from_run(result: &GateRunResult) -> GateState {
 /// always diagnostic noise and is removed from the context copy.
 fn compact_run_history_for_context(
     runs: &[GateRunResult],
-    gate_key: &str,
+    gate_key: &GateKey,
     state: Option<&GateState>,
 ) -> Vec<GateRunResult> {
     state
@@ -318,7 +319,7 @@ fn captured_gate_runs(
 fn captured_gate_evaluation(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
-    gate_key: &str,
+    gate_key: &GateKey,
     gate: &crate::declarations::GateDefinition,
     gate_runs: &CapturedGateRuns,
 ) -> Result<CapturedGateEvaluation> {
@@ -425,13 +426,8 @@ fn captured_gate_evaluation(
 /// Its recorded status necessarily predates the in-flight evaluation and is not
 /// current evidence. The gate definition identifies the active gate, while its
 /// compact prior result remains available through `run_history`.
-fn omit_current_gate_projection(issue: &mut serde_json::Value, gate_key: &str) {
-    if let Some(gates) = issue
-        .get_mut("gates")
-        .and_then(serde_json::Value::as_array_mut)
-    {
-        gates.retain(|gate| gate.get("key").and_then(serde_json::Value::as_str) != Some(gate_key));
-    }
+fn omit_current_gate_projection(issue: &mut IssueShowResponse, gate_key: &GateKey) {
+    issue.gates.retain(|gate| &gate.key != gate_key);
 }
 
 fn repository_rule_report(
@@ -765,7 +761,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         issue_id: &IssueId,
-        gate_key: &str,
+        gate_key: &GateKey,
         run_paths: &[crate::repository_state::VirtualPath],
     ) -> Result<Option<(crate::repository_state::RepositoryImage, IssueId)>>
     where
@@ -876,7 +872,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`VerdictSource::ReuseUnchangedInputs`]: a gate declaring inputs whose
     /// digest a prior run of that gate already recorded takes that run's
     /// verdict instead of executing its checker again.
-    pub fn check_gate(&self, issue_id: &IssueId, gate_key: &str) -> Result<GateRunResult>
+    pub fn check_gate(&self, issue_id: &IssueId, gate_key: &GateKey) -> Result<GateRunResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -896,7 +892,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn check_gate_with(
         &self,
         issue_id: &IssueId,
-        gate_key: &str,
+        gate_key: &GateKey,
         source: VerdictSource,
     ) -> Result<GateRunResult>
     where
@@ -1010,7 +1006,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let state = gate_state_from_run(&result);
             let by = result.by.clone();
-            final_issue.gates_status.insert(gate_key.to_string(), state);
+            final_issue.gates_status.insert(gate_key.clone(), state);
             let event = if result.status == GateRunStatus::Passed {
                 EventBody::draft_gate_passed(target_id.clone(), final_gate.key.clone(), by)
             } else {
@@ -1223,7 +1219,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn get_last_gate_run(
         &self,
         issue_id: &IssueId,
-        gate_key: &str,
+        gate_key: &GateKey,
     ) -> Result<Option<GateRunResult>> {
         let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
@@ -1231,7 +1227,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Load the run `issue`'s recorded status for `gate_key` names.
-    fn projected_gate_run(&self, issue: &Issue, gate_key: &str) -> Result<Option<GateRunResult>> {
+    fn projected_gate_run(
+        &self,
+        issue: &Issue,
+        gate_key: &GateKey,
+    ) -> Result<Option<GateRunResult>> {
         issue
             .gates_status
             .get(gate_key)
@@ -1282,16 +1282,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter_map(|id| input.issues.iter().find(|candidate| candidate.id == *id))
             .map(crate::domain::MinimalIssue::from)
             .collect();
-        let mut issue_json = serde_json::to_value(IssueShowResponse::from_issue(
-            input.issue.clone(),
-            enriched,
-            input.runs,
-        ))?;
-        omit_current_gate_projection(&mut issue_json, input.gate.key.as_str());
+        let mut issue_view =
+            IssueShowResponse::from_issue(input.issue.clone(), enriched, input.runs);
+        omit_current_gate_projection(&mut issue_view, &input.gate.key);
         Ok(Some(GateContext {
             schema_version: 1,
             prompt,
-            issue: issue_json,
+            issue: serde_json::to_value(issue_view)?,
             gate: serde_json::json!({
                 "key": input.gate.key,
                 "title": input.gate.title,
@@ -1300,8 +1297,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             }),
             run_history: compact_run_history_for_context(
                 input.runs,
-                input.gate.key.as_str(),
-                input.issue.gates_status.get(input.gate.key.as_str()),
+                &input.gate.key,
+                input.issue.gates_status.get(&input.gate.key),
             ),
         }))
     }
@@ -1355,7 +1352,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn get_last_gate_runs_for_issue(
         &self,
         issue_id: &IssueId,
-    ) -> Result<(Vec<GateRunResult>, Vec<String>)> {
+    ) -> Result<(Vec<GateRunResult>, Vec<GateKey>)> {
         let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
@@ -1364,7 +1361,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut gates: Vec<_> = issue
             .gates_required
             .iter()
-            .filter_map(|key| registry.gates.get(key.as_str()).map(|g| (key, g)))
+            .filter_map(|key| registry.gates.get(key).map(|g| (key, g)))
             .collect();
         gates.sort_by_key(|(_, gate)| gate.priority);
 
@@ -1392,7 +1389,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn get_required_gate_statuses_for_issue(
         &self,
         issue_id: &IssueId,
-    ) -> Result<Vec<(String, GateStatus)>> {
+    ) -> Result<Vec<(GateKey, GateStatus)>> {
         let full_id = issue_id.clone();
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
@@ -1403,10 +1400,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .gates_required
             .iter()
             .map(|key| {
-                let priority = registry
-                    .gates
-                    .get(key.as_str())
-                    .map_or(u32::MAX, |g| g.priority);
+                let priority = registry.gates.get(key).map_or(u32::MAX, |g| g.priority);
                 (key.clone(), priority)
             })
             .collect();
@@ -1430,7 +1424,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         image: &crate::repository_state::RepositoryImage,
         issue: &Issue,
         registry: &crate::declarations::GateRegistry,
-        captured_prompts: &HashMap<String, String>,
+        captured_prompts: &HashMap<GateKey, String>,
         mutation: &crate::repository_state::MutationContext,
     ) -> Result<PrecheckExecution>
     where
@@ -1445,7 +1439,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut precheck_gates: Vec<_> = issue
             .gates_required
             .iter()
-            .filter_map(|key| registry.gates.get(key.as_str()).map(|g| (key, g)))
+            .filter_map(|key| registry.gates.get(key).map(|g| (key, g)))
             .filter(|(_, gate)| gate.stage == GateStage::Precheck)
             .collect();
         precheck_gates.sort_by_key(|(_, gate)| gate.priority);
@@ -1562,7 +1556,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let registry = self.storage.load_gate_registry()?;
 
         for gate_key in &issue.gates_required {
-            if let Some(gate) = registry.gates.get(gate_key.as_str()) {
+            if let Some(gate) = registry.gates.get(gate_key) {
                 if gate.stage == GateStage::Postcheck && gate.mode == GateMode::Auto {
                     self.check_gate(&full_id, gate_key)?;
                 }
@@ -1583,9 +1577,10 @@ mod tests {
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::gate_findings::GateFindings;
-    use crate::domain::identity::{GateRunId, IssueId};
-    use crate::domain::{GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION};
+    use crate::domain::identity::{GateKey, GateRunId, IssueId};
+    use crate::domain::{GateRunResult, GateRunStatus, GateStatus, State, GATE_RUN_SCHEMA_VERSION};
     use crate::gate_execution::GateRunSubject;
+    use crate::output::IssueShowResponse;
     use crate::repository_state::VirtualPath;
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
     use crate::test_utils::document_reference;
@@ -1628,16 +1623,16 @@ mod tests {
 
     fn add_builtin_gate(
         executor: &CommandExecutor<InMemoryStorage>,
-        gate_key: &str,
+        gate_key: &GateKey,
         checker: GateChecker,
         labels: Vec<String>,
     ) -> IssueId {
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
-            gate_key.parse().unwrap(),
+            gate_key.clone(),
             crate::declarations::GateDefinition {
                 version: 1,
-                key: gate_key.parse().unwrap(),
+                key: gate_key.clone(),
                 title: "Portable check".to_string(),
                 description: "Portable check".to_string(),
                 stage: GateStage::Postcheck,
@@ -1652,7 +1647,7 @@ mod tests {
 
         let mut issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         issue.labels = labels;
-        issue.gates_required.push(gate_key.to_string());
+        issue.gates_required.push(gate_key.clone());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         issue_id
@@ -1733,14 +1728,14 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
 
     fn prior_run(
         run_id: &GateRunId,
-        gate_key: &str,
+        gate_key: &GateKey,
         started_at: i64,
         findings: Option<GateFindings>,
     ) -> GateRunResult {
         GateRunResult {
             schema_version: GATE_RUN_SCHEMA_VERSION,
             run_id: run_id.clone(),
-            gate_key: gate_key.parse().unwrap(),
+            gate_key: gate_key.clone(),
             stage: GateStage::Postcheck,
             issue_id: crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725),
             commit: Some("abc123".to_string()),
@@ -1764,17 +1759,37 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
 
     #[test]
     fn test_compact_run_history_selects_the_run_the_gate_status_names() {
-        let named = prior_run(&crate::test_utils::gate_run_id(1), "review", 20, None);
+        let named = prior_run(
+            &crate::test_utils::gate_run_id(1),
+            &"review".parse().unwrap(),
+            20,
+            None,
+        );
         let runs = vec![
             named.clone(),
-            prior_run(&crate::test_utils::gate_run_id(2), "cargo-ci", 40, None),
-            prior_run(&crate::test_utils::gate_run_id(3), "review", 30, None),
-            prior_run(&crate::test_utils::gate_run_id(4), "review", 10, None),
+            prior_run(
+                &crate::test_utils::gate_run_id(2),
+                &"cargo-ci".parse().unwrap(),
+                40,
+                None,
+            ),
+            prior_run(
+                &crate::test_utils::gate_run_id(3),
+                &"review".parse().unwrap(),
+                30,
+                None,
+            ),
+            prior_run(
+                &crate::test_utils::gate_run_id(4),
+                &"review".parse().unwrap(),
+                10,
+                None,
+            ),
         ];
 
         let compact = compact_run_history_for_context(
             &runs,
-            "review",
+            &"review".parse().unwrap(),
             Some(&super::gate_state_from_run(&named)),
         );
 
@@ -1794,14 +1809,14 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         };
         let source = prior_run(
             &crate::test_utils::gate_run_id(5),
-            "review",
+            &"review".parse().unwrap(),
             10,
             Some(findings.clone()),
         );
 
         let compact = compact_run_history_for_context(
             std::slice::from_ref(&source),
-            "review",
+            &"review".parse().unwrap(),
             Some(&super::gate_state_from_run(&source)),
         );
 
@@ -1815,28 +1830,34 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
 
     #[test]
     fn test_compact_run_history_is_empty_without_matching_runs() {
-        let run = prior_run(&crate::test_utils::gate_run_id(6), "cargo-ci", 10, None);
+        let run = prior_run(
+            &crate::test_utils::gate_run_id(6),
+            &"cargo-ci".parse().unwrap(),
+            10,
+            None,
+        );
         let state = super::gate_state_from_run(&run);
 
-        assert!(compact_run_history_for_context(&[run], "review", Some(&state)).is_empty());
+        assert!(
+            compact_run_history_for_context(&[run], &"review".parse().unwrap(), Some(&state))
+                .is_empty()
+        );
     }
 
     #[test]
     fn test_omit_current_gate_projection_retains_other_gate_evidence() {
-        let mut issue = serde_json::json!({
-            "gates": [
-                {"key": "cargo-ci", "status": "passed", "exit_code": 0},
-                {"key": "review", "status": "failed", "exit_code": 1}
-            ]
-        });
+        let retained = "cargo-ci".parse().unwrap();
+        let removed: GateKey = "review".parse().unwrap();
+        let mut issue = crate::test_utils::fixture_issue("Test".into(), String::new());
+        issue.gates_required = vec![retained, removed.clone()];
+        let mut view = IssueShowResponse::from_issue(issue, Vec::new(), &[]);
+        let expected = serde_json::to_value(&view.gates[0]).unwrap();
 
-        omit_current_gate_projection(&mut issue, "review");
+        omit_current_gate_projection(&mut view, &removed);
 
         assert_eq!(
-            issue["gates"],
-            serde_json::json!([
-                {"key": "cargo-ci", "status": "passed", "exit_code": 0}
-            ])
+            serde_json::to_value(&view.gates).unwrap(),
+            serde_json::json!([expected])
         );
     }
 
@@ -1844,25 +1865,34 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
     fn test_projected_precheck_run_matches_next_checker_issue_view() {
         let mut issue = crate::test_utils::fixture_issue("Test".into(), String::new());
         issue.id = crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725);
-        issue.gates_required = vec!["first".into(), "second".into()];
-        let mut run = prior_run(&crate::test_utils::gate_run_id(7), "first", 10, None);
+        issue.gates_required = vec!["first".parse().unwrap(), "second".parse().unwrap()];
+        let mut run = prior_run(
+            &crate::test_utils::gate_run_id(7),
+            &"first".parse().unwrap(),
+            10,
+            None,
+        );
         run.status = GateRunStatus::Passed;
         issue
             .gates_status
-            .insert("first".into(), super::gate_state_from_run(&run));
+            .insert("first".parse().unwrap(), super::gate_state_from_run(&run));
 
-        let second = issue.gates_status.get("second").cloned();
-        let mut view = serde_json::to_value(crate::output::IssueShowResponse::from_issue(
+        let second = issue.gates_status.get(&"second".parse().unwrap()).cloned();
+        let mut view = crate::output::IssueShowResponse::from_issue(
             issue,
             Vec::new(),
             std::slice::from_ref(&run),
-        ))
-        .unwrap();
-        omit_current_gate_projection(&mut view, "second");
+        );
+        omit_current_gate_projection(&mut view, &"second".parse().unwrap());
 
-        assert_eq!(view["gates"][0]["status"], "passed");
-        assert!(view["gates"][0]["last_run_at"].is_string());
-        assert!(compact_run_history_for_context(&[run], "second", second.as_ref()).is_empty());
+        assert_eq!(view.gates[0].status, GateStatus::Passed);
+        assert!(view.gates[0].last_run_at.is_some());
+        assert!(compact_run_history_for_context(
+            &[run],
+            &"second".parse().unwrap(),
+            second.as_ref()
+        )
+        .is_empty());
     }
 
     #[test]
@@ -1901,18 +1931,23 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "test-gate".to_string())
+            .add_gate(&issue_id, &"test-gate".parse().unwrap())
             .unwrap();
 
         // Check the gate
-        let result = executor.check_gate(&issue_id, "test-gate").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"test-gate".parse().unwrap())
+            .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Passed);
         assert_eq!(result.exit_code, Some(0));
 
         // Verify gate status was updated on issue
         let issue = executor.storage.load_issue(&issue_id).unwrap();
-        let gate_state = issue.gates_status.get("test-gate").unwrap();
+        let gate_state = issue
+            .gates_status
+            .get(&"test-gate".parse().unwrap())
+            .unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
     }
 
@@ -1925,7 +1960,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         let executor = setup();
         let issue_id = add_builtin_gate(
             &executor,
-            "durability-check",
+            &"durability-check".parse().unwrap(),
             GateChecker::Exec {
                 command: "exit 0".to_string(),
                 timeout_seconds: 10,
@@ -1938,7 +1973,9 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             Vec::new(),
         );
 
-        let result = executor.check_gate(&issue_id, "durability-check").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"durability-check".parse().unwrap())
+            .unwrap();
         assert_eq!(result.status, GateRunStatus::Passed);
 
         let runs = executor
@@ -1947,12 +1984,14 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             .unwrap();
         assert!(
             runs.iter().any(|run| run.run_id == result.run_id
-                && run.gate_key.as_str() == "durability-check"
+                && run.gate_key == "durability-check".parse().unwrap()
                 && run.status == GateRunStatus::Passed),
             "the returned run must already be recorded: {runs:?}"
         );
         assert_eq!(
-            executor.storage.load_issue(&issue_id).unwrap().gates_status["durability-check"].status,
+            executor.storage.load_issue(&issue_id).unwrap().gates_status
+                [&"durability-check".parse().unwrap()]
+                .status,
             crate::domain::GateStatus::Passed,
             "the issue must already carry the passing verdict"
         );
@@ -1965,7 +2004,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
                 .any(|event| matches!(
                     event.body(),
                     crate::domain::EventBody::GatePassed { issue_id: subject, gate_key, .. }
-                        if subject == &issue_id && gate_key.as_str() == "durability-check"
+                        if subject == &issue_id && gate_key == &"durability-check".parse::<GateKey>().unwrap()
                 )),
             "the evaluation must already have logged its gate-passed event"
         );
@@ -1976,13 +2015,13 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         let executor = setup();
         let issue_id = add_builtin_gate(
             &executor,
-            "arbitrary-review-key",
+            &"arbitrary-review-key".parse().unwrap(),
             GateChecker::ReviewPlaceholder,
             vec!["type:task".to_string()],
         );
 
         let result = executor
-            .check_gate(&issue_id, "arbitrary-review-key")
+            .check_gate(&issue_id, &"arbitrary-review-key".parse().unwrap())
             .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Passed);
@@ -2011,13 +2050,13 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         let executor = setup();
         let issue_id = add_builtin_gate(
             &executor,
-            "editable-review",
+            &"editable-review".parse().unwrap(),
             GateChecker::ReviewPlaceholder,
             vec!["type:task".to_string()],
         );
 
         let outcome = executor
-            .pass_gate(&issue_id, "editable-review".to_string(), None, true)
+            .pass_gate(&issue_id, &"editable-review".parse().unwrap(), None, true)
             .unwrap();
 
         assert_eq!(outcome.warnings.len(), 1);
@@ -2029,13 +2068,13 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         let executor = setup();
         let issue_id = add_builtin_gate(
             &executor,
-            "not-a-reserved-validation-key",
+            &"not-a-reserved-validation-key".parse().unwrap(),
             GateChecker::IssueValidation,
             vec!["type:task".to_string()],
         );
 
         let result = executor
-            .check_gate(&issue_id, "not-a-reserved-validation-key")
+            .check_gate(&issue_id, &"not-a-reserved-validation-key".parse().unwrap())
             .unwrap();
 
         assert_eq!(result.command, "builtin:issue_validation");
@@ -2048,13 +2087,13 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         let executor = setup();
         let issue_id = add_builtin_gate(
             &executor,
-            "not-a-reserved-repository-key",
+            &"not-a-reserved-repository-key".parse().unwrap(),
             GateChecker::RepositoryValidation,
             vec!["type:task".to_string()],
         );
 
         let result = executor
-            .check_gate(&issue_id, "not-a-reserved-repository-key")
+            .check_gate(&issue_id, &"not-a-reserved-repository-key".parse().unwrap())
             .unwrap();
 
         assert_eq!(result.command, "builtin:repository_validation");
@@ -2079,7 +2118,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     fn seed_gate_issue(
         executor: &CommandExecutor<JsonFileStorage>,
         taxonomy: &crate::test_taxonomy::TestTaxonomy,
-        gate_key: &str,
+        gate_key: &GateKey,
         issue_title: &str,
         issue_description: &str,
     ) -> IssueId {
@@ -2096,7 +2135,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 false,
             )
             .unwrap();
-        executor.add_gate(&issue_id, gate_key.to_string()).unwrap();
+        executor.add_gate(&issue_id, gate_key).unwrap();
         issue_id
     }
 
@@ -2108,7 +2147,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     ) -> IssueId {
         executor
             .define_gate(
-                "not-a-reserved-repository-key".to_string(),
+                &"not-a-reserved-repository-key".parse().unwrap(),
                 "Portable check".to_string(),
                 "Portable check".to_string(),
                 GateStage::Postcheck,
@@ -2119,7 +2158,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap();
         executor
             .define_gate(
-                "editable-review".to_string(),
+                &"editable-review".parse().unwrap(),
                 "Portable check".to_string(),
                 "Portable check".to_string(),
                 GateStage::Postcheck,
@@ -2131,7 +2170,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         seed_gate_issue(
             executor,
             taxonomy,
-            "not-a-reserved-repository-key",
+            &"not-a-reserved-repository-key".parse().unwrap(),
             issue_title,
             issue_description,
         )
@@ -2167,7 +2206,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     struct ReuseFixture {
         repo: tempfile::TempDir,
         executor: CommandExecutor<JsonFileStorage>,
-        gate_key: String,
+        gate_key: GateKey,
     }
 
     impl ReuseFixture {
@@ -2189,10 +2228,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .load_gate_registry()
                 .expect("the seeded registry");
             registry.gates.insert(
-                self.gate_key.parse().unwrap(),
+                self.gate_key.clone(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: self.gate_key.parse().unwrap(),
+                    key: self.gate_key.clone(),
                     title: "Workspace check".to_string(),
                     description: "Workspace check".to_string(),
                     stage: GateStage::Postcheck,
@@ -2268,7 +2307,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .expect("the registry loads");
             let gate = registry
                 .gates
-                .get_mut(self.gate_key.as_str())
+                .get_mut(&self.gate_key)
                 .expect("the gate under test is registered");
             gate.checker = Some(GateChecker::Exec {
                 command: command.to_string(),
@@ -2300,7 +2339,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &[])), 0);
         let first_issue = fixture.issue("Test", "Test");
@@ -2336,7 +2375,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &[])), 1);
         let first_issue = fixture.issue("Test", "Test");
@@ -2364,7 +2403,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &[])), 0);
         let first = fixture.evaluate(&fixture.issue("Test", "Test"));
@@ -2401,7 +2440,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &[])), 0);
         let original = fixture.evaluate(&fixture.issue("Test", "Test"));
@@ -2431,7 +2470,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &[])), 0);
         let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
@@ -2457,7 +2496,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &["workspace/notes/**"])), 0);
         fixture.write("workspace/notes/scratch.md", "before\n");
@@ -2483,7 +2522,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(None, 0);
 
@@ -2508,7 +2547,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &[])), 0);
         let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
@@ -2544,7 +2583,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &[])), 0);
         let wave: Vec<GateRunResult> = (0..5)
@@ -2582,7 +2621,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &[])), 127);
 
@@ -2608,7 +2647,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &[])), 0);
         let before = fixture.evaluate(&fixture.issue("Test", "Test"));
@@ -2641,7 +2680,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let fixture = ReuseFixture {
             repo,
             executor,
-            gate_key: "workspace-check".to_string(),
+            gate_key: "workspace-check".parse().unwrap(),
         };
         fixture.seed(Some((&["workspace"], &[])), 0);
         let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
@@ -2673,14 +2712,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     fn add_exec_gate<S: IssueStore + crate::storage::RepositoryStateStore>(
         executor: &CommandExecutor<S>,
         issue_id: &IssueId,
-        gate_key: &str,
+        gate_key: &GateKey,
         title: &str,
         command: String,
         prompt_file: Option<String>,
     ) {
         executor
             .define_gate(
-                gate_key.to_string(),
+                gate_key,
                 title.to_string(),
                 "Race fixture".to_string(),
                 GateStage::Postcheck,
@@ -2697,7 +2736,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 100,
             )
             .unwrap();
-        executor.add_gate(issue_id, gate_key.to_string()).unwrap();
+        executor.add_gate(issue_id, gate_key).unwrap();
     }
 
     fn corrupt_gate_run_record() -> crate::repository_state::VirtualPath {
@@ -2727,7 +2766,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     fn capture_gate_evidence(
         executor: &CommandExecutor<JsonFileStorage>,
         issue_id: &IssueId,
-        gate_key: &str,
+        gate_key: &GateKey,
     ) -> super::GateEvaluationEvidence {
         use crate::storage::RepositoryStateStore;
 
@@ -2771,7 +2810,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "selected-safe",
+            &"selected-safe".parse().unwrap(),
             "Selected safe",
             "true".to_string(),
             None,
@@ -2779,7 +2818,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "unselected-unsafe",
+            &"unselected-unsafe".parse().unwrap(),
             "Unselected unsafe",
             "true".to_string(),
             Some("../../outside".to_string()),
@@ -2800,7 +2839,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .push(unrelated.as_str().into());
         std::fs::write(index_path, serde_json::to_vec_pretty(&index).unwrap()).unwrap();
 
-        let result = executor.check_gate(&issue_id, "selected-safe").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"selected-safe".parse().unwrap())
+            .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Passed);
     }
@@ -2817,14 +2858,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "no-context",
+            &"no-context".parse().unwrap(),
             "No context",
             "true".to_string(),
             None,
         );
         executor
             .update_gate(
-                "no-context",
+                &"no-context".parse().unwrap(),
                 GateUpdate {
                     pass_context: Some(false),
                     ..Default::default()
@@ -2833,7 +2874,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap();
         write_corrupt_gate_run(repo.path());
 
-        let result = executor.check_gate(&issue_id, "no-context").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"no-context".parse().unwrap())
+            .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Passed);
     }
@@ -2850,14 +2893,16 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "with-context",
+            &"with-context".parse().unwrap(),
             "With context",
             "true".to_string(),
             None,
         );
         write_corrupt_gate_run(repo.path());
 
-        let error = executor.check_gate(&issue_id, "with-context").unwrap_err();
+        let error = executor
+            .check_gate(&issue_id, &"with-context".parse().unwrap())
+            .unwrap_err();
 
         assert!(format!("{error:#}").contains(corrupt_gate_run_record().relative().as_str()));
     }
@@ -2872,7 +2917,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         executor
-            .add_gate(&issue_id, "editable-review".to_string())
+            .add_gate(&issue_id, &"editable-review".parse().unwrap())
             .unwrap();
         let mut issue = executor.storage.load_issue(&issue_id).unwrap();
         issue.documents.push(document_reference("../../outside"));
@@ -2884,7 +2929,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap();
         std::fs::write(issue_path, bytes).unwrap();
 
-        let result = executor.check_gate(&issue_id, "editable-review").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"editable-review".parse().unwrap())
+            .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Passed);
     }
@@ -2898,14 +2945,22 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        let before = capture_gate_evidence(&executor, &issue_id, "not-a-reserved-repository-key");
+        let before = capture_gate_evidence(
+            &executor,
+            &issue_id,
+            &"not-a-reserved-repository-key".parse().unwrap(),
+        );
         std::fs::write(
             repo.path().join(".jit/rules.toml"),
             "# changed broad validation input\n",
         )
         .unwrap();
 
-        let after = capture_gate_evidence(&executor, &issue_id, "not-a-reserved-repository-key");
+        let after = capture_gate_evidence(
+            &executor,
+            &issue_id,
+            &"not-a-reserved-repository-key".parse().unwrap(),
+        );
 
         assert_ne!(before, after);
     }
@@ -3002,7 +3057,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         std::fs::write(repo.path().join(".jit/rules.toml"), late_rule).unwrap();
 
         let result = executor
-            .check_gate(&issue_id, "not-a-reserved-repository-key")
+            .check_gate(&issue_id, &"not-a-reserved-repository-key".parse().unwrap())
             .unwrap();
 
         assert_eq!(result.command, "builtin:repository_validation");
@@ -3052,13 +3107,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
         add_builtin_gate(
             &executor,
-            "z-review",
+            &"z-review".parse().unwrap(),
             GateChecker::ReviewPlaceholder,
             vec!["type:task".to_string()],
         );
         add_builtin_gate(
             &executor,
-            "a-review",
+            &"a-review".parse().unwrap(),
             GateChecker::ReviewPlaceholder,
             vec!["type:task".to_string()],
         );
@@ -3079,7 +3134,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
         let issue_id = add_builtin_gate(
             &executor,
-            "arbitrary-coverage-key",
+            &"arbitrary-coverage-key".parse().unwrap(),
             GateChecker::LabelTargetValidation {
                 label_namespace: "parent-pointer".to_string(),
             },
@@ -3087,7 +3142,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
 
         let result = executor
-            .check_gate(&issue_id, "arbitrary-coverage-key")
+            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
             .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Error);
@@ -3103,7 +3158,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
         let issue_id = add_builtin_gate(
             &executor,
-            "arbitrary-coverage-key",
+            &"arbitrary-coverage-key".parse().unwrap(),
             GateChecker::LabelTargetValidation {
                 label_namespace: String::new(),
             },
@@ -3111,7 +3166,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
 
         let result = executor
-            .check_gate(&issue_id, "arbitrary-coverage-key")
+            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
             .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Error);
@@ -3122,7 +3177,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
         let issue_id = add_builtin_gate(
             &executor,
-            "arbitrary-coverage-key",
+            &"arbitrary-coverage-key".parse().unwrap(),
             GateChecker::LabelTargetValidation {
                 label_namespace: "coverage-target".to_string(),
             },
@@ -3133,7 +3188,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
 
         let result = executor
-            .check_gate(&issue_id, "arbitrary-coverage-key")
+            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
             .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Error);
@@ -3150,7 +3205,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         let issue_id = add_builtin_gate(
             &executor,
-            "arbitrary-coverage-key",
+            &"arbitrary-coverage-key".parse().unwrap(),
             GateChecker::LabelTargetValidation {
                 label_namespace: "coverage-target".to_string(),
             },
@@ -3161,7 +3216,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
 
         let result = executor
-            .check_gate(&issue_id, "arbitrary-coverage-key")
+            .check_gate(&issue_id, &"arbitrary-coverage-key".parse().unwrap())
             .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Passed);
@@ -3204,7 +3259,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         let selected_id = add_builtin_gate(
             &executor,
-            "coverage-preview",
+            &"coverage-preview".parse().unwrap(),
             GateChecker::RuleValidation {
                 rule: "coverage-preview".to_string(),
             },
@@ -3225,7 +3280,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         local_failure.dependencies = vec![crate::test_utils::issue_id(
             0x4c965feb95709e34e4c8581004d64f1d,
         )];
-        local_failure.gates_required = vec!["unrelated-pending".to_string()];
+        local_failure.gates_required = vec!["unrelated-pending".parse().unwrap()];
         seed_issue(&executor.storage, local_failure);
 
         let mut unrelated_graph = crate::test_utils::fixture_issue(
@@ -3256,7 +3311,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         }
 
         let result = executor
-            .check_gate(&selected_id, "coverage-preview")
+            .check_gate(&selected_id, &"coverage-preview".parse().unwrap())
             .expect("captured native rule validation should run");
 
         assert_eq!(result.command, "builtin:rule_validation");
@@ -3271,7 +3326,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         seed_rule_validation_rules(&missing_executor);
         let missing_id = add_builtin_gate(
             &missing_executor,
-            "coverage-preview",
+            &"coverage-preview".parse().unwrap(),
             GateChecker::RuleValidation {
                 rule: "coverage-preview".to_string(),
             },
@@ -3281,7 +3336,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             ],
         );
         let missing = missing_executor
-            .check_gate(&missing_id, "coverage-preview")
+            .check_gate(&missing_id, &"coverage-preview".parse().unwrap())
             .expect("missing target should be a native validation failure");
         assert_eq!(missing.status, GateRunStatus::Failed);
         assert!(missing
@@ -3305,7 +3360,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         }
         let ambiguous_id = add_builtin_gate(
             &ambiguous_executor,
-            "coverage-preview",
+            &"coverage-preview".parse().unwrap(),
             GateChecker::RuleValidation {
                 rule: "coverage-preview".to_string(),
             },
@@ -3315,7 +3370,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             ],
         );
         let ambiguous = ambiguous_executor
-            .check_gate(&ambiguous_id, "coverage-preview")
+            .check_gate(&ambiguous_id, &"coverage-preview".parse().unwrap())
             .expect("ambiguous target should be a native validation failure");
         assert_eq!(ambiguous.status, GateRunStatus::Failed);
         assert!(ambiguous
@@ -3332,14 +3387,16 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         seed_rule_validation_rules(&executor);
         let issue_id = add_builtin_gate(
             &executor,
-            "coverage-preview",
+            &"coverage-preview".parse().unwrap(),
             GateChecker::RuleValidation {
                 rule: "no-such-rule".to_string(),
             },
             vec!["type:task".to_string()],
         );
 
-        let result = executor.check_gate(&issue_id, "coverage-preview").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"coverage-preview".parse().unwrap())
+            .unwrap();
 
         assert_eq!(result.command, "builtin:rule_validation");
         assert_eq!(result.status, GateRunStatus::Error);
@@ -3396,7 +3453,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         std::fs::write(repo.path().join(".jit/rules.toml"), late_rule).unwrap();
 
         let result = executor
-            .check_gate(&issue_id, "not-a-reserved-repository-key")
+            .check_gate(&issue_id, &"not-a-reserved-repository-key".parse().unwrap())
             .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Failed);
@@ -3438,18 +3495,23 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "failing-gate".to_string())
+            .add_gate(&issue_id, &"failing-gate".parse().unwrap())
             .unwrap();
 
         // Check the gate
-        let result = executor.check_gate(&issue_id, "failing-gate").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"failing-gate".parse().unwrap())
+            .unwrap();
 
         assert_eq!(result.status, GateRunStatus::Failed);
         assert_eq!(result.exit_code, Some(1));
 
         // Verify gate status was updated on issue
         let issue = executor.storage.load_issue(&issue_id).unwrap();
-        let gate_state = issue.gates_status.get("failing-gate").unwrap();
+        let gate_state = issue
+            .gates_status
+            .get(&"failing-gate".parse().unwrap())
+            .unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Failed);
     }
 
@@ -3481,11 +3543,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "manual-gate".to_string())
+            .add_gate(&issue_id, &"manual-gate".parse().unwrap())
             .unwrap();
 
         // Try to check the gate - should fail
-        let result = executor.check_gate(&issue_id, "manual-gate");
+        let result = executor.check_gate(&issue_id, &"manual-gate".parse().unwrap());
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("manual"));
     }
@@ -3541,10 +3603,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "auto-gate".to_string())
+            .add_gate(&issue_id, &"auto-gate".parse().unwrap())
             .unwrap();
         executor
-            .add_gate(&issue_id, "manual-gate".to_string())
+            .add_gate(&issue_id, &"manual-gate".parse().unwrap())
             .unwrap();
 
         // Before any evaluation: both required gates are pending, ordered by priority.
@@ -3554,21 +3616,29 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(
             statuses,
             vec![
-                ("auto-gate".to_string(), GateStatus::Pending),
-                ("manual-gate".to_string(), GateStatus::Pending),
+                ("auto-gate".parse::<GateKey>().unwrap(), GateStatus::Pending),
+                (
+                    "manual-gate".parse::<GateKey>().unwrap(),
+                    GateStatus::Pending
+                ),
             ]
         );
 
         // Running the auto gate flips only its status; the manual gate stays pending.
-        executor.check_gate(&issue_id, "auto-gate").unwrap();
+        executor
+            .check_gate(&issue_id, &"auto-gate".parse().unwrap())
+            .unwrap();
         let statuses = executor
             .get_required_gate_statuses_for_issue(&issue_id)
             .unwrap();
         assert_eq!(
             statuses,
             vec![
-                ("auto-gate".to_string(), GateStatus::Passed),
-                ("manual-gate".to_string(), GateStatus::Pending),
+                ("auto-gate".parse::<GateKey>().unwrap(), GateStatus::Passed),
+                (
+                    "manual-gate".parse::<GateKey>().unwrap(),
+                    GateStatus::Pending
+                ),
             ]
         );
 
@@ -3576,7 +3646,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         executor
             .pass_gate(
                 &issue_id,
-                "manual-gate".to_string(),
+                &"manual-gate".parse().unwrap(),
                 Some("human:tester".to_string()),
                 false,
             )
@@ -3587,7 +3657,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert!(statuses.iter().all(|(_, s)| *s == GateStatus::Passed));
     }
 
-    fn make_manual_gate(key: &str) -> crate::declarations::GateDefinition {
+    fn make_manual_gate(key: &GateKey) -> crate::declarations::GateDefinition {
         crate::declarations::GateDefinition {
             mode: GateMode::Manual,
             checker: None,
@@ -3599,15 +3669,17 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// the automated gate `tests`.
     fn seed_review_issue(executor: &CommandExecutor<InMemoryStorage>) -> IssueId {
         let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry
-            .gates
-            .insert("review".parse().unwrap(), make_manual_gate("review"));
-        registry
-            .gates
-            .insert("tests".parse().unwrap(), make_auto_gate("tests", "exit 0"));
+        registry.gates.insert(
+            "review".parse().unwrap(),
+            make_manual_gate(&"review".parse().unwrap()),
+        );
+        registry.gates.insert(
+            "tests".parse().unwrap(),
+            make_auto_gate(&"tests".parse().unwrap(), "exit 0"),
+        );
         seed_gate_registry(executor.storage(), &registry);
         let mut issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
-        issue.gates_required = vec!["review".to_string(), "tests".to_string()];
+        issue.gates_required = vec!["review".parse().unwrap(), "tests".parse().unwrap()];
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         issue_id
@@ -3622,14 +3694,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         executor
             .pass_gate(
                 &issue_id,
-                "review".to_string(),
+                &"review".parse().unwrap(),
                 Some("human:me".to_string()),
                 false,
             )
             .unwrap();
 
         let run = executor
-            .get_last_gate_run(&issue_id, "review")
+            .get_last_gate_run(&issue_id, &"review".parse().unwrap())
             .unwrap()
             .expect("an attestation is a recorded gate run");
         assert_eq!(run.status, GateRunStatus::Passed);
@@ -3651,12 +3723,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
         let issue_id = seed_review_issue(&executor);
 
-        executor.check_gate(&issue_id, "tests").unwrap();
+        executor
+            .check_gate(&issue_id, &"tests".parse().unwrap())
+            .unwrap();
         for _ in 0..2 {
             executor
                 .pass_gate(
                     &issue_id,
-                    "review".to_string(),
+                    &"review".parse().unwrap(),
                     Some("human:me".to_string()),
                     false,
                 )
@@ -3671,7 +3745,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(attested, 2, "every attestation is its own record");
         assert!(runs
             .iter()
-            .any(|run| run.gate_key.as_str() == "tests" && run.origin.is_executed()));
+            .any(|run| run.gate_key == "tests".parse().unwrap() && run.origin.is_executed()));
     }
 
     #[test]
@@ -3679,41 +3753,45 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
         let mut registry = executor.storage.load_gate_registry().unwrap();
         let gates = [
-            make_auto_gate("auto-pass", "exit 0"),
-            make_auto_gate("auto-fail", "exit 1"),
-            make_auto_gate("auto-pending", "exit 0"),
-            make_manual_gate("manual-pass"),
-            make_manual_gate("manual-fail"),
-            make_manual_gate("manual-pending"),
+            make_auto_gate(&"auto-pass".parse().unwrap(), "exit 0"),
+            make_auto_gate(&"auto-fail".parse().unwrap(), "exit 1"),
+            make_auto_gate(&"auto-pending".parse().unwrap(), "exit 0"),
+            make_manual_gate(&"manual-pass".parse().unwrap()),
+            make_manual_gate(&"manual-fail".parse().unwrap()),
+            make_manual_gate(&"manual-pending".parse().unwrap()),
         ];
         for gate in &gates {
             registry.gates.insert(gate.key.clone(), gate.clone());
         }
         seed_gate_registry(executor.storage(), &registry);
         let mut issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
-        issue.gates_required = gates.iter().map(|gate| gate.key.to_string()).collect();
+        issue.gates_required = gates.iter().map(|gate| gate.key.clone()).collect();
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
 
-        executor.check_gate(&issue_id, "auto-pass").unwrap();
-        executor.check_gate(&issue_id, "auto-fail").unwrap();
+        executor
+            .check_gate(&issue_id, &"auto-pass".parse().unwrap())
+            .unwrap();
+        executor
+            .check_gate(&issue_id, &"auto-fail".parse().unwrap())
+            .unwrap();
         let attestor = Some("human:me".to_string());
         executor
             .pass_gate(
                 &issue_id,
-                "manual-pass".to_string(),
+                &"manual-pass".parse().unwrap(),
                 attestor.clone(),
                 false,
             )
             .unwrap();
         executor
-            .fail_gate(&issue_id, "manual-fail".to_string(), attestor)
+            .fail_gate(&issue_id, &"manual-fail".parse().unwrap(), attestor)
             .unwrap();
 
         let (runs, not_run) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
         let latest: HashMap<_, _> = runs
             .iter()
-            .map(|run| (run.gate_key.to_string(), run.clone()))
+            .map(|run| (run.gate_key.clone(), run.clone()))
             .collect();
         let readiness = executor
             .get_required_gate_statuses_for_issue(&issue_id)
@@ -3746,14 +3824,18 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let mut registry = base.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "auto".parse().unwrap(),
-            make_auto_gate("auto", &format!("test -e {}", marker.display())),
+            make_auto_gate(
+                &"auto".parse().unwrap(),
+                &format!("test -e {}", marker.display()),
+            ),
         );
-        registry
-            .gates
-            .insert("review".parse().unwrap(), make_manual_gate("review"));
+        registry.gates.insert(
+            "review".parse().unwrap(),
+            make_manual_gate(&"review".parse().unwrap()),
+        );
         seed_gate_registry(base.storage(), &registry);
         let mut issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
-        issue.gates_required = vec!["auto".to_string(), "review".to_string()];
+        issue.gates_required = vec!["auto".parse().unwrap(), "review".parse().unwrap()];
         let issue_id = issue.id.clone();
         seed_issue(base.storage(), issue);
 
@@ -3766,13 +3848,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             SessionRaceAction::Run(Box::new(move |storage| {
                 std::fs::write(&marker, "").unwrap();
                 let run = memory_executor(storage.clone())
-                    .check_gate(&concurrent, "auto")
+                    .check_gate(&concurrent, &"auto".parse().unwrap())
                     .unwrap();
                 assert_eq!(run.status, GateRunStatus::Passed);
             })),
         );
         let run = memory_executor(evaluating)
-            .check_gate(&issue_id, "auto")
+            .check_gate(&issue_id, &"auto".parse().unwrap())
             .unwrap();
         assert_eq!(run.status, GateRunStatus::Failed);
 
@@ -3786,7 +3868,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 memory_executor(storage.clone())
                     .pass_gate(
                         &concurrent,
-                        "review".to_string(),
+                        &"review".parse().unwrap(),
                         Some("human:b".to_string()),
                         false,
                     )
@@ -3795,7 +3877,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         attesting.inject_repository_state_apply_conflicts(1);
         memory_executor(attesting)
-            .fail_gate(&issue_id, "review".to_string(), Some("human:a".to_string()))
+            .fail_gate(
+                &issue_id,
+                &"review".parse().unwrap(),
+                Some("human:a".to_string()),
+            )
             .unwrap();
 
         let readiness = base
@@ -3804,8 +3890,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(
             readiness,
             vec![
-                ("auto".to_string(), crate::domain::GateStatus::Failed),
-                ("review".to_string(), crate::domain::GateStatus::Failed),
+                (
+                    "auto".parse::<GateKey>().unwrap(),
+                    crate::domain::GateStatus::Failed
+                ),
+                (
+                    "review".parse::<GateKey>().unwrap(),
+                    crate::domain::GateStatus::Failed
+                ),
             ],
             "each A published last"
         );
@@ -3815,7 +3907,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .iter()
             .map(|run| {
                 let state = super::gate_state_from_run(run);
-                (run.gate_key.to_string(), state.status)
+                (run.gate_key.clone(), state.status)
             })
             .collect::<Vec<_>>();
         assert_eq!(latest_status, readiness);
@@ -3827,12 +3919,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         // Define two automated gates
         let mut registry = executor.storage.load_gate_registry().unwrap();
-        for (key, exit_code) in [("gate-1", 0), ("gate-2", 0)] {
+        for (key, exit_code) in [("gate-1", 0), ("gate-2", 0)]
+            .map(|(key, code)| (key.parse::<GateKey>().unwrap(), code))
+        {
             registry.gates.insert(
-                key.parse().unwrap(),
+                key.clone(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: key.parse().unwrap(),
+                    key: key.clone(),
                     title: format!("Gate {}", key),
                     description: "Test".to_string(),
                     stage: GateStage::Postcheck,
@@ -3858,11 +3952,19 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "gate-1".to_string()).unwrap();
-        executor.add_gate(&issue_id, "gate-2".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"gate-1".parse().unwrap())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, &"gate-2".parse().unwrap())
+            .unwrap();
 
-        executor.check_gate(&issue_id, "gate-1").unwrap();
-        executor.check_gate(&issue_id, "gate-2").unwrap();
+        executor
+            .check_gate(&issue_id, &"gate-1".parse().unwrap())
+            .unwrap();
+        executor
+            .check_gate(&issue_id, &"gate-2".parse().unwrap())
+            .unwrap();
 
         let (results, warnings) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
 
@@ -3876,26 +3978,32 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         let mut registry = executor.storage.load_gate_registry().unwrap();
-        for key in ["gate-1", "gate-2"] {
+        for key in ["gate-1", "gate-2"].map(|key| key.parse::<GateKey>().unwrap()) {
             registry
                 .gates
-                .insert(key.parse().unwrap(), make_auto_gate(key, "exit 0"));
+                .insert(key.clone(), make_auto_gate(&key, "exit 0"));
         }
         seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "gate-1".to_string()).unwrap();
-        executor.add_gate(&issue_id, "gate-2".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"gate-1".parse().unwrap())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, &"gate-2".parse().unwrap())
+            .unwrap();
 
-        executor.check_gate(&issue_id, "gate-1").unwrap();
+        executor
+            .check_gate(&issue_id, &"gate-1".parse().unwrap())
+            .unwrap();
 
         let (results, not_run) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
 
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].gate_key.as_str(), "gate-1");
-        assert_eq!(not_run, vec!["gate-2".to_string()]);
+        assert_eq!(results[0].gate_key, "gate-1".parse().unwrap());
+        assert_eq!(not_run, vec!["gate-2".parse::<GateKey>().unwrap()]);
     }
 
     #[test]
@@ -3958,10 +4066,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "precheck".to_string())
+            .add_gate(&issue_id, &"precheck".parse().unwrap())
             .unwrap();
         executor
-            .add_gate(&issue_id, "postcheck-with-unsafe-prompt".to_string())
+            .add_gate(&issue_id, &"postcheck-with-unsafe-prompt".parse().unwrap())
             .unwrap();
 
         // Try to start work - should run prechecks
@@ -3974,7 +4082,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::InProgress);
 
-        let gate_state = issue.gates_status.get("precheck").unwrap();
+        let gate_state = issue
+            .gates_status
+            .get(&"precheck".parse().unwrap())
+            .unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
     }
 
@@ -3991,14 +4102,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "precheck",
+            &"precheck".parse().unwrap(),
             "Precheck",
             "true".to_string(),
             None,
         );
         executor
             .update_gate(
-                "precheck",
+                &"precheck".parse().unwrap(),
                 GateUpdate {
                     stage: Some(GateStage::Precheck),
                     ..Default::default()
@@ -4019,7 +4130,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     .as_path(),
             );
             std::fs::create_dir_all(record.parent().unwrap()).unwrap();
-            let mut run = prior_run(&run_id, "history", index, None);
+            let mut run = prior_run(&run_id, &"history".parse().unwrap(), index, None);
             run.issue_id = issue_id.clone();
             std::fs::write(record, serde_json::to_vec_pretty(&run).unwrap()).unwrap();
         }
@@ -4041,7 +4152,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::InProgress);
         assert_eq!(
-            issue.gates_status["precheck"].status,
+            issue.gates_status[&"precheck".parse().unwrap()].status,
             crate::domain::GateStatus::Passed
         );
     }
@@ -4058,14 +4169,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "precheck-no-context",
+            &"precheck-no-context".parse().unwrap(),
             "Precheck no context",
             "true".to_string(),
             None,
         );
         executor
             .update_gate(
-                "precheck-no-context",
+                &"precheck-no-context".parse().unwrap(),
                 GateUpdate {
                     stage: Some(GateStage::Precheck),
                     pass_context: Some(false),
@@ -4087,7 +4198,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::InProgress);
         assert_eq!(
-            issue.gates_status["precheck-no-context"].status,
+            issue.gates_status[&"precheck-no-context".parse().unwrap()].status,
             crate::domain::GateStatus::Passed
         );
     }
@@ -4128,7 +4239,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         seed_gate_registry(executor.storage(), &registry);
         let mut issue = crate::test_utils::fixture_issue("Test".into(), String::new());
         issue.state = State::Ready;
-        issue.gates_required.push("precheck".to_string());
+        issue.gates_required.push("precheck".parse().unwrap());
         let id = issue.id.clone();
         seed_issue(executor.storage(), issue);
 
@@ -4178,7 +4289,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "precheck-fail".to_string())
+            .add_gate(&issue_id, &"precheck-fail".parse().unwrap())
             .unwrap();
 
         // Try to start work - should fail
@@ -4207,7 +4318,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "precheck-race",
+            &"precheck-race".parse().unwrap(),
             "Precheck race",
             format!(
                 "if [ ! -f .precheck-race-seen ]; then : > .precheck-race-seen; sed -i 's/\\\"title\\\": \\\"Test\\\"/\\\"title\\\": \\\"Moved\\\"/' {issue_path}; fi; printf x >> checker-count; true"
@@ -4216,7 +4327,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         executor
             .update_gate(
-                "precheck-race",
+                &"precheck-race".parse().unwrap(),
                 GateUpdate {
                     stage: Some(GateStage::Precheck),
                     ..Default::default()
@@ -4242,7 +4353,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key.as_str() == "precheck-race")
+            .filter(|run| run.gate_key == "precheck-race".parse().unwrap())
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -4265,10 +4376,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        let gate_key = "not-a-reserved-repository-key";
+        let gate_key: GateKey = "not-a-reserved-repository-key".parse().unwrap();
         executor
             .update_gate(
-                gate_key,
+                &gate_key,
                 GateUpdate {
                     stage: Some(GateStage::Precheck),
                     ..Default::default()
@@ -4295,7 +4406,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key.as_str() == gate_key)
+            .filter(|run| run.gate_key == gate_key)
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -4341,7 +4452,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "postcheck".to_string())
+            .add_gate(&issue_id, &"postcheck".parse().unwrap())
             .unwrap();
 
         // Complete work
@@ -4354,7 +4465,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Done);
 
-        let gate_state = issue.gates_status.get("postcheck").unwrap();
+        let gate_state = issue
+            .gates_status
+            .get(&"postcheck".parse().unwrap())
+            .unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
     }
 
@@ -4395,7 +4509,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "postcheck-fail".to_string())
+            .add_gate(&issue_id, &"postcheck-fail".parse().unwrap())
             .unwrap();
 
         // Complete work
@@ -4411,7 +4525,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Gated);
 
-        let gate_state = issue.gates_status.get("postcheck-fail").unwrap();
+        let gate_state = issue
+            .gates_status
+            .get(&"postcheck-fail".parse().unwrap())
+            .unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Failed);
         let runs = executor
             .storage
@@ -4455,7 +4572,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "postcheck".to_string())
+            .add_gate(&issue_id, &"postcheck".parse().unwrap())
             .unwrap();
 
         // The Gated transition is the first publication. The automated
@@ -4478,7 +4595,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Gated);
         assert_eq!(
-            issue.gates_status["postcheck"].status,
+            issue.gates_status[&"postcheck".parse().unwrap()].status,
             crate::domain::GateStatus::Pending,
             "failed persistence must not leave an unrecorded checker verdict"
         );
@@ -4523,7 +4640,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "postcheck".to_string())
+            .add_gate(&issue_id, &"postcheck".parse().unwrap())
             .unwrap();
 
         let error = executor
@@ -4538,7 +4655,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Gated);
         assert_eq!(
-            issue.gates_status["postcheck"].status,
+            issue.gates_status[&"postcheck".parse().unwrap()].status,
             crate::domain::GateStatus::Pending
         );
         assert!(executor
@@ -4587,10 +4704,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
 
         // Check the gate - should build context and pass it
-        let result = executor.check_gate(&issue_id, "review").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
         assert_eq!(result.status, GateRunStatus::Passed);
 
         // Parse the context JSON from stdout
@@ -4658,9 +4779,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
 
-        let result = executor.check_gate(&issue_id, "review").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
         assert_eq!(result.status, GateRunStatus::Passed);
 
         let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
@@ -4686,13 +4811,15 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "prompt-race",
+            &"prompt-race".parse().unwrap(),
             "Prompt race",
             "if [ ! -f .prompt-race-seen ]; then : > .prompt-race-seen; printf 'new prompt' > review-prompt.md; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"".to_string(),
             Some("review-prompt.md".to_string()),
         );
 
-        let result = executor.check_gate(&issue_id, "prompt-race").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"prompt-race".parse().unwrap())
+            .unwrap();
         let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
 
         assert_eq!(context["prompt"], "old prompt");
@@ -4705,7 +4832,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key.as_str() == "prompt-race")
+            .filter(|run| run.gate_key == "prompt-race".parse().unwrap())
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -4728,7 +4855,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "issue-race",
+            &"issue-race".parse().unwrap(),
             "Issue race",
             format!(
                 "if [ ! -f .issue-race-seen ]; then : > .issue-race-seen; sed -i 's/\"title\": \"Test\"/\"title\": \"Changed concurrently\"/' {issue_path}; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\""
@@ -4736,7 +4863,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             None,
         );
 
-        let result = executor.check_gate(&issue_id, "issue-race").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"issue-race".parse().unwrap())
+            .unwrap();
         let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
 
         assert_eq!(context["issue"]["title"], "Test");
@@ -4753,7 +4882,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key.as_str() == "issue-race")
+            .filter(|run| run.gate_key == "issue-race".parse().unwrap())
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -4790,7 +4919,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "dependency-race",
+            &"dependency-race".parse().unwrap(),
             "Dependency race",
             format!(
                 "if [ ! -f .dependency-race-seen ]; then : > .dependency-race-seen; sed -i 's/\"title\": \"Dependency\"/\"title\": \"Changed dependency\"/' {dependency_path}; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\""
@@ -4798,7 +4927,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             None,
         );
 
-        let result = executor.check_gate(&issue_id, "dependency-race").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"dependency-race".parse().unwrap())
+            .unwrap();
         let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
 
         assert_eq!(context["issue"]["dependencies"][0]["title"], "Dependency");
@@ -4811,7 +4942,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key.as_str() == "dependency-race")
+            .filter(|run| run.gate_key == "dependency-race".parse().unwrap())
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -4838,13 +4969,15 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "gate-race",
+            &"gate-race".parse().unwrap(),
             "Original race title",
             "sh gate-race.sh".to_string(),
             None,
         );
 
-        let result = executor.check_gate(&issue_id, "gate-race").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"gate-race".parse().unwrap())
+            .unwrap();
         let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
 
         assert_eq!(context["gate"]["title"], "Original race title");
@@ -4858,7 +4991,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .list_gate_runs_for_issue(&issue_id)
                 .unwrap()
                 .into_iter()
-                .filter(|run| run.gate_key.as_str() == "gate-race")
+                .filter(|run| run.gate_key == "gate-race".parse().unwrap())
                 .count(),
             1
         );
@@ -4867,7 +5000,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .find(|run| run.gate_key.as_str() == "gate-race")
+            .find(|run| run.gate_key == "gate-race".parse().unwrap())
             .unwrap();
         assert_eq!(
             run.evaluation_stability,
@@ -4916,7 +5049,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "target-race",
+            &"target-race".parse().unwrap(),
             "Target race",
             format!(
                 "if [ ! -f .target-race-seen ]; then : > .target-race-seen; sed -i 's/{issue_id}/{replacement_id}/g' .jit/index.json; rm {issue_path_relative}; cp replacement.json {replacement_path}; fi; true"
@@ -4932,7 +5065,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         )
         .unwrap();
 
-        let error = executor.check_gate(&issue_id, "target-race").unwrap_err();
+        let error = executor
+            .check_gate(&issue_id, &"target-race".parse().unwrap())
+            .unwrap_err();
 
         assert!(
             error
@@ -4945,7 +5080,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .load_issue(&replacement_id)
             .unwrap()
             .gates_status
-            .contains_key("target-race"));
+            .contains_key(&"target-race".parse().unwrap()));
         assert!(executor
             .storage
             .list_gate_runs_for_issue(&replacement_id)
@@ -4965,7 +5100,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let mut concurrent = prior_run(
             &crate::test_utils::gate_run_id(0xcc),
-            "run-race",
+            &"run-race".parse().unwrap(),
             chrono::Utc::now().timestamp(),
             None,
         );
@@ -4978,7 +5113,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "run-race",
+            &"run-race".parse().unwrap(),
             "Run race",
             format!(
                 "if [ ! -f .run-race-seen ]; then : > .run-race-seen; {}; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"",
@@ -4987,7 +5122,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             None,
         );
 
-        let result = executor.check_gate(&issue_id, "run-race").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"run-race".parse().unwrap())
+            .unwrap();
         let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
 
         assert_eq!(
@@ -5000,7 +5137,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .find(|run| run.gate_key.as_str() == "run-race")
+            .find(|run| run.gate_key == "run-race".parse().unwrap())
             .unwrap();
         assert_eq!(
             run.evaluation_stability,
@@ -5023,7 +5160,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "run-race",
+            &"run-race".parse().unwrap(),
             "Run race",
             format!(
                 "{}; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"",
@@ -5032,7 +5169,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             None,
         );
 
-        executor.check_gate(&issue_id, "run-race").unwrap();
+        executor
+            .check_gate(&issue_id, &"run-race".parse().unwrap())
+            .unwrap();
         assert_eq!(
             std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
             "x"
@@ -5042,7 +5181,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .find(|run| run.gate_key.as_str() == "run-race")
+            .find(|run| run.gate_key == "run-race".parse().unwrap())
             .unwrap();
         assert_eq!(
             run.evaluation_stability,
@@ -5062,14 +5201,16 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "apply-race",
+            &"apply-race".parse().unwrap(),
             "Apply race",
             format!("printf x >> {}; true", count.display()),
             None,
         );
         executor.storage.inject_repository_state_apply_conflicts(1);
 
-        let result = executor.check_gate(&issue_id, "apply-race").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"apply-race".parse().unwrap())
+            .unwrap();
 
         assert_eq!(std::fs::read_to_string(count).unwrap(), "x");
         let runs = executor
@@ -5077,7 +5218,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key.as_str() == "apply-race")
+            .filter(|run| run.gate_key == "apply-race".parse().unwrap())
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].run_id, result.run_id);
@@ -5086,7 +5227,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             crate::domain::GateEvaluationStability::Stable
         );
         assert_eq!(
-            executor.storage.load_issue(&issue_id).unwrap().gates_status["apply-race"].status,
+            executor.storage.load_issue(&issue_id).unwrap().gates_status
+                [&"apply-race".parse().unwrap()]
+                .status,
             crate::domain::GateStatus::Passed
         );
         assert_eq!(
@@ -5102,7 +5245,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                             issue_id: event_issue,
                             gate_key,
                             ..
-                        } if event_issue == &issue_id && gate_key.as_str() == "apply-race"
+                        } if event_issue == &issue_id && gate_key == &"apply-race".parse::<GateKey>().unwrap()
                     )
                 })
                 .count(),
@@ -5124,7 +5267,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "single-record-race",
+            &"single-record-race".parse().unwrap(),
             "Single record race",
             format!(
                 "if [ ! -f .single-record-race-seen ]; then : > .single-record-race-seen; sed -i 's/\\\"title\\\": \\\"Test\\\"/\\\"title\\\": \\\"Moved\\\"/' {issue_path}; fi; printf x >> checker-count; true"
@@ -5133,7 +5276,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
 
         executor
-            .check_gate(&issue_id, "single-record-race")
+            .check_gate(&issue_id, &"single-record-race".parse().unwrap())
             .unwrap();
 
         assert_eq!(
@@ -5145,7 +5288,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .filter(|run| run.gate_key.as_str() == "single-record-race")
+            .filter(|run| run.gate_key == "single-record-race".parse().unwrap())
             .collect::<Vec<_>>();
         assert_eq!(runs.len(), 1);
         assert_eq!(
@@ -5162,14 +5305,15 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     matches!(
                         event.body(),
                         crate::domain::EventBody::GatePassed { issue_id: event_issue, gate_key, .. }
-                            if event_issue == &issue_id && gate_key.as_str() == "single-record-race"
+                            if event_issue == &issue_id && gate_key == &"single-record-race".parse::<GateKey>().unwrap()
                     )
                 })
                 .count(),
             1
         );
         assert_eq!(
-            executor.storage.load_issue(&issue_id).unwrap().gates_status["single-record-race"]
+            executor.storage.load_issue(&issue_id).unwrap().gates_status
+                [&"single-record-race".parse().unwrap()]
                 .status,
             crate::domain::GateStatus::Passed
         );
@@ -5189,7 +5333,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         add_exec_gate(
             &executor,
             &issue_id,
-            "failing-race",
+            &"failing-race".parse().unwrap(),
             "Failing race",
             format!(
                 r#"if [ ! -f .failing-race-seen ]; then : > .failing-race-seen; sed -i 's/"title": "Test"/"title": "Moved"/' {issue_path}; fi; printf x >> checker-count; printf '%s\n' '<<<JIT-FINDINGS-JSON' '{{"verdict":"fail","summary":"blocking finding","findings":[{{"id":"F1","severity":"high","disposition":"blocking","summary":"broken contract"}}]}}' 'JIT-FINDINGS-JSON>>>'; exit 1"#
@@ -5198,7 +5342,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
 
         let result = executor
-            .check_gate(&issue_id, "failing-race")
+            .check_gate(&issue_id, &"failing-race".parse().unwrap())
             .expect("a checker failure is a recorded verdict");
 
         assert_eq!(result.status, GateRunStatus::Failed);
@@ -5211,7 +5355,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .find(|run| run.gate_key.as_str() == "failing-race")
+            .find(|run| run.gate_key == "failing-race".parse().unwrap())
             .unwrap();
         assert_eq!(run.status, GateRunStatus::Failed);
         assert_eq!(
@@ -5223,7 +5367,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "broken contract"
         );
         assert_eq!(
-            executor.storage.load_issue(&issue_id).unwrap().gates_status["failing-race"].status,
+            executor.storage.load_issue(&issue_id).unwrap().gates_status
+                [&"failing-race".parse().unwrap()]
+                .status,
             crate::domain::GateStatus::Failed
         );
     }
@@ -5267,10 +5413,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
 
         // First run - should have empty history
-        let result1 = executor.check_gate(&issue_id, "review").unwrap();
+        let result1 = executor
+            .check_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
         assert_eq!(result1.status, GateRunStatus::Failed);
         // The checker really did emit stderr (so the strip below is meaningful).
         assert!(
@@ -5284,7 +5434,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(ctx1["run_history"].as_array().unwrap().len(), 0);
 
         // Second run - should include first run in history
-        let result2 = executor.check_gate(&issue_id, "review").unwrap();
+        let result2 = executor
+            .check_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
         let ctx2: serde_json::Value = serde_json::from_str(&result2.stdout).unwrap();
         let history2 = ctx2["run_history"].as_array().unwrap();
         assert_eq!(history2.len(), 1);
@@ -5296,7 +5448,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
 
         // Third run still includes only the latest previous run.
-        let result3 = executor.check_gate(&issue_id, "review").unwrap();
+        let result3 = executor
+            .check_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
         let ctx3: serde_json::Value = serde_json::from_str(&result3.stdout).unwrap();
         let history3 = ctx3["run_history"].as_array().unwrap();
         assert_eq!(history3.len(), 1);
@@ -5337,9 +5491,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
 
-        let result = executor.check_gate(&issue_id, "review");
+        let result = executor.check_gate(&issue_id, &"review".parse().unwrap());
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
@@ -5384,15 +5540,21 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         issue.state = State::InProgress;
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
 
         // Run the gate repeatedly to exercise history compaction.
         for _ in 0..7 {
-            let _ = executor.check_gate(&issue_id, "review").unwrap();
+            let _ = executor
+                .check_gate(&issue_id, &"review".parse().unwrap())
+                .unwrap();
         }
 
         // The next run receives exactly one latest prior run.
-        let result = executor.check_gate(&issue_id, "review").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
         let ctx: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
         let history = ctx["run_history"].as_array().unwrap();
         assert_eq!(history.len(), 1);
@@ -5438,9 +5600,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "review".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"review".parse().unwrap())
+            .unwrap();
 
-        let result = executor.check_gate(&issue_id, "review");
+        let result = executor.check_gate(&issue_id, &"review".parse().unwrap());
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
@@ -5485,10 +5649,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "test-gate".to_string())
+            .add_gate(&issue_id, &"test-gate".parse().unwrap())
             .unwrap();
 
-        let result = executor.check_gate(&issue_id, "test-gate").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"test-gate".parse().unwrap())
+            .unwrap();
         assert_eq!(result.status, GateRunStatus::Passed);
         // JIT_CONTEXT_FILE should not be set when pass_context is false
         assert!(result.stdout.contains("CTX=unset"));
@@ -5531,7 +5697,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "test-gate".to_string())
+            .add_gate(&issue_id, &"test-gate".parse().unwrap())
             .unwrap();
 
         // Link a document via the same accessor `jit doc add` uses.
@@ -5546,7 +5712,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             )
             .unwrap();
 
-        let result = executor.check_gate(&issue_id, "test-gate").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"test-gate".parse().unwrap())
+            .unwrap();
         assert_eq!(result.status, GateRunStatus::Passed);
 
         let docs: serde_json::Value = serde_json::from_str(result.stdout.trim())
@@ -5594,10 +5762,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "test-gate".to_string())
+            .add_gate(&issue_id, &"test-gate".parse().unwrap())
             .unwrap();
 
-        let result = executor.check_gate(&issue_id, "test-gate").unwrap();
+        let result = executor
+            .check_gate(&issue_id, &"test-gate".parse().unwrap())
+            .unwrap();
         assert_eq!(result.status, GateRunStatus::Passed);
         assert_eq!(result.stdout.trim(), "[]");
     }
@@ -5659,9 +5829,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         seed_gate_registry(executor.storage(), &registry);
 
-        executor.add_gate(&main_id, "review".to_string()).unwrap();
+        executor
+            .add_gate(&main_id, &"review".parse().unwrap())
+            .unwrap();
 
-        let result = executor.check_gate(&main_id, "review").unwrap();
+        let result = executor
+            .check_gate(&main_id, &"review".parse().unwrap())
+            .unwrap();
         assert_eq!(result.status, GateRunStatus::Passed);
 
         let context: serde_json::Value =
@@ -5681,12 +5855,14 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         // Define 3 auto gates with priorities 30, 10, 20
         let mut registry = executor.storage.load_gate_registry().unwrap();
-        for (key, priority) in [("gate-p30", 30u32), ("gate-p10", 10), ("gate-p20", 20)] {
+        for (key, priority) in [("gate-p30", 30u32), ("gate-p10", 10), ("gate-p20", 20)]
+            .map(|(key, priority)| (key.parse::<GateKey>().unwrap(), priority))
+        {
             registry.gates.insert(
-                key.parse().unwrap(),
+                key.clone(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: key.parse().unwrap(),
+                    key: key.clone(),
                     title: format!("Gate {}", key),
                     description: format!("Priority {}", priority),
                     stage: GateStage::Postcheck,
@@ -5713,26 +5889,32 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "gate-p30".to_string())
+            .add_gate(&issue_id, &"gate-p30".parse().unwrap())
             .unwrap();
         executor
-            .add_gate(&issue_id, "gate-p10".to_string())
+            .add_gate(&issue_id, &"gate-p10".parse().unwrap())
             .unwrap();
         executor
-            .add_gate(&issue_id, "gate-p20".to_string())
+            .add_gate(&issue_id, &"gate-p20".parse().unwrap())
             .unwrap();
 
-        executor.check_gate(&issue_id, "gate-p30").unwrap();
-        executor.check_gate(&issue_id, "gate-p10").unwrap();
-        executor.check_gate(&issue_id, "gate-p20").unwrap();
+        executor
+            .check_gate(&issue_id, &"gate-p30".parse().unwrap())
+            .unwrap();
+        executor
+            .check_gate(&issue_id, &"gate-p10".parse().unwrap())
+            .unwrap();
+        executor
+            .check_gate(&issue_id, &"gate-p20".parse().unwrap())
+            .unwrap();
 
         let (results, _) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
 
         // Results should arrive in priority order: 10, 20, 30
         assert_eq!(results.len(), 3);
-        assert_eq!(results[0].gate_key.as_str(), "gate-p10");
-        assert_eq!(results[1].gate_key.as_str(), "gate-p20");
-        assert_eq!(results[2].gate_key.as_str(), "gate-p30");
+        assert_eq!(results[0].gate_key, "gate-p10".parse().unwrap());
+        assert_eq!(results[1].gate_key, "gate-p20".parse().unwrap());
+        assert_eq!(results[2].gate_key, "gate-p30".parse().unwrap());
     }
 
     #[test]
@@ -5741,12 +5923,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         // Define 3 auto gates all with default priority 100
         let mut registry = executor.storage.load_gate_registry().unwrap();
-        for key in ["alpha", "beta", "gamma"] {
+        for key in ["alpha", "beta", "gamma"].map(|key| key.parse::<GateKey>().unwrap()) {
             registry.gates.insert(
-                key.parse().unwrap(),
+                key.clone(),
                 crate::declarations::GateDefinition {
                     version: 1,
-                    key: key.parse().unwrap(),
+                    key: key.clone(),
                     title: format!("Gate {}", key),
                     description: "Same priority".to_string(),
                     stage: GateStage::Postcheck,
@@ -5772,21 +5954,33 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "alpha".to_string()).unwrap();
-        executor.add_gate(&issue_id, "beta".to_string()).unwrap();
-        executor.add_gate(&issue_id, "gamma".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"alpha".parse().unwrap())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, &"beta".parse().unwrap())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, &"gamma".parse().unwrap())
+            .unwrap();
 
-        executor.check_gate(&issue_id, "alpha").unwrap();
-        executor.check_gate(&issue_id, "beta").unwrap();
-        executor.check_gate(&issue_id, "gamma").unwrap();
+        executor
+            .check_gate(&issue_id, &"alpha".parse().unwrap())
+            .unwrap();
+        executor
+            .check_gate(&issue_id, &"beta".parse().unwrap())
+            .unwrap();
+        executor
+            .check_gate(&issue_id, &"gamma".parse().unwrap())
+            .unwrap();
 
         let (results, _) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
 
         // Same-priority gates should maintain insertion order
         assert_eq!(results.len(), 3);
-        assert_eq!(results[0].gate_key.as_str(), "alpha");
-        assert_eq!(results[1].gate_key.as_str(), "beta");
-        assert_eq!(results[2].gate_key.as_str(), "gamma");
+        assert_eq!(results[0].gate_key, "alpha".parse().unwrap());
+        assert_eq!(results[1].gate_key, "beta".parse().unwrap());
+        assert_eq!(results[2].gate_key, "gamma".parse().unwrap());
     }
 
     #[test]
@@ -5805,10 +5999,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(gate.priority, 100);
     }
 
-    fn make_auto_gate(key: &str, command: &str) -> crate::declarations::GateDefinition {
+    fn make_auto_gate(key: &GateKey, command: &str) -> crate::declarations::GateDefinition {
         crate::declarations::GateDefinition {
             version: 1,
-            key: key.parse().unwrap(),
+            key: key.clone(),
             title: key.to_string(),
             description: String::new(),
             stage: GateStage::Postcheck,
@@ -5832,17 +6026,20 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     fn test_get_last_gate_run_returns_none_when_no_runs() {
         let executor = setup();
         let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry
-            .gates
-            .insert("g".parse().unwrap(), make_auto_gate("g", "exit 0"));
+        registry.gates.insert(
+            "g".parse().unwrap(),
+            make_auto_gate(&"g".parse().unwrap(), "exit 0"),
+        );
         seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "g".to_string()).unwrap();
+        executor.add_gate(&issue_id, &"g".parse().unwrap()).unwrap();
 
-        let result = executor.get_last_gate_run(&issue_id, "g").unwrap();
+        let result = executor
+            .get_last_gate_run(&issue_id, &"g".parse().unwrap())
+            .unwrap();
         assert!(result.is_none());
     }
 
@@ -5850,20 +6047,28 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     fn test_get_last_gate_run_returns_most_recent() {
         let executor = setup();
         let mut registry = executor.storage.load_gate_registry().unwrap();
-        registry
-            .gates
-            .insert("g".parse().unwrap(), make_auto_gate("g", "exit 0"));
+        registry.gates.insert(
+            "g".parse().unwrap(),
+            make_auto_gate(&"g".parse().unwrap(), "exit 0"),
+        );
         seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "g".to_string()).unwrap();
+        executor.add_gate(&issue_id, &"g".parse().unwrap()).unwrap();
 
-        let first = executor.check_gate(&issue_id, "g").unwrap();
-        let second = executor.check_gate(&issue_id, "g").unwrap();
+        let first = executor
+            .check_gate(&issue_id, &"g".parse().unwrap())
+            .unwrap();
+        let second = executor
+            .check_gate(&issue_id, &"g".parse().unwrap())
+            .unwrap();
 
-        let last = executor.get_last_gate_run(&issue_id, "g").unwrap().unwrap();
+        let last = executor
+            .get_last_gate_run(&issue_id, &"g".parse().unwrap())
+            .unwrap()
+            .unwrap();
         assert_eq!(last.run_id, second.run_id);
         assert_ne!(last.run_id, first.run_id);
     }
@@ -5874,34 +6079,42 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "gate-a".parse().unwrap(),
-            make_auto_gate("gate-a", "exit 0"),
+            make_auto_gate(&"gate-a".parse().unwrap(), "exit 0"),
         );
         registry.gates.insert(
             "gate-b".parse().unwrap(),
-            make_auto_gate("gate-b", "exit 0"),
+            make_auto_gate(&"gate-b".parse().unwrap(), "exit 0"),
         );
         seed_gate_registry(executor.storage(), &registry);
 
         let issue = crate::test_utils::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        executor.add_gate(&issue_id, "gate-a".to_string()).unwrap();
-        executor.add_gate(&issue_id, "gate-b".to_string()).unwrap();
+        executor
+            .add_gate(&issue_id, &"gate-a".parse().unwrap())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, &"gate-b".parse().unwrap())
+            .unwrap();
 
-        executor.check_gate(&issue_id, "gate-a").unwrap();
-        let b_run = executor.check_gate(&issue_id, "gate-b").unwrap();
+        executor
+            .check_gate(&issue_id, &"gate-a".parse().unwrap())
+            .unwrap();
+        let b_run = executor
+            .check_gate(&issue_id, &"gate-b".parse().unwrap())
+            .unwrap();
 
         let last_a = executor
-            .get_last_gate_run(&issue_id, "gate-a")
+            .get_last_gate_run(&issue_id, &"gate-a".parse().unwrap())
             .unwrap()
             .unwrap();
         let last_b = executor
-            .get_last_gate_run(&issue_id, "gate-b")
+            .get_last_gate_run(&issue_id, &"gate-b".parse().unwrap())
             .unwrap()
             .unwrap();
 
-        assert_eq!(last_a.gate_key.as_str(), "gate-a");
-        assert_eq!(last_b.gate_key.as_str(), "gate-b");
+        assert_eq!(last_a.gate_key, "gate-a".parse().unwrap());
+        assert_eq!(last_b.gate_key, "gate-b".parse().unwrap());
         assert_eq!(last_b.run_id, b_run.run_id);
         assert_ne!(last_a.run_id, last_b.run_id);
     }
@@ -5912,7 +6125,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             "fail-gate".parse().unwrap(),
-            make_auto_gate("fail-gate", "echo 'oops' && exit 1"),
+            make_auto_gate(&"fail-gate".parse().unwrap(), "echo 'oops' && exit 1"),
         );
         seed_gate_registry(executor.storage(), &registry);
 
@@ -5920,13 +6133,15 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
-            .add_gate(&issue_id, "fail-gate".to_string())
+            .add_gate(&issue_id, &"fail-gate".parse().unwrap())
             .unwrap();
 
-        executor.check_gate(&issue_id, "fail-gate").unwrap();
+        executor
+            .check_gate(&issue_id, &"fail-gate".parse().unwrap())
+            .unwrap();
 
         let last = executor
-            .get_last_gate_run(&issue_id, "fail-gate")
+            .get_last_gate_run(&issue_id, &"fail-gate".parse().unwrap())
             .unwrap()
             .unwrap();
         assert_eq!(last.status, GateRunStatus::Failed);
