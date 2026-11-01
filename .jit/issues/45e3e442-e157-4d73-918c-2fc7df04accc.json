@@ -16,7 +16,20 @@
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c28c1385-3f32-41ac-8c2f-5edfc459d7b3",
+      "status": "passed",
+      "updated_at": "2026-11-01T10:29:23.383445304Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "ed1b819f-278f-4062-907b-0af3aa5c7f79",
+      "status": "failed",
+      "updated_at": "2026-11-01T10:30:52.873222034Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "45e3e442-e157-4d73-918c-2fc7df04accc",
   "labels": [
     "type:story",
@@ -34,7 +47,7 @@
     "enforces:@/invariant/no-ignored-tests"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "The default suite runs within its time and footprint budgets",
-  "updated_at": "2026-11-01T10:28:43.298741182Z"
+  "updated_at": "2026-11-01T10:30:52.873222034Z"
 }
