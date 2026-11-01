@@ -16,6 +16,7 @@
     "7a412cb0-1969-4c46-b106-703bcdb502fe",
     "871df4b0-6d6d-4408-8054-a574cb9eafe9",
     "89406e14-32f3-4b41-8b8f-8d8cb6255e76",
+    "8ac93475-f327-4665-afc3-fb740fc4601a",
     "8d64ffae-719b-4631-9660-1317ba7b59cf",
     "9bb30f15-a995-4b63-924a-13c27e9fa61c",
     "aa28fe5f-fd2a-4fc1-8786-5234336f8361",
@@ -46,5 +47,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Build-footprint figures before and after the epic are reported",
-  "updated_at": "2026-11-01T05:32:13.690401096Z"
+  "updated_at": "2026-11-01T07:17:54.217927987Z"
 }
