@@ -622,7 +622,7 @@
           "short_id": "be18da9e",
           "title": "Web UI renders the server-provided short id",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     }

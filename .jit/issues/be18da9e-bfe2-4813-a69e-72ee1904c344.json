@@ -8,6 +8,7 @@
   ],
   "description": "Render the short id the server provides, so no web code derives a short id by truncation.\n\n## Background\n\nThe web UI truncates issue ids with `substring(0, 8)` at `web/src/components/Issue/IssueDetail.tsx:295,460`, `web/src/components/Graph/nodes/ClusterNode.tsx:106` and `web/src/components/Graph/GraphView.tsx:214,715`. Issue and graph responses carry a `short_id` derived by the domain. Commit-hash truncation (`IssueDetail.tsx:701`, `components/Document/DocumentViewer.tsx:278,345`) is not issue identity.\n\n## Success Criteria\n\n- [hard] REQ-01: The web issue and graph types declare the server's `short_id` fields.\n- [hard] REQ-02: The five issue-id truncation sites render the provided short id, and no web source truncates an issue id by length.\n- [hard] REQ-03: Web tests, lint and build pass.\n",
   "documents": [],
+  "done_at": "2026-11-01T01:00:59.635912549Z",
   "first_ready_at": "2026-11-01T00:56:19.866618431Z",
   "gates_required": [
     "npm-ci",
@@ -39,7 +40,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Web UI renders the server-provided short id",
-  "updated_at": "2026-11-01T00:59:24.677921567Z"
+  "updated_at": "2026-11-01T01:00:59.635912549Z"
 }
