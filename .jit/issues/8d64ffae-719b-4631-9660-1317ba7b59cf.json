@@ -28,15 +28,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "fbc9d18d-da47-4c22-9b5a-34f94cf3718f",
+      "run_id": "1f584670-a098-4115-a912-8b5e4c74fa7d",
       "status": "passed",
-      "updated_at": "2026-11-01T04:34:21.845007207Z",
+      "updated_at": "2026-11-01T08:01:50.634525437Z",
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "run_id": "7abb9a4b-b035-4182-94f3-438a7b3b19d9",
+      "run_id": "e9341229-4d42-46d9-9766-0f68eb919374",
       "status": "failed",
-      "updated_at": "2026-11-01T04:36:20.565577781Z",
+      "updated_at": "2026-11-01T08:03:27.116917929Z",
       "updated_by": "auto:executor"
     }
   },
@@ -56,5 +56,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Exit codes and list envelopes each have one owning test",
-  "updated_at": "2026-11-01T04:36:20.565577781Z"
+  "updated_at": "2026-11-01T08:03:27.116917929Z"
 }

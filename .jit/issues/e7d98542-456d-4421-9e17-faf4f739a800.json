@@ -22,7 +22,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "One copy of the dogfood package's declarations, without a drift check",
-  "updated_at": "2026-11-01T07:22:37.060543774Z"
+  "updated_at": "2026-11-01T08:13:17.758668871Z"
 }
