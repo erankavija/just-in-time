@@ -297,8 +297,8 @@ Commands](cli-commands.md#profile-commands).
 
 Use `jit profile diff` before a change to see every target and semantic
 declaration a selection would create, update, leave unchanged, or conflict on. An
-existing declaration whose value differs reports as `unchanged`, because
-publication keeps the repository's entry.
+existing declaration whose value differs reports as `update`, because
+publication replaces the whole entry under its identity with the package's value.
 
 Start with a rehearsal for any mutation. `--dry-run` runs the same planning and
 validation as its corresponding `apply`, `pack`, or `add` command, but writes no target or lifecycle
