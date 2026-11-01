@@ -869,10 +869,10 @@ pub(crate) struct ProfileTargetDecision {
 /// Remove each definition a dependent package overrides from `selection`.
 ///
 /// `dependencies` maps each package to its transitive dependencies. A
-/// definition is overridden when a package depending on its declarer defines
-/// the key differently. A definition that differs from one of a package with
-/// no dependency path to its declarer stays even then, so composition refuses
-/// the key rather than letting a dependent hide the disagreement.
+/// definition is overridden when a package depending on its declarer, at any
+/// depth, defines the key differently, so a common dependent's value settles
+/// what its dependencies disagree on. Differing definitions no dependent
+/// overrides remain for composition to refuse.
 pub(crate) fn drop_overridden_claims(
     selection: Vec<ProfileClaims>,
     dependencies: &BTreeMap<ProfileId, BTreeSet<ProfileId>>,
@@ -930,11 +930,9 @@ fn overridden_declarations<'a, K: Ord + Clone, V: PartialEq + 'a>(
             declared
                 .iter()
                 .filter(|(package, value)| {
-                    let differing = || declared.iter().filter(|(_, other)| other != value);
-                    differing().any(|(other, _)| depends_on(other, package))
-                        && differing().all(|(other, _)| {
-                            depends_on(other, package) || depends_on(package, other)
-                        })
+                    declared
+                        .iter()
+                        .any(|(other, stated)| stated != value && depends_on(other, package))
                 })
                 .map(|(package, _)| (key.clone(), (*package).clone()))
                 .collect::<Vec<_>>()
@@ -2263,19 +2261,42 @@ mod tests {
         assert_eq!(owners, package_owners(&["left", "right"]));
     }
 
-    /// A shared dependent does not settle what its two dependencies disagree on.
+    /// A dependent at any depth settles what its dependencies disagree on.
     #[test]
-    fn test_drop_overridden_claims_keeps_unrelated_disagreement_under_a_common_dependent() {
+    fn test_drop_overridden_claims_composes_a_common_dependents_value_over_a_disagreement() {
+        for edges in [
+            vec![("top", "left"), ("top", "right")],
+            vec![("top", "middle"), ("middle", "left"), ("middle", "right")],
+        ] {
+            let composed = agreed_definitions(compose_shared(
+                vec![
+                    claims_defining_shared("left", "Left."),
+                    claims_defining_shared("right", "Right."),
+                    claims_defining_shared("top", "Top."),
+                ],
+                &edges,
+            ));
+
+            assert_eq!(composed.len(), 1);
+            assert_eq!(
+                composed[0].definition,
+                namespace_contribution("shared", "Top.")
+            );
+        }
+    }
+
+    /// A common dependent stating no value settles nothing.
+    #[test]
+    fn test_drop_overridden_claims_refuses_a_disagreement_a_silent_dependent_leaves() {
         let (_, owners) = contested_outcome(compose_shared(
             vec![
                 claims_defining_shared("left", "Left."),
                 claims_defining_shared("right", "Right."),
-                claims_defining_shared("top", "Top."),
             ],
             &[("top", "left"), ("top", "right")],
         ));
 
-        assert_eq!(owners, package_owners(&["left", "right", "top"]));
+        assert_eq!(owners, package_owners(&["left", "right"]));
     }
 
     /// The dependent's value replaces the dependency's asset and region, and
@@ -2385,7 +2406,7 @@ mod tests {
         }
 
         #[test]
-        fn prop_drop_overridden_claims_contests_exactly_when_unrelated_packages_differ(
+        fn prop_drop_overridden_claims_contests_exactly_when_undepended_declarers_differ(
             (declared, edges) in generated_selection(),
         ) {
             let dependencies = closed_dependencies(
@@ -2401,16 +2422,16 @@ mod tests {
                         required.contains(&ProfileId::try_from(to.as_str()).unwrap())
                     })
             };
-            let unrelated_differ = declared.iter().any(|(left, value)| {
-                declared.iter().any(|(right, other)| {
-                    value != other && !depends(left, right) && !depends(right, left)
-                })
-            });
+            let undepended_values = declared
+                .iter()
+                .filter(|(package, _)| !declared.iter().any(|(other, _)| depends(other, package)))
+                .map(|(_, value)| *value)
+                .collect::<BTreeSet<_>>();
             let contested = composed_shared_definition(&declared, &edges)
                 .iter()
                 .any(|outcome| matches!(outcome, ContributionOutcome::Contested { .. }));
 
-            prop_assert_eq!(contested, unrelated_differ);
+            prop_assert_eq!(contested, undepended_values.len() > 1);
         }
     }
 

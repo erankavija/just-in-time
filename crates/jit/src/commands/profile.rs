@@ -3421,6 +3421,40 @@ template = true
         assert!(!config.contains("Base definition."));
     }
 
+    /// A managed region reaches publication through the same override a
+    /// declaration does.
+    #[test]
+    fn test_apply_profiles_publishes_the_dependents_managed_region() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let manifest = |id: &str, dependency: &str| {
+            format!(
+                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\ncompatible-jit = \">=0.2.0, <2.0.0\"\n{dependency}\n[[region]]\nsource = \"regions/guide.md\"\ntarget = \"docs/guide.md\"\nregion-id = \"guidance\"\nplacement = \"append\"\n"
+            )
+        };
+        authored_manifest_package(
+            &temp,
+            "vendor/base",
+            &manifest("base", ""),
+            &[("regions/guide.md", "Base guidance.\n")],
+        );
+        let workflow = authored_manifest_package(
+            &temp,
+            "vendor/workflow",
+            &manifest(
+                "workflow",
+                "\n[[dependency]]\nid = \"base\"\nversion = \"*\"\n",
+            ),
+            &[("regions/guide.md", "Workflow guidance.\n")],
+        );
+
+        apply_package(&executor, &workflow).unwrap();
+
+        let guide = fs::read_to_string(temp.path().join("docs/guide.md")).unwrap();
+        assert!(guide.contains("Workflow guidance."));
+        assert!(!guide.contains("Base guidance."));
+    }
+
     #[test]
     fn test_apply_profiles_names_both_packages_of_a_conflicting_asset_target() {
         let (temp, _) = setup_test_repo().unwrap();

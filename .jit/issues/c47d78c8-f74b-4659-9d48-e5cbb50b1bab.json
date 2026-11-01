@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "a2a77c0f-7234-4a03-a75b-d2189d1ee8b9",
+      "run_id": "f85bfc5d-bae1-4de2-9f7e-3ebf91513fd8",
       "status": "passed",
-      "updated_at": "2026-11-01T15:54:01.866517843Z",
+      "updated_at": "2026-11-01T16:01:10.668856145Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "ccc36ea8-fa8e-4b36-affd-363d3a5c3256",
-      "status": "passed",
-      "updated_at": "2026-11-01T15:59:10.646067423Z",
+      "run_id": "214030af-89bb-4d22-890c-2a777c0f1406",
+      "status": "failed",
+      "updated_at": "2026-11-01T16:03:54.510645787Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derive issue membership from the issue files",
-  "updated_at": "2026-11-01T15:59:10.646067423Z"
+  "updated_at": "2026-11-01T16:03:54.510645787Z"
 }
