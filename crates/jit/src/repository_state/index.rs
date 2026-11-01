@@ -16,7 +16,6 @@ pub(crate) const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 3;
 #[serde(deny_unknown_fields)]
 pub(crate) struct RepositoryIndex {
     pub(crate) schema_version: u32,
-    #[serde(default)]
     pub(crate) deleted_ids: Vec<IssueId>,
 }
 
@@ -179,6 +178,18 @@ mod tests {
                 Err(RepositoryIndexError::UnsupportedVersion { found: refused, .. }) if refused == found
             ));
         }
+    }
+
+    #[test]
+    fn test_parse_requires_deleted_ids() {
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "schema_version": SUPPORTED_INDEX_SCHEMA_VERSION,
+        }))
+        .unwrap();
+        assert!(RepositoryIndex::parse(&bytes)
+            .unwrap_err()
+            .to_string()
+            .contains("deleted_ids"));
     }
 
     #[test]
