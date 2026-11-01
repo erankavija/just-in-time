@@ -3602,7 +3602,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.remove_gate_definition(&key) {
-                    Ok(_) => {
+                    Ok(warnings) => {
+                        for warning in warnings {
+                            output_ctx.print_warning(&warning)?;
+                        }
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({

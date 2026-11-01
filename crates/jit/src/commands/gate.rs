@@ -1197,17 +1197,27 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    pub fn remove_gate_definition(&self, key: &GateKey) -> Result<()>
+    /// Remove a gate definition, refusing when another agent leases an issue that
+    /// requires it. Answers warnings in `warn` mode.
+    pub fn remove_gate_definition(&self, key: &GateKey) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
         crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
 
+        let requiring = self
+            .storage
+            .list_issues()?
+            .into_iter()
+            .filter(|issue| issue.gates_required.contains(key))
+            .map(|issue| issue.id)
+            .collect::<Vec<_>>();
+        let warnings = self.refuse_foreign_leases(&requiring)?;
         self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Remove {
             key: key.clone(),
         })?;
-        Ok(())
+        Ok(warnings.into_iter().map(|(_, warning)| warning).collect())
     }
 
     pub fn show_gate_definition(&self, key: &GateKey) -> Result<GateDefinition> {
