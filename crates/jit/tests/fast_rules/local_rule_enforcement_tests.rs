@@ -442,7 +442,7 @@ fn test_bulk_update_enforce_rule_blocks() {
              "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#;
     let storage = InMemoryStorage::new();
     storage.add_data_file("schemas/no-bad.json", schema);
-    let mut executor = memory_executor_declaring(
+    let executor = memory_executor_declaring(
         storage,
         MemoryDeclarations {
             config: Some("[worktree]\nenforce_leases = \"off\"\n"),
@@ -472,7 +472,10 @@ assert = { json-schema = "schemas/no-bad.json" }
         add_labels: vec!["bad:value".to_string()],
         ..Default::default()
     };
-    let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, false)
+        .unwrap();
     assert_eq!(result.summary.total_errors, 1, "bulk write must be blocked");
     assert_eq!(result.summary.total_modified, 0);
     // The label must not have been added.
@@ -485,7 +488,10 @@ assert = { json-schema = "schemas/no-bad.json" }
     assert!(bypass_events(&executor).is_empty());
 
     // With --force the bulk write goes through and logs a bypass.
-    let result = executor.apply_bulk_update(&filter, &ops, true).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, true)
+        .unwrap();
     assert_eq!(
         result.summary.total_modified, 1,
         "force must allow the write"
@@ -578,7 +584,7 @@ fn test_bulk_update_force_noop_logs_bypass() {
              "properties": { "labels": { "type": "object", "not": { "required": ["bad"] } } } }"#;
     let storage = InMemoryStorage::new();
     storage.add_data_file("schemas/no-bad.json", schema);
-    let mut executor = memory_executor_declaring(
+    let executor = memory_executor_declaring(
         storage,
         MemoryDeclarations {
             config: Some("[worktree]\nenforce_leases = \"off\"\n"),
@@ -609,7 +615,10 @@ assert = { json-schema = "schemas/no-bad.json" }
         add_labels: vec!["bad:value".to_string()],
         ..Default::default()
     };
-    let result = executor.apply_bulk_update(&filter, &ops, true).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, true)
+        .unwrap();
     assert_eq!(result.summary.total_errors, 0, "force must allow the write");
     assert_eq!(
         result.summary.total_modified, 0,
