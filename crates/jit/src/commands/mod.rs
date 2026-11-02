@@ -67,6 +67,7 @@ pub mod worktree;
 #[allow(dead_code)]
 pub mod test_helpers;
 
+pub use archive::ArchiveOps;
 pub use batch_create::{
     BatchCreateOutcome, BatchDryRunOutcome, BatchIssueDef, BatchValidationError,
     BatchValidationProblem,
