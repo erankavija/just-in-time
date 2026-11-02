@@ -181,7 +181,7 @@
           "short_id": "d84a7bfa",
           "title": "Item, invariant and projection methods behind an items facade",
           "classification": "implementation",
-          "status": "in_progress (worker w-d84a7bfa)",
+          "status": "done (merged 99b8ae0dd; first branch CI missed the suite-clock budget during a concurrent rsync, rerun passed at 17009 ms; cargo-ci, code-review passed)",
           "vendor": "claude",
           "model_tier": "haiku",
           "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
@@ -767,10 +767,11 @@
       "d4373d07": -24,
       "2e7e1348": -4,
       "a807e699": -158,
-      "5d0a9a90": 8
+      "5d0a9a90": 8,
+      "d84a7bfa": 0
     },
     "epic_total": -293,
     "head_lines": 9121,
-    "head_rev": "804acc4d6"
+    "head_rev": "99b8ae0dd"
   }
 }
