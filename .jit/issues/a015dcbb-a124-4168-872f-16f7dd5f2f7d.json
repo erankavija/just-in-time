@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-02T23:27:23.093353912Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -24,7 +25,7 @@
     "satisfies:df129d9e/REQ-03"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Archive and snapshot methods behind an archive facade",
-  "updated_at": "2026-10-22T14:01:53.679341048Z"
+  "updated_at": "2026-11-02T23:27:23.215338151Z"
 }
