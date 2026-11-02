@@ -1896,6 +1896,32 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
     }
 
+    #[test]
+    fn test_check_gate_twice_names_the_second_run_in_gate_state() {
+        let executor = setup();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "test-gate".parse().unwrap(),
+            make_auto_gate(&"test-gate".parse().unwrap(), "exit 0"),
+        );
+        seed_gate_registry(executor.storage(), &registry);
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        let gate_key: GateKey = "test-gate".parse().unwrap();
+        executor.add_gate(&issue_id, &gate_key).unwrap();
+
+        let first = executor.check_gate(&issue_id, &gate_key).unwrap();
+        let second = executor.check_gate(&issue_id, &gate_key).unwrap();
+
+        assert_ne!(first.run_id, second.run_id);
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(
+            issue.gates_status[&gate_key].run_id.as_ref(),
+            Some(&second.run_id)
+        );
+    }
+
     /// REQ-04 (jit:7ca9a0dd): the evaluation publishes the gate run, the issue's
     /// gate status, and the event as one coupled plan before it returns, so a
     /// caller that sees success can read all three. A path that reported success
@@ -3764,6 +3790,25 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             run,
             "the attestation is addressable by its run id"
         );
+    }
+
+    #[test]
+    fn test_pass_gate_manual_attestation_names_the_attestation_run_in_gate_state() {
+        let executor = setup();
+        let issue_id = seed_review_issue(&executor);
+        let gate_key: GateKey = "review".parse().unwrap();
+
+        executor
+            .pass_gate(&issue_id, &gate_key, Some("human:me".to_string()), false)
+            .unwrap();
+
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        let named = issue.gates_status[&gate_key]
+            .run_id
+            .clone()
+            .expect("a manual status write names its run");
+        let run = executor.get_gate_run_result(&named).unwrap();
+        assert_eq!(run.origin, crate::domain::GateVerdictOrigin::Attested);
     }
 
     #[test]
