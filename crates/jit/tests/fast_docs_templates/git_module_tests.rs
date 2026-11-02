@@ -66,6 +66,21 @@ fn test_probe_linked_checkout_yields_shared_common_dir_and_linked_top_level() {
 }
 
 #[test]
+fn test_probe_yields_each_checkouts_own_git_directory() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let linked = dir.path().join("linked");
+    repository.git(&["worktree", "add", "--quiet", linked.to_str().unwrap()]);
+
+    let primary = probe(repository.root()).unwrap();
+    let linked = probe(&linked).unwrap();
+
+    assert_eq!(primary.git_dir, primary.common_dir);
+    assert_ne!(linked.git_dir, linked.common_dir);
+    assert!(linked.git_dir.starts_with(&linked.common_dir));
+}
+
+#[test]
 fn test_probe_repository_without_commits_yields_checkout() {
     let dir = TempDir::new().unwrap();
     let repository = GitRepository::init(dir.path().join("empty"));

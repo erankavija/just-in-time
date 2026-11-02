@@ -757,19 +757,18 @@ fn claims_mutation_guard(
     }
     let agent = crate::agent_config::resolve_agent_id(None)
         .unwrap_or(crate::domain::Assignee::SYSTEM_LEASE_CHECK);
-    let worktree_id =
-        match crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)? {
-            Some(id) => id,
-            None => crate::domain::identity::WorktreeId::try_from(
-                paths.worktree_root.display().to_string(),
-            )
-            .with_context(|| {
-                format!(
-                    "Invalid worktree id fallback from root path '{}'",
-                    paths.worktree_root.display()
-                )
-            })?,
-        };
+    let worktree_id = match crate::storage::worktree_identity::read_worktree_id(paths)? {
+        Some(id) => id,
+        None => {
+            crate::domain::identity::WorktreeId::try_from(paths.worktree_root.display().to_string())
+                .with_context(|| {
+                    format!(
+                        "Invalid worktree id fallback from root path '{}'",
+                        paths.worktree_root.display()
+                    )
+                })?
+        }
+    };
     let coordinator = ClaimCoordinator::new(
         paths.clone(),
         FileLocker::with_configured_timeout(),

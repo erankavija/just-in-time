@@ -2248,6 +2248,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn validate_leases(&self) -> Result<Vec<String>> {
         use crate::storage::claim_coordinator::ClaimsIndex;
         use chrono::Utc;
+        use std::collections::HashSet;
 
         // Load the active-lease index through storage (an absent index yields an
         // empty one, so there are no leases to validate).
@@ -2255,6 +2256,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut invalid_leases = Vec::new();
         let now = Utc::now();
+        let recorded_worktrees = if index.leases.is_empty() {
+            HashSet::new()
+        } else {
+            recorded_worktree_ids(self.require_worktree_paths()?)?
+        };
 
         for lease in &index.leases {
             // Check if lease has expired
@@ -2273,10 +2279,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
 
             // Check if worktree still exists
-            if !check_worktree_exists(
-                &self.require_worktree_paths()?.worktree_root,
-                &lease.worktree_id,
-            )? {
+            if !recorded_worktrees.contains(&lease.worktree_id) {
                 invalid_leases.push(format!(
                     "Lease {} (Issue {}): Worktree {} no longer exists\n  Fix: jit claim force-evict {}",
                     lease.lease_id,
@@ -2444,18 +2447,17 @@ fn format_duration(duration: chrono::Duration) -> String {
     }
 }
 
-/// Check if a worktree with the given ID still exists
-fn check_worktree_exists(
-    repository_root: &std::path::Path,
-    worktree_id: &crate::domain::identity::WorktreeId,
-) -> Result<bool> {
+/// The ids recorded by this repository's listed checkouts.
+fn recorded_worktree_ids(
+    paths: &crate::storage::worktree_paths::WorktreePaths,
+) -> Result<std::collections::HashSet<crate::domain::identity::WorktreeId>> {
     use std::path::PathBuf;
     use std::process::Command;
 
     // Get all git worktrees
     let output = Command::new("git")
         .arg("-C")
-        .arg(repository_root)
+        .arg(&paths.worktree_root)
         .args(["worktree", "list", "--porcelain"])
         .output()
         .context("Failed to execute git worktree list")?;
@@ -2468,27 +2470,18 @@ fn check_worktree_exists(
     let porcelain_output =
         String::from_utf8(output.stdout).context("Invalid UTF-8 in git worktree output")?;
 
-    // Parse worktree paths
-    let worktree_paths = porcelain_output
+    // A checkout that is gone or whose identity is unreadable records no id.
+    Ok(porcelain_output
         .lines()
-        .filter(|line| line.starts_with("worktree "))
         .filter_map(|line| line.strip_prefix("worktree "))
         .map(PathBuf::from)
-        .collect::<Vec<_>>();
-
-    // Check each worktree for matching ID. A missing or unreadable identity
-    // file is tolerated (skip it), matching the prior inline behavior.
-    for worktree_path in worktree_paths {
-        if let Some(id) =
-            crate::storage::worktree_identity::read_worktree_id(&worktree_path).unwrap_or(None)
-        {
-            if &id == worktree_id {
-                return Ok(true);
-            }
-        }
-    }
-
-    Ok(false)
+        .filter_map(|worktree_path| paths.for_worktree_root(worktree_path).ok().flatten())
+        .filter_map(|checkout| {
+            crate::storage::worktree_identity::read_worktree_id(&checkout)
+                .ok()
+                .flatten()
+        })
+        .collect())
 }
 
 /// Validate claims-index consistency for an explicitly selected repository.

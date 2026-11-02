@@ -43,8 +43,9 @@ authored into it — the `rule` kind itself only once a `[item_kinds]` declarati
 reaches the repository.
 
 A live repository also carries gitignored, machine-local files directly under
-`.jit/`: `worktree.json`, `server.log`, `server.pid.json`, a fixed set of lock
-files, and `tmp/`. The data root's own `.gitignore` is derived state, not
+`.jit/`: `server.log`, `server.pid.json`, a fixed set of lock files, `tmp/`, and,
+for a data root inside a checkout, `worktree.json` (see
+[Worktree Identity](#worktree-identity)). The data root's own `.gitignore` is derived state, not
 authored: the engine composes its delimited engine-owned region, whose single
 entry is the scratch directory `tmp/`, so a repository never commits a pending
 redo record. Initialization writes it and `jit validate --fix` restores it,
@@ -54,7 +55,9 @@ ignore file is neither read nor written. The store's fixed lock set under
 `.repo-write.lock`, `.index.lock`, `.gates.lock`, and `.events.lock`; it is
 independent of the number of issues. The repository-sibling
 `.jit-bootstrap.lock` and the `.git/jit/locks/claims.lock` control-plane lock
-complete the fixed set. Their paths come from the
+complete the fixed set, and each checkout over a data root outside every
+checkout adds one `worktree.lock` (see [Worktree Identity](#worktree-identity)).
+Their paths come from the
 [storage layout](../../crates/jit/src/repository_state/path.rs) and the
 [`ClaimCoordinator`](../../crates/jit/src/storage/claim_coordinator.rs)
 implementation. The `.jit/` storage locks and `.jit-bootstrap.lock` retain
@@ -377,6 +380,11 @@ per-worktree lease store.
     └── claims.lock
 ```
 
+A lease names its holder's `worktree_id`, which
+[Worktree Identity](#worktree-identity) defines. A primary checkout's identity
+files can sit in this directory over a data root outside every checkout, and are
+separate from the claims state.
+
 - **`claims.jsonl`**: an append-only, newline-delimited log of claim
   operations (`Acquire`, `Renew`, `Heartbeat`, `Release`, `AutoEvict`,
   `ForceEvict`), each entry carrying a monotonic `seq` for total ordering.
@@ -392,6 +400,31 @@ per-worktree lease store.
 
 `jit claim` command usage (acquire, release, renew, heartbeat, status, list,
 force-evict) is documented in the [Claim reference](claim.md).
+
+## Worktree Identity
+
+Each checkout has one stable `worktree_id`, recorded in a machine-local
+`worktree.json` with its branch and top-level path. The file's location follows
+the data root:
+
+- **A data root inside a checkout** has one owner and holds the file:
+  `<data root>/worktree.json`. A copy reaching a linked checkout gets a new
+  identity.
+- **A data root outside every checkout**, invoked from inside one, can serve many
+  checkouts, so each keeps its file in its own git directory:
+  `<git dir>/jit/worktree.json`, beside the `worktree.lock` that serializes changes
+  to it. `git rev-parse --absolute-git-dir` names that directory: the common
+  directory for a primary checkout, `<common dir>/worktrees/<name>` for a linked
+  one. Such a data root holds no identity, and ignores a `worktree.json` found in
+  it.
+- **A data root and an invocation both outside every checkout** have no checkout
+  to identify and no claims to attribute; `jit worktree` and `jit claim` report the
+  git requirement.
+
+A checkout found away from its recorded path reports one relocation, keeps its id
+and records the new path. `git worktree move` keeps the linked checkout's git
+directory and so its id; `git worktree remove` discards that directory and its
+identity with it.
 
 ## Versioning
 

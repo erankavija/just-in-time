@@ -1,11 +1,15 @@
 //! Worktree identity generation and persistence.
 //!
-//! This module provides deterministic worktree ID generation and persistence
-//! to support parallel multi-agent work with git worktrees.
+//! A data root inside a checkout has one owner and holds its identity. A data
+//! root outside every checkout can serve many, so each keeps its identity in its
+//! own git directory, which `git worktree move` keeps and `git worktree add`
+//! creates fresh.
 
 use crate::domain::identity::WorktreeId;
 use crate::repository_state::VirtualPath;
 use crate::storage::atomic_write::{sync_directory, write_file_synced};
+use crate::storage::lock::{FileLocker, LockGuard};
+use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{RepositoryNotFoundError, StorageWarning};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -14,7 +18,12 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Worktree identity persisted at [`VirtualPath::WORKTREE_IDENTITY`].
+/// The directory under a checkout's git directory holding its identity.
+const GIT_DIR_IDENTITY_DIR: &str = "jit";
+/// Serializes identity changes for one checkout over a store outside every checkout.
+const GIT_DIR_IDENTITY_LOCK: &str = "worktree.lock";
+
+/// Worktree identity persisted at the path [`identity_file`] resolves.
 ///
 /// The worktree ID is stable across relocations to support lease continuity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -65,6 +74,8 @@ pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> Result<Wo
 /// If the identity record exists, load it and check for relocation.
 /// If it doesn't exist, generate a new identity and persist it. An absent data
 /// root fails with [`RepositoryNotFoundError`]; only initialization creates it.
+/// Over a store outside every checkout, a listing in one checkout can record
+/// another's identity, so the check and the write hold that checkout's lock.
 ///
 /// # Relocation Detection
 ///
@@ -79,7 +90,7 @@ pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> Result<Wo
 /// * `paths` - Authoritative selected-store worktree paths
 /// * `branch` - Current git branch name
 pub fn load_or_create_worktree_identity(
-    paths: &crate::storage::worktree_paths::WorktreePaths,
+    paths: &WorktreePaths,
     branch: &str,
 ) -> Result<WorktreeIdentity> {
     // Convenience wrapper that drops the non-fatal relocation warning. Callers
@@ -101,146 +112,112 @@ pub fn load_or_create_worktree_identity(
 /// * `paths` - Authoritative selected-store worktree paths
 /// * `branch` - Current git branch name
 pub fn load_or_create_worktree_identity_with_warnings(
-    paths: &crate::storage::worktree_paths::WorktreePaths,
+    paths: &WorktreePaths,
     branch: &str,
 ) -> Result<(WorktreeIdentity, Vec<StorageWarning>)> {
     if !paths.local_jit.is_dir() {
         return Err(RepositoryNotFoundError::new(paths.local_jit.display().to_string()).into());
     }
-    let mut warnings = Vec::new();
-
-    let layout =
-        crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
-    let wt_file = layout.resolve(&VirtualPath::WORKTREE_IDENTITY)?;
+    let wt_file = identity_file(paths)?;
+    let _guard = lock_git_dir_identity(paths)?;
+    let current_root = paths.checkout_top_level().to_string_lossy().to_string();
 
     if wt_file.exists() {
-        // Load existing identity
-        let content = fs::read_to_string(&wt_file).context("Failed to read worktree identity")?;
-        let mut identity: WorktreeIdentity =
-            serde_json::from_str(&content).context("Failed to parse worktree identity")?;
-
-        // Check for path mismatch
-        let current_root = paths.worktree_root.to_string_lossy().to_string();
-        if identity.root != current_root {
-            // Path mismatch - could be relocation OR copied file from git worktree add
-            if paths.is_worktree() {
-                // In a git worktree with wrong path - could be copied OR moved
-                // Check if old path still exists with the same ID
-                let old_path = PathBuf::from(&identity.root);
-                let old_data_root = old_path.join(".jit");
-                let old_wt_file =
-                    crate::storage::discover_repository_layout(&old_path, &old_data_root)
-                        .ok()
-                        .and_then(|layout| layout.resolve(&VirtualPath::WORKTREE_IDENTITY).ok())
-                        .filter(|path| path.exists());
-
-                let is_copy = if let Some(old_wt_file) = old_wt_file {
-                    // Old path exists - check if it has the same ID
-                    if let Ok(old_content) = fs::read_to_string(&old_wt_file) {
-                        if let Ok(old_identity) =
-                            serde_json::from_str::<WorktreeIdentity>(&old_content)
-                        {
-                            // If IDs match, this is a copy (both have same ID)
-                            old_identity.worktree_id == identity.worktree_id
-                        } else {
-                            // Can't parse old file - treat as copy to be safe
-                            true
-                        }
-                    } else {
-                        // Can't read old file - treat as copy to be safe
-                        true
-                    }
-                } else {
-                    // Old path doesn't exist - this is a move
-                    false
-                };
-
-                if is_copy {
-                    // This is a copied file from git worktree add
-                    // Delete it and create a new identity with unique ID
-                    fs::remove_file(&wt_file)
-                        .context("Failed to remove copied worktree identity")?;
-                    // Fall through to create new identity
-                } else {
-                    // This is a moved worktree (e.g., git worktree move)
-                    warnings.push(StorageWarning::WorktreeRelocated {
-                        from: identity.root.clone(),
-                        to: current_root.clone(),
-                    });
-
-                    identity.root = current_root;
-                    identity.relocated_at = Some(Utc::now());
-
-                    // Write updated identity atomically
-                    write_identity_atomic(&wt_file, &identity)?;
-
-                    return Ok((identity, warnings));
-                }
-            } else {
-                // Not in a git worktree - this is a genuine relocation
-                warnings.push(StorageWarning::WorktreeRelocated {
-                    from: identity.root.clone(),
-                    to: current_root.clone(),
-                });
-
-                identity.root = current_root;
-                identity.relocated_at = Some(Utc::now());
-
-                // Write updated identity atomically
-                write_identity_atomic(&wt_file, &identity)?;
-
-                return Ok((identity, warnings));
-            }
-        } else {
-            // Paths match - use existing identity
+        let mut identity = read_identity(&wt_file)?;
+        if identity.root == current_root {
+            return Ok((identity, Vec::new()));
+        }
+        // Only a store in a linked checkout can arrive there by copy.
+        if !(paths.holds_linked_store() && is_copied_identity(&identity)) {
+            let warnings = vec![StorageWarning::WorktreeRelocated {
+                from: identity.root.clone(),
+                to: current_root.clone(),
+            }];
+            identity.root = current_root;
+            identity.relocated_at = Some(Utc::now());
+            write_identity_atomic(&wt_file, &identity)?;
             return Ok((identity, warnings));
         }
+        fs::remove_file(&wt_file).context("Failed to remove copied worktree identity")?;
     }
 
-    // Create new identity (either no file existed, or we deleted a copied one)
     let now = Utc::now();
-    let worktree_id = generate_worktree_id(&paths.worktree_root, now)?;
-
     let identity = WorktreeIdentity {
         schema_version: 1,
-        worktree_id,
+        worktree_id: generate_worktree_id(Path::new(&current_root), now)?,
         branch: branch.to_string(),
-        root: paths.worktree_root.to_string_lossy().to_string(),
+        root: current_root,
         created_at: now,
         relocated_at: None,
     };
-
-    // Write atomically
     write_identity_atomic(&wt_file, &identity)?;
 
-    Ok((identity, warnings))
+    Ok((identity, Vec::new()))
 }
 
-/// Read the stable worktree id recorded in the selected worktree's identity file.
+/// Whether the store at the identity's recorded root still holds the same id, or
+/// holds a file that cannot be read: `git worktree add` copied the file, where a
+/// `git worktree move` would have left no store behind.
+fn is_copied_identity(identity: &WorktreeIdentity) -> bool {
+    let old_root = PathBuf::from(&identity.root);
+    crate::storage::discover_repository_layout(&old_root, old_root.join(".jit"))
+        .ok()
+        .and_then(|layout| layout.resolve(&VirtualPath::WORKTREE_IDENTITY).ok())
+        .filter(|old_file| old_file.exists())
+        .is_some_and(|old_file| {
+            read_identity(&old_file).map_or(true, |old_identity| {
+                old_identity.worktree_id == identity.worktree_id
+            })
+        })
+}
+
+/// The one resolution of a checkout's identity file; see the module docs.
+fn identity_file(paths: &WorktreePaths) -> Result<PathBuf> {
+    if let Some(git_dir) = paths.checkout_git_dir() {
+        let file = VirtualPath::WORKTREE_IDENTITY;
+        return Ok(git_dir
+            .join(GIT_DIR_IDENTITY_DIR)
+            .join(file.relative().as_str()));
+    }
+    let layout =
+        crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+    Ok(layout.resolve(&VirtualPath::WORKTREE_IDENTITY)?)
+}
+
+/// Lock the identity of a checkout keeping it in its git directory, creating
+/// that directory's identity home. Other layouts take no lock.
+fn lock_git_dir_identity(paths: &WorktreePaths) -> Result<Option<LockGuard>> {
+    paths
+        .checkout_git_dir()
+        .map(|git_dir| {
+            let home = git_dir.join(GIT_DIR_IDENTITY_DIR);
+            fs::create_dir_all(&home).context("Failed to create worktree identity directory")?;
+            FileLocker::with_configured_timeout().lock_exclusive(&home.join(GIT_DIR_IDENTITY_LOCK))
+        })
+        .transpose()
+}
+
+fn read_identity(file: &Path) -> Result<WorktreeIdentity> {
+    let content = fs::read_to_string(file).context("Failed to read worktree identity")?;
+    serde_json::from_str(&content).context("Failed to parse worktree identity")
+}
+
+/// Read the stable worktree id recorded for the checkout `paths` selects.
 ///
 /// Read-only: unlike [`load_or_create_worktree_identity`] this never creates or
-/// rewrites the identity file. It owns the identity-file layout and the
-/// deserialization into [`WorktreeIdentity`], so callers (e.g. lease validation
-/// scanning sibling worktrees) never construct that path or parse the file
-/// inline.
+/// rewrites the identity file.
 ///
-/// Returns `Ok(None)` when the file is absent (the worktree has no recorded
-/// identity yet), `Ok(Some(id))` when present and parseable, and an error only
-/// when the file exists but cannot be read or parsed.
-pub fn read_worktree_id(worktree_root: &Path) -> Result<Option<WorktreeId>> {
-    let data_root = worktree_root.join(".jit");
-    if !data_root.exists() {
+/// Returns `Ok(None)` when the checkout has no recorded identity yet, and an
+/// error only when the file exists but cannot be read or parsed.
+pub fn read_worktree_id(paths: &WorktreePaths) -> Result<Option<WorktreeId>> {
+    if !paths.local_jit.exists() {
         return Ok(None);
     }
-    let layout = crate::storage::discover_repository_layout(worktree_root, &data_root)?;
-    let wt_file = layout.resolve(&VirtualPath::WORKTREE_IDENTITY)?;
+    let wt_file = identity_file(paths)?;
     if !wt_file.exists() {
         return Ok(None);
     }
-    let content = fs::read_to_string(&wt_file).context("Failed to read worktree identity")?;
-    let identity: WorktreeIdentity =
-        serde_json::from_str(&content).context("Failed to parse worktree identity")?;
-    Ok(Some(identity.worktree_id))
+    Ok(Some(read_identity(&wt_file)?.worktree_id))
 }
 
 /// Write worktree identity atomically using temp file + rename pattern.
@@ -330,9 +307,28 @@ mod tests {
     #[test]
     fn test_read_worktree_id_over_absent_data_root_creates_nothing() {
         let temp = tempfile::TempDir::new().unwrap();
+        let paths =
+            WorktreePaths::detect_for_data_root(&temp.path().join(".jit"), temp.path()).unwrap();
 
-        assert_eq!(read_worktree_id(temp.path()).unwrap(), None);
+        assert_eq!(read_worktree_id(&paths).unwrap(), None);
         assert!(!temp.path().join(".jit").exists());
+    }
+
+    #[test]
+    fn test_read_worktree_id_over_external_store_reads_the_checkouts_recorded_identity() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(temp.path().join("repo"));
+        let store = temp.path().join("store");
+        fs::create_dir(&store).unwrap();
+        let paths = WorktreePaths::detect_for_data_root(&store, repository.root()).unwrap();
+        assert_eq!(read_worktree_id(&paths).unwrap(), None);
+
+        let recorded = load_or_create_worktree_identity(&paths, "main").unwrap();
+
+        assert_eq!(
+            read_worktree_id(&paths).unwrap(),
+            Some(recorded.worktree_id)
+        );
     }
 
     #[test]

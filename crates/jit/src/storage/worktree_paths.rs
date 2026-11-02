@@ -4,6 +4,26 @@ use std::path::{Path, PathBuf};
 
 use crate::storage::git::{Git, GitCheckout, ProbedCheckout};
 
+/// The checkout a command runs in when its data root lies outside every checkout
+/// and outside the worktree root.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RelocatedCheckout {
+    /// The checkout's top level; the worktree root may be a subdirectory of it.
+    pub top_level: PathBuf,
+    /// The checkout's own git directory, which holds its identity because the
+    /// data root may serve many checkouts.
+    pub git_dir: PathBuf,
+}
+
+impl From<ProbedCheckout> for RelocatedCheckout {
+    fn from(probed: ProbedCheckout) -> Self {
+        Self {
+            top_level: probed.worktree_root,
+            git_dir: probed.git_dir,
+        }
+    }
+}
+
 /// Paths for worktree-aware storage.
 ///
 /// Detects git worktree context and provides paths for both the data plane
@@ -22,9 +42,9 @@ pub struct WorktreePaths {
     pub local_jit: PathBuf,
     /// Shared control plane: <common_dir>/jit
     pub shared_jit: PathBuf,
-    /// Top level of the checkout holding the worktree root when the selected
-    /// data root lies outside every checkout and outside the worktree root.
-    pub relocated_worktree_checkout: Option<PathBuf>,
+    /// The checkout holding the worktree root when the selected data root lies
+    /// outside every checkout and outside the worktree root.
+    pub relocated_worktree_checkout: Option<RelocatedCheckout>,
 }
 
 impl WorktreePaths {
@@ -72,7 +92,7 @@ impl WorktreePaths {
                 .flatten();
             let worktree_root = non_git_root.to_path_buf();
             let (common_dir, relocated_worktree_checkout) = match worktree_checkout {
-                Some(checkout) => (checkout.common_dir, Some(checkout.worktree_root)),
+                Some(checkout) => (checkout.common_dir.clone(), Some(checkout.into())),
                 None => (worktree_root.join(".git"), None),
             };
             return Ok(Self {
@@ -89,6 +109,7 @@ impl WorktreePaths {
         let ProbedCheckout {
             common_dir,
             worktree_root,
+            ..
         } = probed;
 
         let local_jit = selected_data_root
@@ -136,29 +157,46 @@ impl WorktreePaths {
     pub fn write_checkout(&self) -> Option<GitCheckout> {
         self.git().or_else(|| {
             self.relocated_worktree_checkout
-                .clone()
-                .map(|root| GitCheckout::new(Git::default(), root))
+                .as_ref()
+                .map(|checkout| GitCheckout::new(Git::default(), checkout.top_level.clone()))
         })
     }
 
     /// Project this repository authority onto one worktree reported by Git.
     ///
-    /// This derives per-worktree identity paths without running a second
-    /// repository-layout probe. The projected store uses the conventional
-    /// `.jit` location reported by `git worktree list` consumers.
-    pub fn for_worktree_root(&self, worktree_root: PathBuf) -> Self {
-        let local_jit = worktree_root.join(".jit");
-        Self {
+    /// A checkout holds its store at the conventional `.jit` location and needs
+    /// no process. Over a store outside every checkout, the projection keeps that
+    /// store and probes the worktree for its git directory, answering `None` when
+    /// the worktree is no longer a checkout, as a stale `git worktree list` entry
+    /// can be.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when git reports a checkout whose paths cannot be resolved.
+    pub fn for_worktree_root(&self, worktree_root: PathBuf) -> Result<Option<Self>> {
+        let (local_jit, relocated_worktree_checkout) = match self.relocated_worktree_checkout {
+            None => (worktree_root.join(".jit"), None),
+            Some(_) => match Git::default().probe(&worktree_root)? {
+                Some(checkout) => (self.local_jit.clone(), Some(checkout.into())),
+                None => return Ok(None),
+            },
+        };
+        Ok(Some(Self {
             git_repository: self.git_repository,
             common_dir: self.common_dir.clone(),
-            relocated_worktree_checkout: self
-                .relocated_worktree_checkout
-                .as_ref()
-                .map(|_| worktree_root.clone()),
+            relocated_worktree_checkout,
             worktree_root,
             local_jit,
             shared_jit: self.shared_jit.clone(),
-        }
+        }))
+    }
+
+    /// The git directory holding this checkout's identity, for a store outside
+    /// every checkout. Any other store holds the identity of its one checkout.
+    pub(crate) fn checkout_git_dir(&self) -> Option<&Path> {
+        self.relocated_worktree_checkout
+            .as_ref()
+            .map(|checkout| checkout.git_dir.as_path())
     }
 
     /// Check if we're in a secondary worktree (not main worktree).
@@ -169,10 +207,10 @@ impl WorktreePaths {
     }
 
     /// The worktree root may be a subdirectory of the recorded relocated checkout.
-    fn checkout_top_level(&self) -> &Path {
+    pub(crate) fn checkout_top_level(&self) -> &Path {
         self.relocated_worktree_checkout
-            .as_deref()
-            .unwrap_or(&self.worktree_root)
+            .as_ref()
+            .map_or(&self.worktree_root, |checkout| &checkout.top_level)
     }
 
     /// Check if this is the main worktree.
@@ -426,14 +464,42 @@ mod tests {
     }
 
     #[test]
-    fn test_for_worktree_root_over_external_store_classifies_the_projected_checkout() {
+    fn test_for_worktree_root_over_external_store_projects_the_checkout_over_the_same_store() {
         let dir = tempfile::tempdir().unwrap();
         let dir = dir.path().canonicalize().unwrap();
         let (repository, linked, store) = external_store_layout(&dir);
-
         let paths = WorktreePaths::detect_for_data_root(&store, repository.root()).unwrap();
 
-        assert!(paths.for_worktree_root(linked).is_worktree());
+        let projected = paths.for_worktree_root(linked.clone()).unwrap().unwrap();
+
+        assert_eq!(
+            projected,
+            WorktreePaths::detect_for_data_root(&store, &linked).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_for_worktree_root_over_external_store_answers_none_for_a_removed_checkout() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir = dir.path().canonicalize().unwrap();
+        let (repository, linked, store) = external_store_layout(&dir);
+        let paths = WorktreePaths::detect_for_data_root(&store, repository.root()).unwrap();
+        std::fs::remove_dir_all(&linked).unwrap();
+
+        assert_eq!(paths.for_worktree_root(linked).unwrap(), None);
+    }
+
+    #[test]
+    fn test_for_worktree_root_of_a_store_in_its_checkout_uses_the_conventional_location() {
+        let paths = crate::test_utils::primary_checkout_paths("/repo");
+
+        let projected = paths
+            .for_worktree_root(PathBuf::from("/worktrees/feature"))
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(projected.local_jit, Path::new("/worktrees/feature/.jit"));
+        assert_eq!(projected.checkout_git_dir(), None);
     }
 
     #[test]

@@ -363,7 +363,8 @@ mod identity {
         INVARIANTS: Data = "invariants.toml";
         /// Append-only event log under the data root (`.jit/events.jsonl`).
         EVENTS: Data = "events.jsonl";
-        /// Machine-local worktree identity record under the data root.
+        /// Machine-local worktree identity record of a data root inside a checkout;
+        /// a data root outside every checkout holds none.
         WORKTREE_IDENTITY: Data = "worktree.json";
         /// Server process record under the data root.
         SERVER_PID: Data = "server.pid.json";
