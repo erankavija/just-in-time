@@ -37,7 +37,7 @@ A run record lives at `gate-runs/<issue-id>/<run-id>.json`, built only by `Virtu
 
 ### `latest-run-accessor` [implementation-produced] — One latest-run lookup
 
-`CommandExecutor::get_last_gate_runs_for_issue` returns, for an issue, the run each gate state's `run_id` names, loaded by `(issue, run)`; it lists no runs. Producer: `gate-latest-run-reads`.
+`get_last_gate_runs_for_issue`, in the gate-check family, returns, for an issue, the run each gate state's `run_id` names, loaded by `(issue, run)`; it lists no runs. Producer: `gate-latest-run-reads`.
 
 ### `gate-verdict-record` [plan-fixed] — Per-key reusable verdict
 
