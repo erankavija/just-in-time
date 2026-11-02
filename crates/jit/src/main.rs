@@ -3044,8 +3044,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
 
             let container = resolve_issue_arg(&storage, &container)?;
-            let (result, warnings) =
-                executor.apply_template(&template, &container, &bindings, force)?;
+            let (result, warnings) = executor
+                .templates()
+                .apply_template(&template, &container, &bindings, force)?;
             for warning in &warnings {
                 eprintln!("Warning: {}", warning);
             }
