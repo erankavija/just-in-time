@@ -842,6 +842,7 @@ mod tests {
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
         let initializer = CommandExecutor::new(storage.clone()).with_layout(layout);
         initializer
+            .profiles()
             .initialize_fresh_repository(temp.path(), None)
             .unwrap();
         fs::write(temp.path().join("AGENTS.md"), b"# Existing guidance\n").unwrap();
