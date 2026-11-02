@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-02T23:48:35.163633406Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
@@ -28,7 +29,7 @@
     "satisfies:f8a6b298/REQ-12"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Event-log readers ignore an unterminated final line that the next append overwrites",
-  "updated_at": "2026-11-02T23:41:03.747922330Z"
+  "updated_at": "2026-11-02T23:48:35.163633406Z"
 }
