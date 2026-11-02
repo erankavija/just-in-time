@@ -384,6 +384,10 @@ rm .jit/worktree.json
 jit worktree info
 ```
 
+Over a data root outside every checkout, the file is
+`"$(git rev-parse --absolute-git-dir)/jit/worktree.json"` (see
+[Worktree Identity](../reference/storage-format.md#worktree-identity)).
+
 ### Secondary Worktree Can't See Issues
 
 **Symptom:** `jit query all` returns nothing in secondary worktree.
