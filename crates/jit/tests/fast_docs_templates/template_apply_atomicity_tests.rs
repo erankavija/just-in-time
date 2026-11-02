@@ -486,6 +486,7 @@ fn assert_publication_failure_is_atomic<S: IssueStore + RepositoryStateStore>(
     let before = repository_image(&store);
     store.arm();
     let error = executor
+        .templates()
         .apply_template_with(
             &plan_template(taxonomy),
             &container,
@@ -500,6 +501,7 @@ fn assert_publication_failure_is_atomic<S: IssueStore + RepositoryStateStore>(
     // The one-shot fault is exhausted: a fresh mutation session can publish the
     // complete scaffold, proving the failure left no blocking redo record.
     let result = executor
+        .templates()
         .apply_template_with(
             &plan_template(taxonomy),
             &container,
@@ -548,6 +550,7 @@ fn test_retryable_conflict_reuses_created_ids_and_timestamp() {
     let (executor, container, _) = fixture(executor, &taxonomy);
     store.arm();
     let result = executor
+        .templates()
         .apply_template_with(
             &plan_template(&taxonomy),
             &container,
@@ -631,6 +634,7 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
     };
 
     let error = executor
+        .templates()
         .apply_template_with(
             &plan_template(&taxonomy),
             &container,
@@ -714,6 +718,7 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
     let resolves_before = store.resolve_calls();
 
     let (_, warnings) = executor
+        .templates()
         .apply_template_with(
             &plan_template(&taxonomy),
             &container,
@@ -766,6 +771,7 @@ target = "docs/closure.md"
     store.arm();
 
     executor
+        .templates()
         .apply_template_with(
             &plan_template(&taxonomy),
             &container,
@@ -799,6 +805,7 @@ fn assert_planning_document_capture(
     }
 
     executor
+        .templates()
         .apply_template_with(
             &plan_template(taxonomy),
             &container,
@@ -869,6 +876,7 @@ fn test_unchanged_force_is_exact_noop_without_publication_or_created_id_paths() 
     let (executor, container, _) = fixture(executor, &taxonomy);
     let template = plan_template(&taxonomy);
     let applied = executor
+        .templates()
         .apply_template_with(&template, &container, &bindings(&container), false)
         .unwrap()
         .0;
@@ -879,6 +887,7 @@ fn test_unchanged_force_is_exact_noop_without_publication_or_created_id_paths() 
     issues_before.sort_by(|left, right| left.id.cmp(&right.id));
 
     let refreshed = executor
+        .templates()
         .apply_template_with(&template, &container, &bindings(&container), true)
         .unwrap()
         .0;

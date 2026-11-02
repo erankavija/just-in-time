@@ -184,6 +184,7 @@ applies_to = ["epic"]
 
     let result = h
         .executor
+        .templates()
         .apply_template("plan", &epic, &BTreeMap::new(), false)
         .unwrap()
         .0;
@@ -204,6 +205,7 @@ fn test_apply_instantiates_nodes_with_interpolated_descriptions() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -241,6 +243,7 @@ fn test_apply_resolves_node_doc_location() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -296,6 +299,7 @@ fn test_apply_resolves_the_declared_document_area_into_the_node_doc_location() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -337,6 +341,7 @@ fn test_apply_rejects_a_document_area_the_registry_does_not_declare_and_creates_
     let before = h.all_issues().len();
     let error = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
 
@@ -356,6 +361,7 @@ fn test_apply_attaches_declared_gate_presets() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -386,6 +392,7 @@ fn test_apply_snapshots_container_dependencies_before_mutation() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -424,6 +431,7 @@ fn test_apply_rejects_wrong_container_type_and_creates_nothing() {
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &task, &container_binding(&task), false)
         .unwrap_err();
     assert!(err.to_string().contains("does not apply"));
@@ -440,6 +448,7 @@ fn test_apply_rejects_unbound_anchor_and_creates_nothing() {
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &BTreeMap::new(), false)
         .unwrap_err();
     assert!(err.to_string().contains("not bound"));
@@ -457,6 +466,7 @@ fn test_apply_rejects_anchor_bound_to_missing_issue() {
     let bindings = BTreeMap::from([("container".to_string(), missing_id.clone())]);
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &bindings, false)
         .unwrap_err();
     // Validation fails before any node is created.
@@ -477,12 +487,14 @@ fn test_apply_rejects_already_applied_without_force() {
     // First apply succeeds and wires C→B (the fresh-apply path), so the breakdown
     // node is among the container's deps.
     h.executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     assert!(err.to_string().contains("already"));
@@ -518,6 +530,7 @@ fn test_apply_rejects_legacy_planning_only_bracket() {
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     let msg = err.to_string();
@@ -537,6 +550,7 @@ fn test_force_refreshes_nodes_in_place_without_duplicating() {
 
     let (first, _) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let planning_id = first.created_node_ids_by_role["planning"].clone();
@@ -564,6 +578,7 @@ fn test_force_refreshes_nodes_in_place_without_duplicating() {
     let count_before = h.all_issues().len();
     let (refreshed, _) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), true)
         .unwrap();
 
@@ -596,6 +611,7 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
 
     let (first, _) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let planning_id = first.created_node_ids_by_role["planning"].clone();
@@ -617,6 +633,7 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
     let count_before = h.all_issues().len();
     let (refreshed, _) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), true)
         .unwrap();
 
@@ -675,6 +692,7 @@ applies_to  = ["epic"]
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     assert!(err.to_string().contains("does-not-exist"));
@@ -696,6 +714,7 @@ fn test_apply_plan_template_attaches_repo_validate_to_container() {
     let epic = create_epic(&h, "Repo-validate epic");
 
     h.executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -757,6 +776,7 @@ applies_to  = ["epic"]
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -808,6 +828,7 @@ applies_to  = ["epic"]
     let epic = create_epic(&h, "Anchor-gated epic");
 
     h.executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -855,6 +876,7 @@ applies_to  = ["epic"]
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     assert!(err.to_string().contains("does-not-exist"), "{err}");
@@ -928,6 +950,7 @@ applies_to  = ["epic"]
         let before = h.all_issues().len();
         let error = h
             .executor
+            .templates()
             .apply_template_with(&template, &epic, &container_binding(&epic), false)
             .unwrap_err();
 
@@ -1065,6 +1088,7 @@ applies_to  = ["epic"]
     // Under the BUGGY code this would be `Ok(_)` (silent registry-key fallback), so
     // `unwrap_err` itself pins the regression: apply MUST abort.
     let err = executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     // The malformed-preset load error PROPAGATES. It must NOT be `PresetNotFoundError`
@@ -1115,6 +1139,7 @@ applies_to  = ["epic"]
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     // The error names the offending node so the misconfiguration is actionable.
@@ -1148,6 +1173,7 @@ applies_to  = ["epic"]
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let planning = h.get_issue(&result.created_node_ids_by_role["planning"]);
@@ -1168,6 +1194,7 @@ fn test_force_errors_when_planning_node_unreachable() {
 
     let (first, _) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let breakdown_id = first.created_node_ids_by_role["breakdown"].clone();
@@ -1182,6 +1209,7 @@ fn test_force_errors_when_planning_node_unreachable() {
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), true)
         .unwrap_err();
     // APPA-03: a broken/incomplete bracket errors rather than silently refreshing
@@ -1208,6 +1236,7 @@ fn test_apply_wires_spine_and_moves_upstream_onto_planning() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let planning_id = result.created_node_ids_by_role["planning"].clone();
@@ -1248,6 +1277,7 @@ fn test_transform_does_not_move_freshly_created_breakdown_onto_planning() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let planning_id = result.created_node_ids_by_role["planning"].clone();
@@ -1341,6 +1371,7 @@ applies_to  = ["epic"]
     let before = h.all_issues().len();
     let err = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &bindings, false)
         .unwrap_err();
     assert!(err.to_string().contains("cycle"), "{err}");
@@ -1380,6 +1411,7 @@ fn test_apply_template_leaves_no_node_ready_while_it_carries_an_unmet_dependency
     let epic = create_epic(&h, "Coherence epic");
 
     h.executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -1411,6 +1443,7 @@ fn test_apply_template_appends_a_state_change_event_for_every_node_it_demotes() 
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let breakdown_id = result.created_node_ids_by_role["breakdown"].clone();
@@ -1442,6 +1475,7 @@ fn test_apply_template_appends_a_dependency_add_event_for_every_wired_edge() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
     let breakdown_id = result.created_node_ids_by_role["breakdown"].clone();
@@ -1480,6 +1514,7 @@ fn test_apply_result_serializes_to_expected_json_shape() {
 
     let (result, _w) = h
         .executor
+        .templates()
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap();
 
@@ -1652,6 +1687,7 @@ proptest! {
         let (h, epic, _ups) = harness_with_upstreams("Acyclic prop", upstream_count);
 
         h.executor
+            .templates()
             .apply_template_with(&template, &epic, &container_binding(&epic), false)
             .unwrap();
 
@@ -1671,6 +1707,7 @@ proptest! {
         let (h, epic, _ups) = harness_with_upstreams("Reduced prop", upstream_count);
 
         h.executor
+            .templates()
             .apply_template_with(&template, &epic, &container_binding(&epic), false)
             .unwrap();
 
@@ -1691,6 +1728,7 @@ proptest! {
 
         let (first, _) = h
             .executor
+            .templates()
             .apply_template_with(&template, &epic, &container_binding(&epic), false)
             .unwrap();
         let fingerprint_before = edge_fingerprint(&h);
@@ -1698,6 +1736,7 @@ proptest! {
 
         let (refreshed, _) = h
             .executor
+            .templates()
             .apply_template_with(&template, &epic, &container_binding(&epic), true)
             .unwrap();
 
