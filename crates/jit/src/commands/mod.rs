@@ -83,7 +83,7 @@ pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
 pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueLocalUpdate, IssueOps};
-pub use item::{ItemListResult, ItemShowResult};
+pub use item::{ItemListResult, ItemOps, ItemShowResult};
 pub use profile::{
     parse_profile_selector, ProfileApplyError, ProfileResolutionError, ProfileSelection,
     ProfileSelectorError, ProfileVariableOptions, SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,

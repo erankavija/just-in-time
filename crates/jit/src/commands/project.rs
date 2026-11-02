@@ -94,7 +94,7 @@ fn selected_projection_names(config: &JitConfig, name: Option<&str>) -> Result<V
     }
 }
 
-impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
+impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
     /// Render every declared projection, or the single `name`d one, into its
     /// configured documentation target through one mutation session.
     ///
@@ -118,7 +118,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
         use std::collections::BTreeSet;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let budget = CaptureBudget {
             max_listings: 64,
             max_bytes: 256 * 1024 * 1024,
@@ -135,7 +135,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
         // One bounded capture round: the engine registries, then the closure
         // their declarations enumerate.
-        with_mutation_session(self.storage(), &layout, "project render", |session| {
+        with_mutation_session(self.exec.storage(), &layout, "project render", |session| {
             let spec = CaptureSpec::new(registries()?, budget)?;
             let Some(image) = capture_discovering(session, spec, |image, spec| {
                 let config = assemble_config(image)?;

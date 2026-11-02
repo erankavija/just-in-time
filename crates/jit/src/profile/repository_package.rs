@@ -928,14 +928,17 @@ mod tests {
             crate::storage::discover_repository_layout(temp.path(), temp.path().join(".jit"))
                 .unwrap();
         let reloaded = CommandExecutor::new(storage).with_layout(layout);
-        let invariants = reloaded.project_render(Some("invariants")).unwrap();
+        let invariants = reloaded.items().project_render(Some("invariants")).unwrap();
         let invariants = &invariants.items[0];
         assert_eq!(invariants.target, "AGENTS.md");
         assert_eq!(invariants.mode, crate::config::ProjectionMode::Region);
         assert_eq!(invariants.style, ProjectionStyle::IdAnchor);
         assert_eq!(invariants.kinds, ["invariant"]);
         assert_eq!(invariants.count, contributed.invariants.len());
-        let reference = reloaded.project_render(Some("rules-and-gates")).unwrap();
+        let reference = reloaded
+            .items()
+            .project_render(Some("rules-and-gates"))
+            .unwrap();
         let reference = &reference.items[0];
         assert_eq!(reference.target, ".jit/reference/rules-and-gates.md");
         assert_eq!(reference.mode, crate::config::ProjectionMode::SeparateFile);

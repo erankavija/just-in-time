@@ -835,7 +835,7 @@ pub(crate) fn text_after_checkbox(text: &str) -> &str {
 /// persisted (REQ-05). Every minted id carries its kind segment, so the string is
 /// unique per `(scope, kind, self-id)` — the address round-trips through
 /// [`parse_kind_segmented_address`] and resolves via
-/// [`show_item`](crate::commands::CommandExecutor::show_item). The
+/// [`show_item`](crate::commands::ItemOps::show_item). The
 /// `<short-id>/<self-id>` sugar remains an accepted INPUT form (expanded by
 /// [`expand_sugar_address`]) but is never minted.
 pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {

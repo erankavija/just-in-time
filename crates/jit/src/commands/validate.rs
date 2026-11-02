@@ -1287,7 +1287,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`ItemKind::link_namespaces`](crate::domain::item::ItemKind::link_namespaces),
     /// never a hardcoded list of names) AND its value is a qualified id
     /// `<scope>/<self-id>`. Each candidate is resolved through the SINGLE generic
-    /// resolver [`resolve_link_label`](crate::commands::CommandExecutor::resolve_link_label),
+    /// resolver [`resolve_link_label`](crate::commands::ItemOps::resolve_link_label),
     /// so resolution logic is not forked. A candidate that fails to resolve yields
     /// one [`GraphFinding`] attributed to the owning issue, naming the dangling
     /// qualified id. A link-namespace or coverage-credit-namespace label with a
@@ -1310,7 +1310,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Derive the link-namespace set generically from the configured kinds — no
         // kind-name literal, just the namespaces each kind declares.
-        let kinds = self.item_kinds()?;
+        let kinds = self.items().item_kinds()?;
         // An unloadable rule set is reported by the rules pass; it credits nothing.
         let credit_namespaces = self
             .effective_rules()
@@ -1352,7 +1352,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
                 // Resolve through the single generic resolver; an `Err` means the
                 // qualified id is dangling and is reported as a finding.
-                if self.resolve_link_label(label).is_err() {
+                if self.items().resolve_link_label(label).is_err() {
                     findings.push(GraphFinding::for_issue(
                         issue.id.clone(),
                         Finding {
@@ -1387,7 +1387,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// single issue) via
     /// [`compute_drift_findings`](crate::commands::CommandExecutor::compute_drift_findings),
     /// the SAME tolerant drift computation shared with
-    /// [`check_invariants`](crate::commands::CommandExecutor::check_invariants). The
+    /// [`check_invariants`](crate::commands::ItemOps::check_invariants). The
     /// sole direction is **declared-but-unenforced** — an invariant whose
     /// `enforced-by` names a missing/unloadable rule or gate — emitted at
     /// [`Severity::Error`](crate::declarations::rules::Severity::Error), so it FAILS
@@ -1431,7 +1431,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// This is the SINGLE drift computation shared by the built-in validate pass
     /// ([`enforcement_drift_findings`](Self::enforcement_drift_findings), which
     /// assigns per-direction severity) and the
-    /// [`check_invariants`](crate::commands::CommandExecutor::check_invariants)
+    /// [`check_invariants`](crate::commands::ItemOps::check_invariants)
     /// command (which serializes the raw findings), so both surfaces report
     /// IDENTICALLY. Returns an empty list when no invariants are declared (the
     /// pass is dormant — a repo without `.jit/invariants.toml` is unaffected).
@@ -3217,6 +3217,7 @@ priority = 100
         // components in distinct phrasing, proving the named-project value was
         // structurally routed to (project, kind, self-id) rather than mis-split.
         let err = exec
+            .items()
             .resolve_link_label("enforces:@acme/invariant/sample-invariant")
             .unwrap_err();
         let chain = format!("{err:#}");

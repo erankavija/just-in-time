@@ -110,6 +110,7 @@ fn test_default_repo_per_label_resolves_decision() {
 
     let label = format!("per:{short}/D-01");
     let resolved = exec
+        .items()
         .resolve_link_label(&label)
         .unwrap()
         .expect("a per:<issue>/D-01 label resolves to the addressed decision");
@@ -124,7 +125,7 @@ fn test_default_repo_per_label_resolves_decision() {
     // A registered `per:` namespace whose qualified id cannot be resolved is an
     // error, never a silent drop.
     let bad = format!("per:{short}/D-99");
-    assert!(exec.resolve_link_label(&bad).is_err());
+    assert!(exec.items().resolve_link_label(&bad).is_err());
 }
 
 #[test]
