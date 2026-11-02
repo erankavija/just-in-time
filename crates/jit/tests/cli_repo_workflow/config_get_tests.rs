@@ -6,7 +6,7 @@
 //! coordination settings) via a generic dotted-path walk
 //! over an assembled JSON snapshot, rather than a hand-maintained per-key
 //! match. See `crates/jit/src/commands/config.rs` (`resolve_dotted_key`,
-//! `CommandExecutor::get_config`) and `EffectiveConfig::full_snapshot` in
+//! `ConfigOps::get_config`) and `EffectiveConfig::full_snapshot` in
 //! `crates/jit/src/config.rs`.
 
 use jit::output::ErrorCode;
