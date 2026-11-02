@@ -89,6 +89,7 @@ pub use profile::{
     ProfileSelectorError, ProfileVariableOptions, SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
+pub use query::QueryOps;
 pub use template::TemplateApplyResult;
 pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
