@@ -1048,7 +1048,7 @@ mod tests {
         assert!(task
             .labels
             .contains(&format!("satisfies:{}/REQ-01", map["story"].short_id())));
-        let report = exec.run_rules(None).unwrap();
+        let report = exec.validation().run_rules(None).unwrap();
         assert!(
             !report.findings.iter().any(|f| f.rule == "story-coverage"),
             "{:?}",

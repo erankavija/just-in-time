@@ -2929,13 +2929,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap();
         executor.add_dependency(&a_id, &b_id).unwrap();
         assert!(
-            executor.validate_silent().is_ok(),
+            executor.validation().validate_silent().is_ok(),
             "validation should pass before deletion"
         );
 
         executor.issues().delete_issue(&b_id).unwrap();
 
-        let result = executor.validate_silent();
+        let result = executor.validation().validate_silent();
         assert!(
             result.is_ok(),
             "validate must report no dangling dependency after delete, got: {:?}",

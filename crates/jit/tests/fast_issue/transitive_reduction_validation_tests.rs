@@ -26,8 +26,11 @@ fn test_fix_transitive_reduction_logs_event() {
     let events_before = h.storage.read_events().unwrap().len();
 
     // Apply fix
-    let mut executor = h.executor;
-    let (fixes_applied, _) = executor.validate_with_fix(true, false).unwrap();
+    let executor = h.executor;
+    let (fixes_applied, _) = executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes_applied, 1);
 
     // Verify a DependencyReduced event was logged
@@ -73,7 +76,7 @@ fn test_detect_transitive_redundancy() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Validate should detect it
-    let result = h.executor.validate_silent();
+    let result = h.executor.validation().validate_silent();
     assert!(result.is_err(), "Should detect redundant dependency");
     let err_msg = result.unwrap_err().to_string();
     assert!(
@@ -101,8 +104,11 @@ fn test_fix_transitive_redundancy() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Fix with validate --fix
-    let mut executor = h.executor;
-    let (fixes_applied, _messages) = executor.validate_with_fix(true, false).unwrap();
+    let executor = h.executor;
+    let (fixes_applied, _messages) = executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert!(fixes_applied > 0, "Should apply at least one fix");
 
     // Verify C was removed from A's dependencies
@@ -139,12 +145,15 @@ fn test_validate_reports_all_redundancies() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Validate should detect both
-    let result = h.executor.validate_silent();
+    let result = h.executor.validation().validate_silent();
     assert!(result.is_err(), "Should detect redundant dependencies");
 
     // Fix and verify both removed
-    let mut executor = h.executor;
-    let (fixes_applied, _messages) = executor.validate_with_fix(true, false).unwrap();
+    let executor = h.executor;
+    let (fixes_applied, _messages) = executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes_applied, 2, "Should fix both redundancies");
 
     let fixed_a = h.storage.load_issue(&a).unwrap();
@@ -169,7 +178,7 @@ fn test_no_false_positives_diamond_pattern() {
     h.executor.add_dependency(&a, &c).unwrap();
 
     // Validation should pass - no redundancies
-    let result = h.executor.validate_silent();
+    let result = h.executor.validation().validate_silent();
     assert!(result.is_ok(), "Diamond pattern should be valid");
 }
 
@@ -186,7 +195,7 @@ fn test_no_false_positives_independent_deps() {
     h.executor.add_dependency(&a, &c).unwrap();
 
     // Validation should pass
-    let result = h.executor.validate_silent();
+    let result = h.executor.validation().validate_silent();
     assert!(result.is_ok(), "Independent dependencies should be valid");
 }
 
@@ -207,8 +216,8 @@ fn test_dry_run_does_not_modify() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Dry run
-    let mut executor = h.executor;
-    let (fixes_count, _messages) = executor.validate_with_fix(true, true).unwrap();
+    let executor = h.executor;
+    let (fixes_count, _messages) = executor.validation().validate_with_fix(true, true).unwrap();
     assert!(fixes_count > 0, "Should report fixes available");
 
     // Verify nothing was modified
@@ -240,8 +249,11 @@ fn test_complex_chain_reduction() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Fix
-    let mut executor = h.executor;
-    let _ = executor.validate_with_fix(true, false).unwrap();
+    let executor = h.executor;
+    let _ = executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
 
     // Verify
     let fixed_a = h.storage.load_issue(&a).unwrap();
@@ -279,8 +291,11 @@ fn test_multiple_issues_with_redundancies() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_d);
 
     // Fix both
-    let mut executor = h.executor;
-    let (fixes_applied, _messages) = executor.validate_with_fix(true, false).unwrap();
+    let executor = h.executor;
+    let (fixes_applied, _messages) = executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes_applied, 2, "Should fix both issues");
 
     // Verify both fixed
@@ -410,7 +425,7 @@ fn test_dep_add_reduce_drops_shadowed_edge() {
 
     // Graph is transitively reduced.
     assert!(
-        h.executor.validate_silent().is_ok(),
+        h.executor.validation().validate_silent().is_ok(),
         "graph must be transitively reduced after --reduce add"
     );
 }
@@ -449,7 +464,7 @@ fn test_dep_add_reduce_background_scenario_leaves_validate_clean() {
 
     // A later validate must be clean — no distant violation possible.
     assert!(
-        h.executor.validate_silent().is_ok(),
+        h.executor.validation().validate_silent().is_ok(),
         "validate must be clean after the reduce add"
     );
 }
@@ -470,5 +485,5 @@ fn test_dep_add_non_redundant_edge_still_added_and_validate_clean() {
 
     let loaded_a = h.storage.load_issue(&a).unwrap();
     assert!(loaded_a.dependencies.contains(&b));
-    assert!(h.executor.validate_silent().is_ok());
+    assert!(h.executor.validation().validate_silent().is_ok());
 }

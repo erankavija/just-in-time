@@ -2094,7 +2094,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         // (acknowledged intentional orphan).
                         if !force && !quiet {
                             let issues = storage.list_issues()?;
-                            let graph_findings = executor.evaluate_graph_rules(&issues)?;
+                            let graph_findings =
+                                executor.validation().evaluate_graph_rules(&issues)?;
                             for gf in graph_findings.iter().filter(|gf| {
                                 gf.issue_id.as_ref() == Some(&id)
                                     && !(orphan && gf.finding.rule == "orphan-leaf")
@@ -6059,7 +6060,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         }
         Commands::Status => {
             let output_ctx = OutputContext::new(quiet, json);
-            let summary = executor.get_status()?;
+            let summary = executor.validation().get_status()?;
 
             if json {
                 let msg = format!(
@@ -6158,7 +6159,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // error-severity finding, 0 when clean.
             if let Some(container) = scope.as_deref() {
                 let container = resolve_issue_arg(&storage, container)?;
-                let report = executor.validate_scope(&container)?;
+                let report = executor.validation().validate_scope(&container)?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -6195,7 +6196,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // positional issue as its sole firing subject. The command keeps the
             // same report and exit contract as per-issue validation.
             if let (Some(rule_name), Some(issue_id)) = (rule.as_deref(), id.as_ref()) {
-                let report = executor.validate_rule(issue_id, rule_name)?;
+                let report = executor.validation().validate_rule(issue_id, rule_name)?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -6235,7 +6236,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
             // --explain path: report matched selectors -> rule names -> outcomes.
             if let (true, Some(issue_id)) = (explain, id.as_ref()) {
-                let report = executor.explain_rules(issue_id)?;
+                let report = executor.validation().explain_rules(issue_id)?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -6301,7 +6302,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // (`--fix`/`--branch-drift`/`--leases` + id) were already rejected above,
             // so a present id here is always a pure per-issue rule run.
             if id.is_some() {
-                let report = executor.run_rules(id.as_ref())?;
+                let report = executor.validation().run_rules(id.as_ref())?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -6336,7 +6337,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let mut validation_results = Vec::new();
 
                 if branch_drift {
-                    match executor.validate_branch_drift() {
+                    match executor.validation().validate_branch_drift() {
                         Ok(()) => {
                             if !json {
                                 println!("Branch is up-to-date with origin/main");
@@ -6355,7 +6356,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
 
                 if leases {
-                    match executor.validate_leases() {
+                    match executor.validation().validate_leases() {
                         Ok(invalid_leases) => {
                             if invalid_leases.is_empty() {
                                 if !json {
@@ -6423,7 +6424,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // Standard repository validation (existing code)
             if fix {
                 // Use auto-fix mode
-                let (fixes_applied, messages) = match executor.validate_with_fix(true, dry_run) {
+                let (fixes_applied, messages) = match executor
+                    .validation()
+                    .validate_with_fix(true, dry_run)
+                {
                     Ok(result) => result,
                     Err(error) if json => {
                         let json_error = validate_fix_json_error(&error);
@@ -6471,8 +6475,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 // Wrap any integrity violation in the typed ValidationFailedError
                 // (message preserved verbatim) so the top-level handler classifies
                 // it as a validation failure by downcast rather than by message text.
-                let (validation_report, divergence_report) =
-                    executor.validate_repository_report_with_divergences()?;
+                let (validation_report, divergence_report) = executor
+                    .validation()
+                    .validate_repository_report_with_divergences()?;
                 let (integrity_error, rule_report) = match validation_report {
                     Ok(report) => (None, report.rule_report),
                     Err(failure) => {
@@ -7484,7 +7489,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 )?;
 
                 if !force {
-                    executor.validate_silent()?;
+                    executor.validation().validate_silent()?;
                 }
 
                 let (result, warnings) = executor.export_snapshot(

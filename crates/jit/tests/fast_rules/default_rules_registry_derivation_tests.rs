@@ -141,7 +141,7 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
         )
         .unwrap()
         .0;
-    let report = exec.run_rules(Some(&id)).unwrap();
+    let report = exec.validation().run_rules(Some(&id)).unwrap();
     assert!(
         !report.has_errors(),
         "`jit validate` must pass for a hand-declared namespace with no \

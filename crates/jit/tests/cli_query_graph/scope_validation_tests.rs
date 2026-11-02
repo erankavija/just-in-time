@@ -9,7 +9,7 @@
 //! EXCLUDED exactly as at transition time (R2 / CC-2a). The command fails with
 //! findings shown when an error-severity finding is produced.
 //!
-//! These are in-process tests over `CommandExecutor::validate_scope` (fast and
+//! These are in-process tests over `ValidationOps::validate_scope` (fast and
 //! deterministic); the failure presentation is covered by a subprocess test.
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
@@ -314,6 +314,7 @@ fn test_rule_validation_uses_selected_issue_and_repository_context() {
     );
 
     let selected_report = executor
+        .validation()
         .validate_rule(&selected, "selected-coverage")
         .expect("selected rule validation runs");
     assert!(
@@ -323,6 +324,7 @@ fn test_rule_validation_uses_selected_issue_and_repository_context() {
     );
 
     let historical_report = executor
+        .validation()
         .validate_rule(&historical, "selected-coverage")
         .expect("historical rule validation runs");
     assert!(historical_report.has_errors());
@@ -358,6 +360,7 @@ fn test_rule_validation_selection_errors_are_non_vacuous() {
             &selected
         };
         let report = executor
+            .validation()
             .validate_rule(target, rule)
             .expect("selection error is reported as a rule finding");
         assert!(report.has_errors(), "{rule} must not pass vacuously");
@@ -391,6 +394,7 @@ fn test_rule_validation_reports_selected_container_errors_precisely() {
         &[],
     );
     let missing_report = executor
+        .validation()
         .validate_rule(&missing, "selected-coverage")
         .expect("missing selected target is a validation finding");
     assert!(missing_report.has_errors());
@@ -424,6 +428,7 @@ fn test_rule_validation_reports_selected_container_errors_precisely() {
         &[],
     );
     let ambiguous_report = executor
+        .validation()
         .validate_rule(&ambiguous, "selected-coverage")
         .expect("ambiguous selected target is a validation finding");
     assert!(ambiguous_report.has_errors());
@@ -449,6 +454,7 @@ fn test_rule_validation_resolves_rejected_selected_container() {
     jit::test_harness::seed_memory_issue(executor.storage(), &rejected);
 
     let report = executor
+        .validation()
         .validate_rule(&selected, "selected-coverage")
         .expect("rejected selected target remains resolvable");
     assert!(
@@ -470,7 +476,10 @@ fn test_scope_fires_breakdown_rule_and_fails_on_uncovered_criterion() {
     );
     let (c, _b) = spine_with_breakdown_criteria(&executor, false);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c)
+        .expect("scope validation runs");
 
     assert!(
         report.has_errors(),
@@ -504,7 +513,10 @@ fn test_scope_passes_when_criterion_is_covered() {
     );
     let (c, _b) = spine_with_breakdown_criteria(&executor, true);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c)
+        .expect("scope validation runs");
 
     assert!(
         !report.has_errors(),
@@ -557,7 +569,10 @@ assert = { label-uniqueness = { namespace = "key", scope = "all" } }
         std::slice::from_ref(&t2),
     );
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c)
+        .expect("scope validation runs");
 
     assert!(
         !report.has_errors(),
@@ -618,7 +633,10 @@ assert = { label-coverage = { } }
         std::slice::from_ref(&impl_id),
     );
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c)
+        .expect("scope validation runs");
 
     assert!(
         !report.has_errors(),
@@ -714,7 +732,10 @@ assert = { label-coverage = { } }
         std::slice::from_ref(&impl_id),
     );
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c)
+        .expect("scope validation runs");
 
     assert!(
         report
@@ -817,7 +838,10 @@ fn test_scope_skips_unrelated_breakdown_whose_container_is_out_of_scope() {
         std::slice::from_ref(&task1),
     );
 
-    let report = executor.validate_scope(&c1).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c1)
+        .expect("scope validation runs");
 
     assert!(
         !report.has_errors(),
@@ -857,7 +881,10 @@ fn test_scope_dangling_brackets_pointer_still_fails_precisely() {
         std::slice::from_ref(&b1),
     );
 
-    let report = executor.validate_scope(&c1).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c1)
+        .expect("scope validation runs");
 
     assert!(
         report.has_errors(),
@@ -967,7 +994,10 @@ fn test_scope_reads_criteria_from_external_plan_uncovered_fails() {
     );
     let c = container_with_external_plan(&executor, false);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c)
+        .expect("scope validation runs");
 
     assert!(
         report.has_errors(),
@@ -995,7 +1025,10 @@ fn test_scope_reads_criteria_from_external_plan_covered_clean() {
     );
     let c = container_with_external_plan(&executor, true);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c)
+        .expect("scope validation runs");
 
     assert!(
         !report.has_errors(),
@@ -1035,6 +1068,7 @@ fn test_scope_missing_external_plan_before_planning_done_is_not_an_error() {
         State::Backlog,
     );
     let report = executor
+        .validation()
         .validate_scope(&c)
         .expect("a not-yet-authored plan must not surface as a hard error");
     assert!(
@@ -1073,7 +1107,7 @@ fn test_scope_missing_external_plan_after_planning_done_surfaces_error() {
         State::Done,
     );
 
-    let err = executor.validate_scope(&c).unwrap_err();
+    let err = executor.validation().validate_scope(&c).unwrap_err();
     let message = err.to_string();
     assert!(
         message.contains("plan document") && message.contains(c.short_id()),
@@ -1115,7 +1149,10 @@ fn test_scope_resolves_plan_from_relinked_nondefault_path() {
     // The (done) planning node's `plan` reference points at the archived path.
     wire_plan_bracket(&executor, &c, &archived, State::Done);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c)
+        .expect("scope validation runs");
     assert!(
         report.has_errors() && report.findings.iter().any(|f| f.message.contains("REQ-77")),
         "the criterion read from the re-linked archived plan must drive coverage: {:?}",
@@ -1161,7 +1198,10 @@ fn test_scope_relinked_nondefault_plan_covered_is_clean() {
     );
     wire_plan_bracket(&executor, &c, &archived, State::Done);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c)
+        .expect("scope validation runs");
     assert!(
         !report.has_errors(),
         "a covered criterion in the re-linked archived plan must leave the scope clean: {:?}",
@@ -1184,7 +1224,10 @@ fn test_inline_template_still_validates_from_body() {
     );
     let (c, _b) = spine_with_breakdown_criteria(&executor, false);
 
-    let report = executor.validate_scope(&c).expect("scope validation runs");
+    let report = executor
+        .validation()
+        .validate_scope(&c)
+        .expect("scope validation runs");
 
     assert!(
         report.has_errors() && report.findings.iter().any(|f| f.message.contains("REQ-01")),
@@ -1290,7 +1333,10 @@ mod file_backed_external_plan {
         declare_external_plan(&repo_root);
         let c = container_with_repo_root_plan(&repo_root, &executor, false);
 
-        let report = executor.validate_scope(&c).expect("scope validation runs");
+        let report = executor
+            .validation()
+            .validate_scope(&c)
+            .expect("scope validation runs");
 
         assert!(
             report.has_errors(),
@@ -1313,7 +1359,10 @@ mod file_backed_external_plan {
         declare_external_plan(&repo_root);
         let c = container_with_repo_root_plan(&repo_root, &executor, true);
 
-        let report = executor.validate_scope(&c).expect("scope validation runs");
+        let report = executor
+            .validation()
+            .validate_scope(&c)
+            .expect("scope validation runs");
 
         assert!(
             !report.has_errors(),

@@ -714,7 +714,7 @@ pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
         .is_file()
     {
         let executor = crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout);
-        report.derived_state_repaired = executor.repair_derived_state(false)?.0;
+        report.derived_state_repaired = executor.validation().repair_derived_state(false)?.0;
     }
 
     if paths.has_claims_coordination() {

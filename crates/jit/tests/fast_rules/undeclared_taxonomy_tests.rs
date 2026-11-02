@@ -171,6 +171,7 @@ fn test_scaffold_declaring_no_taxonomy_still_validates() {
     let (_temp, executor) = setup_test_repo_with_config(DECLARES_NOTHING).unwrap();
 
     let report = executor
+        .validation()
         .validate_repository_report()
         .unwrap()
         .expect("a repository declaring no taxonomy must validate");

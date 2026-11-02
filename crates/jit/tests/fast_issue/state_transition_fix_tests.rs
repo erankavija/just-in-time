@@ -9,7 +9,7 @@ use jit::test_harness::TestHarness;
 
 #[test]
 fn test_validate_fix_transitions_backlog_to_ready() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
 
     // Create a story in backlog with one task dependency
     let task = h.create_issue("Task");
@@ -30,7 +30,11 @@ fn test_validate_fix_transitions_backlog_to_ready() {
     assert_eq!(story_issue.state, State::Backlog);
 
     // Run validate --fix
-    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
+    let (fixes, _messages) = h
+        .executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes, 1, "Should fix one pending transition");
 
     // Story should now be ready
@@ -44,7 +48,7 @@ fn test_validate_fix_transitions_backlog_to_ready() {
 
 #[test]
 fn test_validate_fix_ignores_unmet_dependencies() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
 
     // Create a story with two task dependencies
     let task1 = h.create_issue("Task 1");
@@ -59,7 +63,11 @@ fn test_validate_fix_ignores_unmet_dependencies() {
     jit::test_harness::seed_memory_issue(&h.storage, &task1_issue);
 
     // Run validate --fix
-    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
+    let (fixes, _messages) = h
+        .executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes, 0, "Should not fix - dependencies unmet");
 
     // Story should still be in backlog
@@ -69,7 +77,7 @@ fn test_validate_fix_ignores_unmet_dependencies() {
 
 #[test]
 fn test_validate_fix_transitions_multiple_issues() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
 
     // Create multiple stories with dependencies
     let task1 = h.create_issue("Task 1");
@@ -90,7 +98,11 @@ fn test_validate_fix_transitions_multiple_issues() {
     jit::test_harness::seed_memory_issue(&h.storage, &task2_issue);
 
     // Run validate --fix
-    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
+    let (fixes, _messages) = h
+        .executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes, 2, "Should fix two pending transitions");
 
     // Both stories should be ready
@@ -103,7 +115,7 @@ fn test_validate_fix_transitions_multiple_issues() {
 
 #[test]
 fn test_validate_fix_dry_run_no_changes() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
 
     // Create a story with completed dependency
     let task = h.create_issue("Task");
@@ -115,7 +127,11 @@ fn test_validate_fix_dry_run_no_changes() {
     jit::test_harness::seed_memory_issue(&h.storage, &task_issue);
 
     // Run validate --fix with dry-run
-    let (fixes, _messages) = h.executor.validate_with_fix(true, true).unwrap();
+    let (fixes, _messages) = h
+        .executor
+        .validation()
+        .validate_with_fix(true, true)
+        .unwrap();
     assert_eq!(fixes, 1, "Should detect one pending transition");
 
     // Story should still be in backlog (dry run doesn't apply changes)
@@ -129,7 +145,7 @@ fn test_validate_fix_dry_run_no_changes() {
 
 #[test]
 fn test_validate_fix_ignores_ready_issues() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
 
     // Create issues already in ready state
     let issue1 = h.create_issue("Ready issue 1");
@@ -143,13 +159,17 @@ fn test_validate_fix_ignores_ready_issues() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue1_loaded);
 
     // Run validate --fix
-    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
+    let (fixes, _messages) = h
+        .executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes, 0, "Should not touch issues already in ready state");
 }
 
 #[test]
 fn test_validate_fix_ignores_done_issues() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
 
     // Create a done issue that had dependencies
     let task = h.create_issue("Task");
@@ -166,13 +186,17 @@ fn test_validate_fix_ignores_done_issues() {
     jit::test_harness::seed_memory_issue(&h.storage, &story_issue);
 
     // Run validate --fix
-    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
+    let (fixes, _messages) = h
+        .executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes, 0, "Should not touch done issues");
 }
 
 #[test]
 fn test_validate_fix_complex_dependency_chain() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
 
     // Create a chain: epic -> story1, story2 -> task1, task2, task3
     let task1 = h.create_issue("Task 1");
@@ -196,7 +220,11 @@ fn test_validate_fix_complex_dependency_chain() {
     }
 
     // Run validate --fix
-    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
+    let (fixes, _messages) = h
+        .executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes, 2, "Should transition story1 and story2 only");
 
     // Stories should be ready
@@ -220,7 +248,11 @@ fn test_validate_fix_complex_dependency_chain() {
     jit::test_harness::seed_memory_issue(&h.storage, &story2_loaded);
 
     // Run validate --fix again
-    let (more_fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
+    let (more_fixes, _messages) = h
+        .executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(more_fixes, 1, "Should now transition epic");
 
     // Epic should now be ready

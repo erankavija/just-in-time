@@ -1072,6 +1072,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // An `Ok` carries a verdict on the content.
         let judged: Result<(Vec<GateFinding>, bool)> = match checker {
             GateChecker::RepositoryValidation => self
+                .validation()
                 .validate_repository_report()
                 .and_then(gate_findings_from_report),
             GateChecker::IssueValidation => captured_issue_rule_report(repository_image, issue_id)
@@ -2912,7 +2913,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let late_rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
-        let cached = executor.run_rules(None).unwrap();
+        let cached = executor.validation().run_rules(None).unwrap();
         assert!(!cached
             .findings
             .iter()
@@ -2997,6 +2998,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap();
         change(repo.path(), &issue_id);
         let validate = executor
+            .validation()
             .validate_repository_report()
             .unwrap()
             .is_ok_and(|report| !report.rule_report.has_errors());
@@ -3132,7 +3134,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             vec!["type:task".to_string()],
         );
 
-        let findings = executor.review_placeholder_findings().unwrap();
+        let findings = executor.validation().review_placeholder_findings().unwrap();
 
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, crate::commands::REVIEW_PLACEHOLDER_RULE);
@@ -3340,6 +3342,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         seed_unrelated_manual_gate(&executor);
 
         let broad_report = executor
+            .validation()
             .run_rules(None)
             .expect("the representative unrelated failures should be observable");
         for rule in [

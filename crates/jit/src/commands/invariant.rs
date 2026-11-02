@@ -37,9 +37,9 @@ impl<S: IssueStore> ItemOps<'_, S> {
     /// declared rules/gates, returning every drift finding.
     ///
     /// Delegates to
-    /// [`compute_drift_findings`](crate::commands::CommandExecutor::compute_drift_findings),
+    /// [`compute_drift_findings`](crate::commands::ValidationOps::compute_drift_findings),
     /// the SAME tolerant drift computation the built-in `jit validate` pass
-    /// ([`enforcement_drift_findings`](crate::commands::CommandExecutor::enforcement_drift_findings))
+    /// ([`enforcement_drift_findings`](crate::commands::ValidationOps::enforcement_drift_findings))
     /// reports — the sole declared-but-unenforced direction — and exits non-zero
     /// on ANY drift. A `.jit/rules.toml` (or gate registry) load failure is
     /// tolerated, NOT propagated as an `Err`: it is resolved defensively to
@@ -53,7 +53,7 @@ impl<S: IssueStore> ItemOps<'_, S> {
         // case (REQ-01 "missing OR unloadable"): a malformed `.jit/rules.toml`
         // referenced by an `enforced-by` binding yields a declared-but-unenforced
         // finding here too, not a raw parse error.
-        let findings: Vec<DriftFinding> = self.exec.compute_drift_findings()?;
+        let findings: Vec<DriftFinding> = self.exec.validation().compute_drift_findings()?;
         Ok(InvariantCheckResult::new(findings))
     }
 }

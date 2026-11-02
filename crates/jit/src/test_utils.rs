@@ -941,7 +941,11 @@ mod file_setup_tests {
     fn test_setup_test_repo_with_config_yields_an_initialised_repository() {
         let (_temp, executor) = setup_test_repo_with_config(CALLER_CONFIG).unwrap();
 
-        executor.validate_repository_report().unwrap().unwrap();
+        executor
+            .validation()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap();
     }
 
     #[test]
