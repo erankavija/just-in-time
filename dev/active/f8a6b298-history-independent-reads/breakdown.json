@@ -64,6 +64,7 @@
       "code-review"
     ],
     "depends_on": [
+      "gate-latest-run-reads",
       "mutation-event-tail-captures"
     ],
     "planning": {
@@ -1172,7 +1173,8 @@
             "crates/jit/src/validation/record_fidelity.rs",
             "crates/jit/src/storage/repository_state_store_tests.rs",
             "dev/architecture/repository-state-materialization.md",
-            "docs/reference/storage-format.md"
+            "docs/reference/storage-format.md",
+            "docs/reference/events.md"
           ]
         }
       }
@@ -1181,7 +1183,7 @@
   {
     "key": "validation-skips-event-log",
     "title": "Validation captures read only the event log's end",
-    "description": "Make every validation capture request the event log through the end-of-log probe, delete the records pass's parse of the log, and give whole-repository record fidelity its own named whole-log read, so `jit validate` and the `repository_validation` checker are the only validation readers of the log's records.\n\n## Background\n\nRepository validation parses the whole event log only to count its records (`event_count`, `RepositoryValidationReport`, `load_records` in `crates/jit/src/validation/repository.rs`); nothing outside the module reads the count.\n\nThe non-mutation validation base captures the log whole (`commands/validate.rs`: the `mutation` flag chooses `discover_tail` or `discover_paths`), `discover_issue_closure` requests it whole for broad built-in prechecks, and the base's overlay filter special-cases the log. A test pins the whole read for validation.\n\nWhole-repository validation needs the whole log: `record_drift` (`validation/record_fidelity.rs`) reads `image.file_bytes(&VirtualPath::EVENTS)`, which errors with `TailOnlyCapture` on a tail, and reports lines that do not reproduce and event ids on more than one line, a risk `merge=union` keeps producing. `capture_record_fidelity_validation` (`commands/validate.rs`) is already a separate capture, reached from whole-repository `jit validate` and the `repository_validation` checker (`commands/gate_check.rs`). `docs/reference/worktree-validate.md` documents that read.\n\n`event_log_drift` returns empty when the log does not parse, and its module comment assigns that finding to the records pass, so once the records pass stops parsing, an unparseable log would be reported by nothing.\n\n`RepositoryMutationSession` (`storage/repository_state_store.rs`) declares `capture`, `extend` and `apply`, implemented for the file backend (`JsonMutationSession`) and the memory backend (`MemoryMutationSession`).\n\n## Success Criteria\n\n- [hard] REQ-01: `RepositoryValidationReport.event_count` and the event-log parse in the records pass no longer exist, and a test shows that the records pass succeeds over an image whose event log is unparseable.\n- [hard] REQ-02: Every validation capture requests the event log through `discover_tail`, `discover_issue_closure` requests no whole log, and a unit test pins the read mode.\n- [hard] REQ-03: `RepositoryMutationSession::read_history_log` returns the log's bytes through a no-follow read on both backends. It is outside `CaptureSpec` and adds nothing to any image. `capture_record_fidelity_validation` is its only production caller, and `record_drift` takes those bytes instead of reading the image's log entry.\n- [hard] REQ-04: Whole-repository `jit validate` reports an unparseable log as one finding naming the line, keeps reporting lines that do not reproduce and duplicate event ids, and the module comment of `record_fidelity.rs` states this. A test shows the unparseable-log finding.\n",
+    "description": "Make every validation capture request the event log through the end-of-log probe, delete the records pass's parse of the log, and give whole-repository record fidelity its own named whole-log read, so `jit validate` and the `repository_validation` checker are the only validation readers of the log's records.\n\n## Background\n\nRepository validation parses the whole event log only to count its records (`event_count`, `RepositoryValidationReport`, `load_records` in `crates/jit/src/validation/repository.rs`); nothing outside the module reads the count.\n\n`capture_proposed_base_inner` (`commands/validate.rs`) captures the log whole for every purpose but a mutation: its `mutation` flag chooses `discover_tail` or `discover_paths`. `discover_issue_closure` requests it whole for broad built-in prechecks. A test pins the whole read for validation. `BaseCapturePurpose::Archive` is different: `captured_archive_events` parses the log from that image through `file_bytes`, which errors with `TailOnlyCapture` on a tail, so the archive base stays whole until archive execute reads evidence records.\n\nWhole-repository validation needs the whole log: `record_drift` (`validation/record_fidelity.rs`) reads `image.file_bytes(&VirtualPath::EVENTS)`, which errors with `TailOnlyCapture` on a tail, and reports lines that do not reproduce and event ids on more than one line, a risk `merge=union` keeps producing. `capture_record_fidelity_validation` (`commands/validate.rs`) is already a separate capture, reached from whole-repository `jit validate` and the `repository_validation` checker (`commands/gate_check.rs`). `docs/reference/worktree-validate.md` documents that read.\n\n`event_log_drift` returns empty when the log does not parse, and its module comment assigns that finding to the records pass, so once the records pass stops parsing, an unparseable log would be reported by nothing.\n\n`RepositoryMutationSession` (`storage/repository_state_store.rs`) declares `capture`, `extend` and `apply`, implemented for the file backend (`JsonMutationSession`) and the memory backend (`MemoryMutationSession`).\n\n## Success Criteria\n\n- [hard] REQ-01: `RepositoryValidationReport.event_count` and the event-log parse in the records pass no longer exist, and a test shows that the records pass succeeds over an image whose event log is unparseable.\n- [hard] REQ-02: Every capture purpose except `BaseCapturePurpose::Archive` requests the event log through `discover_tail`, `discover_issue_closure` requests no whole log, a unit test pins the read mode, and archive execute still succeeds over its whole-log base.\n- [hard] REQ-03: `RepositoryMutationSession::read_history_log` returns the log's bytes through a no-follow read on both backends. It is outside `CaptureSpec` and adds nothing to any image. `capture_record_fidelity_validation` is its only production caller, and `record_drift` takes those bytes instead of reading the image's log entry.\n- [hard] REQ-04: Whole-repository `jit validate` reports an unparseable log as one finding naming the line, keeps reporting lines that do not reproduce and duplicate event ids, and the module comment of `record_fidelity.rs` states this. A test shows the unparseable-log finding.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1233,7 +1235,7 @@
   {
     "key": "mutation-event-tail-captures",
     "title": "Mutations capture the event log's end, not the whole log",
-    "description": "Make every event-appending mutation capture the event log as its bounded end, so no mutation reads the log's records.\n\n## Background\n\nThe append base of an event-appending mutation is the log's length and final line (`CaptureSpec::discover_tail`, `crates/jit/src/repository_state/image.rs`). Several captures still request `VirtualPath::EVENTS` whole, reading the full log on every run:\n\n- `publish_captured_issue_mutation` (`commands/mod.rs`), shared by issue lifecycle and field mutations;\n- document add, remove and asset rescan (`commands/document.rs`);\n- gate evaluation (`capture_gate_evaluation_image`, `commands/gate_check.rs`);\n- gate preset apply and gate registry mutations (`commands/gate.rs`);\n- template apply (`commands/template.rs`);\n- profile apply and refresh (`commands/profile.rs`);\n- init and re-initialization over an existing data root (`commands/init.rs`, `repository_state/initialize.rs`, read again by `events_action`, which errors on a tail).\n\nProfile and re-init capture through `capture_proposed_base`, whose base requests the log tail once validation captures do, and their `validate_repository` calls read no event log.\n\n## Success Criteria\n\n- [hard] REQ-01: Each listed capture requests the event log through `discover_tail`, and re-initialization decides whether the log exists from the tail entry.\n- [hard] REQ-02: A test shows that a mutation from each listed command family succeeds when every line of the event log except the final one is unparseable.\n",
+    "description": "Make every event-appending mutation capture the event log as its bounded end, so no mutation reads the log's records.\n\n## Background\n\nThe append base of an event-appending mutation is the log's length and final line (`CaptureSpec::discover_tail`, `crates/jit/src/repository_state/image.rs`). Several captures still request `VirtualPath::EVENTS` whole, reading the full log on every run:\n\n- `publish_captured_issue_mutation` (`commands/mod.rs`), shared by issue lifecycle and field mutations;\n- document add, remove and asset rescan (`commands/document.rs`);\n- gate evaluation (`capture_gate_evaluation_image`, `commands/gate_check.rs`);\n- gate preset apply and gate registry mutations (`commands/gate.rs`);\n- template apply (`commands/template.rs`);\n- profile apply and refresh (`commands/profile.rs`);\n- init and re-initialization over an existing data root (`commands/init.rs`, `repository_state/initialize.rs`, read again by `events_action`, which errors on a tail).\n\nProfile and init reach `capture_proposed_base` with the log among their extra paths (`scaffold.delta_paths()` in `commands/init.rs`, `events_path` in `commands/profile.rs`), and a whole request wins over the base's tail in `discover_tail`, so those extra paths must change too. Their `validate_repository` calls read no event log.\n\nA profile's composition reads only the log's final line (`captured_log_end`), so the torn-tail marker does not hold this back.\n\n## Success Criteria\n\n- [hard] REQ-01: Each listed capture requests the event log through `discover_tail`, and re-initialization decides whether the log exists from the tail entry.\n- [hard] REQ-02: A test shows that a mutation from each listed command family succeeds when every line of the event log except the final one is unparseable.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1251,7 +1253,6 @@
       "code-review"
     ],
     "depends_on": [
-      "torn-tail-marker-removal",
       "validation-skips-event-log"
     ],
     "planning": {
@@ -1355,7 +1356,7 @@
     ],
     "depends_on": [
       "archive-execution-record-type",
-      "gate-run-per-issue-layout"
+      "gate-latest-run-reads"
     ],
     "planning": {
       "outcome": "Each archive execution writes its target's evidence record in the same redo record.",
@@ -1390,7 +1391,7 @@
   {
     "key": "archive-execute-reads-evidence",
     "title": "Archive execute reads the per-target evidence record",
-    "description": "Make archive execute read prior executions from the target's evidence record, once, instead of parsing the event log twice.\n\n## Background\n\nExecute captures the whole event log (`capture_archive_base`, `crates/jit/src/commands/validate.rs`) and parses it twice from the image: in the planner (`commands/archive.rs`) and in the finalizer (`finalize_archive_execution`, `repository_state/archive.rs`), both through `captured_archive_events` (`pub(crate)`, re-exported from `repository_state/mod.rs`), which fails as `ArchiveExecutionError::EventLog`. Each target's executions are in `archive-evidence/<target-key>.json`, which execute captures.\n\nKept as one change for a build reason: the planner and the finalizer are the only callers of `captured_archive_events`, and unused crate-private code fails the zero-warning build, so the function, its re-export and the error variant it alone produces go with them.\n\n## Success Criteria\n\n- [hard] REQ-01: Execute reads the target's evidence record once from its image, the finalizer receives it from the planner, and the archive base captures the event log as a tail.\n- [hard] REQ-02: `captured_archive_events`, its re-export and `ArchiveExecutionError::EventLog` no longer exist.\n- [hard] REQ-03: A test shows that execute of a re-archived target succeeds with an unparseable event log and produces the same coverage and residue identities as before.\n",
+    "description": "Make archive execute read prior executions from the target's evidence record, once, instead of parsing the event log twice.\n\n## Background\n\nExecute captures the whole event log (`capture_archive_base`, `crates/jit/src/commands/validate.rs`) and parses it twice from the image: in the planner (`commands/archive.rs`) and in the finalizer (`finalize_archive_execution`, `repository_state/archive.rs`), both through `captured_archive_events` (`pub(crate)`, re-exported from `repository_state/mod.rs`), which fails as `ArchiveExecutionError::EventLog`. Each target's executions are in `archive-evidence/<target-key>.json`, which execute captures.\n\nKept as one change for a build reason: the planner and the finalizer are the only callers of `captured_archive_events`, and unused crate-private code fails the zero-warning build, so the function, its re-export and the error variant it alone produces go with them.\n\n## Success Criteria\n\n- [hard] REQ-01: Execute reads the target's evidence record once from its image, the finalizer receives it from the planner, and `BaseCapturePurpose::Archive` captures the event log as a tail, so `capture_proposed_base_inner` has no whole-log arm and `capture_archive_base`'s doc comment says so.\n- [hard] REQ-02: `captured_archive_events`, its re-export and `ArchiveExecutionError::EventLog` no longer exist.\n- [hard] REQ-03: A test shows that execute of a re-archived target succeeds with an unparseable event log and produces the same coverage and residue identities as before.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1496,7 +1497,7 @@
   {
     "key": "capture-refuses-whole-event-log",
     "title": "Captures refuse a whole read of the event log",
-    "description": "Make every test image capture the event log through the end-of-log probe, make the capture layer refuse a whole read of the log, and delete the code that handles one.\n\n## Background\n\n`CaptureSpec::discover_paths` (`crates/jit/src/repository_state/image.rs`), and `CaptureSpec::new` through it, accept `VirtualPath::EVENTS` as a whole path; only `discover_tail` reads its bounded end. Production captures already use `discover_tail`, and whole-repository record fidelity reads the log through `RepositoryMutationSession::read_history_log`, outside `CaptureSpec`.\n\nTest images still request it whole: the `image_with` helpers in `repository_state/mutation.rs` and `repository_state/archive.rs`; `repository_state/overlay.rs`; `repository_state/mod.rs`; the `image` helper in `repository_state/materialize.rs`; `commands/document.rs`; `captured_issue_spec` and `captured_gate_issue_spec` in `commands/mod.rs`; `commands/gate.rs`; and `storage/repository_state_store_tests.rs`. One test there requests the log as a tail and then whole, and asserts that `extend` upgrades the entry to its bytes; it must move to another path, since it owns upgrade behaviour rather than anything about the log.\n\nThe refusal leaves these arms dead: the whole arm of `captured_log_end` (`repository_state/mutation.rs`), its counterpart in `storage/repository_state_store.rs`, `repository_state/overlay.rs`, the `EVENTS` entry in `repository_state/materialize.rs` with its filter in `commands/validate.rs`, and the \"already requested whole\" branch of `discover_tail`.\n\n## Success Criteria\n\n- [hard] REQ-01: Every listed test image and test spec captures the event log through `discover_tail`. Their assertions are unchanged, except the tail-to-whole upgrade test, which proves the same upgrade on another path.\n- [hard] REQ-02: `CaptureSpec::new` and `discover_paths` return a capture error for `VirtualPath::EVENTS`, and one unit test owns the refusal. `read_history_log` is untouched.\n- [hard] REQ-03: The listed whole-log arms no longer exist: a captured event-log entry is always a tail, and code that reads its length or final line handles only that form.\n",
+    "description": "Make every test image capture the event log through the end-of-log probe, make the capture layer refuse a whole read of the log, and delete the code that handles one.\n\n## Background\n\n`CaptureSpec::discover_paths` (`crates/jit/src/repository_state/image.rs`), and `CaptureSpec::new` through it, accept `VirtualPath::EVENTS` as a whole path; only `discover_tail` reads its bounded end. By the time this lands, production captures use `discover_tail`, and whole-repository record fidelity reads the log through `RepositoryMutationSession::read_history_log`, outside `CaptureSpec`.\n\nTest images still request it whole: the `image_with` helpers in `repository_state/mutation.rs` and `repository_state/archive.rs`; `repository_state/overlay.rs`; `repository_state/mod.rs`; the `image` helper in `repository_state/materialize.rs`; `commands/document.rs`; `captured_issue_spec` and `captured_gate_issue_spec` in `commands/mod.rs`; `commands/gate.rs`; and `storage/repository_state_store_tests.rs`. One test there requests the log as a tail and then whole, and asserts that `extend` upgrades the entry to its bytes; it must move to another path, since it owns upgrade behaviour rather than anything about the log.\n\nThe refusal leaves these arms dead: the whole arm of `captured_log_end` (`repository_state/mutation.rs`), its counterpart in `storage/repository_state_store.rs`, `repository_state/overlay.rs`, the `EVENTS` entry in `validate_capture_closure` (`repository_state/materialize.rs`) with the filter that drops it in `commands/validate.rs`, and the \"already requested whole\" branch of `discover_tail`.\n\n## Success Criteria\n\n- [hard] REQ-01: Every listed test image and test spec captures the event log through `discover_tail`. Their assertions are unchanged, except the tail-to-whole upgrade test, which proves the same upgrade on another path.\n- [hard] REQ-02: `CaptureSpec::new` and `discover_paths` return a capture error for `VirtualPath::EVENTS`, and one unit test owns the refusal. `read_history_log` is untouched.\n- [hard] REQ-03: The listed whole-log arms no longer exist: a captured event-log entry is always a tail, and code that reads its length or final line handles only that form.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1514,7 +1515,8 @@
     ],
     "depends_on": [
       "archive-preview-reads-evidence",
-      "claim-acquire-event-from-assignee"
+      "claim-acquire-event-from-assignee",
+      "mutation-event-tail-captures"
     ],
     "planning": {
       "outcome": "The capture layer admits only the end-of-log probe on the event log, and no code handles a whole-log entry.",
@@ -1644,7 +1646,7 @@
   {
     "key": "storage-records-per-key-reference",
     "title": "The storage-record reference describes verdict and archive-evidence records",
-    "description": "Add the verdict record and the archive-evidence record to the generated storage-record reference, so the reference describes every per-key record a reader addresses.\n\n## Background\n\n`docs/reference/storage-records.md` is generated from `crates/jit/src/storage/reference.rs` by `scripts/generate-storage-records-reference.sh` and checked by a golden test. It describes issue records, gate-run records and event records. It does not describe `gate-runs/verdicts/<gate-key>/<inputs-digest>.json`, which names the run holding a reusable verdict, or `archive-evidence/<target-key>.json`, which holds one archive target's executions. Both are written in the same redo record as the run or execution they describe.\n\n## Success Criteria\n\n- [hard] REQ-01: The reference source documents both records: their paths, their fields, which mutation writes them and which reader addresses them, with field rows derived from their types.\n- [hard] REQ-02: `docs/reference/storage-records.md` is regenerated from the source and its golden test passes.\n",
+    "description": "Add the verdict record and the archive-evidence record to the generated storage-record reference, so the reference describes every per-key record a reader addresses.\n\n## Background\n\n`docs/reference/storage-records.md` is generated from `crates/jit/src/storage/reference.rs` by `scripts/generate-storage-records-reference.sh` and checked by a golden test. It describes issue records, gate-run records and event records. It does not describe `gate-runs/verdicts/<gate-key>/<inputs-digest>.json`, which names the run holding a reusable verdict, or `archive-evidence/<target-key>.json`, which holds one archive target's executions. Both are written in the same redo record as the run or execution they describe. Other changes also regenerate this page; rebase by regenerating it.\n\n## Success Criteria\n\n- [hard] REQ-01: The reference source documents both records: their paths, their fields, which mutation writes them and which reader addresses them, with field rows derived from their types.\n- [hard] REQ-02: `docs/reference/storage-records.md` is regenerated from the source and its golden test passes.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1664,7 +1666,8 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "archive-evidence-writes"
+      "archive-evidence-writes",
+      "gate-verdict-record-writes"
     ],
     "planning": {
       "outcome": "The generated storage-record reference covers verdict and archive-evidence records.",
@@ -1713,7 +1716,8 @@
     ],
     "depends_on": [
       "lease-issue-addressed-ops",
-      "capture-refuses-whole-event-log"
+      "capture-refuses-whole-event-log",
+      "gate-run-per-issue-layout"
     ],
     "planning": {
       "outcome": "A CLI integration module proves ordinary commands succeed over unparseable history files.",
@@ -1763,6 +1767,7 @@
     "depends_on": [
       "lease-issue-addressed-ops",
       "capture-refuses-whole-event-log",
+      "gate-run-per-issue-layout",
       "search-excludes-history",
       "storage-records-per-key-reference"
     ],
@@ -1904,8 +1909,8 @@
     }
   },
   {
-    "key": "format-cutover",
-    "title": "Five repositories move to repository format 4 in one window",
+    "key": "format-rewrite-tooling",
+    "title": "A rewrite script and window driver move a repository to format 4",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1920,16 +1925,17 @@
       "satisfies:f8a6b298/REQ-10"
     ],
     "gates": [
-      "code-review",
-      "repo-validate"
+      "code-review"
     ],
-    "description": "Build, prove and hand over the one rewrite that moves this repository, gf2, mealie-fi, inflected-messages and research from repository format 3 to format 4, so the installed binary can leave the last format 3 build.\n\n## Background\n\nMain's binary is at format 4 and refuses format 3 (`SUPPORTED_INDEX_SCHEMA_VERSION`, `crates/jit/src/repository_state/index.rs`; `docs/reference/storage-format.md`). The installed `jit` is the last format 3 build, and all five repositories are at format 3. There is no migration reader; moving a repository is an explicit rewrite made alongside installing the matching binary. `dev/archive/3d9a0ce3-lead-friction/active/format3-window.sh` and `format3-rewrite.py` are the precedent.\n\nFormat 4 differs from format 3 on disk as follows:\n\n- gate runs live at `gate-runs/<issue-id>/<run-id>.json`, each gate state with runs names its latest in `run_id`, a reused verdict carries `source_issue`, and `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` names the latest qualifying run;\n- leases are `<common-dir>/jit/leases/<issue-id>.json` with no `stale` field, with `claims.seq` beside them, and no `claims.index.json`;\n- `archive-evidence/<target-key>.json` holds each archived target's executions in log order;\n- profile-lifecycle lines carry no `isolated_torn_tail`.\n\nWhat differs per repository is derived at run time, because the counts move. As read on 2026-11-03: this repository has 6,306 runs and 83 archive events; gf2 has 5,971 runs, 36 archive events, 13 marker lines and 2 active leases; the other three have 414, 644 and 449 runs and none of the rest. In gf2, mealie-fi, inflected-messages and research thousands of gate states have runs and no `run_id`. Runs with no `origin` count as executed. A run's stored bytes must still pass `gate_run_drift` (`validation/record_fidelity.rs`): `origin` round-trips, and a record with the current key set stays canonical. gf2 and research gitignore `.jit/gate-runs`; the other three track it. gf2 has uncommitted paths both inside and outside `.jit/`.\n\n`WorktreePaths::shared_jit` is `<common-dir>/jit` in primary and linked checkouts, so linked checkouts share one lease directory, which is machine-local and never committed. A linked checkout's tracked `.jit` arrives by merging main.\n\n## Who does what\n\nThe worker builds the tooling and dry-runs it on copies, and never writes to another repository. The lead runs the window, because each write to another repository needs its own user confirmation when it runs, and live sessions must coordinate the binary reinstall.\n\n## Success Criteria\n\n- [hard] REQ-01: `format4-rewrite.py <checkout>` rewrites one checkout's data root and its `<common-dir>/jit`, and commits nothing: `schema_version` to 4 in the canonical bytes; each run record moved to the per-issue path with `source_issue` added to reused verdicts and other bytes unchanged; `run_id` set on every gate state with runs and none, from the run with the greatest `(started_at, run_id)` of that gate; one verdict record per `(gate, digest)` naming the latest qualifying run; one evidence record per archived target; `isolated_torn_tail` removed from each profile-lifecycle line with every other line byte-identical; each unexpired lease written as a lease record, including a stale one; `claims.seq` seeded from the greater of the log's highest sequence and the index's `last_seq`; and `claims.index.json` and an empty `heartbeat/` removed, with `claims.jsonl` byte-identical.\n- [hard] REQ-02: The script is idempotent, a second run changes no byte, and a run over a tree merged from an older branch converts only what the branch added.\n- [hard] REQ-03: The script refuses and changes nothing on a condition it cannot convert: a run with no resolvable source of a reused verdict, a stored `run_id` that disagrees with the greatest run, a run record whose path and fields disagree, or a marker line carrying `true`. Before finishing it verifies that the run count is unchanged, that every run is reachable from its issue's directory, and that every record count matches what it derived.\n- [hard] REQ-04: `format4-window.sh` follows the precedent: it stops at the first failure and names what committed, refuses when a repository has uncommitted `.jit` paths or moved past its quiet check, copies the old binaries for rollback, installs `jit` and `jit-server` from a commit whose `cargo-ci` passed, then rewrites, validates and commits repository by repository, staging only tracked `.jit` paths. Each repository other than this one is a separate invocation, so each gets its own user confirmation.\n- [hard] REQ-05: The worker runs the script on copies of all five repositories' `.jit` and `<common-dir>/jit` in scratch git repositories, then a second time for idempotence, then runs `jit validate`, `jit gate status` on an issue with runs, `jit claim list` and an archive preview of a seeded target with the binary built from main. Each passes, and the counts are recorded in the completion note. No file in another repository changes.\n- [hard] REQ-06: The lead runs the window with no tracker writer in any of the five repositories, after coordinating the reinstall with live sessions and with a user confirmation for each write to another repository. Afterward all five repositories' `index.json` read 4, `jit validate` passes in each, and every run id cited in `dev/`, `docs/` or an issue record in this repository still resolves.\n\n## Notes\n\n- A linked checkout on an older branch stays refused until it merges main and re-runs the script. Live sessions finish or merge before the window.\n- Copying a repository's tracker for the dry run reads that repository and writes only under the scratch directory.\n- No command gains rewrite behaviour; the script is a one-off outside the product, and history stays append-only for every command.\n",
+    "description": "Build and prove the one rewrite that moves a repository from format 3 to format 4, with the driver the lead runs, so the window has tested tooling. This task writes nothing outside its own worktree.\n\n## Background\n\nMain's binary is at format 4 and refuses format 3 (`SUPPORTED_INDEX_SCHEMA_VERSION`, `crates/jit/src/repository_state/index.rs`; `docs/reference/storage-format.md`). There is no migration reader; moving a repository is an explicit rewrite made alongside installing the matching binary. `dev/archive/3d9a0ce3-lead-friction/active/format3-window.sh` and `format3-rewrite.py` are the precedent.\n\nFormat 4 differs from format 3 on disk as follows:\n\n- gate runs live at `gate-runs/<issue-id>/<run-id>.json`, each gate state with runs names its latest in `run_id`, a reused verdict carries `source_issue`, and `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` names the latest qualifying run;\n- leases are `<common-dir>/jit/leases/<issue-id>.json` with no `stale` field, with `claims.seq` beside them, and no `claims.index.json`;\n- `archive-evidence/<target-key>.json` holds each archived target's executions in log order;\n- profile-lifecycle lines carry no `isolated_torn_tail`.\n\nThe tooling must handle what differs per repository, derived at run time because the counts move. As read on 2026-11-03: this repository has 6,306 runs and 83 archive events; gf2 has 5,971 runs, 36 archive events, 13 marker lines and 2 active leases; mealie-fi, inflected-messages and research have 414, 644 and 449 runs and none of the rest. In gf2, mealie-fi, inflected-messages and research thousands of gate states have runs and no `run_id`. Runs with no `origin` count as executed. A run's stored bytes must still pass `gate_run_drift` (`validation/record_fidelity.rs`): `origin` round-trips, and a record with the current key set stays canonical. gf2 and research gitignore `.jit/gate-runs`; the other three track it.\n\n`WorktreePaths::shared_jit` is `<common-dir>/jit` in primary and linked checkouts, so linked checkouts share one lease directory, which is machine-local and never committed.\n\n## Success Criteria\n\n- [hard] REQ-01: `format4-rewrite.py <checkout>` rewrites one checkout's data root and its `<common-dir>/jit`, and commits nothing: `schema_version` to 4 in the canonical bytes; each run record moved to the per-issue path with `source_issue` added to reused verdicts and other bytes unchanged; `run_id` set on each gate state with runs and none, from the run with the greatest `(started_at, run_id)` of that gate; one verdict record per `(gate, digest)` naming the latest qualifying run; one evidence record per archived target; `isolated_torn_tail` removed from each profile-lifecycle line with other lines byte-identical; each unexpired lease written as a lease record, including a stale one; `claims.seq` seeded from the greater of the log's highest sequence and the index's `last_seq`; and `claims.index.json` and an empty `heartbeat/` removed, with `claims.jsonl` byte-identical.\n- [hard] REQ-02: The script is idempotent, a second run changes no byte, and a run over a tree merged from an older branch converts only what the branch added.\n- [hard] REQ-03: The script refuses and changes nothing on a condition it cannot convert: a reused verdict with no resolvable source, a stored `run_id` that disagrees with the greatest run, a run record whose path and fields disagree, or a marker line carrying `true`. Before finishing it verifies that the run count is unchanged, that each run is reachable from its issue's directory, and that each record count matches what it derived.\n- [hard] REQ-04: `format4-window.sh` follows the precedent for one repository per invocation: it stops at the first failure and names what committed, refuses when the repository has uncommitted `.jit` paths or moved past its quiet check, and rewrites, validates and commits, staging only tracked `.jit` paths. A separate mode copies the old binaries for rollback and installs `jit` and `jit-server` from a commit whose `cargo-ci` passed. This task does not run either against a real repository.\n- [hard] REQ-05: The worker copies the five repositories' `.jit` and `<common-dir>/jit` into scratch git repositories under this worktree's `target/`, runs the script on each, runs it again for idempotence, then runs `jit validate`, `jit gate status` on an issue with runs, `jit claim list` and an archive preview of a seeded target with the binary built from main. Each passes, and the counts are recorded in the completion note.\n- [hard] REQ-06: No file outside this worktree changes.\n\n## Notes\n\n- Copying a repository's tracker for the dry run only reads that repository.\n- No command gains rewrite behaviour; the script is a one-off outside the product, and history stays append-only for every command.\n",
     "depends_on": [
+      "gate-run-per-issue-layout",
       "lease-index-machinery-removal",
-      "archive-preview-reads-evidence"
+      "archive-preview-reads-evidence",
+      "torn-tail-marker-removal"
     ],
     "planning": {
-      "outcome": "This repository, gf2, mealie-fi, inflected-messages and research hold format 4 data, and the installed binary reads it.",
+      "outcome": "An idempotent format 4 rewrite script and a window driver pass on copies of the five repositories.",
       "contract_refs": [
         "format-4-window",
         "gate-run-record-layout",
@@ -1952,21 +1958,74 @@
         "DEC-22"
       ],
       "terminal": {
-        "consumer_family": "repository format data",
+        "consumer_family": "format 4 rewrite tooling",
         "test_boundary": "repository validation on copies",
-        "worker_sized_reason": "One idempotent rewrite script and one window driver following the format 3 precedent, proven on copies.",
+        "worker_sized_reason": "One idempotent script and one driver following the format 3 precedent, proven on copies.",
         "footprint": {
           "creates": [
             "dev/active/f8a6b298-history-independent-reads/format4-rewrite.py",
-            "dev/active/f8a6b298-history-independent-reads/format4-window.sh",
-            ".jit/archive-evidence"
+            "dev/active/f8a6b298-history-independent-reads/format4-window.sh"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "format-cutover",
+    "title": "Five repositories move to repository format 4 in one window",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:history-independent-reads",
+      "milestone:v1.0",
+      "story:history-boundary",
+      "component:storage",
+      "enforces:@/invariant/canonical-cutover",
+      "satisfies:f8a6b298/REQ-01",
+      "satisfies:f8a6b298/REQ-05",
+      "satisfies:f8a6b298/REQ-09",
+      "satisfies:f8a6b298/REQ-10"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "description": "Run the one window that moves this repository, gf2, mealie-fi, inflected-messages and research to format 4, so the installed binary can leave the last format 3 build. The lead runs this, not a worker.\n\n## Background\n\nThe installed `jit` is the last format 3 build, and all five repositories are at format 3. `dev/active/f8a6b298-history-independent-reads/format4-rewrite.py` and `format4-window.sh` are tested on copies of all five. The rewrite takes no jit write lock and relies on quiet.\n\ngf2 has uncommitted paths inside and outside `.jit/`; its work outside `.jit/` stays untouched, and its `.jit` paths are committed by their owner before the window. A linked checkout's tracked `.jit` arrives by merging main, and leases in linked checkouts are covered by their repository's one rewrite.\n\n## Who does what\n\nThe lead runs every step. Each write to another repository needs its own user confirmation when it runs, and live sessions must coordinate the binary reinstall first.\n\n## Success Criteria\n\n- [hard] REQ-01: With no tracker writer in any of the five repositories and the reinstall coordinated with live sessions, the old binaries are copied for rollback and `jit` and `jit-server` are installed from a commit whose `cargo-ci` passed.\n- [hard] REQ-02: Each repository is rewritten, validated and committed by its own invocation of the driver, and each write to a repository other than this one has its own user confirmation.\n- [hard] REQ-03: Afterward all five repositories' `index.json` read 4, `jit validate` passes in each, and each run id cited in `dev/`, `docs/` or an issue record in this repository still resolves.\n\n## Notes\n\n- A linked checkout on an older branch stays refused until it merges main and re-runs the script. Live sessions finish or merge before the window.\n- A stop part-way leaves committed repositories at format 4, which the rollback binary refuses; the driver's message names them.\n",
+    "depends_on": [
+      "format-rewrite-tooling"
+    ],
+    "planning": {
+      "outcome": "This repository, gf2, mealie-fi, inflected-messages and research hold format 4 data, and the installed binary reads it.",
+      "contract_refs": [
+        "format-4-window",
+        "gate-run-record-layout"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "REQ-05",
+        "REQ-09",
+        "REQ-10",
+        "DEC-08",
+        "DEC-14",
+        "DEC-17",
+        "DEC-22"
+      ],
+      "terminal": {
+        "consumer_family": "repository format data",
+        "test_boundary": "repository validation in each repository",
+        "worker_sized_reason": "One lead-run window over tested tooling, one repository at a time.",
+        "footprint": {
+          "creates": [
+            ".jit/archive-evidence",
+            ".git/jit/leases/",
+            ".git/jit/claims.seq"
           ],
           "touches": [
             ".jit/index.json",
             ".jit/gate-runs",
             ".jit/issues",
             ".jit/events.jsonl",
-            ".git/jit"
+            ".git/jit/claims.index.json"
           ]
         }
       }
