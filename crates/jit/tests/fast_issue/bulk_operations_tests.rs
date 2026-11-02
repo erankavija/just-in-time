@@ -36,6 +36,7 @@ fn test_add_multiple_gates_at_once() {
     let issue_id = h.create_issue("Test Issue");
 
     h.executor
+        .gates()
         .add_gates(
             &issue_id,
             &[
@@ -75,12 +76,14 @@ fn test_add_gates_some_already_exist() {
 
     // Add one gate first
     h.executor
+        .gates()
         .add_gate(&issue_id, &"tests".parse().unwrap())
         .unwrap();
 
     // Try to add tests again plus new ones
     let (result, _warnings) = h
         .executor
+        .gates()
         .add_gates(
             &issue_id,
             &["tests".parse().unwrap(), "clippy".parse().unwrap()],
@@ -108,7 +111,7 @@ fn test_add_gates_atomic_failure_invalid_gate() {
     let issue_id = h.create_issue("Test Issue");
 
     // Try to add gates, one doesn't exist
-    let result = h.executor.add_gates(
+    let result = h.executor.gates().add_gates(
         &issue_id,
         &["tests".parse().unwrap(), "nonexistent".parse().unwrap()],
     );
@@ -140,6 +143,7 @@ fn test_add_single_gate_still_works() {
 
     // Single gate via new bulk API
     h.executor
+        .gates()
         .add_gates(&issue_id, &["tests".parse().unwrap()])
         .unwrap();
 
@@ -177,6 +181,7 @@ fn test_remove_multiple_gates() {
 
     // Add multiple gates
     h.executor
+        .gates()
         .add_gates(
             &issue_id,
             &[
@@ -189,6 +194,7 @@ fn test_remove_multiple_gates() {
 
     // Remove two
     h.executor
+        .gates()
         .remove_gates(
             &issue_id,
             &["tests".parse().unwrap(), "clippy".parse().unwrap()],
@@ -221,11 +227,13 @@ fn test_remove_gates_some_not_present() {
     let issue_id = h.create_issue("Test Issue");
 
     h.executor
+        .gates()
         .add_gates(&issue_id, &["tests".parse().unwrap()])
         .unwrap();
 
     let (result, _warnings) = h
         .executor
+        .gates()
         .remove_gates(
             &issue_id,
             &["tests".parse().unwrap(), "clippy".parse().unwrap()],
@@ -377,7 +385,7 @@ fn test_add_gates_empty_list_error() {
     let h = TestHarness::new();
     let issue_id = h.create_issue("Test Issue");
 
-    let result = h.executor.add_gates(&issue_id, &[]);
+    let result = h.executor.gates().add_gates(&issue_id, &[]);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("at least one"));
 }

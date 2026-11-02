@@ -378,7 +378,10 @@ fn test_gated_diversion_runs_before_graph_enforcement() {
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
     // Register the gate so it is a valid reference, leaving it unpassed.
-    executor.add_gate(&epic, &"tests".parse().unwrap()).unwrap();
+    executor
+        .gates()
+        .add_gate(&epic, &"tests".parse().unwrap())
+        .unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -440,7 +443,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
-    executor.add_gate(&epic, &"tests".parse().unwrap()).unwrap();
+    executor
+        .gates()
+        .add_gate(&epic, &"tests".parse().unwrap())
+        .unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -499,7 +505,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
-    executor.add_gate(&epic, &"tests".parse().unwrap()).unwrap();
+    executor
+        .gates()
+        .add_gate(&epic, &"tests".parse().unwrap())
+        .unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -557,7 +566,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     issue.gates_required = vec!["tests".parse().unwrap()];
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
-    executor.add_gate(&epic, &"tests".parse().unwrap()).unwrap();
+    executor
+        .gates()
+        .add_gate(&epic, &"tests".parse().unwrap())
+        .unwrap();
 
     let result = executor.issues().update_issue(
         &epic,
@@ -632,7 +644,7 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
     let epic = issue.id.clone();
     jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
-    let result = executor.pass_gate(
+    let result = executor.gates().pass_gate(
         &epic,
         &"tests".parse().unwrap(),
         Some("ci:test".to_string()),

@@ -2067,8 +2067,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         let issue = storage.load_issue(&id)?;
                         let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
                         let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
-                        let gate_runs =
-                            executor.list_gate_runs(&issue.id, None).with_context(|| {
+                        let gate_runs = executor
+                            .gates()
+                            .list_gate_runs(&issue.id, None)
+                            .with_context(|| {
                                 format!("Failed to load gate runs for issue {}", issue.id)
                             })?;
                         let response = jit::output::IssueShowResponse::from_issue(
@@ -3290,7 +3292,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     prompt_file,
                 });
 
-                match executor.define_gate(
+                match executor.gates().define_gate(
                     &key,
                     title.clone(),
                     description.clone(),
@@ -3436,7 +3438,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     ));
                 }
 
-                match executor.update_gate(&key, update) {
+                match executor.gates().update_gate(&key, update) {
                     Ok((gate, warnings)) => {
                         for warning in warnings {
                             output_ctx.print_warning(&warning)?;
@@ -3471,7 +3473,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             GateCommands::List => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.list_gates() {
+                match executor.gates().list_gates() {
                     Ok(gates) => {
                         if json {
                             use jit::output::{GateDefinition, GateListResponse, JsonOutput};
@@ -3507,7 +3509,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             GateCommands::Show { key } => {
                 let key = parse_gate_key(key, json)?;
-                match executor.show_gate_definition(&key) {
+                match executor.gates().show_gate_definition(&key) {
                     Ok(gate) => {
                         if json {
                             use jit::output::JsonOutput;
@@ -3580,7 +3582,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let key = parse_gate_key(key, json)?;
 
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.remove_gate_definition(&key) {
+                match executor.gates().remove_gate_definition(&key) {
                     Ok(warnings) => {
                         for warning in warnings {
                             output_ctx.print_warning(&warning)?;
@@ -3724,6 +3726,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let id = resolve_issue_arg(&storage, &id)
                         .or_else(|e| report_gate_check_error(e, json))?;
                     let runs = executor
+                        .gates()
                         .list_gate_runs(&id, gate_filter.as_ref())
                         .or_else(|e| report_gate_check_error(e, json))?;
                     // list_gate_runs already returns newest-first; apply the
@@ -3831,6 +3834,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         Ok(full_id) => full_id,
                         Err(e) => {
                             let id_is_gate = executor
+                                .gates()
                                 .list_gates()
                                 .map(|gates| gates.iter().any(|g| g.key.as_str() == id))
                                 .unwrap_or(false);
@@ -4015,7 +4019,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                 let output_ctx = OutputContext::new(quiet, json);
                 match resolve_issue_arg(&storage, &id)
-                    .and_then(|full_id| executor.add_gates(&full_id, &gate_keys))
+                    .and_then(|full_id| executor.gates().add_gates(&full_id, &gate_keys))
                 {
                     Ok((result, warnings)) => {
                         // Print warnings first
@@ -4090,7 +4094,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate evaluate", json)?;
                 let output_ctx = OutputContext::new(quiet, json);
                 match resolve_issue_arg(&storage, &id)
-                    .and_then(|full_id| executor.pass_gate(&full_id, &gate_key, by, force))
+                    .and_then(|full_id| executor.gates().pass_gate(&full_id, &gate_key, by, force))
                 {
                     Ok(outcome) => {
                         // Print warnings first
@@ -4126,7 +4130,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             GateCommands::EvaluateAll { id, by, force } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match resolve_issue_arg(&storage, &id)
-                    .and_then(|full_id| executor.pass_all_gates(&full_id, by, force))
+                    .and_then(|full_id| executor.gates().pass_all_gates(&full_id, by, force))
                 {
                     Ok(outcome) => {
                         // Surface every gate's warnings first.
@@ -4207,6 +4211,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     .filter_map(|(_, id)| id.as_ref().ok().cloned())
                     .collect();
                 let mut evaluated = executor
+                    .gates()
                     .pass_gate_many(&full_ids, &gate_key, by, force)
                     .results
                     .into_iter();
@@ -4313,7 +4318,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                 let output_ctx = OutputContext::new(quiet, json);
                 match resolve_issue_arg(&storage, &id)
-                    .and_then(|full_id| executor.fail_gate(&full_id, &gate_key, by))
+                    .and_then(|full_id| executor.gates().fail_gate(&full_id, &gate_key, by))
                 {
                     Ok(warnings) => {
                         // Print warnings first
@@ -4352,7 +4357,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             GateCommands::Preset(preset_cmd) => match preset_cmd {
                 jit::cli::PresetCommands::List => {
                     use jit::output::{GatePresetListResponse, JsonOutput};
-                    match executor.list_gate_presets() {
+                    match executor.gates().list_gate_presets() {
                         Ok(presets) => {
                             if json {
                                 let msg = format!("{} preset(s)", presets.len());
@@ -4392,7 +4397,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 jit::cli::PresetCommands::Show { name } => {
                     use jit::output::JsonOutput;
-                    match executor.show_gate_preset(&name) {
+                    match executor.gates().show_gate_preset(&name) {
                         Ok(preset) => {
                             if json {
                                 let msg = format!("Preset {}: {}", preset.name, preset.description);
@@ -4479,7 +4484,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     for id in &ids {
                         match resolve_issue_arg(&storage, id).and_then(|full_id| {
-                            executor.apply_gate_preset(
+                            executor.gates().apply_gate_preset(
                                 &full_id,
                                 &name,
                                 timeout,
@@ -4568,9 +4573,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 jit::cli::PresetCommands::Create { from_issue, name } => {
                     use jit::output::JsonOutput;
-                    match resolve_issue_arg(&storage, &from_issue)
-                        .and_then(|from_issue| executor.create_gate_preset(&name, &from_issue))
-                    {
+                    match resolve_issue_arg(&storage, &from_issue).and_then(|from_issue| {
+                        executor.gates().create_gate_preset(&name, &from_issue)
+                    }) {
                         Ok(path) => {
                             if json {
                                 let msg = format!("Created preset '{}'", name);

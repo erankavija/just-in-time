@@ -1018,6 +1018,7 @@ mod tests {
         );
         let key: GateKey = "attested".parse().unwrap();
         executor
+            .gates()
             .define_gate(
                 &key,
                 "Attested".to_string(),
@@ -1029,8 +1030,9 @@ mod tests {
             )
             .unwrap();
         let issue = executor.storage().list_issues().unwrap().remove(0);
-        executor.add_gate(&issue.id, &key).unwrap();
+        executor.gates().add_gate(&issue.id, &key).unwrap();
         executor
+            .gates()
             .pass_gate(&issue.id, &key, Some("human:test".to_string()), false)
             .unwrap();
         std::fs::read_dir(data_path(executor, &VirtualPath::GATE_RUNS))

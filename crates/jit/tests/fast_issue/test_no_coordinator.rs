@@ -107,6 +107,7 @@ fn test_gates_work_without_coordinator() {
 
     // Pass the gate
     h.executor
+        .gates()
         .pass_gate(
             &id,
             &"test-gate".parse().unwrap(),
