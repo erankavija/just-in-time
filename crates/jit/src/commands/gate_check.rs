@@ -1212,7 +1212,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .gates_status
             .get(gate_key)
             .and_then(|state| state.run_id.as_ref())
-            .map(|run_id| self.storage.load_gate_run_result(run_id))
+            .map(|run_id| self.storage.load_gate_run_result(&issue.id, run_id))
             .transpose()
     }
 
@@ -3760,9 +3760,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(run.origin, crate::domain::GateVerdictOrigin::Attested);
         assert!(run.started_at >= before && run.started_at <= Utc::now());
         assert_eq!(
-            executor.get_gate_run_result(&run.run_id).unwrap(),
+            executor
+                .get_gate_run_result(&issue_id, &run.run_id)
+                .unwrap(),
             run,
-            "the attestation is addressable by its run id"
+            "the attestation is addressable by its issue and run id"
         );
     }
 

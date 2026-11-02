@@ -1211,7 +1211,11 @@ impl IssueStore for JsonFileStorage {
         Ok(events)
     }
 
-    fn load_gate_run_result(&self, run_id: &GateRunId) -> Result<crate::domain::GateRunResult> {
+    fn load_gate_run_result(
+        &self,
+        issue_id: &IssueId,
+        run_id: &GateRunId,
+    ) -> Result<crate::domain::GateRunResult> {
         let result_path = self.resolve_virtual_path(&VirtualPath::gate_run_record(run_id))?;
         let data = match super::repository_state_store::open_absolute_dir_nofollow(&self.root) {
             Ok(data) => data,
@@ -1285,13 +1289,17 @@ impl IssueStore for JsonFileStorage {
                 result_path.display()
             )
         })?;
-        let result = serde_json::from_slice(&contents).with_context(|| {
-            format!(
-                "Failed to deserialize gate run result at {}",
-                result_path.display()
-            )
-        })?;
+        let result: crate::domain::GateRunResult =
+            serde_json::from_slice(&contents).with_context(|| {
+                format!(
+                    "Failed to deserialize gate run result at {}",
+                    result_path.display()
+                )
+            })?;
 
+        if &result.issue_id != issue_id {
+            return Err(GateRunNotFoundError::new(run_id.clone()).into());
+        }
         Ok(result)
     }
 
@@ -1700,7 +1708,9 @@ mod tests {
         fs::write(&target, "{}").unwrap();
         std::os::unix::fs::symlink(target, record).unwrap();
 
-        let error = storage.load_gate_run_result(&run_id).unwrap_err();
+        let error = storage
+            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+            .unwrap_err();
         assert!(format!("{error:#}").contains("ordinary file"));
     }
 
@@ -1729,7 +1739,9 @@ mod tests {
         .unwrap();
         let storage = JsonFileStorage::new(data);
 
-        let error = storage.load_gate_run_result(&run_id).unwrap_err();
+        let error = storage
+            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+            .unwrap_err();
         assert!(format!("{error:#}").contains("ordinary directory"));
     }
 
@@ -1752,7 +1764,9 @@ mod tests {
         .unwrap();
         let storage = JsonFileStorage::new(data);
 
-        let error = storage.load_gate_run_result(&run_id).unwrap_err();
+        let error = storage
+            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+            .unwrap_err();
         assert!(format!("{error:#}").contains("ordinary directory"));
         assert!(storage
             .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))

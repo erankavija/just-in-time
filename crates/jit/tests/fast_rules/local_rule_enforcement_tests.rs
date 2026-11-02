@@ -972,9 +972,10 @@ impl IssueStore for FailingMutationStorage {
 
     fn load_gate_run_result(
         &self,
+        issue_id: &jit::domain::identity::IssueId,
         run_id: &jit::domain::identity::GateRunId,
     ) -> anyhow::Result<jit::domain::GateRunResult> {
-        self.inner.load_gate_run_result(run_id)
+        self.inner.load_gate_run_result(issue_id, run_id)
     }
 
     fn list_gate_runs_for_issue(

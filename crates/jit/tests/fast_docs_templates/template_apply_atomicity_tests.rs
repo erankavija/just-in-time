@@ -166,9 +166,10 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     }
     fn load_gate_run_result(
         &self,
+        issue_id: &jit::domain::identity::IssueId,
         run_id: &jit::domain::identity::GateRunId,
     ) -> Result<jit::domain::GateRunResult> {
-        self.inner.load_gate_run_result(run_id)
+        self.inner.load_gate_run_result(issue_id, run_id)
     }
     fn list_gate_runs_for_issue(
         &self,
