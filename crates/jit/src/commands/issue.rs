@@ -410,7 +410,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     ///
     /// let epic = new("Epic");
     /// let child = new("Child");
-    /// executor.add_dependency(&epic, &child).unwrap();
+    /// executor.graph().add_dependency(&epic, &child).unwrap();
     ///
     /// let response = executor.issues().issue_children(&epic).unwrap();
     /// assert_eq!(response.extras.container.title, "Epic");
@@ -466,8 +466,8 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// let epic = new("Epic");
     /// let done = new("Done child");
     /// let todo = new("Todo child");
-    /// executor.add_dependency(&epic, &done).unwrap();
-    /// executor.add_dependency(&epic, &todo).unwrap();
+    /// executor.graph().add_dependency(&epic, &done).unwrap();
+    /// executor.graph().add_dependency(&epic, &todo).unwrap();
     /// executor
     ///     .issues().update_issue(&done, None, None, None, Some(State::Done),
     ///         vec![], vec![], None, None, false)
@@ -2646,7 +2646,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let b_id = create("B");
 
         let events_before = executor.storage.read_events().unwrap().len();
-        executor.add_dependency(&a_id, &b_id).unwrap();
+        executor.graph().add_dependency(&a_id, &b_id).unwrap();
 
         // Adding a dependency edits `A`; the change must be event-logged.
         let logged = executor
@@ -2699,11 +2699,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         };
         let a_id = create("A");
         let b_id = create("B");
-        executor.add_dependency(&a_id, &b_id).unwrap();
+        executor.graph().add_dependency(&a_id, &b_id).unwrap();
 
         // Snapshot AFTER the add so we isolate the removal's event.
         let events_before = executor.storage.read_events().unwrap().len();
-        executor.remove_dependency(&a_id, &b_id).unwrap();
+        executor.graph().remove_dependency(&a_id, &b_id).unwrap();
 
         // Removing a dependency edits `A`; the change must be event-logged.
         let logged = executor
@@ -2746,10 +2746,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let b = crate::test_utils::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, b);
-        executor.add_dependency(&a_id, &b_id).unwrap();
+        executor.graph().add_dependency(&a_id, &b_id).unwrap();
 
         let events_before = executor.storage.read_events().unwrap().len();
         executor
+            .graph()
             .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
             .unwrap();
 
@@ -2798,8 +2799,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let updated_before = executor.storage.load_issue(&a_id).unwrap().updated_at;
         let events_before = executor.storage.read_events().unwrap().len();
 
-        executor.remove_dependency(&a_id, &b_id).unwrap();
+        executor.graph().remove_dependency(&a_id, &b_id).unwrap();
         executor
+            .graph()
             .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
             .unwrap();
 
@@ -2838,7 +2840,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let b = crate::test_utils::fixture_issue("B".to_string(), "Test".to_string());
         let b_id = b.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, b);
-        executor.add_dependency(&a_id, &b_id).unwrap();
+        executor.graph().add_dependency(&a_id, &b_id).unwrap();
         assert!(executor.storage.load_issue(&a_id).unwrap().dependencies == vec![b_id.clone()]);
 
         let events_before = executor.storage.read_events().unwrap().len();
@@ -2927,7 +2929,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 false,
             )
             .unwrap();
-        executor.add_dependency(&a_id, &b_id).unwrap();
+        executor.graph().add_dependency(&a_id, &b_id).unwrap();
         assert!(
             executor.validate_silent().is_ok(),
             "validation should pass before deletion"
@@ -2973,6 +2975,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
 
         let result = executor
+            .graph()
             .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
             .unwrap();
 

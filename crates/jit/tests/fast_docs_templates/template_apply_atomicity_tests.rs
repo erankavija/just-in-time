@@ -448,7 +448,10 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
             false,
         )
         .unwrap();
-    executor.add_dependency(&container, &upstream).unwrap();
+    executor
+        .graph()
+        .add_dependency(&container, &upstream)
+        .unwrap();
     (executor, container, upstream)
 }
 

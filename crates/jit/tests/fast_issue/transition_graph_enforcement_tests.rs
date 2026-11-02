@@ -315,7 +315,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     // A design issue the transitioning epic depends on.
     let design = seed_issue(&executor, "Design", &["type:design"], State::Done);
     let epic = seed_issue(&executor, "Epic", &["type:epic"], State::InProgress);
-    executor.add_dependency(&epic, &design).unwrap();
+    executor.graph().add_dependency(&epic, &design).unwrap();
 
     // An unrelated epic with no design dependency (violates the rule). It is not
     // connected to `epic` in the dependency graph.

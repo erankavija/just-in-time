@@ -21,8 +21,8 @@ pub enum GraphExportFormat {
     Json,
     /// `batch-create` input schema: a JSON array of issue definitions, the
     /// structural inverse of `jit issue batch-create`. Handled on a separate
-    /// path ([`export_graph_batch`](CommandExecutor::export_graph_batch)); the
-    /// graph-rendering [`export_graph`](CommandExecutor::export_graph) never
+    /// path ([`export_graph_batch`](GraphOps::export_graph_batch)); the
+    /// graph-rendering [`export_graph`](GraphOps::export_graph) never
     /// receives it.
     Batch,
 }
@@ -59,7 +59,19 @@ fn keep_generic_label(label: &str, stripped_ns: &HashSet<String>) -> bool {
     namespace != crate::labels::TYPE_NAMESPACE && !stripped_ns.contains(namespace)
 }
 
+/// Graph and dependency operations of a [`CommandExecutor`].
+pub struct GraphOps<'a, S: IssueStore> {
+    pub(super) exec: &'a CommandExecutor<S>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The graph family.
+    pub fn graph(&self) -> GraphOps<'_, S> {
+        GraphOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> GraphOps<'_, S> {
     /// Publish rendered graph bytes to an explicitly selected filesystem path.
     ///
     /// Repository-contained destinations use one captured recoverable delta;
@@ -79,7 +91,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             RepositoryExportIntent,
         };
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         match classify_repository_export(&layout, invocation_dir, requested)? {
             RepositoryExportDestination::External(path) => {
                 crate::storage::external_publish::write_external_export_atomic(&path, bytes)
@@ -91,7 +103,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     max_bytes: super::CAPTURE_MAX_BYTES,
                     max_depth: 128,
                 };
-                self.publish_repository_export(&layout, &intent, budget)
+                self.exec
+                    .publish_repository_export(&layout, &intent, budget)
             }
         }
     }
@@ -112,7 +125,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::graph::Expansion;
 
         let full_id = issue_id.clone();
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
@@ -167,7 +180,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         depth: u32,
     ) -> Result<Vec<Issue>> {
         let full_id = issue_id.clone();
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
@@ -179,7 +192,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn show_roots(&self) -> Result<Vec<Issue>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
@@ -212,14 +225,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         full: bool,
         scope: Option<&IssueId>,
     ) -> Result<String> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
         // Resolve the hierarchy once when it is needed — for scoping and/or the
         // full JSON node shape. Resolution is always repository-wide.
         let needs_full_json = matches!((format, full), (GraphExportFormat::Json, true));
         let resolution = if scope.is_some() || needs_full_json {
-            let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
+            let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
             Some(crate::graph::hierarchy::resolve_hierarchy(
                 &issue_refs,
                 &config,
@@ -269,7 +282,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Export the graph in the `batch-create` input schema — the structural
-    /// inverse of [`batch_create_from_json`](Self::batch_create_from_json).
+    /// inverse of [`batch_create_from_json`](CommandExecutor::batch_create_from_json).
     ///
     /// `scope = Some(container)` captures that container's containment subtree;
     /// `scope = None` captures the whole graph. Each in-scope, non-bracket node
@@ -295,14 +308,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The returned [`BatchExport::defs`] serializes to exactly the JSON array
     /// `batch-create` consumes.
     pub fn export_graph_batch(&self, scope: Option<&IssueId>) -> Result<BatchExport> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
         // Membership scope (the whole graph when unscoped).
         let member_ids: Option<HashSet<&IssueId>> = match &scope {
             Some(container) => {
                 let container_id = *container;
-                let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
+                let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
                 let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
                 Some(
                     resolution
@@ -396,12 +409,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut namespaces: HashSet<String> = HashSet::new();
 
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
         for (_type_name, namespace) in hierarchy.membership_namespaces() {
             namespaces.insert(namespace.clone());
         }
 
-        for rule in &self.effective_rules()?.rules {
+        for rule in &self.exec.effective_rules()?.rules {
             if let Assertion::LabelCoverage { config } = &rule.assert {
                 namespaces.extend(
                     [
@@ -427,7 +440,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`breakdown_type`]: crate::templates::GraphTemplate::breakdown_type
     /// [`RoleBindings`]: crate::templates::RoleBindings
     fn bracket_node_types(&self) -> Result<HashSet<String>> {
-        let registry = &self.cached_config()?.templates;
+        let registry = &self.exec.cached_config()?.templates;
         Ok(registry
             .templates
             .iter()
@@ -476,9 +489,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// let epic = new("Epic", vec![format!("type:{}", taxonomy.type_at_level(2))]);
     /// let task = new("Task", vec![format!("type:{}", taxonomy.type_at_level(4))]);
-    /// executor.add_dependency(&epic, &task).unwrap();
+    /// executor.graph().add_dependency(&epic, &task).unwrap();
     ///
-    /// let response = executor.resolve_hierarchy_tree(None).unwrap();
+    /// let response = executor.graph().resolve_hierarchy_tree(None).unwrap();
     /// assert_eq!(response.items.len(), 2);
     /// let epic_view = response.items.iter().find(|n| n.id == epic).unwrap();
     /// assert_eq!(epic_view.hierarchy.children, vec![task.clone()]);
@@ -490,9 +503,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::output::GraphTreeResponse> {
         use crate::output::{GraphTreeResponse, HierarchyNodeView};
 
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
         let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
 
         // When scoped to a root, keep the root plus its transitive dependency
@@ -567,16 +580,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///         vec![format!("type:{leaf_type}"), membership.clone()], None, None, false)
     ///     .unwrap();
     ///
-    /// let report = executor.detect_divergences().unwrap();
+    /// let report = executor.graph().detect_divergences().unwrap();
     /// assert_eq!(report.items.len(), 1);
     /// assert_eq!(report.items[0].label, membership);
     /// ```
     pub fn detect_divergences(&self) -> Result<crate::output::DivergenceResponse> {
         use crate::output::{DivergenceResponse, DivergenceView};
 
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
         let divergences =
             crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &config);
 
@@ -642,6 +655,7 @@ mod tests {
         let executor = crate::test_utils::file_executor(repo.path()).unwrap();
 
         let error = executor
+            .graph()
             .resolve_hierarchy_tree(None)
             .expect_err("invalid hierarchy must fail graph resolution");
 

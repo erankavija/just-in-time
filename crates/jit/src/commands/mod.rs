@@ -79,7 +79,7 @@ pub use gate::{
     ManualGateAttestationRequiredError, PassAllOutcome,
 };
 pub use gate_check::VerdictSource;
-pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
+pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat, GraphOps};
 pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueLocalUpdate, IssueOps};

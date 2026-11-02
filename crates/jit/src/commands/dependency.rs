@@ -57,7 +57,7 @@ struct DerivedDependencyMutation {
 
 /// Result of adding multiple dependencies.
 ///
-/// All-or-nothing (jit:c8518f2a): [`add_dependencies_with_policy`](CommandExecutor::add_dependencies_with_policy)
+/// All-or-nothing (jit:c8518f2a): [`add_dependencies_with_policy`](GraphOps::add_dependencies_with_policy)
 /// returns this only when every requested edge validated. A batch with any
 /// rejected edge instead returns `Err(`[`DependencyBatchRejectedError`]`)` and
 /// leaves the dependency set — and the event log — completely unchanged, so
@@ -80,7 +80,7 @@ pub struct DependenciesRemoveResult {
     pub warnings: Vec<String>,
 }
 
-impl<S: IssueStore> CommandExecutor<S> {
+impl<S: IssueStore> GraphOps<'_, S> {
     /// Add a dependency to an issue, dropping any now-redundant edge(s).
     ///
     /// Convenience wrapper over
@@ -124,11 +124,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Single {
-            issue_id: issue_id.clone(),
-            dependency_id: dep_id.clone(),
-            policy,
-        })? {
+        match self.exec.publish_captured_dependency_mutation(
+            CapturedDependencyMutation::Single {
+                issue_id: issue_id.clone(),
+                dependency_id: dep_id.clone(),
+                policy,
+            },
+        )? {
             CapturedDependencyOutcome::Single { result, warning } => {
                 Ok((result, warning.into_iter().collect()))
             }
@@ -143,7 +145,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        match self.publish_captured_dependency_mutation(
+        match self.exec.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveSingle {
                 issue_id: issue_id.clone(),
                 dependency_id: dep_id.clone(),
@@ -203,19 +205,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
-        let warnings = self.refuse_foreign_lease(issue_id)?;
-        match self.publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
-            issue_id: issue_id.clone(),
-            dependency_ids: dep_ids.to_vec(),
-            policy,
-        })? {
+        let warnings = self.exec.refuse_foreign_lease(issue_id)?;
+        match self
+            .exec
+            .publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
+                issue_id: issue_id.clone(),
+                dependency_ids: dep_ids.to_vec(),
+                policy,
+            })? {
             CapturedDependencyOutcome::Batch(result) => {
                 Ok(DependenciesAddResult { warnings, ..result })
             }
             _ => unreachable!("batch dependency request returns a batch outcome"),
         }
     }
+}
 
+impl<S: IssueStore> CommandExecutor<S> {
     /// Repair every transitive-reduction violation from one captured graph.
     pub(super) fn reduce_all_dependencies(&self, dry_run: bool) -> Result<(usize, Vec<String>)>
     where
@@ -424,7 +430,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         })
     }
+}
 
+impl<S: IssueStore> GraphOps<'_, S> {
     /// Remove the stored dependencies `dep_ids` from `issue_id`.
     ///
     /// Each id is compared exactly with `issue_id`'s own stored dependencies,
@@ -441,8 +449,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         if dep_ids.is_empty() {
             return Ok(DependenciesRemoveResult::default());
         }
-        let warnings = self.refuse_foreign_lease(issue_id)?;
-        match self.publish_captured_dependency_mutation(
+        let warnings = self.exec.refuse_foreign_lease(issue_id)?;
+        match self.exec.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveBatch {
                 issue_id: issue_id.clone(),
                 dependency_ids: dep_ids.to_vec(),
@@ -1019,7 +1027,10 @@ mod captured_tests {
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        executor.add_dependency(&source_id, &dependency_id).unwrap();
+        executor
+            .graph()
+            .add_dependency(&source_id, &dependency_id)
+            .unwrap();
 
         let updated = executor.storage.load_issue(&source_id).unwrap();
         assert_eq!(updated.title, "concurrent title");
@@ -1061,6 +1072,7 @@ mod captured_tests {
 
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
         assert!(executor
+            .graph()
             .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
             .is_err());
 
@@ -1072,6 +1084,7 @@ mod captured_tests {
 
         let executor = CommandExecutor::new(recovered.clone()).with_layout(layout);
         executor
+            .graph()
             .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
             .unwrap();
         let updated = recovered.load_issue(&source_id).unwrap();
@@ -1116,6 +1129,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         let error = executor
+            .graph()
             .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
             .expect_err("the ready graph rule blocks only the automatic transition");
         assert!(error
@@ -1152,6 +1166,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let executor = CommandExecutor::new(storage).with_layout(layout);
         let result = executor
+            .graph()
             .remove_dependencies(&source_id, &[dependency_id.clone(), dependency_id.clone()])
             .unwrap();
         assert_eq!(result.removed, vec![dependency_id.clone()]);
@@ -1175,6 +1190,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         executor
+            .graph()
             .remove_dependency(&source.id, &dependency.id)
             .unwrap();
         assert!(executor
@@ -1198,6 +1214,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         executor
+            .graph()
             .remove_dependency(&source.id, &dependency.id)
             .unwrap();
         assert!(executor

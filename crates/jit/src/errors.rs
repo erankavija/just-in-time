@@ -512,7 +512,7 @@ impl RedundantDependencyError {
 
 /// A `jit dep add` batch where at least one requested edge failed validation.
 ///
-/// [`add_dependencies_with_policy`](crate::commands::CommandExecutor::add_dependencies_with_policy)
+/// [`add_dependencies_with_policy`](crate::commands::GraphOps::add_dependencies_with_policy)
 /// validates every requested edge against the would-be-final graph BEFORE
 /// writing anything: id resolution (ambiguous or not found) and graph
 /// validation (cycle detection, and — under
