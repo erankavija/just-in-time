@@ -196,8 +196,8 @@ fn normalize_absolute_path(path: &Path) -> PathBuf {
 /// what that permission owes the audit trail.
 ///
 /// This is the whole linked-checkout write policy, evaluated once. It governs
-/// exactly the invocations that open a repository mutation session and run inside
-/// a linked non-primary checkout according to the selected-root worktree
+/// exactly the invocations that open a repository mutation session over a store
+/// held by a linked non-primary checkout according to the selected-root worktree
 /// authority; every other invocation is outside the policy and answers `None`
 /// without reading a declaration. The governed ones take one of three outcomes:
 ///
@@ -221,7 +221,7 @@ fn linked_checkout_write_decision(
     layout: &RepositoryLayout,
     invocation_override: Option<LinkedCheckoutWriteStance>,
 ) -> Result<Option<MutationContextAnnotation>> {
-    if !opens_mutation_session || !worktree_paths.is_worktree() {
+    if !opens_mutation_session || !worktree_paths.holds_linked_store() {
         return Ok(None);
     }
     let declared = ConfigManager::new(layout.clone()).get_write_policy()?;

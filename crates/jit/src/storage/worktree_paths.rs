@@ -6,17 +6,19 @@ use crate::storage::git::{Git, GitCheckout, ProbedCheckout};
 
 /// Paths for worktree-aware storage.
 ///
-/// Detects git worktree context and provides paths for both per-worktree data plane
-/// (`.jit/`) and shared control plane (`.git/jit/`).
+/// Detects git worktree context and provides paths for both the data plane
+/// (`local_jit`) and the shared control plane (`shared_jit`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct WorktreePaths {
     /// Whether the selected data root belongs to a Git checkout.
     pub git_repository: bool,
-    /// Shared .git directory (common across all worktrees)
+    /// Git common directory shared by all worktrees: of the checkout holding the
+    /// data root, else of the checkout holding the worktree root, else the
+    /// unbacked `<worktree_root>/.git`.
     pub common_dir: PathBuf,
     /// Root of current worktree
     pub worktree_root: PathBuf,
-    /// Local data plane: <worktree_root>/.jit
+    /// Selected data root; `<worktree_root>/.jit` unless selected elsewhere.
     pub local_jit: PathBuf,
     /// Shared control plane: <common_dir>/jit
     pub shared_jit: PathBuf,
@@ -37,7 +39,7 @@ impl WorktreePaths {
     /// when it was selected through `JIT_DATA_DIR` and differs from the process
     /// working directory. `non_git_root` remains the repository worktree root
     /// used by Git-optional commands when the selected store is outside version
-    /// control.
+    /// control; its checkout, if any, then supplies the common directory.
     ///
     /// # Errors
     ///
@@ -63,23 +65,25 @@ impl WorktreePaths {
         selected_data_root: Option<&Path>,
     ) -> Result<Self> {
         let Some(probed) = Git::default().probe(current)? else {
-            let relocated_worktree_checkout = selected_data_root
+            let worktree_checkout = selected_data_root
                 .filter(|data_root| !data_root.starts_with(non_git_root))
                 .map(|_| Git::default().probe(non_git_root))
                 .transpose()?
-                .flatten()
-                .map(|checkout| checkout.worktree_root);
+                .flatten();
             let worktree_root = non_git_root.to_path_buf();
-            let dot_git = worktree_root.join(".git");
+            let (common_dir, relocated_worktree_checkout) = match worktree_checkout {
+                Some(checkout) => (checkout.common_dir, Some(checkout.worktree_root)),
+                None => (worktree_root.join(".git"), None),
+            };
             return Ok(Self {
                 relocated_worktree_checkout,
                 git_repository: false,
-                common_dir: dot_git.clone(),
+                shared_jit: common_dir.join("jit"),
+                common_dir,
                 local_jit: selected_data_root
                     .map(Path::to_path_buf)
                     .unwrap_or_else(|| worktree_root.join(".jit")),
                 worktree_root,
-                shared_jit: dot_git.join("jit"),
             });
         };
         let ProbedCheckout {
@@ -105,6 +109,19 @@ impl WorktreePaths {
     /// Return whether the selected data root belongs to a Git checkout.
     pub fn is_git_repository(&self) -> bool {
         self.git_repository
+    }
+
+    /// Return whether a git common directory backs `shared_jit`, so claims and
+    /// leases can coordinate here. Unlike [`Self::is_git_repository`], this holds
+    /// for a store outside every checkout invoked from inside one.
+    pub fn has_claims_coordination(&self) -> bool {
+        self.git_repository || self.relocated_worktree_checkout.is_some()
+    }
+
+    /// Return whether the selected store belongs to a linked checkout. A store
+    /// outside every checkout is shared, so no linked checkout holds it.
+    pub fn holds_linked_store(&self) -> bool {
+        self.git_repository && self.is_worktree()
     }
 
     /// Return this checkout's git operations, run by the default executable,
@@ -134,38 +151,54 @@ impl WorktreePaths {
         Self {
             git_repository: self.git_repository,
             common_dir: self.common_dir.clone(),
+            relocated_worktree_checkout: self
+                .relocated_worktree_checkout
+                .as_ref()
+                .map(|_| worktree_root.clone()),
             worktree_root,
             local_jit,
             shared_jit: self.shared_jit.clone(),
-            relocated_worktree_checkout: self.relocated_worktree_checkout.clone(),
         }
     }
 
     /// Check if we're in a secondary worktree (not main worktree).
     ///
-    /// Returns true if `common_dir != worktree_root/.git`.
+    /// Returns true if `common_dir != <checkout top level>/.git`.
     pub fn is_worktree(&self) -> bool {
-        self.common_dir != self.worktree_root.join(".git")
+        self.common_dir != self.checkout_top_level().join(".git")
+    }
+
+    /// The worktree root may be a subdirectory of the recorded relocated checkout.
+    fn checkout_top_level(&self) -> &Path {
+        self.relocated_worktree_checkout
+            .as_deref()
+            .unwrap_or(&self.worktree_root)
     }
 
     /// Check if this is the main worktree.
     ///
-    /// Returns true if `common_dir == worktree_root/.git`.
+    /// Returns true if `common_dir == <checkout top level>/.git`.
     pub fn is_main_worktree(&self) -> bool {
         !self.is_worktree()
     }
 
     /// Return the primary checkout root when this is a linked non-primary checkout.
     ///
+    /// A store outside every checkout needs no primary checkout, so an unmappable
+    /// common directory answers `None` there.
+    ///
     /// # Errors
     ///
-    /// Returns an error for a linked checkout whose common directory cannot be
-    /// mapped to a primary checkout.
+    /// Returns an error for a linked checkout holding its store whose common
+    /// directory cannot be mapped to a primary checkout.
     pub fn primary_worktree_root(&self) -> Result<Option<&Path>> {
         if !self.is_worktree() {
             return Ok(None);
         }
         if self.common_dir.file_name().and_then(|name| name.to_str()) != Some(".git") {
+            if !self.git_repository {
+                return Ok(None);
+            }
             anyhow::bail!(
                 "git common directory is not a primary-checkout .git directory: {}",
                 self.common_dir.display()
@@ -206,7 +239,7 @@ impl WorktreePaths {
     pub fn is_primary_worktree_path(&self, candidate: &Path) -> Result<bool> {
         Ok(match self.primary_worktree_root()? {
             Some(primary) => candidate == primary,
-            None => candidate == self.worktree_root,
+            None => !self.is_worktree() && candidate == self.checkout_top_level(),
         })
     }
 }
@@ -295,6 +328,137 @@ mod tests {
         assert_eq!(in_checkout.write_checkout(), in_checkout.git());
         assert_eq!(in_checkout.relocated_worktree_checkout, None);
         assert_eq!(without_git.write_checkout(), None);
+    }
+
+    /// `(repository, linked checkout, store outside both)` under `dir`.
+    fn external_store_layout(
+        dir: &Path,
+    ) -> (crate::test_harness::git::GitRepository, PathBuf, PathBuf) {
+        let repository = crate::test_harness::git::GitRepository::init(dir.join("repo"));
+        repository.write("base", "base").commit("base");
+        let linked = dir.join("linked");
+        repository.git(&["worktree", "add", "-q", linked.to_str().unwrap()]);
+        let store = dir.join("store");
+        (repository, linked, store)
+    }
+
+    #[test]
+    fn test_detect_for_external_store_from_primary_locates_claims_in_its_common_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir = dir.path().canonicalize().unwrap();
+        let (repository, _, store) = external_store_layout(&dir);
+
+        let paths = WorktreePaths::detect_for_data_root(&store, repository.root()).unwrap();
+
+        assert_eq!(paths.common_dir, repository.root().join(".git"));
+        assert_eq!(paths.shared_jit, repository.root().join(".git/jit"));
+        assert!(paths.has_claims_coordination());
+        assert!(!paths.is_git_repository());
+        assert!(paths.is_main_worktree());
+        assert!(!paths.holds_linked_store());
+    }
+
+    #[test]
+    fn test_detect_for_external_store_from_primary_subdirectory_is_the_main_worktree() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir = dir.path().canonicalize().unwrap();
+        let (repository, _, store) = external_store_layout(&dir);
+        let subdirectory = repository.root().join("sub");
+        std::fs::create_dir(&subdirectory).unwrap();
+
+        let paths = WorktreePaths::detect_for_data_root(&store, &subdirectory).unwrap();
+
+        assert_eq!(paths.worktree_root, subdirectory);
+        assert_eq!(paths.common_dir, repository.root().join(".git"));
+        assert!(paths.is_main_worktree());
+        assert!(paths.is_primary_worktree_path(repository.root()).unwrap());
+    }
+
+    #[test]
+    fn test_detect_for_external_store_from_linked_checkout_shares_the_primary_common_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir = dir.path().canonicalize().unwrap();
+        let (repository, linked, store) = external_store_layout(&dir);
+
+        let paths = WorktreePaths::detect_for_data_root(&store, &linked).unwrap();
+
+        assert_eq!(paths.common_dir, repository.root().join(".git"));
+        assert_eq!(paths.shared_jit, repository.root().join(".git/jit"));
+        assert!(paths.has_claims_coordination());
+        assert_eq!(paths.git(), None);
+        assert!(paths.is_worktree());
+        assert!(!paths.holds_linked_store());
+        assert_eq!(
+            paths.primary_worktree_root().unwrap(),
+            Some(repository.root())
+        );
+        assert_eq!(paths.primary_data_root().unwrap(), None);
+        assert!(paths.is_primary_worktree_path(repository.root()).unwrap());
+    }
+
+    /// A bare repository has no primary checkout, and an external store needs none.
+    #[test]
+    fn test_detect_for_external_store_from_linked_checkout_of_bare_repository_resolves_no_primary()
+    {
+        let dir = tempfile::tempdir().unwrap();
+        let dir = dir.path().canonicalize().unwrap();
+        let (repository, _, store) = external_store_layout(&dir);
+        let bare = dir.join("bare.git");
+        let linked = dir.join("bare-linked");
+        repository.git(&["clone", "-q", "--bare", ".", bare.to_str().unwrap()]);
+        repository.git(&[
+            "--git-dir",
+            bare.to_str().unwrap(),
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            linked.to_str().unwrap(),
+        ]);
+
+        let paths = WorktreePaths::detect_for_data_root(&store, &linked).unwrap();
+
+        assert_eq!(paths.common_dir, bare);
+        assert!(paths.is_worktree());
+        assert_eq!(paths.primary_worktree_root().unwrap(), None);
+        assert_eq!(paths.primary_data_root().unwrap(), None);
+        assert!(!paths.is_primary_worktree_path(&linked).unwrap());
+    }
+
+    #[test]
+    fn test_for_worktree_root_over_external_store_classifies_the_projected_checkout() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir = dir.path().canonicalize().unwrap();
+        let (repository, linked, store) = external_store_layout(&dir);
+
+        let paths = WorktreePaths::detect_for_data_root(&store, repository.root()).unwrap();
+
+        assert!(paths.for_worktree_root(linked).is_worktree());
+    }
+
+    #[test]
+    fn test_detect_for_data_root_inside_a_checkout_keeps_claims_in_its_common_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir = dir.path().canonicalize().unwrap();
+        let (repository, linked, _) = external_store_layout(&dir);
+
+        let paths = WorktreePaths::detect_for_data_root(&linked.join(".jit"), &linked).unwrap();
+
+        assert_eq!(paths.shared_jit, repository.root().join(".git/jit"));
+        assert!(paths.is_git_repository());
+        assert!(paths.has_claims_coordination());
+        assert!(paths.holds_linked_store());
+    }
+
+    #[test]
+    fn test_detect_for_data_root_outside_every_checkout_and_invoked_outside_has_no_claims() {
+        let store = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+
+        let paths = WorktreePaths::detect_for_data_root(store.path(), outside.path()).unwrap();
+
+        assert!(!paths.has_claims_coordination());
+        assert!(!paths.holds_linked_store());
     }
 
     #[test]
