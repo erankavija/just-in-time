@@ -181,7 +181,10 @@
           "short_id": "d84a7bfa",
           "title": "Item, invariant and projection methods behind an items facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (worker w-d84a7bfa)",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         },
         {
           "key": "executor-facade-validation",
@@ -718,6 +721,27 @@
       "issue": "f7f01654",
       "summary": "REQ-04 void: ProfileAgreement deleted by 24268b05 (plan D-25)",
       "status": "applied 3778a65fe"
+    },
+    {
+      "date": "2026-11-03",
+      "kind": "user-decision",
+      "issue": "wave 4 facades",
+      "summary": "Stale method lists reconciled (plan D-27)",
+      "status": "applied"
+    },
+    {
+      "date": "2026-11-03",
+      "kind": "user-decision",
+      "issue": "083c9a91",
+      "summary": "614a6f97 now depends on 083c9a91 (plan D-28)",
+      "status": "applied"
+    },
+    {
+      "date": "2026-11-03",
+      "kind": "user-decision",
+      "issue": "df129d9e",
+      "summary": "No disk cleanup by this lead; just-in-time-6a coordinates relocation to /mnt/nvme",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -730,17 +754,7 @@
     "5d0a9a90": 2
   },
   "surfaced_pitfalls": [],
-  "external_blockers": {
-    "083c9a91": [
-      "d759d606"
-    ],
-    "handlers-*": [
-      "2195c98f cli-issue-id-boundary (steward edge, pending)"
-    ],
-    "0eca332a": [
-      "2195c98f error-code-vocabulary (steward edge, pending)"
-    ]
-  },
+  "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
   "line_target": {
     "modules": "main.rs + dispatch/ + output",
@@ -756,7 +770,7 @@
       "5d0a9a90": 8
     },
     "epic_total": -293,
-    "head_lines": 9031,
-    "head_rev": "1d998db27"
+    "head_lines": 9121,
+    "head_rev": "804acc4d6"
   }
 }
