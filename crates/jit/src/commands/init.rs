@@ -601,6 +601,7 @@ mod tests {
         // The kind resolves against that registry with nothing declared in it and
         // no package applied.
         assert!(executor
+            .items()
             .list_items(Some("invariant"))
             .unwrap()
             .items
@@ -642,6 +643,7 @@ mod tests {
 
         let resolved = file_executor(repo.path())
             .unwrap()
+            .items()
             .show_item("@/invariant/authored-here")
             .unwrap();
         assert_eq!(resolved.item.self_id, "authored-here");

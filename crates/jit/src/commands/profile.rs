@@ -4085,7 +4085,7 @@ template = true
         )
         .unwrap();
         let executor = file_executor(temp.path()).unwrap();
-        executor.project_render(None).unwrap();
+        executor.items().project_render(None).unwrap();
         let package = authored_package(
             &temp,
             "vendor/workflow",

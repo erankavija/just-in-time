@@ -1197,15 +1197,15 @@ fn run_item_inner<S: IssueStore>(
 
     match command {
         ItemCommands::List { kind } => {
-            let result = executor.list_items(kind.as_deref())?;
+            let result = executor.items().list_items(kind.as_deref())?;
             print_list(&result, json, quiet)?;
         }
         ItemCommands::Search { query, kind } => {
-            let result = executor.search_items(&query, kind.as_deref())?;
+            let result = executor.items().search_items(&query, kind.as_deref())?;
             print_list(&result, json, quiet)?;
         }
         ItemCommands::Show { qualified_id } | ItemCommands::Resolve { qualified_id } => {
-            let result = executor.show_item(&qualified_id)?;
+            let result = executor.items().show_item(&qualified_id)?;
             print_item_show(&result, json, quiet)?;
         }
     }
@@ -1247,7 +1247,7 @@ fn run_invariant_inner<S: IssueStore>(
     let OutputMode { json, quiet } = mode;
     match command {
         InvariantCommands::Check => {
-            let result = executor.check_invariants()?;
+            let result = executor.items().check_invariants()?;
             let exit_nonzero = result.has_drift();
             let output_ctx = OutputContext::new(quiet, json);
             if json {
@@ -1287,7 +1287,7 @@ fn run_invariant_inner<S: IssueStore>(
 
 /// Run `jit project <subcommand>`.
 ///
-/// A thin delegation over [`CommandExecutor::project_render`]: `render` writes
+/// A thin delegation over [`jit::commands::ItemOps::project_render`]: `render` writes
 /// every declared `[projection.*]` (or a single `--name`d one) into its configured
 /// documentation target and reports what was written. On `--json` a failure is
 /// rendered as a JSON error object (honoring the machine-readable contract) rather
@@ -1327,7 +1327,7 @@ fn run_project_inner<S: IssueStore + jit::storage::RepositoryStateStore>(
     let OutputMode { json, quiet } = mode;
     match command {
         ProjectCommands::Render { name } => {
-            let result = executor.project_render(name.as_deref())?;
+            let result = executor.items().project_render(name.as_deref())?;
             let output_ctx = OutputContext::new(quiet, json);
             if json {
                 let msg = format!("Rendered {} projection(s)", result.count());
@@ -2297,7 +2297,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // addressed item through the same item resolver as
                     // `jit item show`, honoring --json (REQ-04 / concept).
                     if !projecting && !summary && requested.contains('/') {
-                        match executor.show_item(requested) {
+                        match executor.items().show_item(requested) {
                             Ok(result) => {
                                 print_item_show(&result, json, quiet)?;
                                 return Ok(());

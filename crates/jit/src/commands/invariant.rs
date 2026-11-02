@@ -32,7 +32,7 @@ impl InvariantCheckResult {
     }
 }
 
-impl<S: IssueStore> CommandExecutor<S> {
+impl<S: IssueStore> ItemOps<'_, S> {
     /// Compute the enforcement-drift between the invariant registry and the
     /// declared rules/gates, returning every drift finding.
     ///
@@ -53,7 +53,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // case (REQ-01 "missing OR unloadable"): a malformed `.jit/rules.toml`
         // referenced by an `enforced-by` binding yields a declared-but-unenforced
         // finding here too, not a raw parse error.
-        let findings: Vec<DriftFinding> = self.compute_drift_findings()?;
+        let findings: Vec<DriftFinding> = self.exec.compute_drift_findings()?;
         Ok(InvariantCheckResult::new(findings))
     }
 }
@@ -111,7 +111,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let result = executor.check_invariants().unwrap();
+        let result = executor.items().check_invariants().unwrap();
         assert!(result.has_drift());
         assert_eq!(result.items.len(), 1, "{:?}", result.items);
         assert_eq!(result.items[0].invariant_id, "sample-invariant");
@@ -139,7 +139,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let result = executor.check_invariants().unwrap();
+        let result = executor.items().check_invariants().unwrap();
         assert!(!result.has_drift(), "{:?}", result.items);
     }
 
@@ -163,7 +163,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let result = executor.check_invariants().unwrap();
+        let result = executor.items().check_invariants().unwrap();
         assert!(!result.has_drift(), "{:?}", result.items);
     }
 
@@ -187,7 +187,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let result = executor.check_invariants().unwrap();
+        let result = executor.items().check_invariants().unwrap();
         let json = serde_json::to_value(&result).unwrap();
         let findings = json["findings"].as_array().unwrap();
         assert_eq!(findings.len(), 1, "{json}");

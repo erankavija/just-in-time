@@ -67,14 +67,26 @@ enum ResolvedItemAddress {
     },
 }
 
+/// Addressable-item operations of a [`CommandExecutor`].
+pub struct ItemOps<'a, S: IssueStore> {
+    pub(super) exec: &'a CommandExecutor<S>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The addressable-item family.
+    pub fn items(&self) -> ItemOps<'_, S> {
+        ItemOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> ItemOps<'_, S> {
     /// Resolve the effective item kinds from the cached `[item_kinds]` registry.
     ///
     /// The engine bakes in no kinds: with no `[item_kinds]` table the result is
     /// empty (see [`resolve_item_kinds`]). A profile package or repository-authored
     /// config can supply the table.
     pub(crate) fn item_kinds(&self) -> Result<Vec<ItemKind>> {
-        let config = self.cached_config()?;
+        let config = self.exec.cached_config()?;
         resolve_item_kinds(config.item_kinds.as_ref()).map_err(|err| {
             crate::errors::InvalidArgumentError::new(format!(
                 "invalid [item_kinds] configuration: {err}"
@@ -136,8 +148,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             .into_iter()
             .filter(|k| filter.is_none_or(|f| k.name() == f))
             .collect();
-        let repo_format = self.repo_content_format()?;
-        let mut issues = self.storage.list_issues()?;
+        let repo_format = self.exec.repo_content_format()?;
+        let mut issues = self.exec.storage.list_issues()?;
         // Deterministic output: order by short id, then the index's own order.
         issues.sort_by_key(|a| a.short_id());
 
@@ -239,16 +251,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                         // An absent file contributes no items (graceful), mirroring
                         // the markdown-first path; a present-but-malformed file is a
                         // typed error.
-                        let toml =
-                            self.storage
-                                .read_repo_file(&descriptor.toml)
-                                .with_context(|| {
-                                    format!(
-                                        "cannot read toml source '{}' for item kind '{}'",
-                                        descriptor.toml,
-                                        kind.name()
-                                    )
-                                })?;
+                        let toml = self
+                            .exec
+                            .storage
+                            .read_repo_file(&descriptor.toml)
+                            .with_context(|| {
+                                format!(
+                                    "cannot read toml source '{}' for item kind '{}'",
+                                    descriptor.toml,
+                                    kind.name()
+                                )
+                            })?;
                         if let Some(toml) = toml {
                             let rows = load_toml_scope_items(kind.name(), descriptor, &toml)
                                 .with_context(|| {
@@ -272,12 +285,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                     };
                     // Read via the storage boundary: absent -> None (graceful,
                     // REQ-01), invalid/escaping path or unreadable file -> typed error.
-                    let markdown = self.storage.read_repo_file(source_rel).with_context(|| {
-                        format!(
+                    let markdown =
+                        self.exec
+                            .storage
+                            .read_repo_file(source_rel)
+                            .with_context(|| {
+                                format!(
                             "cannot read project-scope source '{source_rel}' for item kind '{}'",
                             kind.name()
                         )
-                    })?;
+                            })?;
                     let Some(markdown) = markdown else {
                         continue;
                     };
@@ -286,7 +303,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        let repo_format = self.repo_content_format()?;
+        let repo_format = self.exec.repo_content_format()?;
         // Project-scope source files use the repo's content format (Markdown by
         // default); reuse the same parser selection as issue descriptions.
         let parser = crate::document::content_parser_for(None, repo_format)
@@ -355,16 +372,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                 kind,
                 self_id,
             } => {
-                let full_id = self.storage.resolve_issue_id(&issue_ref).with_context(|| {
-                    format!(
-                        "cannot resolve issue scope '{}' in '{qualified}'",
-                        issue_ref.as_str()
-                    )
-                })?;
-                let issue = self.storage.load_issue(&full_id)?;
+                let full_id = self
+                    .exec
+                    .storage
+                    .resolve_issue_id(&issue_ref)
+                    .with_context(|| {
+                        format!(
+                            "cannot resolve issue scope '{}' in '{qualified}'",
+                            issue_ref.as_str()
+                        )
+                    })?;
+                let issue = self.exec.storage.load_issue(&full_id)?;
 
                 let kinds = self.issue_item_kinds()?;
-                let repo_format = self.repo_content_format()?;
+                let repo_format = self.exec.repo_content_format()?;
                 let parser = crate::document::content_parser_for(issue.content_format, repo_format)
                     .map_err(|err| {
                         anyhow!(
@@ -486,8 +507,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // self-id visible so a caller can confirm the value was
                 // structurally routed, not mis-split, even on the error path.
                 let local_name = self
+                    .exec
                     .config_manager
-                    .project_name_from_config(self.cached_config()?);
+                    .project_name_from_config(self.exec.cached_config()?);
                 let scope = addr.scope.bind_local(local_name.as_deref()).map_err(|err| {
                     anyhow!(
                         "cannot resolve item address '{qualified}' (kind '{kind}', self-id '{}'): {err}",
@@ -629,7 +651,7 @@ mod tests {
             },
         );
 
-        let result = exec.list_items(None).unwrap();
+        let result = exec.items().list_items(None).unwrap();
         assert_eq!(result.items.len(), 3);
         // Qualified ids disambiguate the two REQ-01s by their issue scope.
         let qids: Vec<&str> = result
@@ -653,8 +675,20 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        assert_eq!(exec.list_items(Some("nonexistent")).unwrap().count(), 0);
-        assert_eq!(exec.list_items(Some("requirement")).unwrap().count(), 1);
+        assert_eq!(
+            exec.items()
+                .list_items(Some("nonexistent"))
+                .unwrap()
+                .count(),
+            0
+        );
+        assert_eq!(
+            exec.items()
+                .list_items(Some("requirement"))
+                .unwrap()
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -677,9 +711,9 @@ mod tests {
         );
 
         // Registry-first shipped kinds contribute project items of their own.
-        let all = exec.list_items(None).unwrap();
+        let all = exec.items().list_items(None).unwrap();
         assert!(all.items.iter().any(|i| i.kind == "gate"));
-        let requirements = exec.list_items(Some("requirement")).unwrap();
+        let requirements = exec.items().list_items(Some("requirement")).unwrap();
         assert_eq!(requirements.items.len(), 2);
         assert!(requirements.items.iter().all(|i| i.kind == "requirement"));
     }
@@ -700,9 +734,15 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        assert_eq!(exec.search_items("atomic", None).unwrap().count(), 1);
-        assert_eq!(exec.search_items("REQ-02", None).unwrap().count(), 1);
-        assert_eq!(exec.search_items("", None).unwrap().count(), 2);
+        assert_eq!(
+            exec.items().search_items("atomic", None).unwrap().count(),
+            1
+        );
+        assert_eq!(
+            exec.items().search_items("REQ-02", None).unwrap().count(),
+            1
+        );
+        assert_eq!(exec.items().search_items("", None).unwrap().count(), 2);
     }
 
     #[test]
@@ -723,7 +763,7 @@ mod tests {
 
         // The `<short-id>/<self-id>` sugar still resolves as INPUT (D3-A), but the
         // minted qualified id it resolves to is the canonical kind-segmented form.
-        let shown = exec.show_item(&format!("{short}/REQ-01")).unwrap();
+        let shown = exec.items().show_item(&format!("{short}/REQ-01")).unwrap();
         assert_eq!(shown.item.self_id, "REQ-01");
         assert_eq!(
             shown.item.qualified_id,
@@ -751,7 +791,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let shown = exec.show_item("@/glossary/GLOSS-01").unwrap();
+        let shown = exec.items().show_item("@/glossary/GLOSS-01").unwrap();
         assert_eq!(shown.item.self_id, "GLOSS-01");
         assert_eq!(shown.item.qualified_id, "@/glossary/GLOSS-01");
         assert_eq!(shown.item.scope, "@");
@@ -776,7 +816,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("@/glossary/GLOSS-99").unwrap_err();
+        let err = exec.items().show_item("@/glossary/GLOSS-99").unwrap_err();
         assert!(err.to_string().contains("project scope"));
         assert!(err.to_string().contains("no addressable item"));
     }
@@ -793,7 +833,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
+        let err = exec.items().show_item("@/glossary/GLOSS-01").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("project scope"));
         assert!(!msg.contains("resolve issue scope"));
@@ -833,8 +873,11 @@ mod tests {
             },
         );
 
-        let from_issue = exec.show_item(&format!("{short}/GLOSS-01")).unwrap();
-        let from_project = exec.show_item("@/glossary/GLOSS-01").unwrap();
+        let from_issue = exec
+            .items()
+            .show_item(&format!("{short}/GLOSS-01"))
+            .unwrap();
+        let from_project = exec.items().show_item("@/glossary/GLOSS-01").unwrap();
         assert!(from_issue.item.text.contains("issue one"));
         assert!(from_project.item.text.contains("project one"));
         assert_ne!(from_issue.item.qualified_id, from_project.item.qualified_id);
@@ -864,12 +907,18 @@ mod tests {
             },
         );
 
-        let rule = exec.show_item("@/custom-rule/coverage-preview").unwrap();
+        let rule = exec
+            .items()
+            .show_item("@/custom-rule/coverage-preview")
+            .unwrap();
         assert_eq!(rule.item.kind, "custom-rule");
         assert_eq!(rule.item.self_id, "coverage-preview");
         assert!(rule.item.text.contains("rule form"));
 
-        let gate = exec.show_item("@/custom-gate/coverage-preview").unwrap();
+        let gate = exec
+            .items()
+            .show_item("@/custom-gate/coverage-preview")
+            .unwrap();
         assert_eq!(gate.item.kind, "custom-gate");
         assert_eq!(gate.item.self_id, "coverage-preview");
         assert!(gate.item.text.contains("gate form"));
@@ -907,14 +956,21 @@ mod tests {
         );
 
         // The self-id `only-rule` belongs to `custom-rule`, not `custom-gate`.
-        let err = exec.show_item("@/custom-gate/only-rule").unwrap_err();
+        let err = exec
+            .items()
+            .show_item("@/custom-gate/only-rule")
+            .unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("no addressable item"), "message: {msg}");
         assert!(msg.contains("gate"), "message: {msg}");
 
         // Sanity: the correct kind DOES resolve it.
         assert_eq!(
-            exec.show_item("@/custom-rule/only-rule").unwrap().item.kind,
+            exec.items()
+                .show_item("@/custom-rule/only-rule")
+                .unwrap()
+                .item
+                .kind,
             "custom-rule"
         );
     }
@@ -938,8 +994,8 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let named = exec.show_item("@acme/glossary/GLOSS-01").unwrap();
-        let bare = exec.show_item("@/glossary/GLOSS-01").unwrap();
+        let named = exec.items().show_item("@acme/glossary/GLOSS-01").unwrap();
+        let bare = exec.items().show_item("@/glossary/GLOSS-01").unwrap();
         assert_eq!(named.item, bare.item);
         assert_eq!(named.item.qualified_id, "@/glossary/GLOSS-01");
     }
@@ -966,6 +1022,7 @@ mod tests {
             },
         );
         let err = exec
+            .items()
             .show_item("@other-project/glossary/GLOSS-01")
             .unwrap_err();
         let msg = format!("{err:#}");
@@ -986,7 +1043,10 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("@acme/requirement/REQ-01").unwrap_err();
+        let err = exec
+            .items()
+            .show_item("@acme/requirement/REQ-01")
+            .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("acme"), "got: {msg}");
         assert!(msg.contains("local-only"), "got: {msg}");
@@ -1008,7 +1068,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("@acme/GLOSS-01").unwrap_err();
+        let err = exec.items().show_item("@acme/GLOSS-01").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("segments"), "got: {msg}");
         assert!(!msg.contains("no addressable item"), "got: {msg}");
@@ -1044,18 +1104,21 @@ mod tests {
 
         // Explicit project form `@/<kind>/<self-id>`.
         let proj = exec
+            .items()
             .resolve_link_label("defines:@/glossary/GLOSS-01")
             .unwrap();
         assert_eq!(proj.unwrap().item.self_id, "GLOSS-01");
 
         // Explicit issue form `@/issue/<short>/<kind>/<self-id>`.
         let issue_form = exec
+            .items()
             .resolve_link_label(&format!("satisfies:@/issue/{short}/requirement/REQ-01"))
             .unwrap();
         assert_eq!(issue_form.unwrap().item.self_id, "REQ-01");
 
         // `<short>/<self-id>` sugar form.
         let sugar = exec
+            .items()
             .resolve_link_label(&format!("satisfies:{short}/REQ-01"))
             .unwrap();
         assert_eq!(sugar.unwrap().item.self_id, "REQ-01");
@@ -1081,6 +1144,7 @@ mod tests {
             },
         );
         let err = exec
+            .items()
             .resolve_link_label("satisfies:@acme/requirement/REQ-01")
             .unwrap_err();
         // The top-level context marks it unresolvable; the wrapped cause (rendered
@@ -1114,7 +1178,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let result = exec.list_items(None).unwrap();
+        let result = exec.items().list_items(None).unwrap();
         let qids: Vec<&str> = result
             .items
             .iter()
@@ -1144,7 +1208,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
+        let err = exec.items().show_item("@/glossary/GLOSS-01").unwrap_err();
         // The typed InvalidPath cause is in the error chain (alternate Display
         // renders the full anyhow context chain).
         let msg = format!("{err:#}");
@@ -1173,7 +1237,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
+        let err = exec.items().show_item("@/glossary/GLOSS-01").unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("absolute paths are not permitted"),
@@ -1208,7 +1272,7 @@ statement = \"Every dependency edge stays acyclic.\"
             },
         );
 
-        let first = exec.show_item("@/policy/POL-01").unwrap();
+        let first = exec.items().show_item("@/policy/POL-01").unwrap();
         assert_eq!(first.item.self_id, "POL-01");
         assert_eq!(first.item.qualified_id, "@/policy/POL-01");
         assert_eq!(first.item.scope, "@");
@@ -1226,12 +1290,12 @@ statement = \"Every dependency edge stays acyclic.\"
         assert_eq!(first.issue_full_id, None);
 
         // An entry with no link field is graceful: it still indexes, with no labels.
-        let second = exec.show_item("@/policy/POL-02").unwrap();
+        let second = exec.items().show_item("@/policy/POL-02").unwrap();
         assert_eq!(second.item.self_id, "POL-02");
         assert!(second.item.links.is_empty());
 
         // Both surface in the cross-repo list under the `@` project scope.
-        let listed = exec.list_items(Some("policy")).unwrap();
+        let listed = exec.items().list_items(Some("policy")).unwrap();
         assert_eq!(listed.items.len(), 2);
     }
 
@@ -1247,7 +1311,7 @@ statement = \"Every dependency edge stays acyclic.\"
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("@/policy/POL-01").unwrap_err();
+        let err = exec.items().show_item("@/policy/POL-01").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("project scope"), "got: {msg}");
         assert!(!msg.contains("resolve issue scope"), "got: {msg}");
@@ -1281,7 +1345,7 @@ kind = \"advisory\"
                 ..MemoryDeclarations::default()
             },
         );
-        let result = exec.list_items(Some("invariant")).unwrap();
+        let result = exec.items().list_items(Some("invariant")).unwrap();
         assert_eq!(result.items.len(), 2);
         let qids: Vec<&str> = result
             .items
@@ -1316,7 +1380,10 @@ kind = \"advisory\"
                 ..MemoryDeclarations::default()
             },
         );
-        let shown = exec.show_item("@/invariant/second-invariant").unwrap();
+        let shown = exec
+            .items()
+            .show_item("@/invariant/second-invariant")
+            .unwrap();
         assert_eq!(shown.item.self_id, "second-invariant");
         assert_eq!(shown.item.qualified_id, "@/invariant/second-invariant");
         assert_eq!(shown.item.kind, "invariant");
@@ -1356,7 +1423,7 @@ enforce = true
                 ..MemoryDeclarations::default()
             },
         );
-        let shown = exec.show_item("@/rule/coverage-preview").unwrap();
+        let shown = exec.items().show_item("@/rule/coverage-preview").unwrap();
         assert_eq!(shown.item.self_id, "coverage-preview");
         // The minted qualified id carries the kind segment, so it equals the
         // kind-segmented address it resolved from (round-trip).
@@ -1402,7 +1469,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
-        let result = exec.list_items(Some("gate")).unwrap();
+        let result = exec.items().list_items(Some("gate")).unwrap();
         assert_eq!(result.items.len(), 2);
         let qids: Vec<&str> = result
             .items
@@ -1441,7 +1508,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
-        let shown = exec.show_item("@/gate/cargo-ci").unwrap();
+        let shown = exec.items().show_item("@/gate/cargo-ci").unwrap();
         assert_eq!(shown.item.self_id, "cargo-ci");
         // The minted qualified id carries the kind segment, so it round-trips with
         // the kind-segmented address it resolved from.
@@ -1487,13 +1554,13 @@ stage = \"postcheck\"
             },
         );
 
-        let rule = exec.show_item("@/rule/coverage-preview").unwrap();
+        let rule = exec.items().show_item("@/rule/coverage-preview").unwrap();
         assert_eq!(rule.item.kind, "rule");
         assert_eq!(rule.item.self_id, "coverage-preview");
         assert_eq!(rule.item.text, "coverage-preview");
         assert_eq!(rule.item.qualified_id, "@/rule/coverage-preview");
 
-        let gate = exec.show_item("@/gate/coverage-preview").unwrap();
+        let gate = exec.items().show_item("@/gate/coverage-preview").unwrap();
         assert_eq!(gate.item.kind, "gate");
         assert_eq!(gate.item.self_id, "coverage-preview");
         assert_eq!(gate.item.qualified_id, "@/gate/coverage-preview");
@@ -1508,7 +1575,7 @@ stage = \"postcheck\"
 
         // Both coexist in one unfiltered list with no DuplicateSelfId despite the
         // shared self-id (they differ by kind).
-        let all = exec.list_items(None).unwrap();
+        let all = exec.items().list_items(None).unwrap();
         assert_eq!(all.items.len(), 2);
     }
 
@@ -1525,7 +1592,10 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
-        let hits = exec.search_items("acyclic", Some("invariant")).unwrap();
+        let hits = exec
+            .items()
+            .search_items("acyclic", Some("invariant"))
+            .unwrap();
         assert_eq!(hits.items.len(), 1);
         assert_eq!(hits.items[0].qualified_id, "@/invariant/sample-invariant");
     }
@@ -1554,7 +1624,7 @@ stage = \"postcheck\"
             },
         );
 
-        let invariants = exec.list_items(Some("invariant")).unwrap();
+        let invariants = exec.items().list_items(Some("invariant")).unwrap();
         let qids: Vec<&str> = invariants
             .items
             .iter()
@@ -1584,7 +1654,10 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
-        assert_eq!(exec.list_items(Some("invariant")).unwrap().count(), 0);
+        assert_eq!(
+            exec.items().list_items(Some("invariant")).unwrap().count(),
+            0
+        );
     }
 
     #[test]
@@ -1611,7 +1684,7 @@ stage = \"postcheck\"
                 "## Success Criteria\n\n- [hard] missing-invariant: looks like an invariant\n",
             ),
         );
-        let result = exec.list_items(Some("invariant")).unwrap();
+        let result = exec.items().list_items(Some("invariant")).unwrap();
         let qids: Vec<&str> = result
             .items
             .iter()
@@ -1654,7 +1727,7 @@ stage = \"postcheck\"
         );
         seed_issue(exec.storage(), issue);
         // No rejection: the kind resolves and indexes from the issue description.
-        let result = exec.list_items(Some("tenet")).unwrap();
+        let result = exec.items().list_items(Some("tenet")).unwrap();
         assert_eq!(result.items.len(), 1);
         assert_eq!(
             result.items[0].qualified_id,
@@ -1684,14 +1757,14 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.list_items(None).unwrap_err();
+        let err = exec.items().list_items(None).unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("declares no 'source'") && msg.contains("foo"),
             "expected MissingProjectSource for 'foo', got: {msg}"
         );
         // The same typed rejection surfaces when the kind is filtered directly.
-        assert!(exec.list_items(Some("foo")).is_err());
+        assert!(exec.items().list_items(Some("foo")).is_err());
     }
 
     #[test]
@@ -1708,7 +1781,10 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item(&format!("{short}/REQ-99")).unwrap_err();
+        let err = exec
+            .items()
+            .show_item(&format!("{short}/REQ-99"))
+            .unwrap_err();
         assert!(err.to_string().contains("no addressable item"));
     }
 
@@ -1722,7 +1798,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("REQ-01").unwrap_err();
+        let err = exec.items().show_item("REQ-01").unwrap_err();
         assert!(err.to_string().contains("not a qualified id"));
     }
 
@@ -1739,7 +1815,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("@/rule/foo:bar").unwrap_err();
+        let err = exec.items().show_item("@/rule/foo:bar").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("colon"), "got: {msg}");
     }
@@ -1762,7 +1838,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("@/coverage-preview").unwrap_err();
+        let err = exec.items().show_item("@/coverage-preview").unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("cannot resolve item address '@/coverage-preview'"),
@@ -1775,7 +1851,11 @@ stage = \"postcheck\"
         assert!(!msg.contains("no addressable item"), "got: {msg}");
         // The kind-segmented address still resolves the same item.
         assert_eq!(
-            exec.show_item("@/rule/coverage-preview").unwrap().item.kind,
+            exec.items()
+                .show_item("@/rule/coverage-preview")
+                .unwrap()
+                .item
+                .kind,
             "rule"
         );
     }
@@ -1790,7 +1870,7 @@ stage = \"postcheck\"
                 ..MemoryDeclarations::default()
             },
         );
-        let err = exec.show_item("56ab0224/REQ:01").unwrap_err();
+        let err = exec.items().show_item("56ab0224/REQ:01").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("colon"), "got: {msg}");
     }
@@ -1813,7 +1893,11 @@ stage = \"postcheck\"
         );
 
         let label = format!("satisfies:{short}/REQ-01");
-        let resolved = exec.resolve_link_label(&label).unwrap().expect("resolves");
+        let resolved = exec
+            .items()
+            .resolve_link_label(&label)
+            .unwrap()
+            .expect("resolves");
         assert_eq!(resolved.item.self_id, "REQ-01");
         assert_eq!(
             resolved.item.qualified_id,
@@ -1838,6 +1922,7 @@ stage = \"postcheck\"
             },
         );
         let err = exec
+            .items()
             .resolve_link_label(&format!("satisfies:{short}/REQ-99"))
             .unwrap_err();
         assert!(err.to_string().contains("unresolvable qualified item id"));
@@ -1878,6 +1963,7 @@ stage = \"postcheck\"
 
         // requirement / `satisfies:` -> the requirement item.
         let req = exec
+            .items()
             .resolve_link_label(&format!("satisfies:{short}/REQ-01"))
             .unwrap()
             .expect("satisfies resolves");
@@ -1889,6 +1975,7 @@ stage = \"postcheck\"
 
         // decision / `per:` -> the decision item.
         let dec = exec
+            .items()
             .resolve_link_label(&format!("per:{short}/D-01"))
             .unwrap()
             .expect("per resolves");
@@ -1900,6 +1987,7 @@ stage = \"postcheck\"
 
         // risk / `mitigates:` and `resolves:` -> the risk item (both namespaces).
         let mit = exec
+            .items()
             .resolve_link_label(&format!("mitigates:{short}/RISK-01"))
             .unwrap()
             .expect("mitigates resolves");
@@ -1909,6 +1997,7 @@ stage = \"postcheck\"
             format!("@/issue/{short}/risk/RISK-01")
         );
         let res = exec
+            .items()
             .resolve_link_label(&format!("resolves:{short}/RISK-01"))
             .unwrap()
             .expect("resolves resolves");
@@ -1916,6 +2005,7 @@ stage = \"postcheck\"
 
         // invariant / `enforces:@/<kind>/<id>` -> the registry-first invariant item.
         let inv = exec
+            .items()
             .resolve_link_label("enforces:@/invariant/sample-invariant")
             .unwrap()
             .expect("enforces resolves");
@@ -1946,6 +2036,7 @@ stage = \"postcheck\"
         );
 
         let rule = exec
+            .items()
             .resolve_link_label("enforces:@/rule/coverage-preview")
             .unwrap()
             .expect("enforces resolves the rule item");
@@ -1953,6 +2044,7 @@ stage = \"postcheck\"
         assert_eq!(rule.item.self_id, "coverage-preview");
 
         let gate = exec
+            .items()
             .resolve_link_label("enforces:@/gate/cargo-ci")
             .unwrap()
             .expect("enforces resolves the gate item");
@@ -1975,15 +2067,17 @@ stage = \"postcheck\"
         );
         // A bare self-id addresses no item.
         assert!(exec
+            .items()
             .resolve_link_label("satisfies:REQ-01")
             .unwrap()
             .is_none());
         // A namespace that is not a kind link-namespace is not an item reference.
         assert!(exec
+            .items()
             .resolve_link_label("type:epic/REQ-01")
             .unwrap()
             .is_none());
         // A label with no `:` is not a reference.
-        assert!(exec.resolve_link_label("nope").unwrap().is_none());
+        assert!(exec.items().resolve_link_label("nope").unwrap().is_none());
     }
 }

@@ -1,4 +1,4 @@
-//! Command-harness tests for `CommandExecutor::project_render` (REQ-08).
+//! Command-harness tests for `ItemOps::project_render` (REQ-08).
 //!
 //! Drives the generic projection command directly over `InMemoryStorage` (no
 //! subprocess) — the `CommandExecutor` layer the project's testing strategy
@@ -107,7 +107,7 @@ style = "id-anchor"
             ..MemoryDeclarations::default()
         },
     );
-    let result = executor.project_render(Some("charter")).unwrap();
+    let result = executor.items().project_render(Some("charter")).unwrap();
     assert_eq!(result.items.len(), 1);
     assert_eq!(result.items[0].target, "AGENTS.md");
     assert_eq!(result.items[0].count, 2);
@@ -174,7 +174,7 @@ style = "id-anchor"
     executor
         .effective_rules()
         .expect("prime the executor's stale config cache");
-    let result = executor.project_render(Some("charter")).unwrap();
+    let result = executor.items().project_render(Some("charter")).unwrap();
 
     assert_eq!(result.items[0].target, "CAPTURED.md");
     assert_eq!(result.items[0].count, 1);
@@ -206,7 +206,7 @@ fn test_invariants_projection_parity_with_typed_render() {
         },
     );
 
-    executor.project_render(Some("invariants")).unwrap();
+    executor.items().project_render(Some("invariants")).unwrap();
     let written = storage
         .read_repo_file(".jit/invariants.md")
         .unwrap()
@@ -247,7 +247,10 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
             ..MemoryDeclarations::default()
         },
     );
-    executor.project_render(Some("rules-and-gates")).unwrap();
+    executor
+        .items()
+        .project_render(Some("rules-and-gates"))
+        .unwrap();
     let written = storage
         .read_repo_file(".jit/rules-and-gates.md")
         .unwrap()
@@ -285,7 +288,7 @@ style = \"id-anchor\"
             ..MemoryDeclarations::default()
         },
     );
-    let err = executor.project_render(Some("bad")).unwrap_err();
+    let err = executor.items().project_render(Some("bad")).unwrap_err();
     assert!(
         err.to_string().contains("bad") || err.chain().any(|c| c.to_string().contains("unknown")),
         "unexpected error: {err:#}"
@@ -314,7 +317,10 @@ fn test_missing_target_is_typed_error_naming_projection() {
         },
     );
 
-    let err = executor.project_render(Some("invariants")).unwrap_err();
+    let err = executor
+        .items()
+        .project_render(Some("invariants"))
+        .unwrap_err();
     let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
     assert!(
         matches!(
@@ -366,7 +372,7 @@ fn test_two_phase_render_writes_nothing_when_a_later_projection_fails() {
     );
     // `a-good` sorts before `b-bad`, so it materializes (phase 1) before `b-bad`
     // fails — yet phase 2 never runs, so nothing is written anywhere.
-    let err = executor.project_render(None).unwrap_err();
+    let err = executor.items().project_render(None).unwrap_err();
     // `b-bad`'s target lacks its managed region, so the managed-document engine
     // rejects the composition with a typed required-region-absent fault before the
     // delta is applied (it keeps the validation exit code, like the old marker
@@ -422,7 +428,7 @@ fn test_full_style_dispatches_on_registry_source_not_kind_name() {
         },
     );
 
-    executor.project_render(Some("house")).unwrap();
+    executor.items().project_render(Some("house")).unwrap();
     let written = storage
         .read_repo_file(".jit/house.md")
         .unwrap()
@@ -460,7 +466,10 @@ fn test_full_style_issue_scoped_kind_is_typed_error_and_writes_nothing() {
         },
     );
 
-    let err = executor.project_render(Some("decisions")).unwrap_err();
+    let err = executor
+        .items()
+        .project_render(Some("decisions"))
+        .unwrap_err();
     let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
     assert!(
         matches!(
@@ -503,7 +512,10 @@ fn test_full_style_missing_registry_source_errors_pre_write() {
         },
     );
 
-    let err = executor.project_render(Some("invariants")).unwrap_err();
+    let err = executor
+        .items()
+        .project_render(Some("invariants"))
+        .unwrap_err();
     let typed = err.downcast_ref::<jit::repository_state::ProjectionError>();
     assert!(
         matches!(

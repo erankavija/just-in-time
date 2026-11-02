@@ -70,7 +70,7 @@ use crate::validation::engine::Finding;
 /// 1. **Colon-split (namespace) sites** — stop at the first colon and never
 ///    look at the rest of the value, so the widened value grammar cannot
 ///    change their behavior: `labels::parse_label`, `labels::type_value_of`,
-///    [`crate::commands::CommandExecutor::resolve_link_label`],
+///    [`crate::commands::ItemOps::resolve_link_label`],
 ///    [`crate::commands::CommandExecutor::dangling_link_findings`],
 ///    `validation::desugar::desugar_require_label`,
 ///    [`crate::commands::CommandExecutor::query_by_label`],
@@ -81,7 +81,7 @@ use crate::validation::engine::Finding;
 /// 2. **Slash-decode qualified-id sites** — route through the structural
 ///    address parser ([`crate::domain::item::parse_kind_segmented_address`] /
 ///    [`crate::domain::item::expand_sugar_address`]):
-///    [`crate::commands::CommandExecutor::show_item`] (via
+///    [`crate::commands::ItemOps::show_item`] (via
 ///    `resolve_item_address`), `resolve_link_label`'s qualified check (now
 ///    [`crate::domain::item::is_qualified_reference`]), `dangling_link_findings`,
 ///    and [`label_credits_id`] below — which routes an `@`-prefixed value

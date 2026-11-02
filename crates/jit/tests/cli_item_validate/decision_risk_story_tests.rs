@@ -116,6 +116,7 @@ fn test_story_per_label_resolves_decision() {
 
     let label = format!("per:{short}/D-01");
     let resolved = exec
+        .items()
         .resolve_link_label(&label)
         .unwrap()
         .expect("a per:<issue>/D-01 label resolves to the addressed decision");
@@ -134,7 +135,7 @@ fn test_story_per_label_resolves_decision() {
     // error, never a silent drop.
     let bad = format!("per:{short}/D-99");
     assert!(
-        exec.resolve_link_label(&bad).is_err(),
+        exec.items().resolve_link_label(&bad).is_err(),
         "unresolvable per: qualified id must be an error"
     );
 }
@@ -155,6 +156,7 @@ fn test_story_mitigates_and_resolves_labels_resolve_risk() {
     // mitigates: namespace.
     let mit_label = format!("mitigates:{short}/RISK-01");
     let mit_resolved = exec
+        .items()
         .resolve_link_label(&mit_label)
         .unwrap()
         .expect("a mitigates:<issue>/RISK-01 label resolves to the addressed risk");
@@ -172,6 +174,7 @@ fn test_story_mitigates_and_resolves_labels_resolve_risk() {
     // resolves: namespace.
     let res_label = format!("resolves:{short}/RISK-01");
     let res_resolved = exec
+        .items()
         .resolve_link_label(&res_label)
         .unwrap()
         .expect("a resolves:<issue>/RISK-01 label resolves to the addressed risk");
@@ -185,12 +188,12 @@ fn test_story_mitigates_and_resolves_labels_resolve_risk() {
     // Both namespaces ALSO return an error when the qualified id is unresolvable.
     let bad_mit = format!("mitigates:{short}/RISK-99");
     assert!(
-        exec.resolve_link_label(&bad_mit).is_err(),
+        exec.items().resolve_link_label(&bad_mit).is_err(),
         "unresolvable mitigates: qualified id must be an error"
     );
     let bad_res = format!("resolves:{short}/RISK-99");
     assert!(
-        exec.resolve_link_label(&bad_res).is_err(),
+        exec.items().resolve_link_label(&bad_res).is_err(),
         "unresolvable resolves: qualified id must be an error"
     );
 }

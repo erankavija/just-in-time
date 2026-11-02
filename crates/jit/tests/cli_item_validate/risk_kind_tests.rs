@@ -75,6 +75,7 @@ fn test_default_repo_mitigates_label_resolves_risk() {
 
     let label = format!("mitigates:{short}/RISK-01");
     let resolved = exec
+        .items()
         .resolve_link_label(&label)
         .unwrap()
         .expect("a mitigates:<issue>/RISK-01 label resolves to the addressed risk");
@@ -89,7 +90,7 @@ fn test_default_repo_mitigates_label_resolves_risk() {
     // A registered `mitigates:` namespace whose qualified id cannot be resolved is
     // an error, never a silent drop.
     let bad = format!("mitigates:{short}/RISK-99");
-    assert!(exec.resolve_link_label(&bad).is_err());
+    assert!(exec.items().resolve_link_label(&bad).is_err());
 }
 
 #[test]
@@ -108,6 +109,7 @@ fn test_default_repo_resolves_label_resolves_risk() {
 
     let label = format!("resolves:{short}/RISK-01");
     let resolved = exec
+        .items()
         .resolve_link_label(&label)
         .unwrap()
         .expect("a resolves:<issue>/RISK-01 label resolves to the addressed risk");
@@ -122,7 +124,7 @@ fn test_default_repo_resolves_label_resolves_risk() {
     // A registered `resolves:` namespace whose qualified id cannot be resolved is
     // an error, never a silent drop.
     let bad = format!("resolves:{short}/RISK-99");
-    assert!(exec.resolve_link_label(&bad).is_err());
+    assert!(exec.items().resolve_link_label(&bad).is_err());
 }
 
 #[test]
