@@ -55,7 +55,9 @@ ignore file is neither read nor written. The store's fixed lock set under
 `.repo-write.lock`, `.index.lock`, `.gates.lock`, and `.events.lock`; it is
 independent of the number of issues. The repository-sibling
 `.jit-bootstrap.lock` and the `.git/jit/locks/claims.lock` control-plane lock
-complete the fixed set. Their paths come from the
+complete the fixed set, and each checkout over a data root outside every
+checkout adds one `worktree.lock` (see [Worktree Identity](#worktree-identity)).
+Their paths come from the
 [storage layout](../../crates/jit/src/repository_state/path.rs) and the
 [`ClaimCoordinator`](../../crates/jit/src/storage/claim_coordinator.rs)
 implementation. The `.jit/` storage locks and `.jit-bootstrap.lock` retain
