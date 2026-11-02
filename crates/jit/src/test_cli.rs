@@ -108,6 +108,15 @@ impl JitCli {
         Ok((primary, linked, store))
     }
 
+    /// The fixture over `path` beneath this one's temporary directory, where a
+    /// test moves or nests a checkout.
+    pub fn at(&self, path: impl AsRef<Path>) -> Self {
+        Self {
+            _dir: Arc::clone(&self._dir),
+            root: self._dir.path().join(path),
+        }
+    }
+
     pub fn root(&self) -> &Path {
         &self.root
     }

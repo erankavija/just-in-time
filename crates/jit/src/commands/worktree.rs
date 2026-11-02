@@ -237,7 +237,7 @@ pub fn execute_worktree_info(paths: &WorktreePaths) -> Result<(WorktreeInfo, Vec
 /// # Errors
 ///
 /// Returns an error if `git worktree list` fails, the primary checkout cannot
-/// be resolved, or a present `.jit` identity cannot be read.
+/// be resolved, or a listed checkout's identity cannot be read.
 pub fn execute_worktree_list(
     paths: &WorktreePaths,
 ) -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
@@ -297,29 +297,37 @@ fn execute_worktree_list_at(
         .into_iter()
         .map(|git_entry| -> Result<WorktreeListEntry> {
             let worktree_path = PathBuf::from(&git_entry.path);
-            let local_jit = worktree_path.join(".jit");
+            let entry_paths = paths
+                .for_worktree_root(worktree_path.clone())?
+                .filter(|entry_paths| entry_paths.local_jit.exists());
 
-            // Load worktree identity - error if .jit exists but can't be read
-            let worktree_id = if local_jit.exists() {
-                let entry_paths = paths.for_worktree_root(worktree_path.clone());
-                let (identity, entry_warnings) =
-                    load_or_create_worktree_identity_with_warnings(&entry_paths, &git_entry.branch)
+            // Load worktree identity - error if the store exists but the identity
+            // can't be read
+            let worktree_id = match entry_paths {
+                Some(entry_paths) => {
+                    let (identity, entry_warnings) =
+                        load_or_create_worktree_identity_with_warnings(
+                            &entry_paths,
+                            &git_entry.branch,
+                        )
                         .with_context(|| {
                             format!(
-                                "Failed to load worktree identity from {}",
-                                local_jit.display()
+                                "Failed to load worktree identity for {}",
+                                worktree_path.display()
                             )
                         })?;
-                warnings.extend(entry_warnings);
-                identity.worktree_id
-            } else {
-                // No .jit directory yet - use branch-based temporary ID
-                WorktreeId::try_from(format!("wt:{}", git_entry.branch)).with_context(|| {
-                    format!(
-                        "Invalid worktree id fallback from branch '{}'",
-                        git_entry.branch
-                    )
-                })?
+                    warnings.extend(entry_warnings);
+                    identity.worktree_id
+                }
+                // No store for this checkout yet - use branch-based temporary ID
+                None => {
+                    WorktreeId::try_from(format!("wt:{}", git_entry.branch)).with_context(|| {
+                        format!(
+                            "Invalid worktree id fallback from branch '{}'",
+                            git_entry.branch
+                        )
+                    })?
+                }
             };
 
             // Count active claims for this worktree

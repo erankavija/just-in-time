@@ -50,6 +50,9 @@ pub struct ProbedCheckout {
     pub common_dir: PathBuf,
     /// The top-level directory of the probed checkout.
     pub worktree_root: PathBuf,
+    /// The checkout's own git directory: the common directory for a primary
+    /// checkout, its per-worktree directory for a linked one.
+    pub git_dir: PathBuf,
 }
 
 impl Git {
@@ -70,7 +73,12 @@ impl Git {
     /// Returns an error when git reports a checkout whose paths cannot be read
     /// or resolved.
     pub fn probe(&self, dir: &Path) -> Result<Option<ProbedCheckout>, GitError> {
-        const ARGS: [&str; 3] = ["rev-parse", "--git-common-dir", "--show-toplevel"];
+        const ARGS: [&str; 4] = [
+            "rev-parse",
+            "--git-common-dir",
+            "--show-toplevel",
+            "--absolute-git-dir",
+        ];
         let output = match self.run(dir, &ARGS) {
             Ok(output) if output.status.success() => output,
             Ok(_) | Err(GitError::Unavailable { .. }) => return Ok(None),
@@ -81,8 +89,10 @@ impl Git {
             output: String::from_utf8_lossy(&output.stdout).into_owned(),
         };
         let stdout = std::str::from_utf8(&output.stdout).map_err(|_| unexpected())?;
-        let (common_dir, worktree_root) = match stdout.lines().collect::<Vec<_>>()[..] {
-            [common_dir, worktree_root] => (Path::new(common_dir), Path::new(worktree_root)),
+        let (common_dir, worktree_root, git_dir) = match stdout.lines().collect::<Vec<_>>()[..] {
+            [common_dir, worktree_root, git_dir] => {
+                (Path::new(common_dir), Path::new(worktree_root), git_dir)
+            }
             _ => return Err(unexpected()),
         };
         let common_dir = if common_dir.is_absolute() {
@@ -99,6 +109,7 @@ impl Git {
         Ok(Some(ProbedCheckout {
             common_dir,
             worktree_root: worktree_root.to_path_buf(),
+            git_dir: PathBuf::from(git_dir),
         }))
     }
 

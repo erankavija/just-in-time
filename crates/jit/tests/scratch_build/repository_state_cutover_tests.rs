@@ -529,9 +529,10 @@ const NON_REPOSITORY_WRITES: [WriteClass; 8] = [
         "the identity file is machine-local and names one checkout, not repository content",
     ),
     (
-        "git hooks",
+        "git directory",
         &["git_dir"],
-        "hooks live in the git directory, which no repository root contains",
+        "hooks and the identity of a checkout over an external store live in the git \
+         directory, which no repository root contains",
     ),
     (
         "export",
@@ -553,7 +554,7 @@ const NON_REPOSITORY_WRITES: [WriteClass; 8] = [
 /// creating a parent directory can create the root itself.
 const OUTSIDE_ROOT_WRITES: [&str; 4] = [
     "claims control plane",
-    "git hooks",
+    "git directory",
     "export",
     "build script",
 ];
