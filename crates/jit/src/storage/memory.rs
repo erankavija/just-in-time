@@ -476,8 +476,7 @@ impl InMemoryStorage {
         let Some(bytes) = Self::data_entry_bytes(state, &VirtualPath::EVENTS) else {
             return Ok(Vec::new());
         };
-        parse_known_events(&String::from_utf8_lossy(&bytes))
-            .context("Failed to deserialize event log from repository image")
+        parse_known_events(&bytes).context("Failed to deserialize event log from repository image")
     }
 }
 
