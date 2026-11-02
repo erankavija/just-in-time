@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:external-root-lead",
+  "claimed_at": "2026-11-02T06:33:00.840742568Z",
   "context": {},
   "created_at": "2026-11-01T23:09:57.019989395Z",
   "dependencies": [],
@@ -18,7 +19,7 @@
     "type:bug"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Checkouts sharing an external data root keep separate worktree identities",
-  "updated_at": "2026-11-01T23:09:57.019989395Z"
+  "updated_at": "2026-11-02T06:33:00.840742568Z"
 }
