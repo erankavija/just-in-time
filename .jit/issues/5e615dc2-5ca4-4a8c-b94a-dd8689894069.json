@@ -44,6 +44,13 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/f8a6b298-history-independent-reads/breakdown.json"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f8a6b298-history-independent-reads/drift-audit.md"
     }
   ],
   "done_at": "2026-10-21T10:39:42.241423648Z",
@@ -53,9 +60,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "run_id": "8511c894-3e20-4efe-bff4-3a424366ad3e",
-      "status": "passed",
-      "updated_at": "2026-10-21T10:39:31.460342990Z",
+      "run_id": "4f666ccb-9a4b-482a-977e-416d9278bbb9",
+      "status": "failed",
+      "updated_at": "2026-11-02T23:31:29.005719220Z",
       "updated_by": "auto:executor"
     }
   },
@@ -75,5 +82,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Restructure storage so reads never scale with project history",
-  "updated_at": "2026-10-21T10:39:42.241423648Z"
+  "updated_at": "2026-11-02T23:31:29.005719220Z"
 }
