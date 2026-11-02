@@ -252,6 +252,7 @@ fn test_apply_resolves_node_doc_location() {
     // hand-composed `area/id` path.
     let directory = h
         .executor
+        .documents()
         .resolve_issue_artifact_directory(&epic, DOCUMENT_AREA)
         .unwrap()
         .directory;
@@ -304,6 +305,7 @@ fn test_apply_resolves_the_declared_document_area_into_the_node_doc_location() {
     // that repeats no short id, because the directory already names the issue.
     let directory = h
         .executor
+        .documents()
         .resolve_issue_artifact_directory(&epic, DOCUMENT_AREA)
         .unwrap()
         .directory;

@@ -1298,7 +1298,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             } => repo_root.join(subdir),
             _ => repo_root,
         };
-        let documents = self.issue_documents(input.issue)?;
+        let documents = self.documents().issue_documents(input.issue)?;
         let context = self.build_captured_gate_context(checker, &input, &documents)?;
         let subject = GateRunSubject {
             run_id: input.run_id,
@@ -4379,6 +4379,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         std::fs::create_dir_all(repo.path().join("dev")).unwrap();
         std::fs::write(repo.path().join("dev/notes.md"), "# Notes\n").unwrap();
         executor
+            .documents()
             .add_document_reference(&issue_id, "dev/notes.md", None, None, None, true)
             .unwrap();
         crate::test_utils::transition_issue(&executor, &issue_id, State::Ready).unwrap();
@@ -5666,6 +5667,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         // Link a document via the same accessor `jit doc add` uses.
         executor
+            .documents()
             .add_document_reference(
                 &issue_id,
                 "dev/active/my-plan.md",
