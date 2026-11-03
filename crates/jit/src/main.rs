@@ -2134,7 +2134,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         })?;
 
                     if dry_run {
-                        let outcome = executor.validate_batch_from_json(&defs)?;
+                        let outcome = executor.issues().validate_batch_from_json(&defs)?;
                         if json {
                             println!("{}", serde_json::to_string_pretty(&outcome)?);
                         } else {
@@ -2146,7 +2146,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         return Ok(());
                     }
 
-                    let outcome = executor.batch_create_from_json(defs)?;
+                    let outcome = executor.issues().batch_create_from_json(defs)?;
 
                     if json {
                         // Print EXACTLY the pure `{key: id}` map: every top-level
@@ -2716,8 +2716,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         };
 
                         // Execute bulk update
-                        let result =
-                            executor.apply_bulk_update(&query_filter, &operations, force)?;
+                        let result = executor.issues().apply_bulk_update(
+                            &query_filter,
+                            &operations,
+                            force,
+                        )?;
 
                         if json {
                             let msg =
@@ -5704,7 +5707,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             jit::cli::LabelCommands::Values { namespace } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let values = executor.list_label_values(&namespace)?;
+                let values = executor.issues().list_label_values(&namespace)?;
                 if json {
                     use jit::output::{JsonOutput, LabelValuesResponse, LabelValuesScope};
                     let msg = format!("{} value(s)", values.len());

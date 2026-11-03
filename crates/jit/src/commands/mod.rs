@@ -958,7 +958,7 @@ impl CapturedFieldUpdate {
     /// Build the bulk-update request shape for one issue. Shared by the real
     /// per-issue publication path ([`CommandExecutor::publish_captured_bulk_update`])
     /// and the no-op verification derivation
-    /// ([`CommandExecutor::confirm_bulk_noop_candidates`]) so both run the
+    /// ([`IssueOps::confirm_bulk_noop_candidates`]) so both run the
     /// identical authoritative request through [`derive_field_update`] --
     /// there is exactly one place that turns `UpdateOperations` into a
     /// captured request, so the two call sites cannot silently drift apart.
