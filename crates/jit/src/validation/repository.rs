@@ -19,7 +19,10 @@ use crate::domain::item::{
 };
 use crate::domain::{Issue, ReadinessCorrection};
 use crate::graph::DependencyGraph;
-use crate::repository_state::{captured_issue_ids, RepositoryImage, RepositoryIndex, VirtualPath};
+use crate::repository_state::{
+    captured_issue_ids, parse_issue_records, IssueRecordsError, RepositoryImage, RepositoryIndex,
+    VirtualPath,
+};
 use crate::validation::engine::Finding;
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
@@ -371,10 +374,6 @@ fn read_text(read: &ReadBytes<'_>, path: &str) -> Result<Option<String>> {
         .transpose()
 }
 
-fn required_text(read: &ReadBytes<'_>, path: &str) -> Result<String> {
-    read_text(read, path)?.ok_or_else(|| anyhow!("required repository file '{path}' is missing"))
-}
-
 fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Vec<Issue>> {
     let index_path = VirtualPath::INDEX.repository_relative();
     RepositoryIndex::parse(
@@ -382,22 +381,19 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Vec<Iss
             .ok_or_else(|| anyhow!("required repository file '{index_path}' is missing"))?,
     )
     .context(RepositoryJudgedInvalid(format!("invalid {index_path}")))?;
-    captured_issue_ids(image)?
-        .iter()
-        .map(|id| {
-            let path = VirtualPath::issue_record(id).repository_relative();
-            let issue: Issue = serde_json::from_str(&required_text(read, &path)?)
-                .with_context(|| RepositoryJudgedInvalid(format!("invalid {path}")))?;
-            if &issue.id != id {
-                return Err(RepositoryJudgedInvalid(format!(
-                    "issue file '{path}' contains id '{}' instead of '{id}'",
-                    issue.id
-                ))
-                .into());
-            }
-            Ok(issue)
-        })
-        .collect()
+    let ids = captured_issue_ids(image)?;
+    parse_issue_records(&ids, |path| image.file_bytes(path)).map_err(|error| match error {
+        IssueRecordsError::Malformed { id, error } => {
+            anyhow!(error.into_source()).context(RepositoryJudgedInvalid(format!(
+                "invalid {}",
+                VirtualPath::issue_record(&id).repository_relative()
+            )))
+        }
+        error @ IssueRecordsError::MismatchedId { .. } => {
+            RepositoryJudgedInvalid(error.to_string()).into()
+        }
+        error => error.into(),
+    })
 }
 
 fn validate_integrity(
