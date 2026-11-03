@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9a886c0e5549222517feac5d0816589cf3e18337",
+  "completed_at": "2026-11-03T23:07:52.229408882Z",
+  "duration_ms": 186388,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue success criteria are satisfied; the prior registry-test finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "abe555e9-0b95-474b-bf80-a9c23f33dbfa",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cdba1054-6064-4b15-908f-59a86ace3810",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T23:04:45.841205298Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 938bd0a27, a48f3186c (jit:abe555e9)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-02, REQ-05, REQ-12, REQ-17 (.jit/issues/df129d9e-c795-4d92-9ee5-ffd776339252.json); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T23:04:45Z); code-review previously failed (exit 1, prior F1 verified addressed)\nTruncation recovery: bounded re-reads of current dispatch/output/schema/test sources and both attributable patches\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue success criteria are satisfied; the prior registry-test finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
