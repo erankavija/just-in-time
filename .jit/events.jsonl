@@ -23004,3 +23004,5 @@
 {"gate_key":"code-review","id":"d8b4d4c7-800f-45b3-9a01-8910b2e201e6","issue_id":"1539da29-f445-430c-a238-8613da6ae904","timestamp":"2026-11-03T21:10:00.416422297Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"breakdown-review","id":"114448a5-0bf0-442d-8bfe-c9db2874025b","issue_id":"b06cee74-7635-49c0-bc13-448bcfa28324","timestamp":"2026-11-03T21:11:50.512484876Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"f4f0654d-1475-4e03-906d-2a89d9db9e20","issue_id":"dd53527f-818b-4e61-a0de-c2fb1d0d2684","timestamp":"2026-11-03T21:12:09.941123261Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"plan-review","id":"b88bfc86-44c3-4433-9149-af99f840be8b","issue_id":"0dc73711-07fb-49c3-8eda-996516b19bd1","timestamp":"2026-11-03T21:16:35.673673847Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"coverage-preview","id":"d9626272-541c-440c-a185-394baf720613","issue_id":"12ecb90c-eb0c-4c4d-8717-f217217eb5c9","timestamp":"2026-11-03T21:16:36.167973576Z","type":"gate_passed","updated_by":"auto:executor"}
