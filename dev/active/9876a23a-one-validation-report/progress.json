@@ -1,7 +1,7 @@
 {
   "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
   "epic_short_id": "9876a23a",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -78,7 +78,7 @@
           "short_id": "c92f4011",
           "title": "Keep default rules in force when rules.toml holds only custom rules",
           "classification": "implementation",
-          "status": "merged bdc0fd571; cargo-ci passed; rework 2 for code-review F1 (custom rule shadows default); docs-mechanical blocked by target symlink (escalated)",
+          "status": "done (merges bdc0fd571, 108f53d99; rework 2: CI fixtures, then custom/default name collision)",
           "worker": "codex gpt-6-astra xhigh"
         }
       ]
@@ -89,25 +89,25 @@
       "issues": [
         {
           "short_id": "977d01d8",
-          "status": "landed 5e0ca8825; gates running",
+          "status": "done 5e0ca8825",
           "worker": "codex gpt-6-astra xhigh",
           "worker_reason": "small residue + tests"
         },
         {
           "short_id": "ea843d26",
-          "status": "landed b1017884c; cargo-ci passed; code-review running",
+          "status": "done b1017884c, 976e3b932 (rework 1: trailing-hyphen property)",
           "worker": "codex gpt-6-astra xhigh",
           "worker_reason": "local allocation-free match"
         },
         {
           "short_id": "b3a768b3",
-          "status": "landed 9b6397f43; gates running",
+          "status": "done 9b6397f43",
           "worker": "claude opus",
           "worker_reason": "produces parsed-records contract"
         },
         {
           "short_id": "f968dfe1",
-          "status": "rework 1 done; resolving merge conflict with b3a768b3",
+          "status": "done 107ee1810 (rework 1: best-effort image_plan_content; merge conflict resolved)",
           "worker": "claude opus",
           "worker_reason": "produces plan-document-resolver contract"
         }
@@ -134,12 +134,22 @@
       },
       {
         "wave": 2,
-        "partial": true,
         "default": 15,
-        "test_support_as_test": 0,
+        "test_support_as_test": -1,
         "by_issue": {
-          "70ac98fc": "+9 (builder file())",
-          "cf49da17": "+6 (builder files())"
+          "70ac98fc": 0,
+          "cf49da17": 0,
+          "c92f4011": -1
+        }
+      },
+      {
+        "wave": 3,
+        "test_support_as_test": -42,
+        "by_issue": {
+          "977d01d8": -7,
+          "b3a768b3": 7,
+          "f968dfe1": -46,
+          "ea843d26": 4
         }
       }
     ]
@@ -187,7 +197,9 @@
     }
   ],
   "rework_counts": {
-    "c92f4011": 2
+    "c92f4011": 2,
+    "ea843d26": 1,
+    "f968dfe1": 1
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
