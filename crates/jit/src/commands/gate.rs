@@ -665,7 +665,7 @@ fn derive_gate_registry_mutation(
 
 /// Quality-gate operations of a [`CommandExecutor`].
 pub struct GateOps<'a, S: IssueStore> {
-    exec: &'a CommandExecutor<S>,
+    pub(super) exec: &'a CommandExecutor<S>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -787,7 +787,7 @@ impl<S: IssueStore> GateOps<'_, S> {
     ///
     /// For an automated gate this runs the checker; for a manual gate it records
     /// the attestation. A gate declaring inputs a prior run's verdict already
-    /// covers reuses that verdict ([`check_gate`](CommandExecutor::check_gate)); `force`
+    /// covers reuses that verdict ([`check_gate`](GateOps::check_gate)); `force`
     /// refuses reuse and executes. Manual attestations are always recorded as
     /// fresh evidence.
     fn record_gate_pass(
@@ -836,7 +836,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             } else {
                 crate::commands::VerdictSource::ReuseUnchangedInputs
             };
-            let result = self.exec.check_gate_with(&full_id, gate_key, source)?;
+            let result = self.check_gate_with(&full_id, gate_key, source)?;
             if result.status != GateRunStatus::Passed {
                 return Err(GatePassFailed {
                     issue_id: full_id,
@@ -1112,9 +1112,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations(
-            self.exec.real_repo_layout().as_ref(),
-        )?;
+        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
 
         // Validate: auto gates must have checker
         if mode == crate::declarations::GateMode::Auto && checker.is_none() {
@@ -1211,9 +1209,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main (mirrors define_gate).
-        crate::commands::worktree::enforce_main_only_operations(
-            self.exec.real_repo_layout().as_ref(),
-        )?;
+        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
         let warnings = self.refuse_foreign_leases_on_gate_users(key)?;
         match self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Update {
             key: key.clone(),
@@ -1249,9 +1245,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations(
-            self.exec.real_repo_layout().as_ref(),
-        )?;
+        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
 
         let warnings = self.refuse_foreign_leases_on_gate_users(key)?;
         self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Remove {

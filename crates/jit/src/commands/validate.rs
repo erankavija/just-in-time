@@ -2214,6 +2214,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
 
         let layout = self
             .exec
+            .gates()
             .real_repo_layout()
             .context("Branch drift needs a repository on disk")?;
         let repository = layout.data_root();

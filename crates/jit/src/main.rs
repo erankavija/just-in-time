@@ -3686,7 +3686,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate status", json)?;
                     let id = resolve_issue_arg(&storage, &id)
                         .or_else(|e| report_gate_check_error(e, json))?;
-                    match executor.get_last_gate_run(&id, &gate_key) {
+                    match executor.gates().get_last_gate_run(&id, &gate_key) {
                         Ok(Some(result)) => {
                             if json {
                                 use jit::output::{GateFindingsResponse, JsonOutput};
@@ -3790,7 +3790,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let id = resolve_issue_arg(&storage, &id)
                         .or_else(|e| report_gate_check_error(e, json))?;
 
-                    match executor.get_last_gate_run(&id, &gate_key) {
+                    match executor.gates().get_last_gate_run(&id, &gate_key) {
                         Ok(Some(result)) => {
                             let rendered_stdout =
                                 want_stdout.then(|| render_report_stream(&result.stdout, tail));
@@ -3891,7 +3891,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     let gate_key = parse_gate_key(gate_key, json)?;
 
-                    match executor.get_last_gate_run(&id, &gate_key) {
+                    match executor.gates().get_last_gate_run(&id, &gate_key) {
                         Ok(Some(result)) => {
                             if json {
                                 use jit::output::{GateRunSummary, JsonOutput};
@@ -3934,9 +3934,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let output_ctx = OutputContext::new(quiet, json);
                 let id = resolve_issue_arg(&storage, &id)?;
                 // Latest recorded run of each required gate.
-                let (results, _) = executor.get_last_gate_runs_for_issue(&id)?;
+                let (results, _) = executor.gates().get_last_gate_runs_for_issue(&id)?;
                 // Readiness across EVERY required gate (auto + manual).
-                let gate_statuses = executor.get_required_gate_statuses_for_issue(&id)?;
+                let gate_statuses = executor.gates().get_required_gate_statuses_for_issue(&id)?;
 
                 let total = gate_statuses.len();
                 let passed_count = gate_statuses

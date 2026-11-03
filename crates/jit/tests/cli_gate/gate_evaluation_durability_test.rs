@@ -77,6 +77,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
         .expect("require the durability gate on the issue");
 
     let evaluated = executor
+        .gates()
         .check_gate(&issue_id, &"durability-check".parse().unwrap())
         .expect("the automated gate evaluates");
     assert_eq!(evaluated.status, GateRunStatus::Passed);
