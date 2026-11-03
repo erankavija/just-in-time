@@ -265,11 +265,11 @@ the time and emits one exact plan.
 - `finalize` (built on `finalize_delta`) follows a frozen identifier order — the
   indices of new issue ids first, reserved for the ids their commands derived,
   gate-run/record ids next, event ids last after canonical event ordering — stamps the one timestamp on every transition, emits the new
-  event lines as one `AppendEvents` action at the captured log length
-  (`@/inv/event-log`), and derives `index.json` tombstones from the captured
-  preimage. The captured tail is the finalizer's torn-tail evidence: it refuses to
-  append after an uncertified torn final line. `finalize_audit_append` reuses the
-  same torn-tail authority for init/profile deltas that carry their own asset
+  event lines as one `AppendEvents` action at the log's committed length, the end
+  of its last newline-terminated line (`@/inv/event-log`), and derives `index.json`
+  tombstones from the captured preimage. The captured tail determines that length,
+  so an unterminated final line is overwritten. `finalize_audit_append` positions
+  its append the same way for init/profile deltas that carry their own asset
   actions.
 
 The finalizer serializes every record canonically (`serialize_issue`,
@@ -348,7 +348,7 @@ sequenceDiagram
 A `RedoRecord` (`storage/redo_record.rs`) is one mutation's file changes: the
 directories it makes, the complete new bytes and mode of every file it puts, the
 paths it deletes, and one event append (bytes at the offset the capture read as
-the log's length). A mode change is a put of the captured bytes under the new
+the log's committed length). A mode change is a put of the captured bytes under the new
 mode. Operation paths are pairwise disjoint — no two operations name one path and
 none is an ancestor of another, the event append's implicit target included —
 checked identically by `RedoRecord::new` and `RedoRecord::parse`, so only a

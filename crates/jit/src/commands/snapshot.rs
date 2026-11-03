@@ -1,6 +1,6 @@
 //! Snapshot export command implementation
 
-use crate::commands::{CommandExecutor, SnapshotExportResult};
+use crate::commands::{ArchiveOps, SnapshotExportResult};
 use crate::document::{AdapterRegistry, AssetScanner};
 use crate::domain::{DocumentReference, Issue, State};
 use crate::snapshot::{
@@ -42,7 +42,7 @@ struct CapturedFile {
     size_bytes: usize,
 }
 
-impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
+impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
     /// Determine source mode based on options and git availability
     pub fn determine_snapshot_source_mode(
         &self,
@@ -50,7 +50,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         working_tree: bool,
         committed_only: bool,
     ) -> Result<SourceMode> {
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let open_repo = || {
             git2::Repository::open(layout.worktree_root())
                 .map_err(|_| anyhow!("snapshot source requires git repository"))
@@ -670,7 +670,7 @@ fn build_snapshot_tar(
     Ok(staged)
 }
 
-impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
+impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
     /// Assemble and publish one snapshot through its classified destination.
     pub fn export_snapshot(
         &self,
@@ -685,9 +685,9 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             RepositoryExportIntent,
         };
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let exporter = SnapshotExporter::new(
-            &self.storage,
+            &self.exec.storage,
             layout.worktree_root().to_path_buf(),
             layout.data_root().to_path_buf(),
             chrono::Utc::now(),
@@ -710,7 +710,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                         let (directories, files) = tree.repository_payload(staging.path())?;
                         let intent = RepositoryExportIntent::new_tree(target, directories, files);
                         super::map_occupied_export_error(
-                            self.publish_repository_export(&layout, &intent, budget),
+                            self.exec
+                                .publish_repository_export(&layout, &intent, budget),
                             &output_path,
                         )?;
                     }
@@ -736,7 +737,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                         let bytes = std::fs::read(tar.path())?;
                         let intent = RepositoryExportIntent::new_absent_file(target, bytes);
                         super::map_occupied_export_error(
-                            self.publish_repository_export(&layout, &intent, budget),
+                            self.exec
+                                .publish_repository_export(&layout, &intent, budget),
                             &output_path,
                         )?;
                     }

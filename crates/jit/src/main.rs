@@ -3044,8 +3044,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
 
             let container = resolve_issue_arg(&storage, &container)?;
-            let (result, warnings) =
-                executor.apply_template(&template, &container, &bindings, force)?;
+            let (result, warnings) = executor
+                .templates()
+                .apply_template(&template, &container, &bindings, force)?;
             for warning in &warnings {
                 eprintln!("Warning: {}", warning);
             }
@@ -5325,7 +5326,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         },
         Commands::Archive(archive_cmd) => match archive_cmd {
             ArchiveCommands::Candidates => {
-                let report = executor.archive_candidates()?;
+                let report = executor.archive().archive_candidates()?;
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report)?);
                 } else {
@@ -5334,14 +5335,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             ArchiveCommands::Document { path, execute } => {
                 if execute {
-                    let result = executor.execute_archive_document(&path)?;
+                    let result = executor.archive().execute_archive_document(&path)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
                         print!("{}", jit::output::render_archive_execution(&result));
                     }
                 } else {
-                    let plan = executor.preview_archive_document(&path)?;
+                    let plan = executor.archive().preview_archive_document(&path)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&plan)?);
                     } else {
@@ -5352,14 +5353,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             ArchiveCommands::Container { id, execute } => {
                 let id = resolve_issue_arg(&storage, &id)?;
                 if execute {
-                    let result = executor.execute_archive_container(&id)?;
+                    let result = executor.archive().execute_archive_container(&id)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
                         print!("{}", jit::output::render_archive_execution(&result));
                     }
                 } else {
-                    let plan = executor.preview_archive_container(&id)?;
+                    let plan = executor.archive().preview_archive_container(&id)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&plan)?);
                     } else {
@@ -6609,11 +6610,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
         }
         Commands::Recover => {
-            use jit::commands::claim::execute_recover;
             use jit::output::{JsonOutput, OutputContext};
             use serde_json::json;
 
-            match execute_recover(&storage, &worktree_paths) {
+            match executor.claims().recover() {
                 Ok(report) => {
                     if json {
                         let msg = format!(
@@ -6912,18 +6912,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 agent_id,
                 reason,
             } => {
-                use jit::commands::claim::execute_claim_acquire;
                 use jit::output::{JsonOutput, OutputContext};
 
                 match resolve_issue_arg(&storage, &issue_id).and_then(|full_id| {
-                    execute_claim_acquire(
-                        &storage,
-                        &worktree_paths,
-                        &full_id,
-                        ttl,
-                        agent_id.as_deref(),
-                        reason.as_deref(),
-                    )
+                    executor
+                        .claims()
+                        .acquire(&full_id, ttl, agent_id.as_deref(), reason.as_deref())
                 }) {
                     Ok((lease_id, warnings)) => {
                         if json {
@@ -6958,12 +6952,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             ClaimCommands::Release { issue_id } => {
-                use jit::commands::claim::execute_claim_release_by_issue;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match resolve_issue_arg(&storage, &issue_id).and_then(|full_id| {
-                    execute_claim_release_by_issue(&storage, &worktree_paths, &full_id)
-                }) {
+                match resolve_issue_arg(&storage, &issue_id)
+                    .and_then(|full_id| executor.claims().release_by_issue(&full_id))
+                {
                     Ok((released, warnings)) => {
                         if json {
                             let response = serde_json::json!({
@@ -7008,10 +7001,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 lease_id,
                 extension,
             } => {
-                use jit::commands::claim::execute_claim_renew;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_renew(&worktree_paths, &lease_id, extension) {
+                match executor.claims().renew(&lease_id, extension) {
                     Ok((renewed_lease, warnings)) => {
                         if json {
                             let response = serde_json::json!({
@@ -7046,10 +7038,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             ClaimCommands::Heartbeat { lease_id } => {
-                use jit::commands::claim::execute_claim_heartbeat;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_heartbeat(&worktree_paths, &lease_id) {
+                match executor.claims().heartbeat(&lease_id) {
                     Ok(warnings) => {
                         if json {
                             let response = serde_json::json!({
@@ -7079,7 +7070,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             ClaimCommands::Status { issue, agent } => {
-                use jit::commands::claim::execute_claim_status;
                 use jit::output::{
                     JsonOutput, LeaseListResponse, LeaseListWarnings, OutputContext,
                 };
@@ -7087,9 +7077,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 match issue
                     .map(|id| resolve_issue_filter_arg(&storage, &id))
                     .transpose()
-                    .and_then(|issue| {
-                        execute_claim_status(&worktree_paths, issue.as_ref(), agent.as_deref())
-                    }) {
+                    .and_then(|issue| executor.claims().status(issue.as_ref(), agent.as_deref()))
+                {
                     Ok((leases, warnings)) => {
                         if json {
                             let msg = format!("{} active lease(s)", leases.len());
@@ -7172,12 +7161,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             ClaimCommands::List => {
-                use jit::commands::claim::execute_claim_list;
                 use jit::output::{
                     JsonOutput, LeaseListResponse, LeaseListWarnings, OutputContext,
                 };
 
-                match execute_claim_list(&worktree_paths) {
+                match executor.claims().list() {
                     Ok((leases, warnings)) => {
                         if json {
                             let msg = format!("{} lease(s) found", leases.len());
@@ -7248,10 +7236,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             ClaimCommands::ForceEvict { lease_id, reason } => {
-                use jit::commands::claim::execute_claim_force_evict;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_force_evict(&worktree_paths, &lease_id, &reason) {
+                match executor.claims().force_evict(&lease_id, &reason) {
                     Ok(warnings) => {
                         if json {
                             let response = serde_json::json!({
@@ -7477,7 +7464,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     .with_context(|| format!("Invalid format: {}", format))?;
 
                 // Determine source mode
-                let source_mode = executor.determine_snapshot_source_mode(
+                let source_mode = executor.archive().determine_snapshot_source_mode(
                     at.as_deref(),
                     working_tree,
                     committed_only,
@@ -7487,7 +7474,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     executor.validate_silent()?;
                 }
 
-                let (result, warnings) = executor.export_snapshot(
+                let (result, warnings) = executor.archive().export_snapshot(
                     &current_dir,
                     &snapshot_scope,
                     &source_mode,

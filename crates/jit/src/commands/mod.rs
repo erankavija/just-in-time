@@ -67,12 +67,14 @@ pub mod worktree;
 #[allow(dead_code)]
 pub mod test_helpers;
 
+pub use archive::ArchiveOps;
 pub use batch_create::{
     BatchCreateOutcome, BatchDryRunOutcome, BatchIssueDef, BatchValidationError,
     BatchValidationProblem,
 };
 pub use bootstrap::{open_repository, OpenedRepository, RecoveryFailedError, RepositoryInvocation};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
+pub use claim::ClaimOps;
 pub use config::{
     resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigOps, ConfigSetOutcome,
 };
@@ -91,7 +93,7 @@ pub use profile::{
     ProfileSelectorError, ProfileVariableOptions, SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
-pub use template::TemplateApplyResult;
+pub use template::{TemplateApplyResult, TemplateOps};
 pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
     TemplateDelta,
@@ -3196,13 +3198,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let record = update.as_mut().unwrap_or(&mut issue);
                 match &request {
                     CapturedLifecycleMutation::Claim { assignee, .. } => {
-                        record.assignee = Some(assignee.clone());
-                        events.push((
-                            4,
-                            EventBody::draft_issue_claimed(record.id.clone(), assignee.clone()),
-                        ));
-                        if update.is_none() {
-                            update = Some(issue);
+                        if record.assignee.as_ref() != Some(assignee) {
+                            record.assignee = Some(assignee.clone());
+                            events.push((
+                                4,
+                                EventBody::draft_issue_claimed(record.id.clone(), assignee.clone()),
+                            ));
+                            if update.is_none() {
+                                update = Some(issue);
+                            }
                         }
                     }
                     CapturedLifecycleMutation::Release {
@@ -4448,7 +4452,15 @@ assert = {}
         );
         coordinator.init().unwrap();
         let issue_id = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0f0e_0d0c);
-        coordinator.acquire_claim(&issue_id, 600).unwrap();
+        coordinator
+            .acquire_claim_synchronized(
+                &issue_id,
+                600,
+                Some("test lease"),
+                crate::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
         let guard = claims_mutation_guard(&paths).unwrap().unwrap();
 
         let stranger = "agent:stranger".parse().unwrap();

@@ -1363,12 +1363,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(runs)
     }
 
-    /// Load a single gate run result by run ID.
+    /// Load a single gate run result belonging to the issue.
     pub fn get_gate_run_result(
         &self,
+        issue_id: &IssueId,
         run_id: &crate::domain::identity::GateRunId,
     ) -> Result<crate::domain::GateRunResult> {
-        self.storage.load_gate_run_result(run_id)
+        self.storage.load_gate_run_result(issue_id, run_id)
     }
 
     pub fn create_gate_preset(

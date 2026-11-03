@@ -122,6 +122,35 @@ pub fn stamped_event(
     crate::domain::Event::new(id.into(), timestamp, body)
 }
 
+/// A non-reconciling execution of `target` into `root` publishing each
+/// `(source, destination)` pair with identity of the destination's own text.
+pub fn archive_execution(
+    target: crate::domain::artifact_plan::PlanTarget,
+    root: &str,
+    published: &[(&str, &str)],
+) -> crate::domain::artifact_execution::ArchiveExecution {
+    crate::domain::artifact_execution::ArchiveExecution {
+        target,
+        destination_root: root.to_string(),
+        publications: published
+            .iter()
+            .map(
+                |(source, destination)| crate::domain::artifact_execution::ArchivePublication {
+                    source: Some((*source).to_string()),
+                    destination: (*destination).to_string(),
+                    content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
+                        destination.as_bytes(),
+                    ),
+                    adopted: false,
+                },
+            )
+            .collect(),
+        reference_changes: Vec::new(),
+        planned_deletions: Vec::new(),
+        reconciling: false,
+    }
+}
+
 #[cfg(test)]
 mod fixture_issue_tests {
     use super::fixture_issue;

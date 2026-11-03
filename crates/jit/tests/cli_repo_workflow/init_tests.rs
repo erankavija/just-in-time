@@ -5,7 +5,9 @@ use jit::declarations::parse_configuration;
 use jit::domain::artifact_classifier::contains_path;
 use jit::profile::ProfilePackageModel;
 use jit::repository_state::{Contribution, ScalarTarget, SetStringTarget};
+use jit::storage::worktree_paths::WorktreePaths;
 use jit::test_cli::JitCli;
+use jit::test_lease_store::history_path;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -342,10 +344,12 @@ fn test_init_json_gitattributes_has_no_stale_claims_jsonl_entry() {
     assert!(out.status.success(), "jit init --json failed: {:?}", out);
 
     let content = fs::read_to_string(cli.root().join(".gitattributes")).unwrap();
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    let history = history_path(&paths.shared_jit);
     assert!(
-        !content.contains("claims.jsonl"),
+        !content.contains(history.file_name().unwrap().to_str().unwrap()),
         "claim coordination writes its log under .git/jit/, not .jit/, so \
-         .gitattributes should have no merge-driver entry for claims.jsonl, got: {content:?}"
+         .gitattributes should have no merge-driver entry for the claims log, got: {content:?}"
     );
     // Positive control: the events.jsonl entry stays — events.jsonl is
     // actually persisted under the versioned .jit/ data plane.
