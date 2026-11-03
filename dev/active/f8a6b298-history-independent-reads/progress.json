@@ -418,13 +418,13 @@
     },
     {
       "item": "dd53527f code-review fail 4: claim list text output lacks STALE marker",
-      "status": "pending with user via just-in-time-6a"
+      "status": "approved by 6a: rework 2 dispatched"
     }
   ],
   "rework_counts": {
     "becea20a": 1,
     "f9bf70a5": 1,
-    "dd53527f": 1
+    "dd53527f": 2
   },
   "surfaced_pitfalls": [
     {
@@ -540,6 +540,12 @@
       "model": "gpt-6-astra",
       "effort": "high",
       "reason": "capture read-mode sweep across command families"
+    },
+    {
+      "id": "dd53527f-r2",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "code-review F1: claim list text output lacks STALE marker (6a approved)"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
