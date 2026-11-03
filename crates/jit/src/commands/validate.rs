@@ -326,9 +326,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     ///
     /// The round reads the registries, the event log (whole for an archive,
     /// otherwise as its length and tail; a `mutation` also parses issues
-    /// strictly) and the caller's paths; then the closure those registries plan. Validation and mutation passes also read
-    /// linked plan documents; a mutation's precheck target adds prompt files and
-    /// gate-run results. Repair and archive omit these rule-evaluation inputs.
+    /// strictly) and the caller's paths; then the closure those registries
+    /// plan. Validation and mutation passes also read linked plan documents; a
+    /// mutation's precheck target adds prompt files and gate-run results.
+    /// Repair and archive omit these rule-evaluation inputs.
     fn capture_proposed_base_inner(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
