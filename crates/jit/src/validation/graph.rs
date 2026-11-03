@@ -73,7 +73,7 @@ use crate::validation::engine::Finding;
 ///    [`crate::commands::ItemOps::resolve_link_label`],
 ///    [`crate::commands::ValidationOps::dangling_link_findings`],
 ///    `validation::desugar::desugar_require_label`,
-///    [`crate::commands::CommandExecutor::query_by_label`],
+///    [`crate::commands::QueryOps::query_by_label`],
 ///    `snapshot::SnapshotScope::parse`, plus unrelated-namespace assignee
 ///    parsing (`commands::claim::assert_valid_actor` and
 ///    `domain::Assignee::from_str` — label values never reach these parsers,

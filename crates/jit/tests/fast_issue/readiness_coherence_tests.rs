@@ -48,6 +48,7 @@ fn test_batch_create_starts_an_entry_carrying_an_unmet_dependency_in_backlog() {
 
     let outcome = h
         .executor
+        .issues()
         .batch_create_from_json(vec![
             batch_def("upstream", "Upstream", &[]),
             batch_def("dependent", "Dependent", &["upstream"]),

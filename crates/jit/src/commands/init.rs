@@ -1,4 +1,7 @@
-use super::{profile::ProfileSelection, with_mutation_session, CommandExecutor, SessionStep};
+use super::{
+    profile::{ProfileOps, ProfileSelection},
+    with_mutation_session, SessionStep,
+};
 use crate::config::{slugify_project_name, ProjectName};
 use crate::profile::{ProfileComposedApplyResult, ProfileRunMode};
 use crate::repository_state::{
@@ -6,6 +9,7 @@ use crate::repository_state::{
     GitattributesStatus, InitializationScaffold, MaterializationPlan, MaterializationRequest,
     RepositoryAction, VirtualPath,
 };
+use crate::storage::worktree_identity::WorktreeIdentity;
 use crate::storage::{IssueStore, RepositoryStateStore};
 use anyhow::{Context, Result};
 use std::path::Path;
@@ -24,7 +28,7 @@ pub struct FreshInitResult {
     pub modified_paths: Vec<String>,
 }
 
-impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
+impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
     /// Publish a fresh neutral or profiled repository through one mutation
     /// session.
     ///
@@ -49,14 +53,14 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let profiles = selection
             .map(ProfileSelection::application_inputs)
             .unwrap_or_default();
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         // Typed Git evidence is acquired once at the boundary (loop-invariant).
         let gitattributes = gitattributes_claim(&layout);
         // One MutationContext per operation, reused across probe/final finalize and
         // every retry so a composed lifecycle event's id/timestamp stay stable.
         let context = super::production_mutation_context();
         let mut result = with_mutation_session(
-            self.storage(),
+            self.exec.storage(),
             &layout,
             "repository initialization",
             |session| {
@@ -80,7 +84,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 // preserved `IfAbsent` file (e.g. an existing `rules.toml` referencing a
                 // custom schema) is not shadowed by its neutral default in the closure.
                 let probe_overrides = scaffold.overlay_overrides()?;
-                let Some(mut probe) = self.capture_proposed_base(
+                let Some(mut probe) = self.exec.capture_proposed_base(
                     &mut *session,
                     &probe_overrides,
                     &extra_paths,
@@ -114,7 +118,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
 
                 // Grow the probe by the exact write set's validation closure, then
                 // finalize, validate, and publish under the same held session.
-                let Some(base) = self.capture_proposed_base(
+                let Some(base) = self.exec.capture_proposed_base(
                     &mut *session,
                     &delta_overlay,
                     &extra_paths,
@@ -252,6 +256,51 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             ),
         };
         Ok((config, project_name, image))
+    }
+}
+
+impl<S: IssueStore> ProfileOps<'_, S> {
+    /// Create or refresh machine-local worktree identity after repository
+    /// scaffold publication.
+    ///
+    /// Called after the scaffold is published, so optional Git host state
+    /// remains outside repository publication.
+    pub fn initialize_worktree_identity(
+        &self,
+        paths: &crate::storage::worktree_paths::WorktreePaths,
+    ) -> Result<(
+        Option<WorktreeIdentity>,
+        Vec<crate::storage::StorageWarning>,
+    )> {
+        use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
+
+        if !paths.is_git_repository() {
+            return Ok((None, Vec::new()));
+        }
+
+        // Get git branch name
+        let branch = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&paths.worktree_root)
+            .args(["branch", "--show-current"])
+            .output()
+            .ok()
+            .and_then(|output| {
+                if output.status.success() {
+                    String::from_utf8(output.stdout).ok()
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "main".to_string())
+            .trim()
+            .to_string();
+
+        // Create or update worktree identity
+        // This handles copied files in git worktrees automatically
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+
+        Ok((Some(identity), warnings))
     }
 }
 
@@ -412,6 +461,7 @@ fn git_events_pattern(relative: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::CommandExecutor;
     use crate::profile::ProfileApplicationStatus;
     use crate::profile::ProfilePackage;
     use crate::repository_state::{Contribution, MapEntryTarget};
@@ -502,8 +552,11 @@ mod tests {
             repo_dir: &Path,
             selectors: &[PathBuf],
         ) -> Result<FreshInitResult> {
-            let selection = self.select_profiles(selectors, &Default::default())?;
-            self.initialize_fresh_repository(repo_dir, Some(&selection))
+            let selection = self
+                .profiles()
+                .select_profiles(selectors, &Default::default())?;
+            self.profiles()
+                .initialize_fresh_repository(repo_dir, Some(&selection))
         }
     }
 
@@ -513,6 +566,7 @@ mod tests {
         let executor = file_executor(repo.path()).unwrap();
 
         let result = executor
+            .profiles()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -543,12 +597,15 @@ mod tests {
     fn test_fresh_init_over_memory_store_writes_the_files_the_json_backend_writes() {
         let repo = TempDir::new().unwrap();
         let json = file_executor(repo.path()).unwrap();
-        json.initialize_fresh_repository(repo.path(), None).unwrap();
+        json.profiles()
+            .initialize_fresh_repository(repo.path(), None)
+            .unwrap();
 
         let memory = crate::storage::InMemoryStorage::rooted_at(repo.path());
         let layout = memory.repository_layout();
         let memory_executor = CommandExecutor::new(memory.clone()).with_layout(layout);
         memory_executor
+            .profiles()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -583,6 +640,7 @@ mod tests {
         let executor = file_executor(repo.path()).unwrap();
 
         let result = executor
+            .profiles()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -624,6 +682,7 @@ mod tests {
         );
         let executor = file_executor(repo.path()).unwrap();
         executor
+            .profiles()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -1125,6 +1184,7 @@ mod tests {
         let repo = TempDir::new().unwrap();
         let executor = file_executor(repo.path()).unwrap();
         executor
+            .profiles()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -1215,6 +1275,7 @@ unique = true\n";
         declare_before_init(repo.path(), &taxonomy.config_fragment());
         file_executor(repo.path())
             .unwrap()
+            .profiles()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -1242,6 +1303,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
 
         file_executor(repo.path())
             .unwrap()
+            .profiles()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
@@ -1259,6 +1321,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         fs::write(&config_path, config.replace(SQUAD_NAMESPACE, "")).unwrap();
         file_executor(repo.path())
             .unwrap()
+            .profiles()
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         let refreshed = fs::read_to_string(&rules_path).unwrap();

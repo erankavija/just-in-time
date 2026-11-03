@@ -3422,9 +3422,11 @@ priority = 100
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
         executor
+            .documents()
             .add_document_reference(&issue_id, "dev/notes.md", None, None, None, true)
             .unwrap();
         executor
+            .documents()
             .add_document_reference(&issue_id, "dev/pinned.md", Some("HEAD"), None, None, true)
             .unwrap();
         let document = VirtualPath::worktree("dev/notes.md").unwrap();
