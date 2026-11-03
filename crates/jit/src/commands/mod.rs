@@ -2620,35 +2620,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
     }
 
-    /// Return the EFFECTIVE rule set, with `.jit/rules.toml` as the operative
-    /// ruleset and its `origin = "default"` rules reconciled against `config.toml`
-    /// at load (DR §8.2/§8.4).
+    /// Combine authored rules with registry-derived defaults in memory, without
+    /// writing files. Missing default rows apply even in an empty or custom-only
+    /// file; existing rows retain their policy edits. Custom rules load their
+    /// declared schemas, while default assertions derive from configuration.
     ///
-    /// Semantics depend on whether the file EXISTS, not whether it is empty:
-    ///
-    /// - **File present (even with zero rules):** the parsed file supplies the
-    ///   operative rule set — which rules exist and, for the built-in rules `jit
-    ///   init` scaffolds (marked `origin = "default"`), their editable policy
-    ///   fields (severity, enforce, selector). The default family is reconciled
-    ///   against the declared `[namespaces]` / `[type_hierarchy]` registry IN
-    ///   MEMORY at load
-    ///   ([`reconcile_default_rules_with_config`](crate::repository_state::reconcile_default_rules_with_config)):
-    ///   assertions are re-derived, a rule is added for a newly-declared namespace
-    ///   and dropped for a removed one, so a hand edit of the registry cannot
-    ///   desync validation against a stale `schemas/default-*.json` projection.
-    ///   Custom rules (any other `origin`)
-    ///   are used verbatim, reading their own declared schema files. An
-    ///   intentionally-emptied file yields an empty set.
-    /// - **File ABSENT (pre-init repo or deleted file):** build the FIXED
-    ///   [`default_ruleset`](crate::repository_state::default_ruleset) from the
-    ///   repo's namespace registry IN MEMORY (MF4). This is read-only — NO disk
-    ///   write, NO warning, NO error — so gates, the server, read-only checkouts,
-    ///   and multiple worktrees stay safe. Only `jit init` materializes the file
-    ///   to disk (under the write lock).
-    ///
-    /// The result is built at most once and cached. A malformed `config.toml` or
-    /// `.jit/rules.toml` is surfaced as an `Err` rather than silently dropping
-    /// enforcement.
+    /// The result, including any configuration or rule-loading error, is cached.
     pub fn effective_rules(&self) -> Result<&RuleSet> {
         self.effective_rules
             .get_or_init(|| {
@@ -2657,14 +2634,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .resolve(&crate::repository_state::VirtualPath::RULES)
                     .map_err(|error| error.to_string())?;
                 if rules_path.exists() {
-                    // File present (even empty) supplies the operative rule set.
-                    // Its default-origin rules are a config PROJECTION: reconcile
-                    // the default family against the declared registry IN MEMORY at
-                    // load — re-derive assertions, add a rule for a newly-declared
-                    // namespace, drop one whose namespace is gone — so the baked
-                    // `schemas/default-*.json` files are never the authority. Custom
-                    // rules and the default rules' editable policy fields
-                    // (severity/enforce/selector) are taken from the file unchanged.
                     let user = self.rules().map_err(|e| e.to_string())?.clone();
                     let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
                     Ok(
