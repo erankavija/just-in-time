@@ -35,8 +35,8 @@ use crate::config::DocumentationConfig;
 use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
 use crate::domain::identity::{GateKey, IssueId};
 use crate::domain::type_taxonomy::HierarchyConfig;
-use crate::domain::Issue;
-use std::collections::HashSet;
+use crate::domain::{Issue, State};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -655,11 +655,11 @@ impl GraphTemplate {
 
 /// Find the planning dependency of a breakdown node carrying the template-declared
 /// container label. `by_id` must cover the whole repository, even for scoped validation.
-pub(crate) fn find_planning_node<'a>(
+fn find_planning_node<'a>(
     container: &Issue,
     template: &GraphTemplate,
     roles: &RoleBindings,
-    by_id: &std::collections::HashMap<&IssueId, &'a Issue>,
+    by_id: &HashMap<&IssueId, &'a Issue>,
 ) -> Option<&'a Issue> {
     let planning_type = template.planning_type(roles)?;
     let bracket_label = declared_container_label(template, roles, container).ok()?;
@@ -681,13 +681,35 @@ pub(crate) fn find_planning_node<'a>(
 /// Linked plan documents remain authoritative when moved or archived.
 const PLAN_DOC_LABEL: &str = "plan";
 
-/// The repository-relative path of the planning node's linked plan, if present.
-pub(crate) fn planning_node_plan_path(planning: &Issue) -> Option<String> {
+/// A breakable container's linked plan document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PlanDocumentRef {
+    /// Repository-relative path.
+    pub(crate) path: String,
+    /// Whether the planning node is `done`, which makes an absent plan an error.
+    pub(crate) planning_done: bool,
+}
+
+/// The `plan`-labelled document of `container`'s planning node, when its template
+/// declares a plan-document location; `None` for an inline plan. `by_id` must
+/// cover the whole repository.
+pub(crate) fn plan_document_ref(
+    container: &Issue,
+    by_id: &HashMap<&IssueId, &Issue>,
+    templates: &TemplateRegistry,
+) -> Option<PlanDocumentRef> {
+    let template = crate::labels::type_label_value(&container.labels)
+        .and_then(|container_type| templates.template_for_container(container_type))
+        .filter(|template| template.plan_doc_location(&templates.roles).is_some())?;
+    let planning = find_planning_node(container, template, &templates.roles, by_id)?;
     planning
         .documents
         .iter()
         .find(|d| d.label.as_deref() == Some(PLAN_DOC_LABEL))
-        .map(|d| d.path.clone())
+        .map(|d| PlanDocumentRef {
+            path: d.path.clone(),
+            planning_done: planning.state == State::Done,
+        })
 }
 
 /// Fixed template-token substitution shared by container lookup and node expansion.
@@ -812,8 +834,9 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    #[test]
-    fn test_find_planning_node_resolves_template_declared_container_label() {
+    /// An epic bracketed by a template whose planning node declares a plan
+    /// location, with its planning and breakdown nodes.
+    fn bracket_fixture() -> (TemplateRegistry, Issue, Issue, Issue) {
         let template_toml = r#"
 [[template]]
 name = "custom-plan"
@@ -821,6 +844,7 @@ applies_to = ["epic"]
 [[template.nodes]]
 role = "planning"
 type = "planning"
+doc = "plans/{container.short_id}.md"
 [[template.nodes]]
 role = "breakdown"
 type = "breakdown"
@@ -828,11 +852,11 @@ labels = ["scaffold:{container.short_id}"]
 depends_on = ["planning"]
 "#;
         let registry = TemplateRegistry::from_toml_str(template_toml, &[] as &[&str]).unwrap();
-        let template = registry.get("custom-plan").unwrap();
 
         let mut container =
             crate::test_utils::fixture_issue("container".to_string(), String::new());
         container.id = crate::test_utils::issue_id(0xcd81_56d8_b74a_832a_9736_5c98_69cf_16b3);
+        container.labels = vec!["type:epic".to_string()];
 
         let mut planning = crate::test_utils::fixture_issue("planning".to_string(), String::new());
         planning.id = crate::test_utils::issue_id(0xb4cb_51e2_ab13_a142_2f78_4c62_d893_6a00);
@@ -846,14 +870,50 @@ depends_on = ["planning"]
             format!("scaffold:{}", container.short_id()),
         ];
         breakdown.dependencies = vec![planning.id.clone()];
+        (registry, container, planning, breakdown)
+    }
 
-        let by_id = std::collections::HashMap::from([
-            (&planning.id, &planning),
-            (&breakdown.id, &breakdown),
-        ]);
+    #[test]
+    fn test_find_planning_node_resolves_template_declared_container_label() {
+        let (registry, container, planning, breakdown) = bracket_fixture();
+        let template = registry.get("custom-plan").unwrap();
+        let by_id = HashMap::from([(&planning.id, &planning), (&breakdown.id, &breakdown)]);
+
         let resolved = find_planning_node(&container, template, &registry.roles, &by_id).unwrap();
 
         assert_eq!(resolved.id, planning.id);
+    }
+
+    #[test]
+    fn test_plan_document_ref_follows_planning_node_plan_link_and_state() {
+        let (registry, container, planning, breakdown) = bracket_fixture();
+        let resolve = |planning: &Issue| {
+            let by_id = HashMap::from([(&planning.id, planning), (&breakdown.id, &breakdown)]);
+            plan_document_ref(&container, &by_id, &registry)
+        };
+
+        assert_eq!(resolve(&planning), None, "an inline plan has no reference");
+
+        let relinked = Issue {
+            documents: vec![crate::domain::DocumentReference {
+                label: Some(PLAN_DOC_LABEL.to_string()),
+                ..crate::test_utils::document_reference("archive/moved-plan.md")
+            }],
+            ..planning.clone()
+        };
+        assert_eq!(
+            resolve(&relinked),
+            Some(PlanDocumentRef {
+                path: "archive/moved-plan.md".to_string(),
+                planning_done: false,
+            })
+        );
+
+        let done = Issue {
+            state: State::Done,
+            ..relinked
+        };
+        assert!(resolve(&done).is_some_and(|plan| plan.planning_done));
     }
 
     #[test]

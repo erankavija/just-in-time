@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "54db33a1-0bf5-437e-b5ec-690af2866734",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:48:37.513148592Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2117739f-f6b9-4b39-9dbd-f3deb7a0885e",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Latest-run readers use the gate-state accessor",
-  "updated_at": "2026-11-03T23:30:43.915277971Z"
+  "updated_at": "2026-11-03T23:48:37.513148592Z"
 }

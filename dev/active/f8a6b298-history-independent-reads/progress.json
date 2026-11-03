@@ -581,6 +581,9 @@
     "a4 agreed: keeps DEC-09 bridge, sends field name when 6ba4f623 lands (for 53d19851 brief); warn a4 before 2117739f, its benchmark 5d774061 needs a format-4 copy and a main build after the bump.",
     "88 2e0f276b: IssueOps assign/claim/unassign/release/reject/update_issue_resolved take &IssueIdPrefix and return IssueMutation{issue,warnings}; create_issue returns IssueCreation{issue,warnings}. Put in briefs.",
     "User principle (via 6a): refactors and spec changes must make things more consistent and simpler on their own merit, never to pre-empt a reviewer; a wrong review finding goes to 6a.",
-    "Host schedule: from 03:30 EET dispatch nothing new; let running work finish; hold until 6a says gf2 benchmark is done. Warn 6a the moment 2117739f lands."
+    "Host schedule: from 03:30 EET dispatch nothing new; let running work finish; hold until 6a says gf2 benchmark is done. Warn 6a the moment 2117739f lands.",
+    "User approved format-4 cutover for all five repos (just-in-time, gf2, mealie-fi, inflected-messages, research) without per-repo runtime confirmation. Conditions: inspect research first; stop and report via 6a if any repo is not a format-3 jit tracker; before each rewrite, .jit/ has no uncommitted changes and git tree is clean enough to revert; coordinate with live sessions (gf2-4e in gf2; benchmark 04:00-04:15); reinstall jit only after all five are rewritten, then tell 6a.",
+    "User allows Codex gpt-6-luna and gpt-6.1-sol liberally alongside astra and Claude.",
+    "User ruling: reorder toward 944edb32 (format rewrite tooling); defer tasks off its path."
   ]
 }

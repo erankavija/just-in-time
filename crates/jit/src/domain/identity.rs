@@ -900,10 +900,11 @@ mod tests {
             other in canonical_id(),
             len in IssueIdPrefix::MIN_ID_PREFIX_LENGTH..=33usize,
             spelling in proptest::collection::vec((any::<bool>(), 0usize..3), 33),
+            trailing_hyphens in 0usize..3,
         ) {
             let candidate = IssueId::try_from(id.as_str()).unwrap();
             for source in [&id, &other] {
-                let requested: String = normalise(source)
+                let mut requested: String = normalise(source)
                     .chars()
                     .chain(std::iter::once('0'))
                     .take(len)
@@ -913,6 +914,7 @@ mod tests {
                         format!("{}{c}", "-".repeat(*hyphens))
                     })
                     .collect();
+                requested.push_str(&"-".repeat(trailing_hyphens));
                 let prefix = IssueIdPrefix::try_from(requested.as_str()).unwrap();
                 prop_assert_eq!(
                     prefix.matches(&candidate),

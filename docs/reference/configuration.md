@@ -283,7 +283,9 @@ proceeds and the bypass is logged, at every level.
 > (`severity`, `enforce`, `when`, and `description`) are preserved.
 >
 > To disable a default rule, keep its `origin = "default"` row and set
-> `severity = "off"`. Deleting the row does not disable it. Under `loose`
+> `severity = "off"`. Deleting the row does not disable it. A custom rule cannot
+> take a derived default's name: rule names are addresses (`@/rule/<name>`), so
+> such a collision is a configuration error. Under `loose`
 > strictness, `enforce = false` only stops the rule blocking writes: it still
 > reports findings, and an error-severity finding still fails `jit validate`.
 > `strict` strictness can block even unenforced findings, as described above.
