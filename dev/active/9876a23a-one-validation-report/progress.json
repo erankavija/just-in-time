@@ -78,7 +78,7 @@
           "short_id": "c92f4011",
           "title": "Keep default rules in force when rules.toml holds only custom rules",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "rework 1: merged-tree suite failed (batch_export roundtrip, scope JSON success) under the new default-rule semantics",
           "worker": "codex gpt-6-astra xhigh"
         }
       ]
@@ -148,14 +148,27 @@
       "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
     }
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "c92f4011": 1
+  },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
-    "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566"
+    "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566",
+    "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch"
   ],
   "started_at": "2026-11-03T23:40:00+02:00",
   "rejected": [
     "145b4d57 (superseded, merged into 977d01d8)",
     "e16493fc (superseded, REQ-02 folded into 2f12d920)"
-  ]
+  ],
+  "traps": [
+    "Workers verify only --lib and named suites; a behaviour change needs the whole-workspace nextest run with --no-fail-fast (c92f4011 r1).",
+    "Never wrap land.sh in `jit worktree exec`: it takes the repository lock itself, so nesting waits on its own parent.",
+    "Plan and manifest edits in main's checkout block other leads' land.sh; edit in scratch, then copy and commit in one command.",
+    "User principle: each code, criterion or wording change is justified on its own merit, never to pre-empt a review."
+  ],
+  "plan_reviews": {
+    "plan-review 2df01664": "passed after amendment (0 findings)",
+    "breakdown-review de9a7557": "round 1 after amendment failed F1 (ea843d26 lost its B edge; restored 39f8487b3); rerun pending"
+  }
 }

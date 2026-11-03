@@ -784,7 +784,10 @@ fn claims_mutation_guard(
         worktree_id,
         agent,
     );
-    coordinator.lock_claims_for_repository_mutation().map(Some)
+    coordinator
+        .lock()
+        .map(crate::storage::claim_coordinator::ClaimsMutationGuard::hold)
+        .map(Some)
 }
 
 /// The lease rule every issue-record write obeys: `strict` refuses when another
@@ -793,7 +796,7 @@ fn claims_mutation_guard(
 fn refuse_foreign_leases(
     mode: crate::config::EnforcementMode,
     targets: &[IssueId],
-    conflicting_holder: impl Fn(&IssueId) -> Option<crate::domain::Assignee>,
+    conflicting_holder: impl Fn(&IssueId) -> Result<Option<crate::domain::Assignee>>,
 ) -> Result<Vec<(IssueId, String)>> {
     use crate::config::EnforcementMode;
 
@@ -803,9 +806,13 @@ fn refuse_foreign_leases(
     let findings = targets
         .iter()
         .filter_map(|id| {
-            conflicting_holder(id).map(|holder| (id.clone(), format!("{id} is leased by {holder}")))
+            conflicting_holder(id)
+                .map(|holder| {
+                    holder.map(|holder| (id.clone(), format!("{id} is leased by {holder}")))
+                })
+                .transpose()
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>>>()?;
     if mode == EnforcementMode::Strict && !findings.is_empty() {
         let named = findings
             .iter()
@@ -828,9 +835,11 @@ fn refuse_foreign_leases_held(
 ) -> Result<Vec<String>> {
     let agent = crate::agent_config::resolve_agent_id(None).ok();
     let findings = refuse_foreign_leases(mode, targets, |id| {
-        guard
-            .and_then(|guard| guard.conflicting_lease(id, agent.as_ref()))
-            .map(|lease| lease.agent_id)
+        Ok(guard
+            .map(|guard| guard.conflicting_lease(id, agent.as_ref()))
+            .transpose()?
+            .flatten()
+            .map(|lease| lease.agent_id))
     })?;
     Ok(findings.into_iter().map(|(_, finding)| finding).collect())
 }
@@ -850,10 +859,10 @@ fn refuse_foreign_leases_read(
     let agent = crate::agent_config::resolve_agent_id(None).ok();
     let leases = read_active_leases(paths, chrono::Utc::now())?;
     refuse_foreign_leases(mode, targets, |id| {
-        leases
+        Ok(leases
             .iter()
             .find(|lease| &lease.issue_id == id && Some(&lease.agent_id) != agent.as_ref())
-            .map(|lease| lease.agent_id.clone())
+            .map(|lease| lease.agent_id.clone()))
     })
 }
 
@@ -868,9 +877,11 @@ fn ensure_claim_available(
         crate::config::EnforcementMode::Strict,
         std::slice::from_ref(target),
         |id| {
-            guard
-                .and_then(|guard| guard.conflicting_lease(id, Some(assignee)))
-                .map(|lease| lease.agent_id)
+            Ok(guard
+                .map(|guard| guard.conflicting_lease(id, Some(assignee)))
+                .transpose()?
+                .flatten()
+                .map(|lease| lease.agent_id))
         },
     )
     .map(drop)
@@ -929,7 +940,6 @@ struct PrecheckPreflight {
 struct CapturedLifecycleOutcome {
     issue: Issue,
     changed: bool,
-    storage_warnings: Vec<crate::storage::StorageWarning>,
 }
 
 #[derive(Clone)]
@@ -2837,19 +2847,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &IssueId,
         assignee: crate::domain::Assignee,
-    ) -> Result<IssueMutation<crate::storage::StorageWarning>>
+    ) -> Result<Issue>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let outcome =
-            self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
-                issue_id: issue_id.clone(),
-                assignee,
-            })?;
-        Ok(IssueMutation {
-            issue: outcome.issue,
-            warnings: outcome.storage_warnings,
+        self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
+            issue_id: issue_id.clone(),
+            assignee,
         })
+        .map(|outcome| outcome.issue)
     }
 
     fn publish_captured_release(&self, issue_id: &IssueId, reason: String) -> Result<Issue>
@@ -3038,9 +3044,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                     run.evaluation_stability = GateEvaluationStability::InputsMoved;
                 });
             }
-            let storage_warnings = claims_guard
-                .as_ref()
-                .map_or_else(Vec::new, |guard| guard.warnings());
             if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
                 ensure_claim_available(claims_guard.as_ref(), &expected_target, assignee)?;
             }
@@ -3119,7 +3122,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                             return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                                 issue,
                                 changed: false,
-                                storage_warnings,
                             }));
                         }
                     }
@@ -3157,7 +3159,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                             issue,
                             changed: false,
-                            storage_warnings,
                         }));
                     }
                     State::Ready
@@ -3170,7 +3171,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                             issue,
                             changed: false,
-                            storage_warnings,
                         }));
                     }
                     State::Backlog
@@ -3180,7 +3180,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                             issue,
                             changed: false,
-                            storage_warnings,
                         }));
                     }
                     State::Done
@@ -3289,7 +3288,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                     issue: issue_result,
                     changed,
-                    storage_warnings,
                 }));
             }
             let plan = finalize(&layout, &image, &context, &intents)?;
@@ -3302,7 +3300,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
                 issue: issue_result,
                 changed,
-                storage_warnings,
             }))
         })
     }
@@ -4458,6 +4455,7 @@ assert = {}
         let stranger = "agent:stranger".parse().unwrap();
         assert!(guard
             .conflicting_lease(&issue_id, Some(&stranger))
+            .unwrap()
             .is_some());
     }
 }
