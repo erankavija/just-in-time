@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7f257f0277fe9bc18dbde4dfff245c35ce58a627",
+  "completed_at": "2026-11-03T04:09:17.841185879Z",
+  "duration_ms": 256443,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Validation facade implementation satisfies the issue criteria with passing recorded Rust CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5962427b-14bb-4de7-b0b9-33cae61f7a25",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3636c6b5-d504-4900-ac33-7791a8e38b9b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T04:05:01.397808902Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4fa9f7a44, 02813f9b8\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-03 (issue Markdown); @/invariant/architecture-dependency-direction, @/invariant/canonical-cutover, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (`.jit/invariants.toml`); @/gate/jit-validate (`.jit/gates.toml`)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: Re-read the validation patch in bounded chunks and individually re-read affected caller and test patches.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Validation facade implementation satisfies the issue criteria with passing recorded Rust CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
