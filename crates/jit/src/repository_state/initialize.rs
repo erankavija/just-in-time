@@ -12,8 +12,8 @@
 //! [`ProfileApplicationInput`]; this module alone derives and compares their final
 //! bytes.
 //! Finalization derives the coupled default-rule/schema closure and composes the
-//! aggregate profile lifecycle line appended at the captured `events.jsonl` length (id,
-//! timestamp, and torn-tail handling are never command-owned). Every byte flows through
+//! aggregate profile lifecycle line appended at the captured `events.jsonl` committed
+//! length (id, timestamp, and position are never command-owned). Every byte flows through
 //! `session.apply` here.
 
 use std::collections::BTreeMap;
@@ -362,7 +362,7 @@ impl InitializationScaffold {
         }
         // The audit log is not a neutral scaffold file: the finalizer composes it
         // (an empty log for a plain init, an aggregate lifecycle append for a profiled
-        // one) at the captured length. See `derive_initialization`.
+        // one) at the captured committed length. See `derive_initialization`.
         Ok(files)
     }
 
@@ -383,8 +383,8 @@ impl InitializationScaffold {
             .into_iter()
             .map(|file| file.path)
             .collect();
-        // The finalizer appends to `events.jsonl` at its captured length, so its
-        // path must be captured for that length and the action preimage.
+        // The finalizer appends to `events.jsonl` at its captured committed length,
+        // so its path must be captured for that length and the action preimage.
         paths.push(VirtualPath::EVENTS);
         for profile in self.profiles() {
             paths.extend(profile.claims.target_paths());

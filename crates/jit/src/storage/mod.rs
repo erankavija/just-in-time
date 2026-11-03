@@ -284,8 +284,8 @@ pub trait IssueStore: Clone {
 
     /// Read dependency-aware archive events for reconciliation.
     ///
-    /// File storage overrides this path so an isolated malformed torn-tail line
-    /// cannot prevent a later archive run from repairing and reconciling state.
+    /// File storage overrides this path so a torn event prefix cannot prevent a
+    /// later archive run from repairing and reconciling state.
     fn read_artifact_archive_events(&self) -> Result<Vec<Event>> {
         Ok(self
             .read_events()?

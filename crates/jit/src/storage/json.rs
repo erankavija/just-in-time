@@ -150,8 +150,8 @@ pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot>
                 VirtualPath::EVENTS.relative().as_str(),
             )
             .with_context(|| format!("Failed to open event log at {}", events_path.display()))?;
-            let mut contents = String::new();
-            file.read_to_string(&mut contents).with_context(|| {
+            let mut contents = Vec::new();
+            file.read_to_end(&mut contents).with_context(|| {
                 format!("Failed to read event log at {}", events_path.display())
             })?;
             parse_known_events(&contents).with_context(|| {
@@ -1166,10 +1166,8 @@ impl IssueStore for JsonFileStorage {
             return Ok(Vec::new());
         }
 
-        let events_lock_path = self.root.join(EVENTS_LOCK_FILE);
-        let _lock = self.locker.lock_shared(&events_lock_path)?;
-
-        let contents = fs::read_to_string(&events_path).context("Failed to read events file")?;
+        // Lock-free (`@/charter/D-22`): the parser ignores a partly written final line.
+        let contents = fs::read(&events_path).context("Failed to read events file")?;
         parse_known_events(&contents).context("Failed to deserialize event log")
     }
 
@@ -1423,12 +1421,8 @@ impl IssueStore for JsonFileStorage {
 }
 
 fn is_torn_event_prefix(line: &str, error: &serde_json::Error) -> bool {
-    // The canonical mutation finalizer isolates a non-newline tail before
-    // publishing the next event. Before that retry it is still the final line. Such a record
-    // is therefore recognizable as an object-shaped JSON prefix that fails
-    // only because input ended. This admits a final torn append and every
-    // number of independently isolated predecessors (including prefixes ending
-    // after a nested `}`), while syntax and shape/data corruption remain fatal.
+    // An object-shaped JSON prefix that fails only because input ended, including
+    // one ending after a nested `}`. Syntax and shape corruption remain fatal.
     line.trim_start().starts_with('{') && error.is_eof()
 }
 
@@ -1566,6 +1560,20 @@ mod tests {
 
         assert_eq!(result.unwrap(), "verdict");
         drop(retained);
+    }
+
+    #[test]
+    fn test_read_events_does_not_wait_on_a_writer_holding_the_events_lock() {
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        fs::write(temp.path().join(".jit/events.jsonl"), "").unwrap();
+        let root = storage.root().to_path_buf();
+        drop(storage);
+        let storage =
+            JsonFileStorage::with_lock_timeout(root, std::time::Duration::from_millis(50));
+        let _writer = storage.acquire_events_write_lock().unwrap();
+
+        assert_eq!(storage.read_events().unwrap(), Vec::new());
     }
 
     #[test]
