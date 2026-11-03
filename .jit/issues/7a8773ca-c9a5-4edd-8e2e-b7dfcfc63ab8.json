@@ -9,12 +9,26 @@
   ],
   "description": "Exclude history files from `jit search` when no file selection is given, using one declaration of the history paths.\n\n## Background\n\n`jit search` with no `--glob` runs ripgrep over the whole data root (`crates/jit/src/search.rs`, CLI call site in `main.rs`), so it reads the event log and every gate-run record. The server always passes explicit globs and is unaffected. `search()` runs ripgrep with its working directory at the data root and matches globs relative to it. Verified on ripgrep 15.2.0: anchored negations exclude all three history paths, result paths stay absolute, and an explicit glob still reaches a gate-run file. An unanchored `!tmp` would also hide any nested `tmp`, so the exclusions are anchored. The redo scratch directory can hold appended event bytes.\n\n## Success Criteria\n\n- [hard] REQ-01: `repository_state/path.rs` declares the data-root history paths (the event log, the gate-run directory and the redo scratch directory) once, beside their `VirtualPath` constants.\n- [hard] REQ-02: When neither a glob nor explicit file patterns are given, the search excludes each declared history path by an anchored negation; an explicit selection is passed through unchanged.\n- [hard] REQ-03: A unit test over a corpus shows that a default search returns no match from a history file, that a same-named file nested elsewhere is still searched, and that an explicit glob still reaches a history file.\n",
   "documents": [],
+  "done_at": "2026-11-03T00:04:09.411245654Z",
   "first_ready_at": "2026-10-21T10:39:53.980326737Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "91985c00-3c56-40fd-b6d4-b5fd7abd5de7",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:00:43.770376063Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "17e55a87-21da-4e12-8d4f-d2cf13dcdbd9",
+      "status": "passed",
+      "updated_at": "2026-11-03T00:04:08.949385305Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7a8773ca-c9a5-4edd-8e2e-b7dfcfc63ab8",
   "labels": [
     "type:task",
@@ -27,7 +41,7 @@
     "satisfies:f8a6b298/REQ-11"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Default search reads no history file",
-  "updated_at": "2026-11-02T23:48:36.090183196Z"
+  "updated_at": "2026-11-03T00:04:09.411245654Z"
 }
