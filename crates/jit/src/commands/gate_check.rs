@@ -1535,7 +1535,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::{compact_run_history_for_context, omit_current_gate_projection};
+    use super::{compact_run_history_for_context, omit_current_gate_projection, IssueIdPrefix};
     use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file, setup};
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
@@ -4273,7 +4273,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         // Try to start work - should run prechecks
         executor
             .issues()
-            .claim_issue(&issue_id, "agent:worker".parse().unwrap())
+            .claim_issue(
+                &IssueIdPrefix::from(&issue_id),
+                "agent:worker".parse().unwrap(),
+            )
             .unwrap();
 
         // Verify prechecks ran and issue transitioned
@@ -4342,7 +4345,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         executor
             .issues()
-            .claim_issue(&issue_id, "agent:worker".parse().unwrap())
+            .claim_issue(
+                &IssueIdPrefix::from(&issue_id),
+                "agent:worker".parse().unwrap(),
+            )
             .unwrap();
 
         let issue = executor.storage.load_issue(&issue_id).unwrap();
@@ -4386,7 +4392,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         executor
             .issues()
-            .claim_issue(&issue_id, "agent:worker".parse().unwrap())
+            .claim_issue(
+                &IssueIdPrefix::from(&issue_id),
+                "agent:worker".parse().unwrap(),
+            )
             .unwrap();
 
         let issue = executor.storage.load_issue(&issue_id).unwrap();
@@ -4439,9 +4448,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap();
 
         // Try to start work - should fail
-        let result = executor
-            .issues()
-            .claim_issue(&issue_id, "agent:worker".parse().unwrap());
+        let result = executor.issues().claim_issue(
+            &IssueIdPrefix::from(&issue_id),
+            "agent:worker".parse().unwrap(),
+        );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("precheck"));
 
@@ -4485,7 +4495,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         executor
             .issues()
-            .claim_issue(&issue_id, "agent:worker".parse().unwrap())
+            .claim_issue(
+                &IssueIdPrefix::from(&issue_id),
+                "agent:worker".parse().unwrap(),
+            )
             .unwrap();
 
         assert_eq!(
@@ -4541,7 +4554,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         executor
             .issues()
-            .claim_issue(&issue_id, "agent:worker".parse().unwrap())
+            .claim_issue(
+                &IssueIdPrefix::from(&issue_id),
+                "agent:worker".parse().unwrap(),
+            )
             .unwrap();
 
         let runs = executor

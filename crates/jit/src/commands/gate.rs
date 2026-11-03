@@ -740,6 +740,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 issue_id: full_id,
                 gate_keys: gate_keys.to_vec(),
             })?
+            .1
         else {
             return Err(anyhow!("unexpected result from captured gate addition"));
         };
@@ -780,6 +781,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 issue_id: full_id,
                 gate_keys: gate_keys.to_vec(),
             })?
+            .1
         else {
             return Err(anyhow!("unexpected result from captured gate removal"));
         };

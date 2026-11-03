@@ -1,7 +1,7 @@
 //! Issue CRUD operations and lifecycle management
 
 use super::*;
-use crate::domain::identity::GateKey;
+use crate::domain::identity::{GateKey, IssueIdPrefix};
 use crate::errors::{DeletionNotConfirmedError, TransitionBlocker};
 use crate::storage::StorageWarning;
 
@@ -183,6 +183,13 @@ fn derive_issue_deletion(
 pub struct IssueCreation {
     pub issue: Issue,
     pub warnings: Vec<String>,
+}
+
+/// The issue as persisted by a mutation, with its advisory warnings.
+#[derive(Debug, Clone)]
+pub struct IssueMutation<W = String> {
+    pub issue: Issue,
+    pub warnings: Vec<W>,
 }
 
 /// Issue lifecycle operations of a [`CommandExecutor`].
@@ -529,7 +536,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         self.update_issue_resolved(
-            id,
+            &IssueIdPrefix::from(id),
             title,
             description,
             priority,
@@ -541,17 +548,16 @@ impl<S: IssueStore> IssueOps<'_, S> {
             IssueLocalUpdate::default(),
             force,
         )
-        .map(|(_, warnings)| warnings)
+        .map(|result| result.warnings)
     }
 
     /// [`Self::update_issue`] combined with `local` gate and assignee changes,
     /// published as one mutation: either every requested change applies or
-    /// none does. Also returns the full id `id` resolved to in the captured
-    /// repository.
+    /// none does. Returns the issue as persisted by the mutation.
     #[allow(clippy::too_many_arguments)]
     pub fn update_issue_resolved(
         &self,
-        id: &IssueId,
+        id: &IssueIdPrefix,
         title: Option<String>,
         description: Option<DescriptionUpdate>,
         priority: Option<Priority>,
@@ -562,10 +568,11 @@ impl<S: IssueStore> IssueOps<'_, S> {
         issue_type: Option<String>,
         local: IssueLocalUpdate,
         force: bool,
-    ) -> Result<(IssueId, Vec<String>)>
+    ) -> Result<IssueMutation>
     where
         S: crate::storage::RepositoryStateStore,
     {
+        let id = self.exec.storage.resolve_issue_id(id)?;
         let assignee = local.assignee;
         let outcome = self
             .exec
@@ -595,7 +602,10 @@ impl<S: IssueStore> IssueOps<'_, S> {
             self.exec.check_auto_transitions()?;
         }
 
-        Ok((outcome.target_id, outcome.warnings))
+        Ok(IssueMutation {
+            issue: outcome.issue,
+            warnings: outcome.warnings,
+        })
     }
 
     /// Confirm operator intent for the destructive `jit issue delete` command
@@ -703,84 +713,91 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// promoting each dependent it unblocks, all in one redo record. A `reason` that cannot form a valid label is refused
     /// before anything is written. Rejection bypasses rule enforcement, so
     /// other label-rule findings surface as warnings.
-    pub fn reject_issue(&self, id: &IssueId, reason: Option<&str>) -> Result<Vec<String>>
+    pub fn reject_issue(&self, id: &IssueIdPrefix, reason: Option<&str>) -> Result<IssueMutation>
     where
         S: crate::storage::RepositoryStateStore,
     {
+        let id = self.exec.storage.resolve_issue_id(id)?;
         let resolution = reason.map(crate::labels::resolution_label).transpose()?;
-        Ok(self
+        let outcome = self
             .exec
-            .publish_captured_field_update(CapturedFieldUpdate::rejection(id.clone(), resolution))?
-            .warnings)
+            .publish_captured_field_update(CapturedFieldUpdate::rejection(id, resolution))?;
+        Ok(IssueMutation {
+            issue: outcome.issue,
+            warnings: outcome.warnings,
+        })
     }
 
     /// Assign an issue to someone.
     ///
-    /// Returns warnings (e.g., lease warnings) if any.
+    /// Returns the persisted issue and any lease warnings.
     pub fn assign_issue(
         &self,
-        id: &IssueId,
+        id: &IssueIdPrefix,
         assignee: crate::domain::Assignee,
-    ) -> Result<Vec<String>>
+    ) -> Result<IssueMutation>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = id.clone();
+        let full_id = self.exec.storage.resolve_issue_id(id)?;
 
         // Collect warnings instead of printing
         let warnings = self.exec.refuse_foreign_lease(&full_id)?;
 
-        self.exec
-            .publish_captured_issue_mutation(CapturedIssueMutation::Assign {
-                issue_id: full_id,
-                assignee,
-            })?;
-        Ok(warnings)
+        let (issue, _) =
+            self.exec
+                .publish_captured_issue_mutation(CapturedIssueMutation::Assign {
+                    issue_id: full_id,
+                    assignee,
+                })?;
+        Ok(IssueMutation { issue, warnings })
     }
 
     /// Claim an issue for `assignee`.
     ///
-    /// Returns any non-fatal [`StorageWarning`]s (e.g. a worktree relocation
+    /// Returns the persisted issue and any non-fatal [`StorageWarning`]s (e.g. a worktree relocation
     /// observed while checking leases) so the calling command can surface them
     /// at its own output boundary; this method never writes to stderr.
     pub fn claim_issue(
         &self,
-        id: &IssueId,
+        id: &IssueIdPrefix,
         assignee: crate::domain::Assignee,
-    ) -> Result<Vec<StorageWarning>>
+    ) -> Result<IssueMutation<StorageWarning>>
     where
         S: crate::storage::RepositoryStateStore,
     {
         // The captured claim owns the precheck capture/checker/recapture loop so
         // checker success and coordinator evidence cannot be applied to a
-        // different source state or short-id target.
-        self.exec.publish_captured_claim(id, assignee)
+        // different captured source state.
+        let id = self.exec.storage.resolve_issue_id(id)?;
+        self.exec.publish_captured_claim(&id, assignee)
     }
 
     /// Unassign an issue.
     ///
-    /// Returns warnings (e.g., lease warnings) if any.
-    pub fn unassign_issue(&self, id: &IssueId) -> Result<Vec<String>>
+    /// Returns the persisted issue and any lease warnings.
+    pub fn unassign_issue(&self, id: &IssueIdPrefix) -> Result<IssueMutation>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = id.clone();
+        let full_id = self.exec.storage.resolve_issue_id(id)?;
 
         // Collect warnings instead of printing
         let warnings = self.exec.refuse_foreign_lease(&full_id)?;
 
-        self.exec
-            .publish_captured_issue_mutation(CapturedIssueMutation::Unassign {
-                issue_id: full_id,
-            })?;
-        Ok(warnings)
+        let (issue, _) =
+            self.exec
+                .publish_captured_issue_mutation(CapturedIssueMutation::Unassign {
+                    issue_id: full_id,
+                })?;
+        Ok(IssueMutation { issue, warnings })
     }
 
-    pub fn release_issue(&self, id: &IssueId, reason: &str) -> Result<()>
+    pub fn release_issue(&self, id: &IssueIdPrefix, reason: &str) -> Result<Issue>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = id.clone();
+        let full_id = self.exec.storage.resolve_issue_id(id)?;
         self.exec
             .publish_captured_release(&full_id, reason.to_string())
     }
@@ -794,7 +811,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         &self,
         assignee: crate::domain::Assignee,
         filter: Option<String>,
-    ) -> Result<(IssueId, Vec<StorageWarning>)>
+    ) -> Result<IssueMutation<StorageWarning>>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -815,9 +832,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .iter()
             .find(|i| filter.as_ref().is_none_or(|f| f.matches(i, &context)))
         {
-            let id = issue.id.clone();
-            let warnings = self.claim_issue(&id, assignee)?;
-            Ok((id, warnings))
+            self.claim_issue(&IssueIdPrefix::from(&issue.id), assignee)
         } else {
             Err(crate::errors::NotFoundError::new("No ready issues available").into())
         }
@@ -1072,13 +1087,15 @@ mod tests {
         let beta = seed_ready(&executor, "Beta", Priority::Low, "type:epic");
         let gamma = seed_ready(&executor, "Gamma", Priority::High, "type:epic");
 
-        let (claimed, _) = executor
+        let claimed = executor
             .issues()
             .claim_next(
                 "agent:w1".parse().unwrap(),
                 Some("label:type:epic".to_string()),
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         assert_eq!(claimed, gamma);
         let unclaimed = executor.storage.load_issue(&beta).unwrap();
@@ -1243,9 +1260,10 @@ mod tests {
             .unwrap();
 
         // Try to claim the issue - should fail because precheck hasn't passed
-        let result = executor
-            .issues()
-            .claim_issue(&issue_id, "agent:test".parse().unwrap());
+        let result = executor.issues().claim_issue(
+            &IssueIdPrefix::from(&issue_id),
+            "agent:test".parse().unwrap(),
+        );
 
         // Currently this test FAILS because claim_issue bypasses prechecks
         // After fix, claiming should fail with "Manual precheck 'tdd-reminder' has not been passed"
@@ -1322,9 +1340,10 @@ mod tests {
             .unwrap();
 
         // Now claiming should succeed
-        let result = executor
-            .issues()
-            .claim_issue(&issue_id, "agent:test".parse().unwrap());
+        let result = executor.issues().claim_issue(
+            &IssueIdPrefix::from(&issue_id),
+            "agent:test".parse().unwrap(),
+        );
         assert!(
             result.is_ok(),
             "Claiming should succeed when precheck passes"
@@ -1367,7 +1386,10 @@ mod tests {
         // (a full claim here would exit 4 on the blocked in_progress transition).
         executor
             .issues()
-            .assign_issue(&dependent_id, "agent:test".parse().unwrap())
+            .assign_issue(
+                &IssueIdPrefix::from(&dependent_id),
+                "agent:test".parse().unwrap(),
+            )
             .unwrap();
         let assigned = executor.storage.load_issue(&dependent_id).unwrap();
         assert_eq!(assigned.state, State::Backlog);
@@ -1397,9 +1419,10 @@ mod tests {
         );
 
         // Claim as the SAME assignee: must proceed rather than erroring.
-        let result = executor
-            .issues()
-            .claim_issue(&dependent_id, "agent:test".parse().unwrap());
+        let result = executor.issues().claim_issue(
+            &IssueIdPrefix::from(&dependent_id),
+            "agent:test".parse().unwrap(),
+        );
         assert!(
             result.is_ok(),
             "same-assignee claim should promote the assignment, got: {:?}",
@@ -1438,12 +1461,16 @@ mod tests {
 
         executor
             .issues()
-            .claim_issue(&issue_id, "agent:first".parse().unwrap())
+            .claim_issue(
+                &IssueIdPrefix::from(&issue_id),
+                "agent:first".parse().unwrap(),
+            )
             .unwrap();
 
-        let result = executor
-            .issues()
-            .claim_issue(&issue_id, "agent:second".parse().unwrap());
+        let result = executor.issues().claim_issue(
+            &IssueIdPrefix::from(&issue_id),
+            "agent:second".parse().unwrap(),
+        );
         assert!(
             result.is_err(),
             "claim by a different assignee must still be rejected"
@@ -2139,14 +2166,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         executor
             .issues()
-            .assign_issue(&issue_id, "agent:a".parse().unwrap())
+            .assign_issue(&IssueIdPrefix::from(&issue_id), "agent:a".parse().unwrap())
             .unwrap();
         let updated_after_assign = executor.storage.load_issue(&issue_id).unwrap().updated_at;
 
         // Re-assigning the same assignee is a no-op.
         executor
             .issues()
-            .assign_issue(&issue_id, "agent:a".parse().unwrap())
+            .assign_issue(&IssueIdPrefix::from(&issue_id), "agent:a".parse().unwrap())
             .unwrap();
         assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().updated_at,
@@ -2173,7 +2200,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let updated_before = executor.storage.load_issue(&issue_id).unwrap().updated_at;
 
         // Unassigning an issue that has no assignee is a no-op.
-        executor.issues().unassign_issue(&issue_id).unwrap();
+        executor
+            .issues()
+            .unassign_issue(&IssueIdPrefix::from(&issue_id))
+            .unwrap();
         assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().updated_at,
             updated_before,
@@ -3303,9 +3333,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         executor: &CommandExecutor<InMemoryStorage>,
         id: &IssueId,
         local: IssueLocalUpdate,
-    ) -> Result<(IssueId, Vec<String>)> {
+    ) -> Result<IssueMutation> {
         executor.issues().update_issue_resolved(
-            id,
+            &IssueIdPrefix::from(id),
             None,
             None,
             Some(Priority::High),
@@ -3399,9 +3429,12 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             match &local.assignee {
                 Some(assignee) => executor
                     .issues()
-                    .assign_issue(&separate, assignee.clone())
+                    .assign_issue(&IssueIdPrefix::from(&separate), assignee.clone())
                     .map(drop),
-                None => executor.issues().unassign_issue(&separate).map(drop),
+                None => executor
+                    .issues()
+                    .unassign_issue(&IssueIdPrefix::from(&separate))
+                    .map(drop),
             }
             .unwrap();
             executor
@@ -3465,7 +3498,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         executor
             .issues()
-            .reject_issue(&id, Some("duplicate"))
+            .reject_issue(&IssueIdPrefix::from(&id), Some("duplicate"))
             .unwrap();
 
         assert_eq!(counter.0.load(Ordering::SeqCst) - opened, 1);
@@ -3484,7 +3517,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             let dependent_id = dependent.id.clone();
             crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
 
-            executor.issues().reject_issue(&blocker_id, reason).unwrap();
+            executor
+                .issues()
+                .reject_issue(&IssueIdPrefix::from(&blocker_id), reason)
+                .unwrap();
 
             assert_eq!(
                 executor.storage.load_issue(&dependent_id).unwrap().state,
@@ -3518,7 +3554,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::commands::test_helpers::seed_issue(&storage, dependent);
             let executor = CommandExecutor::new(storage).with_layout(layout.clone());
 
-            assert!(executor.issues().reject_issue(&blocker_id, None).is_err());
+            assert!(executor
+                .issues()
+                .reject_issue(&IssueIdPrefix::from(&blocker_id), None)
+                .is_err());
             drop(recovered.open_mutation_session(layout).unwrap());
 
             let (blocker_state, dependent_state) = if rejected {
@@ -3557,9 +3596,12 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         executor
             .issues()
-            .reject_issue(&with_reason, Some("duplicate"))
+            .reject_issue(&IssueIdPrefix::from(&with_reason), Some("duplicate"))
             .unwrap();
-        executor.issues().reject_issue(&state_only, None).unwrap();
+        executor
+            .issues()
+            .reject_issue(&IssueIdPrefix::from(&state_only), None)
+            .unwrap();
 
         let issue = executor.storage.load_issue(&with_reason).unwrap();
         assert_eq!(issue.state, State::Rejected);
@@ -3593,7 +3635,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         assert!(executor
             .issues()
-            .reject_issue(&id, Some("duplicate"))
+            .reject_issue(&IssueIdPrefix::from(&id), Some("duplicate"))
             .is_err());
 
         let issue = recovered.load_issue(&id).unwrap();
@@ -3628,7 +3670,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let executor = crate::commands::test_helpers::memory_executor(raced.clone());
 
-        executor.issues().reject_issue(&id, Some("done")).unwrap();
+        executor
+            .issues()
+            .reject_issue(&IssueIdPrefix::from(&id), Some("done"))
+            .unwrap();
 
         let issue = raced.load_issue(&id).unwrap();
         assert_eq!(issue.state, State::Rejected);
@@ -3654,7 +3699,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let error = executor
             .issues()
-            .reject_issue(&id, Some("Premise removed. See x"))
+            .reject_issue(&IssueIdPrefix::from(&id), Some("Premise removed. See x"))
             .unwrap_err();
 
         assert!(error
@@ -3741,8 +3786,14 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::test_utils::fixture_issue("Reject twice".into(), String::new()),
         );
 
-        executor.issues().reject_issue(&id, Some("done")).unwrap();
-        executor.issues().reject_issue(&id, Some("done")).unwrap();
+        executor
+            .issues()
+            .reject_issue(&IssueIdPrefix::from(&id), Some("done"))
+            .unwrap();
+        executor
+            .issues()
+            .reject_issue(&IssueIdPrefix::from(&id), Some("done"))
+            .unwrap();
 
         let labels = executor.storage.load_issue(&id).unwrap().labels;
         assert_eq!(

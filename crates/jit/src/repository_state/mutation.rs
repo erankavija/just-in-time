@@ -667,6 +667,71 @@ pub(crate) fn created_issue(draft: &Issue, now: DateTime<Utc>) -> Issue {
     issue
 }
 
+/// The issue a mutation persists, or its captured record for a no-op.
+pub(crate) fn mutated_issue(
+    image: &RepositoryImage,
+    id: &IssueId,
+    intents: &[MutationIntent],
+    now: DateTime<Utc>,
+) -> Result<Issue, MutationError> {
+    let preimage =
+        captured_issue(image, id)?.ok_or_else(|| MutationError::MissingIssue(id.clone()))?;
+    let Some(issue) = intents.iter().find_map(|intent| match intent {
+        MutationIntent::UpdateIssue { issue } if &issue.id == id => Some(issue.as_ref()),
+        _ => None,
+    }) else {
+        return Ok(preimage);
+    };
+    Ok(updated_issue(&preimage, issue, intents, now))
+}
+
+fn updated_issue(
+    preimage: &Issue,
+    issue: &Issue,
+    intents: &[MutationIntent],
+    now: DateTime<Utc>,
+) -> Issue {
+    let mut updated = issue.clone();
+    updated.created_at = preimage.created_at;
+    updated.first_ready_at = preimage.first_ready_at;
+    updated.claimed_at = preimage.claimed_at;
+    updated.done_at = preimage.done_at;
+    if preimage.state != State::Ready && updated.state == State::Ready {
+        updated.mark_first_ready(now);
+    }
+    if preimage.assignee.is_none() && updated.assignee.is_some() {
+        updated.mark_claimed(now);
+    }
+    if preimage.state != State::Done && updated.state == State::Done {
+        updated.mark_done(now);
+    }
+    for (key, state) in &mut updated.gates_status {
+        let records_evidence = intents.iter().any(|intent| match intent {
+            MutationIntent::RecordEvent { event, .. } => match (&**event, state.status) {
+                (
+                    EventBody::GatePassed {
+                        issue_id, gate_key, ..
+                    },
+                    GateStatus::Passed,
+                )
+                | (
+                    EventBody::GateFailed {
+                        issue_id, gate_key, ..
+                    },
+                    GateStatus::Failed,
+                ) => issue_id == &updated.id && gate_key == key,
+                _ => false,
+            },
+            _ => false,
+        });
+        if records_evidence || preimage.gates_status.get(key) != Some(state) {
+            state.updated_at = now;
+        }
+    }
+    updated.updated_at = now;
+    updated
+}
+
 pub(super) fn finalize_delta(
     layout: &RepositoryLayout,
     image: &RepositoryImage,
@@ -825,45 +890,7 @@ pub(super) fn finalize_delta(
         if let MutationIntent::UpdateIssue { issue } = intent {
             let preimage = captured_issue(image, &issue.id)?
                 .ok_or_else(|| MutationError::MissingIssue(issue.id.clone()))?;
-            let now = context.timestamp();
-            let mut updated = (**issue).clone();
-            updated.created_at = preimage.created_at;
-            updated.first_ready_at = preimage.first_ready_at;
-            updated.claimed_at = preimage.claimed_at;
-            updated.done_at = preimage.done_at;
-            if preimage.state != State::Ready && updated.state == State::Ready {
-                updated.mark_first_ready(now);
-            }
-            if preimage.assignee.is_none() && updated.assignee.is_some() {
-                updated.mark_claimed(now);
-            }
-            if preimage.state != State::Done && updated.state == State::Done {
-                updated.mark_done(now);
-            }
-            for (key, state) in &mut updated.gates_status {
-                let records_evidence = intents.iter().any(|intent| match intent {
-                    MutationIntent::RecordEvent { event, .. } => match (&**event, state.status) {
-                        (
-                            EventBody::GatePassed {
-                                issue_id, gate_key, ..
-                            },
-                            GateStatus::Passed,
-                        )
-                        | (
-                            EventBody::GateFailed {
-                                issue_id, gate_key, ..
-                            },
-                            GateStatus::Failed,
-                        ) => issue_id == &updated.id && gate_key == key,
-                        _ => false,
-                    },
-                    _ => false,
-                });
-                if records_evidence || preimage.gates_status.get(key) != Some(state) {
-                    state.updated_at = now;
-                }
-            }
-            updated.updated_at = now;
+            let updated = updated_issue(&preimage, issue, intents, context.timestamp());
             actions.push(write_issue_action(image, &updated)?);
         }
     }
