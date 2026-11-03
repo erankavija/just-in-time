@@ -1,7 +1,7 @@
 {
   "epic_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "epic_short_id": "df129d9e",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -329,7 +329,7 @@
           "short_id": "1539da29",
           "title": "Derive failure details and suggestions from the error type",
           "classification": "implementation",
-          "status": "in_progress (dispatched at base 467fcab19)",
+          "status": "done (merged 5934d9658, rework merged 788a891f3; rework 1: deleted text-code guard replaced by test_main_emits_no_literal_error_codes; code-review R1 failed F1 suggestion tests too loose (semantic-test-assertions), rework 2 asserts each suggestion by action marker; R2 passed)",
           "vendor": "claude",
           "model_tier": "sonnet",
           "tier_reason": "typed errors across many call sites; moderate design"
@@ -340,7 +340,7 @@
           "short_id": "a3a99cf8",
           "title": "Shared IssueFilterArgs group for issue filters",
           "classification": "implementation",
-          "status": "in_progress (dispatched at base 467fcab19)",
+          "status": "done (merged 2f76a56e7; Codex stopped on stale Background, lead decision note; Background corrected per 6a, plan D-29; cargo-ci, code-review passed)",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "CLI contract change over ~14 sites; alternation"
@@ -351,7 +351,7 @@
           "short_id": "8b7f2973",
           "title": "Issue creation returns the created issue",
           "classification": "implementation",
-          "status": "in_progress (dispatched at base 467fcab19)",
+          "status": "done (merged d28cc53a8; cargo-ci, code-review passed)",
           "vendor": "claude",
           "model_tier": "sonnet",
           "tier_reason": "compiler-driven rewrite of ~900 call sites; needs stamina"
@@ -362,7 +362,7 @@
           "short_id": "334c12e7",
           "title": "Template application returns the created issues",
           "classification": "implementation",
-          "status": "in_progress (dispatched at base 467fcab19)",
+          "status": "done (merged fbbaa2ba4; cargo-ci, code-review passed)",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "narrow return-shape change; alternation"
@@ -373,7 +373,7 @@
           "short_id": "d05b5639",
           "title": "CLI search runs through the executor",
           "classification": "implementation",
-          "status": "in_progress (dispatched at base 467fcab19)",
+          "status": "done (merged 92858ba2d; cargo-ci, code-review passed)",
           "vendor": "claude",
           "model_tier": "haiku",
           "tier_reason": "one executor entry point and one arm"
@@ -818,6 +818,11 @@
       "source": "wave 4 workers",
       "summary": "cargo doc -p jit --no-deps reports unresolved intra-doc links (pre-existing): cli.rs, commands/mod.rs (incl. :2303 RepositoryLayout), bulk_update.rs, document.rs, gate.rs, dependency.rs, config.rs, validate.rs, project.rs:112, profile.rs:441 PackageArchiveError, domain/artifact_discovery.rs:243 private crate::commands::archive, domain/types.rs:129,185,1220,1442",
       "disposition": "reconcile against REQ-03-type criteria before container gates"
+    },
+    {
+      "source": "wave 5 lead",
+      "summary": "jit caps indefinite leases at 2 per agent; later dispatches use --ttl 86400 and need renewal on long waves",
+      "disposition": "process note"
     }
   ],
   "external_blockers": {},
@@ -846,10 +851,15 @@
       "fd2073b7": 5,
       "f79d2510": 3,
       "a24b11aa": 0,
-      "083c9a91": -14
+      "083c9a91": -14,
+      "1539da29": 7,
+      "a3a99cf8": -98,
+      "8b7f2973": 0,
+      "334c12e7": -10,
+      "d05b5639": -1
     },
-    "epic_total": -255,
-    "head_lines": 9159,
-    "head_rev": "2ac3d1872"
+    "epic_total": -357,
+    "head_lines": 9026,
+    "head_rev": "572d8b13a"
   }
 }
