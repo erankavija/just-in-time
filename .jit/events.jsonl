@@ -23089,3 +23089,5 @@
 {"fields":["description"],"id":"296c899a-a233-40a2-8c33-10cf5180b8a3","issue_id":"1b7f58ae-a8cf-47aa-ac64-cc2cc07d55f6","timestamp":"2026-11-03T22:37:01.148735846Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["dependencies"],"id":"36bb73b5-9df8-412f-aa54-982c6e3b5c86","issue_id":"cf49da17-a076-480e-a96b-bc9224269ac0","timestamp":"2026-11-03T22:37:32.174770119Z","type":"issue_updated","updated_by":"dependency-remove"}
 {"from":"backlog","id":"72a15cd6-3edf-4e35-9994-49d623203327","issue_id":"cf49da17-a076-480e-a96b-bc9224269ac0","timestamp":"2026-11-03T22:37:32.174770119Z","to":"ready","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"dbbbc5d3-3316-4117-9b15-7f3a522b5d14","issue_id":"725af076-76e0-40ea-91e3-a1b43f720cc6","timestamp":"2026-11-03T22:37:40.026132480Z","type":"issue_updated","updated_by":"dependency-add"}
+{"id":"7a70df9a-a669-4be6-9d25-75bffb4fd06d","issue_id":"2f12d920-2bbc-4b8f-99f5-bca7d0e9ff4a","new_count":1,"old_count":2,"removed_deps":["de9a7557-2061-4b63-9c74-6c18ed840c17"],"timestamp":"2026-11-03T22:37:40.026132480Z","type":"dependency_reduced"}
