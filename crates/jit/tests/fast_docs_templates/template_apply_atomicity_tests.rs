@@ -166,9 +166,10 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     }
     fn load_gate_run_result(
         &self,
+        issue_id: &jit::domain::identity::IssueId,
         run_id: &jit::domain::identity::GateRunId,
     ) -> Result<jit::domain::GateRunResult> {
-        self.inner.load_gate_run_result(run_id)
+        self.inner.load_gate_run_result(issue_id, run_id)
     }
     fn list_gate_runs_for_issue(
         &self,
@@ -714,7 +715,15 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
         "agent:holder".parse().unwrap(),
     );
     holder.init().unwrap();
-    holder.acquire_claim(&container, 600).unwrap();
+    holder
+        .acquire_claim_synchronized(
+            &container,
+            600,
+            Some("test lease"),
+            jit::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
+            |_| Ok(()),
+        )
+        .unwrap();
     let resolves_before = store.resolve_calls();
 
     let (_, warnings) = executor

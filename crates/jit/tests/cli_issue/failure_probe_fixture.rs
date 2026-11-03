@@ -3,8 +3,11 @@
 use super::failure_lever_registry::{failure_lever_registry, FailureLever, REGISTRY_TOML};
 use anyhow::{bail, Context, Result};
 use clap::Parser;
+use jit::domain::identity::IssueId;
 use jit::output::ErrorCode;
+use jit::storage::worktree_paths::WorktreePaths;
 use jit::test_cli::{created_issue_id, JitCli};
+use jit::test_lease_store::{corrupt_lease, LeaseCorruption};
 use jit::test_utils::{copy_tree_exact, keyed_fixture, keyed_fixture_key, CRATE_SOURCE_SHA256};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -308,6 +311,7 @@ fn require_parser_acceptance<T>(path: &str, parsed: Result<T, clap::Error>) {
 
 struct FailureFixture {
     cli: JitCli,
+    claimed_issue: Option<IssueId>,
     environment: BTreeMap<String, Option<String>>,
     /// An initialised tree the `init` step copies instead of running `jit init`,
     /// whose syncs across every row would wait on the host's writeback backlog.
@@ -319,6 +323,7 @@ impl FailureFixture {
         let git_ceiling = cli.root().display().to_string();
         Self {
             cli,
+            claimed_issue: None,
             // Git may discover a repository inherited from the host's `/tmp`.
             // Stop discovery at the temporary repository so `git:absent`
             // observes only the fixture it was asked to inspect.
@@ -391,8 +396,15 @@ impl FailureFixture {
                     .expect("write malformed server PID file");
             }
             SetupStep::MalformedClaimIndex => {
-                fs::write(self.root().join(".git/jit/claims.index.json"), "{")
-                    .expect("write malformed claim index");
+                let paths =
+                    WorktreePaths::detect_for_data_root(&self.root().join(".jit"), self.root())
+                        .unwrap();
+                corrupt_lease(
+                    &paths.shared_jit,
+                    self.claimed_issue.as_ref().expect("claim fixture issue"),
+                    LeaseCorruption::MalformedJson,
+                )
+                .expect("write malformed lease storage");
             }
             SetupStep::MalformedWorktreeIdentity => {
                 self.require_setup_jit(&["worktree", "info", "--json"]);
@@ -466,6 +478,7 @@ impl FailureFixture {
                 let created: serde_json::Value = serde_json::from_slice(&created.stdout)
                     .expect("claim fixture issue creation emits JSON");
                 let issue_id = created_issue_id(&created).expect("created issue id");
+                self.claimed_issue = Some(issue_id.parse().expect("valid created issue id"));
                 self.require_setup_jit(&[
                     "claim",
                     "acquire",

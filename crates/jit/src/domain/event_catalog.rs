@@ -212,14 +212,16 @@ impl EventTag {
                 vec!["priority".to_string()],
             ),
             EventTag::ArtifactArchiveExecuted => EventBody::draft_artifact_archive_executed(
-                crate::domain::artifact_plan::PlanTarget::Document {
-                    path: "dev/plan.md".to_string(),
+                crate::domain::artifact_execution::ArchiveExecution {
+                    target: crate::domain::artifact_plan::PlanTarget::Document {
+                        path: "dev/plan.md".to_string(),
+                    },
+                    destination_root: "dev/archive".to_string(),
+                    publications: Vec::new(),
+                    reference_changes: Vec::new(),
+                    planned_deletions: Vec::new(),
+                    reconciling: false,
                 },
-                "dev/archive".to_string(),
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                false,
             ),
             EventTag::DependencyReduced => EventBody::draft_dependency_reduced(
                 issue_id,
@@ -296,7 +298,7 @@ impl EventBody {
             EventBody::IssueDeleted { .. } => EventTag::IssueDeleted,
             EventBody::IssueReleased { .. } => EventTag::IssueReleased,
             EventBody::IssueUpdated { .. } => EventTag::IssueUpdated,
-            EventBody::ArtifactArchiveExecuted { .. } => EventTag::ArtifactArchiveExecuted,
+            EventBody::ArtifactArchiveExecuted(_) => EventTag::ArtifactArchiveExecuted,
             EventBody::DependencyReduced { .. } => EventTag::DependencyReduced,
             EventBody::LocalRuleBypassed { .. } => EventTag::LocalRuleBypassed,
             EventBody::TransitionBlocked { .. } => EventTag::TransitionBlocked,

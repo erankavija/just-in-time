@@ -33,6 +33,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
         .expect("discover repository layout before initialization");
     let executor = CommandExecutor::new(storage).with_layout(layout);
     executor
+        .profiles()
         .initialize_fresh_repository(repo.root(), None)
         .expect("initialize fresh repository");
     executor

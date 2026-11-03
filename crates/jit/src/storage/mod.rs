@@ -284,23 +284,25 @@ pub trait IssueStore: Clone {
 
     /// Read dependency-aware archive events for reconciliation.
     ///
-    /// File storage overrides this path so an isolated malformed torn-tail line
-    /// cannot prevent a later archive run from repairing and reconciling state.
+    /// File storage overrides this path so a torn event prefix cannot prevent a
+    /// later archive run from repairing and reconciling state.
     fn read_artifact_archive_events(&self) -> Result<Vec<Event>> {
         Ok(self
             .read_events()?
             .into_iter()
-            .filter(|event| matches!(event.body(), EventBody::ArtifactArchiveExecuted { .. }))
+            .filter(|event| matches!(event.body(), EventBody::ArtifactArchiveExecuted(_)))
             .collect())
     }
 
-    /// Load a gate run result by run ID.
+    /// Load a gate run result by issue and run ID.
     ///
     /// # Errors
     ///
-    /// Returns an error if the result does not exist or cannot be deserialized.
+    /// Returns not found if the result is absent or belongs to another issue,
+    /// or an error if it cannot be read or deserialized.
     fn load_gate_run_result(
         &self,
+        issue_id: &IssueId,
         run_id: &crate::domain::identity::GateRunId,
     ) -> Result<crate::domain::GateRunResult>;
 

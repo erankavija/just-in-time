@@ -88,7 +88,7 @@ Lease records live under `.git/jit/`, not `.jit/`. See
 A mutation publishes through one **redo record**: the directories it creates,
 the new contents of every file it writes, and the paths it removes, except
 that the event log is the one file the record extends rather than replaces, its
-new lines appended at the length the mutation read (`@/charter/D-17`). The mutation fails, before anything durable is written, if
+new lines appended at the committed length the mutation read (`@/charter/D-17`). The mutation fails, before anything durable is written, if
 any path it creates, writes, or removes changed since it read it. The record is
 then written and synced under the scratch directory; that write is the
 mutation's commit point. Application creates the directories, replaces each
@@ -272,6 +272,12 @@ tagged record per line, with sample records — is specified in
 [Storage Record Layout](storage-records.md#event-log-records); the tag
 vocabulary, each tag's scope, and which tags carry an `issue_id` are the
 generated [Event Log Tags](events.md) catalog.
+
+The log's committed length is the end of its last newline-terminated line. A
+final line without a terminating newline is an uncommitted append: readers ignore
+it and the next event append, positioned at the committed length, overwrites it.
+Any other line that is not a well-formed record of the current vocabulary fails
+the read with an error naming the line.
 
 ## Gate Run Records
 

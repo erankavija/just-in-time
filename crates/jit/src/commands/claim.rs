@@ -2,6 +2,7 @@
 //!
 //! Provides CLI interface to the lease-based claim coordination system.
 
+use super::CommandExecutor;
 use crate::config::JitConfig;
 use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId};
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
@@ -63,105 +64,126 @@ fn get_current_branch(worktree_root: &Path) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
 
-/// Execute `jit claim acquire` command.
-///
-/// Acquires an exclusive lease on an issue for the specified agent.
-///
-/// # Returns
-///
-/// The acquired lease id paired with any non-fatal [`StorageWarning`]s observed
-/// while loading the worktree identity (e.g. a relocation). The caller's output
-/// layer decides how to render the warnings; this function never writes to
-/// stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the issue cannot be loaded, or if the lease
-/// cannot be acquired (e.g. it is already held by another agent).
-pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStore>(
-    storage: &S,
-    paths: &WorktreePaths,
-    issue_id: &IssueId,
-    ttl_secs: u64,
-    agent_id: Option<&str>,
-    reason: Option<&str>,
-) -> Result<(LeaseId, Vec<StorageWarning>)> {
-    use crate::agent_config::resolve_agent_id;
+/// Claim and recovery operations of a [`CommandExecutor`].
+pub struct ClaimOps<'a, S: IssueStore> {
+    exec: &'a CommandExecutor<S>,
+}
 
-    // Resolve short ID to full ID
-    let full_id = issue_id.clone();
+impl<S: IssueStore> CommandExecutor<S> {
+    /// The claim and recovery family.
+    pub fn claims(&self) -> ClaimOps<'_, S> {
+        ClaimOps { exec: self }
+    }
+}
 
-    // Validate issue exists
-    let _issue = storage
-        .load_issue(&full_id)
-        .with_context(|| format!("Issue {} not found", full_id))?;
+impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
+    /// Execute `jit claim acquire` command.
+    ///
+    /// Acquires an exclusive lease on an issue for the specified agent.
+    ///
+    /// # Returns
+    ///
+    /// The acquired lease id paired with any non-fatal [`StorageWarning`]s observed
+    /// while loading the worktree identity (e.g. a relocation). The caller's output
+    /// layer decides how to render the warnings; this function never writes to
+    /// stderr itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the issue cannot be loaded, or if the lease
+    /// cannot be acquired (e.g. it is already held by another agent).
+    pub fn acquire(
+        &self,
+        issue_id: &IssueId,
+        ttl_secs: u64,
+        agent_id: Option<&str>,
+        reason: Option<&str>,
+    ) -> Result<(LeaseId, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        let storage = self.exec.storage();
+        use crate::agent_config::resolve_agent_id;
 
-    // Get current branch
-    let branch = get_current_branch(&paths.worktree_root)?;
+        // Resolve short ID to full ID
+        let full_id = issue_id.clone();
 
-    // Load or generate worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Validate issue exists
+        let _issue = storage
+            .load_issue(&full_id)
+            .with_context(|| format!("Issue {} not found", full_id))?;
 
-    // Resolve agent ID using proper priority: CLI flag > JIT_AGENT_ID > ~/.config/jit/agent.toml > error
-    let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
+        // Get current branch
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load config for policy limits
-    let coord_config = JitConfig::load(&storage.repository_layout()?)?.coordination();
+        // Load or generate worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // Create file locker with the default lock-acquisition timeout
-    let locker = FileLocker::with_configured_timeout();
+        // Resolve agent ID using proper priority: CLI flag > JIT_AGENT_ID > ~/.config/jit/agent.toml > error
+        let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
 
-    // Create claim coordinator
-    let coordinator = ClaimCoordinator::new(
-        paths.clone(),
-        locker,
-        identity.worktree_id.clone(),
-        agent.clone(),
-    );
+        // Load config for policy limits
+        let coord_config = JitConfig::load(&storage.repository_layout()?)?.coordination();
 
-    // Initialize control plane if needed
-    coordinator.init()?;
+        // Create file locker with the default lock-acquisition timeout
+        let locker = FileLocker::with_configured_timeout();
 
-    // Acquire the lease AND synchronize the repository-side issue/event state
-    // under one held coordinator lock, in the mandatory order coordinator ->
-    // bootstrap -> repository -> events. The coordinator receives the CANONICAL
-    // full id (never the raw user spelling), and the repository transition is
-    // idempotent and convergent over both the captured issue assignment and the
-    // captured event-log tail, so a crash-interrupted prior attempt converges
-    // without emitting a duplicate claim event (@/inv/event-log).
-    let worktree_root = paths.worktree_root.clone();
-    let data_root = storage.root().to_path_buf();
-    let (lease, ()) = coordinator.acquire_claim_synchronized(
-        &full_id,
-        ttl_secs,
-        reason,
-        ClaimAcquireLimits::new(
-            coord_config.max_indefinite_leases_per_agent,
-            coord_config.max_indefinite_leases_per_repo,
-        ),
-        |_lease| {
-            synchronize_claim_repository_state(
-                storage,
-                &worktree_root,
-                &data_root,
-                &full_id,
-                &agent,
-            )
-        },
+        // Create claim coordinator
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            locker,
+            identity.worktree_id.clone(),
+            agent.clone(),
+        );
+
+        // Initialize control plane if needed
+        coordinator.init()?;
+
+        // Acquire the lease AND synchronize the repository-side issue/event state
+        // under one held coordinator lock, in the mandatory order coordinator ->
+        // bootstrap -> repository -> events. The coordinator receives the CANONICAL
+        // full id (never the raw user spelling).
+        let worktree_root = paths.worktree_root.clone();
+        let data_root = storage.root().to_path_buf();
+        let (lease, ()) = coordinator.acquire_claim_synchronized(
+            &full_id,
+            ttl_secs,
+            reason,
+            ClaimAcquireLimits::new(
+                coord_config.max_indefinite_leases_per_agent,
+                coord_config.max_indefinite_leases_per_repo,
+            ),
+            |_lease| {
+                synchronize_claim_repository_state(
+                    storage,
+                    &worktree_root,
+                    &data_root,
+                    &full_id,
+                    &agent,
+                )
+            },
+        )?;
+
+        Ok((lease.lease_id, warnings))
+    }
+}
+
+/// The claim reads the issue record and appends at the log's end.
+fn claim_capture_spec(full_id: &IssueId) -> Result<crate::repository_state::CaptureSpec> {
+    use crate::repository_state::{CaptureSpec, VirtualPath};
+    let mut spec = CaptureSpec::new(
+        [VirtualPath::issue_record(full_id)],
+        super::issue_mutation_capture_budget(),
     )?;
-
-    Ok((lease.lease_id, warnings))
+    spec.discover_tail(VirtualPath::EVENTS)?;
+    Ok(spec)
 }
 
 /// Publish the repository-side issue assignment and claim event through one
 /// mutation session.
 ///
 /// Invoked under the held coordinator lock, so the guard order is coordinator ->
-/// bootstrap -> repository -> events. The transition is derived from the captured
-/// image and is convergent: a claim already reflected in both the issue
-/// assignment and the event-log tail is a complete no-op; an issue assigned
-/// without its claim event emits exactly the missing event; a duplicate event is
-/// never emitted, preserving `@/inv/event-log`.
+/// bootstrap -> repository -> events. The captured assignee alone decides: an
+/// issue already assigned to `agent` publishes nothing; any other publishes the
+/// assignment and its `IssueClaimed` (`@/inv/event-log`).
 fn synchronize_claim_repository_state<S>(
     storage: &S,
     worktree_root: &Path,
@@ -173,7 +195,7 @@ where
     S: IssueStore + crate::storage::RepositoryStateStore,
 {
     use super::{capture_or_retry, with_mutation_session, SessionStep};
-    use crate::repository_state::{finalize, CaptureSpec, MutationIntent, VirtualPath};
+    use crate::repository_state::{finalize, MutationIntent};
     use crate::storage::discover_repository_layout;
 
     let layout = discover_repository_layout(worktree_root, data_root)?;
@@ -181,12 +203,6 @@ where
         issue_id: full_id.clone(),
         agent: agent.clone(),
     }];
-    let build_spec = || -> Result<CaptureSpec> {
-        Ok(CaptureSpec::new(
-            [VirtualPath::issue_record(full_id), VirtualPath::EVENTS],
-            super::issue_mutation_capture_budget(),
-        )?)
-    };
     // Operation-scoped: a capture/apply retry must keep claim audit identity and
     // transition time stable while opening a fresh mutation session.
     let context = super::production_mutation_context();
@@ -195,7 +211,8 @@ where
         &layout,
         "claim repository synchronization",
         |session| {
-            let Some(image) = capture_or_retry(session.capture(build_spec()?))? else {
+            let Some(image) = capture_or_retry(session.capture(claim_capture_spec(full_id)?))?
+            else {
                 return Ok(SessionStep::Retry);
             };
             let plan = finalize(&layout, &image, &context, &intents)?;
@@ -204,47 +221,47 @@ where
     )
 }
 
-/// Execute `jit claim heartbeat` command.
-///
-/// Sends a heartbeat for an indefinite lease to prevent staleness.
-///
-/// # Returns
-///
-/// Any non-fatal [`StorageWarning`]s observed while loading the worktree
-/// identity (e.g. a relocation), for the caller's output layer to render.
-///
-/// # Errors
-///
-/// Returns an error if the selected worktree's branch cannot be resolved or the
-/// heartbeat cannot be recorded (e.g. the lease does not exist).
-pub fn execute_claim_heartbeat(
-    paths: &WorktreePaths,
-    lease_id: &LeaseId,
-) -> Result<Vec<StorageWarning>> {
-    use crate::agent_config::resolve_agent_id;
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Execute `jit claim heartbeat` command.
+    ///
+    /// Sends a heartbeat for an indefinite lease to prevent staleness.
+    ///
+    /// # Returns
+    ///
+    /// Any non-fatal [`StorageWarning`]s observed while loading the worktree
+    /// identity (e.g. a relocation), for the caller's output layer to render.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected worktree's branch cannot be resolved or the
+    /// heartbeat cannot be recorded (e.g. the lease does not exist).
+    pub fn heartbeat(&self, lease_id: &LeaseId) -> Result<Vec<StorageWarning>> {
+        let paths = self.exec.require_worktree_paths()?;
+        use crate::agent_config::resolve_agent_id;
 
-    // Get current branch for identity
-    let branch = get_current_branch(&paths.worktree_root)?;
+        // Get current branch for identity
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Load worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // Resolve agent ID
-    let agent = resolve_agent_id(None)?;
+        // Resolve agent ID
+        let agent = resolve_agent_id(None)?;
 
-    // Create coordinator
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
+        // Create coordinator
+        let locker = FileLocker::with_configured_timeout();
+        let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
 
-    // Send heartbeat
-    coordinator.heartbeat(lease_id)?;
+        // Send heartbeat
+        coordinator.heartbeat(lease_id)?;
 
-    Ok(warnings)
+        Ok(warnings)
+    }
 }
 
 /// Details of a lease released via `jit claim release <issue-id>`.
 ///
-/// Returned by [`execute_claim_release_by_issue`] so the caller can report which
+/// Returned by [`ClaimOps::release_by_issue`] so the caller can report which
 /// lease was released, on which issue, and which identity performed the release
 /// (the actor recorded in the audit trail).
 #[derive(Debug, Clone, serde::Serialize)]
@@ -307,266 +324,287 @@ pub(super) fn resolve_release_actor(worktree_root: &Path) -> Result<crate::domai
         .map_err(Into::into)
 }
 
-/// Execute `jit claim release <issue-id>` command.
-///
-/// Resolves the issue's active lease and releases it regardless of the lease
-/// owner, recording the acting identity in the eviction audit trail. Reuses the
-/// admin/owner-bypass [`ClaimCoordinator::force_evict_lease`] path so a non-owner
-/// (or an actor with no configured agent identity) can release the lease.
-///
-/// The argument is a resolved issue id. If the issue holds more than one active lease (which should not happen
-/// under exclusive claiming), every active lease is released; the returned
-/// [`ReleasedLeaseInfo`] reports the last one released.
-///
-/// # Errors
-///
-/// Returns an error if the issue does not exist, if it has no
-/// active lease (see [`crate::errors::no_active_lease`]), or if the underlying
-/// eviction fails.
-pub fn execute_claim_release_by_issue<S: IssueStore>(
-    storage: &S,
-    paths: &WorktreePaths,
-    issue_id: &IssueId,
-) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
-    storage.load_issue(issue_id)?;
-    let full_id = issue_id.clone();
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Execute `jit claim release <issue-id>` command.
+    ///
+    /// Resolves the issue's active lease and releases it regardless of the lease
+    /// owner, recording the acting identity in the eviction audit trail. Reuses the
+    /// admin/owner-bypass [`ClaimCoordinator::force_evict_lease`] path so a non-owner
+    /// (or an actor with no configured agent identity) can release the lease.
+    ///
+    /// The argument is a resolved issue id. If the issue holds more than one active lease (which should not happen
+    /// under exclusive claiming), every active lease is released; the returned
+    /// [`ReleasedLeaseInfo`] reports the last one released.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the issue does not exist, if it has no
+    /// active lease (see [`crate::errors::no_active_lease`]), or if the underlying
+    /// eviction fails.
+    pub fn release_by_issue(
+        &self,
+        issue_id: &IssueId,
+    ) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
+        self.release_by_issue_with_actor(issue_id, resolve_release_actor)
+    }
 
-    // Get current branch for identity
-    let branch = get_current_branch(&paths.worktree_root)?;
+    /// [`Self::release_by_issue`] with the acting identity resolved by
+    /// `resolve_actor`, which receives the worktree root.
+    fn release_by_issue_with_actor(
+        &self,
+        issue_id: &IssueId,
+        resolve_actor: impl FnOnce(&Path) -> Result<crate::domain::Assignee>,
+    ) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        let storage = self.exec.storage();
+        storage.load_issue(issue_id)?;
+        let full_id = issue_id.clone();
 
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Get current branch for identity
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Resolve the acting identity for the audit trail BEFORE evicting anything,
-    // so a release never happens without an attributable actor. This is
-    // independent of lease ownership: any identified actor may release by issue id.
-    let actor = resolve_release_actor(&paths.worktree_root)
-        .context("Cannot release lease without an attributable acting identity")?;
+        // Load worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // Create file locker and coordinator using the actor as the agent id.
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(
-        paths.clone(),
-        locker,
-        identity.worktree_id.clone(),
-        actor.clone(),
-    );
-    coordinator.init().with_context(|| {
-        format!(
-            "Failed to initialize claim coordinator for issue {}",
-            full_id
-        )
-    })?;
+        // Resolve the acting identity for the audit trail BEFORE evicting anything,
+        // so a release never happens without an attributable actor. This is
+        // independent of lease ownership: any identified actor may release by issue id.
+        let actor = resolve_actor(&paths.worktree_root)
+            .context("Cannot release lease without an attributable acting identity")?;
 
-    // Resolve the issue's active (non-expired) lease(s).
-    let leases = coordinator
-        .get_active_leases(None, None)
-        .with_context(|| format!("Failed to look up active leases for issue {}", full_id))?
-        .into_iter()
-        .filter(|lease| lease.issue_id == full_id)
-        .collect::<Vec<_>>();
+        // Create file locker and coordinator using the actor as the agent id.
+        let locker = FileLocker::with_configured_timeout();
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            locker,
+            identity.worktree_id.clone(),
+            actor.clone(),
+        );
+        coordinator.init().with_context(|| {
+            format!(
+                "Failed to initialize claim coordinator for issue {}",
+                full_id
+            )
+        })?;
 
-    let released = leases
-        .into_iter()
-        .map(|lease| {
-            let reason = format!("released by {} via claim release", actor);
-            coordinator
-                .force_evict_lease(&lease.lease_id, &reason)
-                .with_context(|| {
-                    format!(
-                        "Failed to release lease {} for issue {}",
-                        lease.lease_id, full_id
-                    )
-                })?;
-            Ok(ReleasedLeaseInfo {
-                lease_id: lease.lease_id,
-                issue_id: lease.issue_id,
-                previous_owner: lease.agent_id.to_string(),
-                actor: actor.to_string(),
+        // Resolve the issue's active (non-expired) lease(s).
+        let leases = coordinator
+            .get_active_leases(None, None)
+            .with_context(|| format!("Failed to look up active leases for issue {}", full_id))?
+            .into_iter()
+            .filter(|lease| lease.issue_id == full_id)
+            .collect::<Vec<_>>();
+
+        let released = leases
+            .into_iter()
+            .map(|lease| {
+                let reason = format!("released by {} via claim release", actor);
+                coordinator
+                    .force_evict_lease(&lease.lease_id, &reason)
+                    .with_context(|| {
+                        format!(
+                            "Failed to release lease {} for issue {}",
+                            lease.lease_id, full_id
+                        )
+                    })?;
+                Ok(ReleasedLeaseInfo {
+                    lease_id: lease.lease_id,
+                    issue_id: lease.issue_id,
+                    previous_owner: lease.agent_id.to_string(),
+                    actor: actor.to_string(),
+                })
             })
-        })
-        .collect::<Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>()?;
 
-    let info = released.into_iter().next_back().ok_or_else(|| {
-        crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(&full_id))
-    })?;
-    Ok((info, warnings))
+        let info = released.into_iter().next_back().ok_or_else(|| {
+            crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(&full_id))
+        })?;
+        Ok((info, warnings))
+    }
 }
 
-/// Renews an existing lease, extending its expiry time.
-///
-/// # Arguments
-///
-/// * `lease_id` - ID of the lease to renew
-/// * `extension_secs` - How many seconds to extend the lease by
-///
-/// # Returns
-///
-/// The renewed lease with updated expiry time, paired with any non-fatal
-/// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
-/// relocation), for the caller's output layer to render. This function never
-/// writes to stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the selected worktree's branch cannot be resolved or the
-/// lease cannot be renewed (e.g. it does not exist).
-pub fn execute_claim_renew(
-    paths: &WorktreePaths,
-    lease_id: &LeaseId,
-    extension_secs: u64,
-) -> Result<(Lease, Vec<StorageWarning>)> {
-    use crate::agent_config::resolve_agent_id;
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Renews an existing lease, extending its expiry time.
+    ///
+    /// # Arguments
+    ///
+    /// * `lease_id` - ID of the lease to renew
+    /// * `extension_secs` - How many seconds to extend the lease by
+    ///
+    /// # Returns
+    ///
+    /// The renewed lease with updated expiry time, paired with any non-fatal
+    /// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
+    /// relocation), for the caller's output layer to render. This function never
+    /// writes to stderr itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected worktree's branch cannot be resolved or the
+    /// lease cannot be renewed (e.g. it does not exist).
+    pub fn renew(
+        &self,
+        lease_id: &LeaseId,
+        extension_secs: u64,
+    ) -> Result<(Lease, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        use crate::agent_config::resolve_agent_id;
 
-    // Get current branch
-    let branch = get_current_branch(&paths.worktree_root)?;
+        // Get current branch
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Load worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // Resolve agent ID
-    let agent = resolve_agent_id(None)?;
+        // Resolve agent ID
+        let agent = resolve_agent_id(None)?;
 
-    // Create locker and coordinator
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(
-        paths.clone(),
-        locker,
-        identity.worktree_id.clone(),
-        agent.clone(),
-    );
+        // Create locker and coordinator
+        let locker = FileLocker::with_configured_timeout();
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            locker,
+            identity.worktree_id.clone(),
+            agent.clone(),
+        );
 
-    // Renew the lease
-    let lease = coordinator.renew_lease(lease_id, extension_secs)?;
-    Ok((lease, warnings))
+        // Renew the lease
+        let lease = coordinator.renew_lease(lease_id, extension_secs)?;
+        Ok((lease, warnings))
+    }
 }
 
-/// Shows status of active leases.
-///
-/// # Arguments
-///
-/// * `issue` - Optional filter matching each lease's stored issue id
-/// * `agent_id` - Optional filter by agent ID
-///
-/// # Returns
-///
-/// Vector of active leases matching the filters, paired with any non-fatal
-/// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
-/// relocation), for the caller's output layer to render. This function never
-/// writes to stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the selected worktree's branch cannot be resolved or the
-/// leases cannot be read.
-pub fn execute_claim_status(
-    paths: &WorktreePaths,
-    issue: Option<&IssueIdPrefix>,
-    agent_id: Option<&str>,
-) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
-    use crate::agent_config::resolve_agent_id;
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Shows status of active leases.
+    ///
+    /// # Arguments
+    ///
+    /// * `issue` - Optional filter matching each lease's stored issue id
+    /// * `agent_id` - Optional filter by agent ID
+    ///
+    /// # Returns
+    ///
+    /// Vector of active leases matching the filters, paired with any non-fatal
+    /// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
+    /// relocation), for the caller's output layer to render. This function never
+    /// writes to stderr itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected worktree's branch cannot be resolved or the
+    /// leases cannot be read.
+    pub fn status(
+        &self,
+        issue: Option<&IssueIdPrefix>,
+        agent_id: Option<&str>,
+    ) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        use crate::agent_config::resolve_agent_id;
 
-    // Get current branch for identity
-    let branch = get_current_branch(&paths.worktree_root)?;
+        // Get current branch for identity
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Load worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // Resolve current agent ID using proper priority: JIT_AGENT_ID > ~/.config/jit/agent.toml > error
-    let current_agent_id = resolve_agent_id(None)?;
+        // Resolve current agent ID using proper priority: JIT_AGENT_ID > ~/.config/jit/agent.toml > error
+        let current_agent_id = resolve_agent_id(None)?;
 
-    // Create claim coordinator
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(
-        paths.clone(),
-        locker,
-        identity.worktree_id,
-        current_agent_id.clone(),
-    );
-    coordinator.init()?;
+        // Create claim coordinator
+        let locker = FileLocker::with_configured_timeout();
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            locker,
+            identity.worktree_id,
+            current_agent_id.clone(),
+        );
+        coordinator.init()?;
 
-    // Get active leases (default to current agent if no filters specified)
-    let filter_agent = if agent_id.is_none() && issue.is_none() {
-        Some(current_agent_id.to_string())
-    } else {
-        agent_id.map(str::to_string)
-    };
+        // Get active leases (default to current agent if no filters specified)
+        let filter_agent = if agent_id.is_none() && issue.is_none() {
+            Some(current_agent_id.to_string())
+        } else {
+            agent_id.map(str::to_string)
+        };
 
-    let leases = coordinator.get_active_leases(issue, filter_agent.as_deref())?;
-    Ok((leases, warnings))
+        let leases = coordinator.get_active_leases(issue, filter_agent.as_deref())?;
+        Ok((leases, warnings))
+    }
 }
 
-/// Lists all active leases across all agents and worktrees.
-///
-/// # Returns
-///
-/// Vector of all active leases, paired with any non-fatal [`StorageWarning`]s
-/// observed while loading the worktree identity (e.g. a relocation), for the
-/// caller's output layer to render. This function never writes to stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the selected worktree's branch cannot be resolved or the
-/// leases cannot be read.
-pub fn execute_claim_list(paths: &WorktreePaths) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
-    // Get current branch for identity
-    let branch = get_current_branch(&paths.worktree_root)?;
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Lists all active leases across all agents and worktrees.
+    ///
+    /// # Returns
+    ///
+    /// Vector of all active leases, paired with any non-fatal [`StorageWarning`]s
+    /// observed while loading the worktree identity (e.g. a relocation), for the
+    /// caller's output layer to render. This function never writes to stderr itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected worktree's branch cannot be resolved or the
+    /// leases cannot be read.
+    pub fn list(&self) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
+        let paths = self.exec.require_worktree_paths()?;
+        // Get current branch for identity
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Load worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // We need an agent ID for coordinator, but it doesn't matter which one for listing
-    let agent = crate::domain::Assignee::SYSTEM_LIST;
+        // We need an agent ID for coordinator, but it doesn't matter which one for listing
+        let agent = crate::domain::Assignee::SYSTEM_LIST;
 
-    // Create claim coordinator
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
-    coordinator.init()?;
+        // Create claim coordinator
+        let locker = FileLocker::with_configured_timeout();
+        let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
+        coordinator.init()?;
 
-    // Get all active leases (no filters)
-    let leases = coordinator.get_active_leases(None, None)?;
-    Ok((leases, warnings))
+        // Get all active leases (no filters)
+        let leases = coordinator.get_active_leases(None, None)?;
+        Ok((leases, warnings))
+    }
 }
 
-/// Force-evicts a lease (admin operation).
-///
-/// # Arguments
-///
-/// * `lease_id` - ID of the lease to evict
-/// * `reason` - Reason for eviction (for audit trail)
-///
-/// # Returns
-///
-/// Any non-fatal [`StorageWarning`]s observed while loading the worktree
-/// identity (e.g. a relocation), for the caller's output layer to render. This
-/// function never writes to stderr itself.
-///
-/// # Errors
-///
-/// Returns an error if the selected worktree's branch cannot be resolved or the
-/// lease cannot be evicted.
-pub fn execute_claim_force_evict(
-    paths: &WorktreePaths,
-    lease_id: &LeaseId,
-    reason: &str,
-) -> Result<Vec<StorageWarning>> {
-    // Get current branch for identity
-    let branch = get_current_branch(&paths.worktree_root)?;
+impl<S: IssueStore> ClaimOps<'_, S> {
+    /// Force-evicts a lease (admin operation).
+    ///
+    /// # Arguments
+    ///
+    /// * `lease_id` - ID of the lease to evict
+    /// * `reason` - Reason for eviction (for audit trail)
+    ///
+    /// # Returns
+    ///
+    /// Any non-fatal [`StorageWarning`]s observed while loading the worktree
+    /// identity (e.g. a relocation), for the caller's output layer to render. This
+    /// function never writes to stderr itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected worktree's branch cannot be resolved or the
+    /// lease cannot be evicted.
+    pub fn force_evict(&self, lease_id: &LeaseId, reason: &str) -> Result<Vec<StorageWarning>> {
+        let paths = self.exec.require_worktree_paths()?;
+        // Get current branch for identity
+        let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Load worktree identity, surfacing relocation as a warning
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-    // For force-evict, we use a system agent (admin operation)
-    let agent = crate::domain::Assignee::SYSTEM_ADMIN;
+        // For force-evict, we use a system agent (admin operation)
+        let agent = crate::domain::Assignee::SYSTEM_ADMIN;
 
-    // Create claim coordinator
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
-    coordinator.init()?;
+        // Create claim coordinator
+        let locker = FileLocker::with_configured_timeout();
+        let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
+        coordinator.init()?;
 
-    // Force evict the lease
-    coordinator.force_evict_lease(lease_id, reason)?;
-    Ok(warnings)
+        // Force evict the lease
+        coordinator.force_evict_lease(lease_id, reason)?;
+        Ok(warnings)
+    }
 }
 
 /// Report of recovery actions taken.
@@ -681,67 +719,69 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
     Ok(())
 }
 
-/// Run the repair routines of `jit recover`.
-///
-/// Like every mutating command, `jit recover` applies a leftover redo record
-/// when its session opens, before this runs. The routines, in sequence:
-/// - Repairs declaration-derived state through the `jit validate --fix` path
-/// - With claims coordination: cleans up stale claim locks from crashed processes
-///   (PID check), rebuilds a corrupted claims index from its append-only log,
-///   and evicts expired leases; without Git, skips these with a warning
-/// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
-///
-/// Safe to run at any time: it removes only provably stale data and never
-/// the pending redo record.
-pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
-    storage: &S,
-    paths: &WorktreePaths,
-) -> Result<RecoveryReport> {
-    use crate::storage::temp_cleanup;
+impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
+    /// Run the repair routines of `jit recover`.
+    ///
+    /// Like every mutating command, `jit recover` applies a leftover redo record
+    /// when its session opens, before this runs. The routines, in sequence:
+    /// - Repairs declaration-derived state through the `jit validate --fix` path
+    /// - With claims coordination: cleans up stale claim locks from crashed processes
+    ///   (PID check), rebuilds a corrupted claims index from its append-only log,
+    ///   and evicts expired leases; without Git, skips these with a warning
+    /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
+    ///
+    /// Safe to run at any time: it removes only provably stale data and never
+    /// the pending redo record.
+    pub fn recover(&self) -> Result<RecoveryReport> {
+        let paths = self.exec.require_worktree_paths()?;
+        let storage = self.exec.storage();
+        use crate::storage::temp_cleanup;
 
-    let mut report = RecoveryReport::default();
+        let mut report = RecoveryReport::default();
 
-    // Derived-state drift is repaired before anything that depends on git.
-    // The git-dependent phase below aborts in a repository whose HEAD does not
-    // resolve, and repairing afterwards would leave that repository's drift
-    // untouched — a core capability made conditional on git history, against
-    // `@/charter/D-4`. Repairing first keeps the repair unconditional while
-    // preserving the git phase's own failure.
-    let layout =
-        crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
-    if layout
-        .resolve(&crate::repository_state::VirtualPath::CONFIG)?
-        .is_file()
-    {
-        let executor = crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout);
-        report.derived_state_repaired = executor.repair_derived_state(false)?.0;
+        // Derived-state drift is repaired before anything that depends on git.
+        // The git-dependent phase below aborts in a repository whose HEAD does not
+        // resolve, and repairing afterwards would leave that repository's drift
+        // untouched — a core capability made conditional on git history, against
+        // `@/charter/D-4`. Repairing first keeps the repair unconditional while
+        // preserving the git phase's own failure.
+        let layout =
+            crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+        if layout
+            .resolve(&crate::repository_state::VirtualPath::CONFIG)?
+            .is_file()
+        {
+            let executor =
+                crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout);
+            report.derived_state_repaired = executor.repair_derived_state(false)?.0;
+        }
+
+        if paths.has_claims_coordination() {
+            execute_git_recovery(paths, &mut report)?;
+        } else {
+            report.claims_lease_recovery = RecoveryPhase::Skipped {
+                reason: RecoverySkipReason::RequiresGit,
+            };
+            report
+                .warnings
+                .push(StorageWarning::ClaimsLeaseRecoverySkipped);
+        }
+
+        // 4. Clean up orphaned temp files. Best-effort: a failure is surfaced as a
+        // warning rather than aborting recovery.
+        let jit_data_dir = &paths.local_jit;
+        match temp_cleanup::cleanup_orphaned_temp_files(
+            jit_data_dir,
+            crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS,
+        ) {
+            Ok(removed) => report.temp_files_removed = removed,
+            Err(e) => report.warnings.push(StorageWarning::TempCleanupFailed {
+                reason: e.to_string(),
+            }),
+        }
+
+        Ok(report)
     }
-
-    if paths.has_claims_coordination() {
-        execute_git_recovery(paths, &mut report)?;
-    } else {
-        report.claims_lease_recovery = RecoveryPhase::Skipped {
-            reason: RecoverySkipReason::RequiresGit,
-        };
-        report
-            .warnings
-            .push(StorageWarning::ClaimsLeaseRecoverySkipped);
-    }
-
-    // 4. Clean up orphaned temp files. Best-effort: a failure is surfaced as a
-    // warning rather than aborting recovery.
-    let jit_data_dir = &paths.local_jit;
-    match temp_cleanup::cleanup_orphaned_temp_files(
-        jit_data_dir,
-        crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS,
-    ) {
-        Ok(removed) => report.temp_files_removed = removed,
-        Err(e) => report.warnings.push(StorageWarning::TempCleanupFailed {
-            reason: e.to_string(),
-        }),
-    }
-
-    Ok(report)
 }
 
 #[cfg(test)]
@@ -762,7 +802,15 @@ mod tests {
         create_test_paths, grow_event_log_beyond, setup_test_repo, setup_test_repo_with_config,
     };
 
-    /// Execute claim acquire with manually constructed paths (bypassing WorktreePaths::detect)
+    /// Production claim entry points resolve the branch through git, so the
+    /// fixture's synthetic `.git` directory becomes a real checkout once.
+    fn ensure_git_checkout(temp: &TempDir) -> Result<()> {
+        if temp.path().join(".git/HEAD").exists() {
+            return Ok(());
+        }
+        crate::test_cli::init_git_repository_with_commit(temp.path())
+    }
+
     fn execute_claim_acquire_test(
         temp: &TempDir,
         storage: &JsonFileStorage,
@@ -770,101 +818,27 @@ mod tests {
         ttl_secs: u64,
         agent_id: &str,
     ) -> Result<LeaseId> {
-        // Resolve short ID to full ID
-        let full_id = issue_id.clone();
-
-        // Validate issue exists
-        let _issue = storage.load_issue(&full_id)?;
-
-        // Get test paths
-        let paths = create_test_paths(temp);
-
-        // Get or create worktree identity
-        let branch = "test-branch".to_string();
-        let identity = load_or_create_worktree_identity(&paths, &branch)?;
-
-        // Create coordinator
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            locker,
-            identity.worktree_id.clone(),
-            agent_id.parse()?,
-        );
-        coordinator.init()?;
-
-        // Acquire claim
-        let lease = coordinator.acquire_claim(&full_id, ttl_secs)?;
-        Ok(lease.lease_id)
+        ensure_git_checkout(temp)?;
+        CommandExecutor::new(storage.clone())
+            .with_worktree_paths(create_test_paths(temp))
+            .claims()
+            .acquire(issue_id, ttl_secs, Some(agent_id), Some("test lease"))
+            .map(|(lease_id, _)| lease_id)
     }
 
-    /// Execute claim release with manually constructed paths (for testing)
-    fn execute_claim_release_test(
-        temp: &TempDir,
-        lease_id: &LeaseId,
-        agent_id: &str,
-    ) -> Result<()> {
-        let paths = create_test_paths(temp);
-
-        // Create coordinator
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator =
-            ClaimCoordinator::new(paths, locker, "wt:test".parse().unwrap(), agent_id.parse()?);
-
-        // Release lease
-        coordinator.release_lease(lease_id)?;
-        Ok(())
-    }
-
-    /// Execute claim release-by-issue with manually constructed paths (for testing).
-    ///
-    /// Mirrors [`execute_claim_release_by_issue`] but takes explicit test paths
-    /// and an explicit actor (simulating the resolved identity) so tests can act
-    /// as an arbitrary identity without touching `JIT_AGENT_ID` / config.
     fn execute_claim_release_by_issue_test(
         temp: &TempDir,
         storage: &JsonFileStorage,
         issue_id: &IssueId,
         actor: &str,
     ) -> Result<ReleasedLeaseInfo> {
-        storage.load_issue(issue_id)?;
-        let full_id = issue_id.clone();
-        let paths = create_test_paths(temp);
-
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator =
-            ClaimCoordinator::new(paths, locker, "wt:test".parse().unwrap(), actor.parse()?);
-        coordinator.init()?;
-
-        let leases = coordinator
-            .get_active_leases(None, None)?
-            .into_iter()
-            .filter(|lease| lease.issue_id == full_id)
-            .collect::<Vec<_>>();
-
-        let released = leases
-            .into_iter()
-            .map(|lease| {
-                let reason = format!("released by {} via claim release", actor);
-                coordinator.force_evict_lease(&lease.lease_id, &reason)?;
-                Ok(ReleasedLeaseInfo {
-                    lease_id: lease.lease_id,
-                    issue_id: lease.issue_id,
-                    previous_owner: lease.agent_id.to_string(),
-                    actor: actor.to_string(),
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        released.into_iter().next_back().ok_or_else(|| {
-            crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(&full_id)).into()
-        })
+        ensure_git_checkout(temp)?;
+        let actor = actor.parse()?;
+        CommandExecutor::new(storage.clone())
+            .with_worktree_paths(create_test_paths(temp))
+            .claims()
+            .release_by_issue_with_actor(issue_id, |_| Ok(actor))
+            .map(|(info, _)| info)
     }
 
     /// Assert a string satisfies the agent-identity invariant: has a `:`,
@@ -1391,45 +1365,6 @@ mod tests {
 
     // Tests for claim release command
     #[test]
-    fn test_claim_release_fails_for_nonexistent_lease() -> Result<()> {
-        let (temp, _storage) = setup_test_repo()?;
-
-        let result = execute_claim_release_test(
-            &temp,
-            &"00000000-0000-4000-8000-000000000008".parse().unwrap(),
-            "agent:test",
-        );
-
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn test_claim_release_succeeds_for_valid_lease() -> Result<()> {
-        let (temp, executor) = setup_test_repo_with_config("")?;
-        let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
-
-        // Acquire a claim first
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
-
-        // Release it
-        let result = execute_claim_release_test(&temp, &lease_id, "agent:test");
-
-        assert!(result.is_ok(), "Should successfully release valid lease");
-        Ok(())
-    }
-
-    #[test]
     fn test_claim_release_allows_re_acquisition_after_release() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
@@ -1445,10 +1380,10 @@ mod tests {
         )?;
 
         // Acquire claim
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
 
         // Release it
-        execute_claim_release_test(&temp, &lease_id, "agent:first")?;
+        execute_claim_release_by_issue_test(&temp, &storage, &issue_id, "agent:first")?;
 
         // Should be able to acquire again
         let second_lease =
@@ -1789,26 +1724,17 @@ mod tests {
         Ok(())
     }
 
-    /// Helper to execute force evict in tests
     fn execute_claim_force_evict_test(
         temp: &TempDir,
         lease_id: &LeaseId,
         reason: &str,
     ) -> Result<()> {
-        let paths = create_test_paths(temp);
-
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            locker,
-            "wt:test".parse().unwrap(),
-            crate::domain::Assignee::SYSTEM_ADMIN,
-        );
-        coordinator.init()?;
-
-        coordinator.force_evict_lease(lease_id, reason)
+        ensure_git_checkout(temp)?;
+        CommandExecutor::new(JsonFileStorage::new(temp.path().join(".jit")))
+            .with_worktree_paths(create_test_paths(temp))
+            .claims()
+            .force_evict(lease_id, reason)
+            .map(drop)
     }
 
     #[test]
@@ -1832,64 +1758,6 @@ mod tests {
     // and its `--json` counterpart), not here: the gap is the CLI's hint.
 
     // --- REQ-02: coordinator-held acquire synchronization + crash convergence -
-
-    /// Acquire through the production synchronized path with explicit test paths,
-    /// exercising the real coordinator-held repository synchronization.
-    fn execute_claim_acquire_synchronized_test(
-        temp: &TempDir,
-        storage: &JsonFileStorage,
-        issue_id: &IssueId,
-        ttl_secs: u64,
-        agent_id: &str,
-    ) -> Result<LeaseId> {
-        let full_id = issue_id.clone();
-        let paths = create_test_paths(temp);
-        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths.clone(),
-            locker,
-            identity.worktree_id.clone(),
-            agent_id.parse()?,
-        );
-        coordinator.init()?;
-        let agent: crate::domain::Assignee = agent_id.parse()?;
-        let worktree_root = paths.worktree_root.clone();
-        let data_root = storage.root().to_path_buf();
-        let (lease, ()) = coordinator.acquire_claim_synchronized(
-            &full_id,
-            ttl_secs,
-            None,
-            ClaimAcquireLimits::new(100, 100),
-            |_lease| {
-                super::synchronize_claim_repository_state(
-                    storage,
-                    &worktree_root,
-                    &data_root,
-                    &full_id,
-                    &agent,
-                )
-            },
-        )?;
-        Ok(lease.lease_id)
-    }
-
-    fn persist_claim(temp: &TempDir, issue_id: &IssueId, agent_id: &str) -> Result<Lease> {
-        let paths = create_test_paths(temp);
-        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            FileLocker::new(Duration::from_secs(
-                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-            )),
-            identity.worktree_id,
-            agent_id.parse()?,
-        );
-        coordinator.init()?;
-        coordinator.acquire_claim(issue_id, 600)
-    }
 
     /// Count claim events for one issue by a given agent in the event log.
     fn claim_events_for(storage: &JsonFileStorage, full_id: &IssueId, agent: &str) -> usize {
@@ -1923,13 +1791,7 @@ mod tests {
             false,
         )?;
 
-        let lease_id = execute_claim_acquire_synchronized_test(
-            &temp,
-            &storage,
-            &issue_id,
-            600,
-            "agent:worker",
-        )?;
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
         assert!(!lease_id.as_str().is_empty());
 
         // Issue is assigned with a stamped claimed_at, and exactly one claim event
@@ -1945,11 +1807,12 @@ mod tests {
     }
 
     #[test]
-    fn test_claim_acquire_idempotent_over_split_and_full_reflection() -> Result<()> {
-        let (temp, executor) = setup_test_repo_with_config("")?;
+    fn test_claim_acquire_appends_one_event_per_assignee_change() -> Result<()> {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n")?;
         let storage = executor.storage().clone();
         let (issue_id, _) = executor.issues().create_issue(
-            "Split Issue".to_string(),
+            "Reclaimed Issue".to_string(),
             "Test description".to_string(),
             crate::domain::Priority::Normal,
             Vec::new(),
@@ -1958,26 +1821,30 @@ mod tests {
             None,
             false,
         )?;
+        let acquire =
+            || execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:worker");
 
-        // First acquire publishes the assigned issue and its claim event in one
-        // redo record.
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
-        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
-        assert!(storage.load_issue(&issue_id)?.assignee.is_some());
-
-        // Simulate a crash that left the issue assigned but lost its claim event
-        // (the split state the old save-then-append path could produce).
-        std::fs::write(storage.root().join("events.jsonl"), b"")?;
-        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 0);
-
-        // The retry emits EXACTLY the missing event (the issue is already assigned).
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+        acquire()?;
+        acquire()?;
         assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
 
-        // A further acquire by the same agent/worktree is a complete no-op: the
-        // convergent transition never emits a duplicate event.
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
-        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
+        executor.issues().unassign_issue(&issue_id)?;
+        acquire()?;
+        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_capture_spec_requests_only_the_issue_record_and_the_log_tail() -> Result<()> {
+        use crate::repository_state::{ReadMode, VirtualPath};
+
+        let issue_id = crate::test_utils::issue_id(0x5000_4000_8000_0000_0000_0001_abcd_ef12);
+        let record = VirtualPath::issue_record(&issue_id);
+        let spec = super::claim_capture_spec(&issue_id)?;
+
+        assert_eq!(spec.paths().count(), 2);
+        assert_eq!(spec.read_mode(&record), Some(ReadMode::Whole));
+        assert_eq!(spec.read_mode(&VirtualPath::EVENTS), Some(ReadMode::Tail));
         Ok(())
     }
 
@@ -2002,7 +1869,7 @@ mod tests {
         )?;
         grow_event_log_beyond(&storage, 16 * 1024 * 1024)?;
 
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
 
         assert_eq!(
             storage
@@ -2029,9 +1896,9 @@ mod tests {
             &crate::test_utils::issue_id(0x4000_4000_8000_0000_0000_0002_abcd_ef12),
             "Second shared-prefix issue",
         )?;
-        persist_claim(&temp, &first_id, "agent:worker")?;
+        execute_claim_acquire_test(&temp, &storage, &first_id, 600, "agent:worker")?;
 
-        execute_claim_acquire_synchronized_test(&temp, &storage, &second_id, 600, "agent:worker")?;
+        execute_claim_acquire_test(&temp, &storage, &second_id, 600, "agent:worker")?;
 
         let leases = execute_claim_list_test(&temp)?;
         assert_eq!(leases.len(), 2);
@@ -2059,29 +1926,18 @@ mod tests {
         )?;
         let full_id = issue_id.clone();
 
+        ensure_git_checkout(&temp)?;
         let paths = create_test_paths(&temp);
-        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths.clone(),
-            locker,
-            identity.worktree_id,
-            "agent:worker".parse().unwrap(),
-        );
-        coordinator.init()?;
 
         // Hold a repository mutation session, THEN attempt to coordinate: reverse
         // acquisition is rejected before any coordinator lock is taken.
         let layout = discover_repository_layout(&paths.worktree_root, storage.root()).unwrap();
         let _session = storage.open_mutation_session(layout).unwrap();
-        let result = coordinator.acquire_claim_synchronized(
+        let result = executor.with_worktree_paths(paths).claims().acquire(
             &full_id,
             600,
+            Some("agent:worker"),
             None,
-            ClaimAcquireLimits::new(100, 100),
-            |_lease| Ok(()),
         );
         assert!(result.is_err(), "reverse guard order must be rejected");
         let message = result.unwrap_err().to_string();
@@ -2106,40 +1962,8 @@ mod tests {
             None,
             false,
         )?;
-        let full_id = issue_id.clone();
 
-        let paths = create_test_paths(&temp);
-        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths.clone(),
-            locker,
-            identity.worktree_id.clone(),
-            "agent:worker".parse().unwrap(),
-        );
-        coordinator.init()?;
-        let agent: crate::domain::Assignee = "agent:worker".parse().unwrap();
-        let worktree_root = paths.worktree_root.clone();
-        let data_root = storage.root().to_path_buf();
-
-        // Acquire an indefinite lease (claims the issue via the synchronized path).
-        let (lease, ()) = coordinator.acquire_claim_synchronized(
-            &full_id,
-            0,
-            Some("manual oversight"),
-            ClaimAcquireLimits::new(100, 100),
-            |_lease| {
-                super::synchronize_claim_repository_state(
-                    &storage,
-                    &worktree_root,
-                    &data_root,
-                    &full_id,
-                    &agent,
-                )
-            },
-        )?;
+        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:worker")?;
 
         // Snapshot repository-owned state after the acquire.
         let issue_before = storage.load_issue(&issue_id)?;
@@ -2147,9 +1971,19 @@ mod tests {
 
         // Coordinator-only operations (heartbeat, renew, force-evict/release) never
         // open a repository session, so they cannot mutate the issue or event log.
-        coordinator.heartbeat(&lease.lease_id)?;
-        coordinator.renew_lease(&lease.lease_id, 0)?;
-        coordinator.force_evict_lease(&lease.lease_id, "released")?;
+        let paths = create_test_paths(&temp);
+        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
+        let coordinator = ClaimCoordinator::new(
+            paths,
+            FileLocker::new(Duration::from_secs(
+                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+            )),
+            identity.worktree_id,
+            "agent:worker".parse()?,
+        );
+        coordinator.heartbeat(&lease_id)?;
+        coordinator.renew_lease(&lease_id, 0)?;
+        execute_claim_force_evict_test(&temp, &lease_id, "released")?;
 
         let issue_after = storage.load_issue(&issue_id)?;
         let events_after = storage.read_events()?;

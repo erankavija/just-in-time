@@ -182,20 +182,13 @@ pub type ArtifactEvidenceMap = BTreeMap<String, ArtifactEvidence>;
 /// The copy each source was published to by recorded archivals of `target`,
 /// keyed by normalized source; a later record supersedes an earlier one.
 pub fn recorded_archived_copies(
-    events: &[crate::domain::Event],
+    executions: &[crate::domain::artifact_execution::ArchiveExecution],
     target: &crate::domain::artifact_plan::PlanTarget,
 ) -> BTreeMap<String, String> {
-    events
+    executions
         .iter()
-        .filter_map(|event| match event.body() {
-            crate::domain::EventBody::ArtifactArchiveExecuted {
-                target: recorded,
-                publications,
-                ..
-            } if recorded == target => Some(publications),
-            _ => None,
-        })
-        .flatten()
+        .filter(|execution| &execution.target == target)
+        .flat_map(|execution| &execution.publications)
         .filter_map(|publication| {
             publication.source.as_deref().map(|source| {
                 (
@@ -911,4 +904,27 @@ fn capture_alternative<'a>(
     indices
         .iter()
         .find_map(|index| captures.get(*index).map(|value| value.as_str()))
+}
+
+#[cfg(test)]
+mod archived_copy_tests {
+    use super::recorded_archived_copies;
+    use crate::domain::artifact_plan::PlanTarget;
+    use crate::test_utils::archive_execution;
+
+    fn document(path: &str) -> PlanTarget {
+        PlanTarget::Document { path: path.into() }
+    }
+
+    #[test]
+    fn test_recorded_archived_copies_later_execution_supersedes_and_other_targets_are_ignored() {
+        let executions = [
+            archive_execution(document("a.md"), "arc", &[("src/x.md", "arc/old/x.md")]),
+            archive_execution(document("b.md"), "arc", &[("src/x.md", "arc/other/x.md")]),
+            archive_execution(document("a.md"), "arc", &[("src/x.md", "arc/new/x.md")]),
+        ];
+        let copies = recorded_archived_copies(&executions, &document("a.md"));
+        assert_eq!(copies.len(), 1);
+        assert_eq!(copies["src/x.md"], "arc/new/x.md");
+    }
 }
