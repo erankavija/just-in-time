@@ -10,7 +10,6 @@ use crate::declarations::rules::{RuleSet, Severity};
 use crate::declarations::GateChecker;
 use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
-use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::GateKey;
 use crate::domain::identity::IssueId;
 use crate::domain::item::{
@@ -36,7 +35,7 @@ pub enum RepositoryValidationPass {
     RulesAndSchemas,
     /// `gates.toml` parses and gate identities are unique.
     Gates,
-    /// `index.json`, issue JSON, and `events.jsonl` parse and agree on embedded ids.
+    /// `index.json` and issue JSON parse and agree on embedded ids.
     Records,
     /// Dependencies, required gates, DAG shape, and transitive reduction hold.
     RepositoryIntegrity,
@@ -55,8 +54,6 @@ pub struct RepositoryValidationReport {
     pub passes: Vec<RepositoryValidationPass>,
     /// Number of issue records validated.
     pub issue_count: usize,
-    /// Number of known event records validated.
-    pub event_count: usize,
     /// Declarative and built-in semantic findings produced from the same view.
     pub rule_report: RuleReport,
 }
@@ -95,7 +92,6 @@ impl RepositoryValidationFailure {
             RepositoryValidationReport {
                 passes: Vec::new(),
                 issue_count: 0,
-                event_count: 0,
                 rule_report: RuleReport::default(),
             },
         )
@@ -107,7 +103,6 @@ impl RepositoryValidationFailure {
             RepositoryValidationReport {
                 passes: Vec::new(),
                 issue_count: 0,
-                event_count: 0,
                 rule_report: RuleReport::default(),
             },
         )
@@ -193,7 +188,6 @@ pub fn validate_repository(
                 RepositoryValidationReport {
                     passes: Vec::new(),
                     issue_count: 0,
-                    event_count: 0,
                     rule_report: RuleReport::default(),
                 },
             )
@@ -224,7 +218,6 @@ pub(crate) fn validate_repository_with_materializations(
             RepositoryValidationReport {
                 passes,
                 issue_count: 0,
-                event_count: 0,
                 rule_report: RuleReport::default(),
             },
         ));
@@ -252,10 +245,10 @@ pub(crate) fn validate_repository_with_materializations(
     let gates = declarations.gates().clone();
     passes.push(RepositoryValidationPass::Gates);
 
-    let records = match load_records(read, image).context("records validation pass") {
-        Ok(records) => {
+    let issues = match load_records(read, image).context("records validation pass") {
+        Ok(issues) => {
             passes.push(RepositoryValidationPass::Records);
-            Some(records)
+            Some(issues)
         }
         Err(error) => {
             if structural_error.is_none() {
@@ -271,8 +264,8 @@ pub(crate) fn validate_repository_with_materializations(
             .err();
     }
 
-    if let Some(records) = &records {
-        let integrity_error = validate_integrity(&records.issues, &gates, document_references)
+    if let Some(issues) = &issues {
+        let integrity_error = validate_integrity(issues, &gates, document_references)
             .map_err(judged_invalid)
             .context("repository-integrity validation pass")
             .err();
@@ -292,8 +285,8 @@ pub(crate) fn validate_repository_with_materializations(
 
     let mut namespace_and_hierarchy_complete = rules_loaded;
     if rules_loaded {
-        if let Some(records) = &records {
-            match collect_rule_findings(read, &records.issues, &rules, &namespaces, &config)
+        if let Some(issues) = &issues {
+            match collect_rule_findings(read, issues, &rules, &namespaces, &config)
                 .context("namespace-and-hierarchy validation pass")
             {
                 Ok(rule_findings) => findings.extend(rule_findings),
@@ -318,13 +311,13 @@ pub(crate) fn validate_repository_with_materializations(
         passes.push(RepositoryValidationPass::NamespaceAndHierarchy);
     }
 
-    if let Some(records) = &records {
+    if let Some(issues) = &issues {
         let credit_namespaces = if rules_loaded {
             crate::validation::graph::coverage_credit_namespaces(&rules.rules)
         } else {
             HashSet::new()
         };
-        match collect_item_link_findings(read, &records.issues, &config, &credit_namespaces)
+        match collect_item_link_findings(read, issues, &config, &credit_namespaces)
             .context("item-links validation pass")
         {
             Ok(item_findings) => {
@@ -352,13 +345,9 @@ pub(crate) fn validate_repository_with_materializations(
         }
     }
 
-    let (issue_count, event_count) = records.as_ref().map_or((0, 0), |records| {
-        (records.issues.len(), records.event_count)
-    });
     let report = RepositoryValidationReport {
         passes,
-        issue_count,
-        event_count,
+        issue_count: issues.as_ref().map_or(0, Vec::len),
         rule_report: RuleReport { findings },
     };
     match structural_error {
@@ -386,19 +375,14 @@ fn required_text(read: &ReadBytes<'_>, path: &str) -> Result<String> {
     read_text(read, path)?.ok_or_else(|| anyhow!("required repository file '{path}' is missing"))
 }
 
-struct Records {
-    issues: Vec<Issue>,
-    event_count: usize,
-}
-
-fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records> {
+fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Vec<Issue>> {
     let index_path = VirtualPath::INDEX.repository_relative();
     RepositoryIndex::parse(
         &read(&index_path)?
             .ok_or_else(|| anyhow!("required repository file '{index_path}' is missing"))?,
     )
     .context(RepositoryJudgedInvalid(format!("invalid {index_path}")))?;
-    let issues = captured_issue_ids(image)?
+    captured_issue_ids(image)?
         .iter()
         .map(|id| {
             let path = VirtualPath::issue_record(id).repository_relative();
@@ -413,21 +397,7 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
             }
             Ok(issue)
         })
-        .collect::<Result<Vec<_>>>()?;
-
-    let mut event_count = 0;
-    if let Some(events) = read(&VirtualPath::EVENTS.repository_relative())? {
-        event_count = parse_known_events(&events)
-            .context(RepositoryJudgedInvalid(format!(
-                "invalid {}",
-                VirtualPath::EVENTS.repository_relative()
-            )))?
-            .len();
-    }
-    Ok(Records {
-        issues,
-        event_count,
-    })
+        .collect()
 }
 
 fn validate_integrity(
@@ -1318,7 +1288,7 @@ mod tests {
     }
 
     #[test]
-    fn test_overlay_index_events_and_issue_records_ignore_disagreeing_live_bytes() {
+    fn test_overlay_index_ignores_disagreeing_live_bytes() {
         let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
@@ -1334,18 +1304,63 @@ mod tests {
             vec!["type:task".to_string()],
         );
         let index = read_fixture(&executor, &VirtualPath::INDEX.repository_relative()).unwrap();
-        let events =
-            read_fixture(&executor, &VirtualPath::EVENTS.repository_relative()).unwrap_or_default();
         std::fs::write(data_path(&executor, &VirtualPath::INDEX), "not json").unwrap();
-        std::fs::write(data_path(&executor, &VirtualPath::EVENTS), "not jsonl").unwrap();
         assert!(validate_overlaid(
             &executor,
-            [
-                (VirtualPath::INDEX.repository_relative(), Some(index)),
-                (VirtualPath::EVENTS.repository_relative(), Some(events)),
-            ],
+            [(VirtualPath::INDEX.repository_relative(), Some(index))],
         )
         .is_ok());
+    }
+
+    #[test]
+    fn test_validate_repository_passes_records_over_an_unparseable_event_log() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
+        seed_fixture_issue(
+            &mut executor,
+            "Root",
+            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
+            vec!["type:task".to_string()],
+        );
+
+        let report = validate_overlaid(
+            &executor,
+            [put(
+                VirtualPath::EVENTS.repository_relative(),
+                "not jsonl\n",
+            )],
+        )
+        .unwrap();
+
+        assert!(report.passes.contains(&RepositoryValidationPass::Records));
+    }
+
+    #[test]
+    fn test_validate_live_reports_an_unparseable_event_log() {
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::EVENTS), "not jsonl\n").unwrap();
+
+        let error = validate_live(&executor).unwrap_err().to_string();
+
+        assert!(
+            error.contains("record-fidelity")
+                && error.contains(&VirtualPath::EVENTS.repository_relative())
+                && error.contains("line 1"),
+            "{error}"
+        );
     }
 
     #[test]

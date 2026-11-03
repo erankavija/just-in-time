@@ -931,6 +931,12 @@ impl jit::storage::RepositoryMutationSession for FailingMutationSession {
             "simulated publication failure".to_string(),
         ))
     }
+
+    fn read_history_log(
+        &mut self,
+    ) -> Result<Option<Vec<u8>>, jit::storage::RepositoryStateStoreError> {
+        self.inner.read_history_log()
+    }
 }
 
 impl jit::storage::RepositoryStateStore for FailingMutationStorage {

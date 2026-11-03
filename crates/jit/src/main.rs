@@ -332,33 +332,23 @@ fn gate_pass_json_error(e: &anyhow::Error, requested: &str) -> jit::output::Json
 /// In `--json` mode emits the structured
 /// [`TemplateApplyResult`](jit::commands::TemplateApplyResult) (template name,
 /// resolved anchor bindings, created/refreshed node ids by role, and the
-/// pre-apply anchor dependency snapshots) plus the freshly-loaded created
+/// pre-apply anchor dependency snapshots) plus the returned created
 /// issues, keyed by role. In quiet mode prints just the created node ids (one per
 /// line, role-ordered) for scripting; otherwise a short human summary.
 fn print_apply_result(
-    storage: &JsonFileStorage,
     result: &jit::commands::TemplateApplyResult,
     container: &IssueId,
     quiet: bool,
     json: bool,
 ) -> Result<()> {
     if json {
-        // Load each created node so the JSON consumer gets the full stored
-        // records (gate list under the storage names) alongside the role→id map.
-        // Routed through the typed response so the schema derives from the same
-        // `Issue` the emission serializes (jit:f40f1b0a).
-        let created_issues: std::collections::BTreeMap<String, jit::domain::Issue> = result
-            .created_node_ids_by_role
-            .iter()
-            .map(|(role, id)| Ok((role.clone(), storage.load_issue(id)?)))
-            .collect::<Result<_>>()?;
         let response = jit::output::TemplateApplyResponse {
             template: result.template.clone(),
             container: container.clone(),
             anchor_bindings: result.anchor_bindings.clone(),
             created_node_ids_by_role: result.created_node_ids_by_role.clone(),
             anchor_dependency_snapshots: result.anchor_dependency_snapshots.clone(),
-            created_issues,
+            created_issues: result.created_issues.clone(),
         };
         let msg = format!("Applied template '{}' to {}", result.template, container);
         let output = JsonOutput::success(response).with_message(msg);
@@ -3037,7 +3027,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             for warning in &warnings {
                 eprintln!("Warning: {}", warning);
             }
-            print_apply_result(&storage, &result, &container, quiet, json)?;
+            print_apply_result(&result, &container, quiet, json)?;
         }
         Commands::Dep(dep_cmd) => match dep_cmd {
             DepCommands::Add {
@@ -5915,7 +5905,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             glob,
         } => {
             let output_ctx = OutputContext::new(quiet, json);
-            use jit::search::{search, SearchOptions};
+            use jit::search::SearchOptions;
 
             let options = SearchOptions {
                 case_sensitive,
@@ -5926,42 +5916,41 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 file_patterns: Vec::new(),
             };
 
-            match search(&jit_dir, &query, options) {
-                Ok(results) => {
+            match executor.queries().search_content(&query, options) {
+                Ok(matches) => {
                     if json {
                         use jit::output::{JsonOutput, SearchResponse};
 
-                        let msg = format!("Found {} result(s)", results.len());
+                        let msg = format!("Found {} result(s)", matches.len());
+                        let results = matches.into_iter().map(|m| m.result).collect();
                         let response = SearchResponse::with_extras(
                             results,
                             jit::output::SearchQuery { query },
                         );
                         let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
-                    } else if results.is_empty() {
+                    } else if matches.is_empty() {
                         let _ =
                             output_ctx.print_info(format!("No matches found for \"{}\"", query));
                     } else {
                         let _ = output_ctx.print_info(format!(
                             "Search results for \"{}\" ({} matches):\n",
                             query,
-                            results.len()
+                            matches.len()
                         ));
 
                         let mut current_file = String::new();
-                        for result in &results {
+                        for m in &matches {
+                            let result = &m.result;
                             if result.path != current_file {
                                 current_file = result.path.clone();
 
-                                if let Some(issue_id) = &result.issue_id {
-                                    // Try to load issue for title
-                                    if let Ok(issue) = storage.load_issue(issue_id) {
-                                        println!("Issue {} | {}", issue_id, issue.title);
-                                    } else {
-                                        println!("Issue {}", issue_id);
+                                match (&result.issue_id, &m.issue_title) {
+                                    (Some(issue_id), Some(title)) => {
+                                        println!("Issue {} | {}", issue_id, title)
                                     }
-                                } else {
-                                    println!("Document {}", result.path);
+                                    (Some(issue_id), None) => println!("Issue {}", issue_id),
+                                    (None, _) => println!("Document {}", result.path),
                                 }
                             }
 
