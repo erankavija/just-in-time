@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "run_id": "8911440d-ed28-4ac8-a9ff-8136f3a7e965",
+      "run_id": "421a7ad1-e914-4514-a0b1-b9770322cc18",
       "status": "passed",
-      "updated_at": "2026-11-03T21:11:50.512484876Z",
+      "updated_at": "2026-11-03T21:43:02.059431810Z",
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
@@ -45,5 +45,5 @@
   "priority": "high",
   "state": "done",
   "title": "breakdown: Restructure storage so reads never scale with project history",
-  "updated_at": "2026-11-03T21:35:17.343969761Z"
+  "updated_at": "2026-11-03T21:43:02.059431810Z"
 }

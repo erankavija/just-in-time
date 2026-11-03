@@ -22,9 +22,9 @@
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "run_id": "b02c2cd5-cde5-4352-9276-3408b3512825",
+      "run_id": "7e0611c5-36e6-4773-a24d-cf9dfb06ab52",
       "status": "passed",
-      "updated_at": "2026-11-03T21:16:36.167973576Z",
+      "updated_at": "2026-11-03T21:46:31.562340746Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "done",
   "title": "breakdown: Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-11-03T21:24:30.254024173Z"
+  "updated_at": "2026-11-03T21:46:31.562340746Z"
 }

@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "756f6a9f-93f7-4f5a-aa90-c34d7dab2c57",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:43:52.436719911Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5582e39e-10d5-4079-b81f-47f23a81e45a",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Mutations capture the event log's end, not the whole log",
-  "updated_at": "2026-11-03T21:30:36.439425664Z"
+  "updated_at": "2026-11-03T21:43:52.436719911Z"
 }
