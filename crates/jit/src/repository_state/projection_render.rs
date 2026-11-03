@@ -37,7 +37,6 @@ use crate::domain::item::{
     derive_scope_items, index_markdown_items, load_toml_scope_items, resolve_item_kinds,
     AddressableItem, ItemKind, Scope,
 };
-use crate::domain::ContentFormat;
 use std::collections::BTreeSet;
 
 /// The loaded registries a projection body render reads besides its source files:
@@ -99,7 +98,7 @@ fn resolve_rows(
     config: &JitConfig,
     read: &mut dyn FnMut(&str) -> Result<Option<String>, ProducerError>,
 ) -> Result<Vec<AddressableItem>, ProducerError> {
-    let parser = content_parser_for(None, repo_content_format(config))?;
+    let parser = content_parser_for(None, config.content_format())?;
     let mut rows = Vec::new();
     for kind in kinds {
         if !kind.kind_scope().is_project() {
@@ -236,11 +235,4 @@ fn render_full_body(
         }
         .into())
     }
-}
-
-/// The repo-level content format (`[validation].content_format`, defaulting to
-/// [`ContentFormat::DEFAULT`]), matching the selection issue descriptions and project sources use so
-/// a projection scans its source identically.
-fn repo_content_format(config: &JitConfig) -> ContentFormat {
-    config.content_format()
 }

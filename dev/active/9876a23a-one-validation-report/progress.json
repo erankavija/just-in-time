@@ -78,7 +78,7 @@
           "short_id": "c92f4011",
           "title": "Keep default rules in force when rules.toml holds only custom rules",
           "classification": "implementation",
-          "status": "rework 1: merged-tree suite failed (batch_export roundtrip, scope JSON success) under the new default-rule semantics",
+          "status": "merged bdc0fd571; cargo-ci passed; rework 2 for code-review F1 (custom rule shadows default); docs-mechanical blocked by target symlink (escalated)",
           "worker": "codex gpt-6-astra xhigh"
         }
       ]
@@ -174,10 +174,16 @@
       "at": "2026-11-04",
       "subject": "70ac98fc code-review F1 ancestry misread",
       "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-04",
+      "subject": "docs-mechanical M8 fails: jit profile pack refuses symlinked target/",
+      "status": "open"
     }
   ],
   "rework_counts": {
-    "c92f4011": 1
+    "c92f4011": 2
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",

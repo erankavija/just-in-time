@@ -232,7 +232,7 @@ pub struct IconConfigToml {
 ///
 /// Per-rule enforcement lives in `.jit/rules.toml` (DR §8.2/§8.4), whose built-in
 /// default rules derive from this repo's registry at load.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ValidationConfig {
     /// Repo-wide enforcement strictness. It modulates which rule violations block
@@ -1202,26 +1202,20 @@ impl JitConfig {
         resolve_coordination(self.coordination.as_ref())
     }
 
-    /// The repo-level content format for issue bodies: `[validation]`'s
-    /// [`ValidationConfig::content_format`], or
-    /// [`ContentFormat::DEFAULT`](crate::domain::ContentFormat::DEFAULT) without
-    /// the section.
+    /// The repo-level content format, resolved by [`ValidationConfig::content_format`].
     pub fn content_format(&self) -> crate::domain::ContentFormat {
-        self.validation.as_ref().map_or(
-            crate::domain::ContentFormat::DEFAULT,
-            ValidationConfig::content_format,
-        )
+        self.validation
+            .as_ref()
+            .unwrap_or(&ValidationConfig::default())
+            .content_format()
     }
 
-    /// The repo-wide validation strictness: `[validation]`'s
-    /// [`ValidationConfig::strictness`], or
-    /// [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) without the
-    /// section.
+    /// The repo-wide validation strictness, resolved by [`ValidationConfig::strictness`].
     pub fn strictness(&self) -> crate::validation::Strictness {
-        self.validation.as_ref().map_or(
-            crate::validation::Strictness::DEFAULT,
-            ValidationConfig::strictness,
-        )
+        self.validation
+            .as_ref()
+            .unwrap_or(&ValidationConfig::default())
+            .strictness()
     }
 
     /// Load configuration from `.jit/config.toml` if it exists.
@@ -1915,6 +1909,38 @@ default_type = "task"
             Some(crate::validation::Strictness::Loose)
         );
         assert_eq!(validation.default_type, Some("task".to_string()));
+    }
+
+    #[test]
+    fn test_content_format_resolves_absent_table_absent_key_and_declared_value() {
+        use crate::domain::ContentFormat::{Html, Markdown};
+
+        [
+            ("", Markdown),
+            ("[validation]", Markdown),
+            ("[validation]\ncontent_format = \"html\"", Html),
+        ]
+        .into_iter()
+        .for_each(|(source, expected)| {
+            let config: JitConfig = toml::from_str(source).unwrap();
+            assert_eq!(config.content_format(), expected, "{source:?}");
+        });
+    }
+
+    #[test]
+    fn test_strictness_resolves_absent_table_absent_key_and_declared_value() {
+        use crate::validation::Strictness::{Loose, Strict};
+
+        [
+            ("", Loose),
+            ("[validation]", Loose),
+            ("[validation]\nstrictness = \"strict\"", Strict),
+        ]
+        .into_iter()
+        .for_each(|(source, expected)| {
+            let config: JitConfig = toml::from_str(source).unwrap();
+            assert_eq!(config.strictness(), expected, "{source:?}");
+        });
     }
 
     #[test]
