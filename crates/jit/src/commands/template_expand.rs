@@ -27,12 +27,12 @@ use std::collections::BTreeMap;
 use anyhow::{anyhow, Result};
 
 use crate::config::DocumentationConfig;
-use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
+use crate::domain::artifact_directory::ArtifactDirectoryError;
 use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, Priority};
 use crate::labels as label_utils;
-use crate::templates::{GraphTemplate, TemplateNode, TransformKind};
+use crate::templates::{GraphTemplate, InterpolationContext, TemplateNode, TransformKind};
 
 /// One endpoint of a [`DeltaEdge`]: a node the delta creates (named by its
 /// template role), or an issue that already exists (named by its full id).
@@ -290,29 +290,6 @@ pub fn expand_template(
     })
 }
 
-/// The canonical artifact directory `node`'s document belongs in, or `None` when
-/// the node declares no [`doc_area`](TemplateNode::doc_area).
-///
-/// The directory is the domain resolver's own answer
-/// ([`resolve_artifact_directory`]), so the composition rule — the area, the
-/// container's short id, and its membership slug — has one implementation.
-///
-/// # Errors
-///
-/// [`ArtifactDirectoryError`] when the declared area is absent from the
-/// configured issue-scoped registry.
-fn node_artifact_directory(
-    node: &TemplateNode,
-    container: &Issue,
-    documentation: &DocumentationConfig,
-    hierarchy: &HierarchyConfig,
-) -> std::result::Result<Option<String>, ArtifactDirectoryError> {
-    node.doc_area
-        .as_deref()
-        .map(|area| resolve_artifact_directory(container, area, documentation, hierarchy))
-        .transpose()
-}
-
 /// The repository-relative document path `node` declares for `container`, or
 /// `None` when the node declares no [`doc`](TemplateNode::doc).
 ///
@@ -503,157 +480,6 @@ pub(super) fn node_description(node: &TemplateNode, context: &InterpolationConte
     }
 }
 
-/// Fixed token-substitution context for template interpolation (PURE: no I/O).
-///
-/// Resolves the container-derived tokens declared by the template schema —
-/// `{container.id}`, `{container.short_id}`, `{container.title}`,
-/// `{container.hard_criteria}` — plus the per-node `{container.dir}` (the
-/// canonical artifact directory of the area the node declares) and `{doc}` (the
-/// node's own interpolated `doc`). [`for_node`](InterpolationContext::for_node)
-/// is the one constructor, so every derivation of a node's prose, labels, and
-/// document path substitutes the same context. This is a simple `{token}`
-/// replace over a fixed map, and not a templating language.
-#[derive(Debug, Clone)]
-pub(super) struct InterpolationContext {
-    id: IssueId,
-    title: String,
-    hard_criteria: String,
-    directory: Option<String>,
-    doc: Option<String>,
-}
-
-impl InterpolationContext {
-    /// Build the context `node`'s declarations are substituted into: the
-    /// container tokens, the `{container.dir}` directory of the area `node`
-    /// declares, and `node`'s own interpolated `{doc}`.
-    ///
-    /// Every derivation that resolves a template declaration for a node builds
-    /// its context here, so the apply engine and the derivations around it
-    /// resolve one declaration through one substitution.
-    ///
-    /// # Errors
-    ///
-    /// [`ArtifactDirectoryError`] when the node's declared area is absent from
-    /// the configured issue-scoped registry.
-    pub(super) fn for_node(
-        container: &Issue,
-        node: &TemplateNode,
-        documentation: &DocumentationConfig,
-        hierarchy: &HierarchyConfig,
-    ) -> std::result::Result<Self, ArtifactDirectoryError> {
-        let directory = node_artifact_directory(node, container, documentation, hierarchy)?;
-        Ok(Self::for_container(container).with_doc(node, directory))
-    }
-
-    /// Build the container-derived context (the `{container.dir}` and `{doc}`
-    /// tokens are unset until a node is selected via [`with_doc`](Self::with_doc)).
-    fn for_container(container: &Issue) -> Self {
-        Self {
-            id: container.id.clone(),
-            title: container.title.clone(),
-            hard_criteria: extract_hard_criteria(&container.description),
-            directory: None,
-            doc: None,
-        }
-    }
-
-    /// Produce a per-node copy of this context whose `{container.dir}` token
-    /// resolves to `directory` and whose `{doc}` token resolves to `node`'s own
-    /// interpolated `doc` template (empty when the node has none).
-    ///
-    /// `directory` is the canonical artifact directory of the area `node`
-    /// declares ([`node_artifact_directory`]); `None` leaves `{container.dir}`
-    /// out of scope, which is what a node declaring no area resolves under. The
-    /// node's `doc` is interpolated with `{container.dir}` already in scope and
-    /// WITHOUT `{doc}`, so `{doc}` in a description always refers to the node's
-    /// resolved doc path, never itself.
-    fn with_doc(&self, node: &TemplateNode, directory: Option<String>) -> Self {
-        let scoped = Self {
-            directory,
-            ..self.clone()
-        };
-        let doc = node
-            .doc
-            .as_deref()
-            .map(|template| scoped.interpolate(template))
-            .unwrap_or_default();
-        Self {
-            doc: Some(doc),
-            ..scoped
-        }
-    }
-
-    /// Substitute every supported `{token}` in `template` with its context value.
-    ///
-    /// A token this context does not carry — `{container.dir}` for a node that
-    /// declares no area, `{doc}` before a node is selected — is left verbatim,
-    /// like any unknown `{...}` text.
-    fn interpolate(&self, template: &str) -> String {
-        let mut out = template
-            .replace("{container.id}", self.id.as_str())
-            .replace("{container.short_id}", self.id.short_id())
-            .replace("{container.title}", &self.title)
-            .replace("{container.hard_criteria}", &self.hard_criteria);
-        if let Some(directory) = &self.directory {
-            out = out.replace("{container.dir}", directory);
-        }
-        if let Some(doc) = &self.doc {
-            out = out.replace("{doc}", doc);
-        }
-        out
-    }
-}
-
-/// Resolve the breakdown node's declared container label for `container`.
-///
-/// The label declaration is the source of truth for the namespace that ties a
-/// breakdown node to its container. A declaration is eligible when it
-/// interpolates either supported container identifier token; the resulting
-/// label is what bracket lookup must use.
-pub(super) fn declared_container_label(
-    template: &GraphTemplate,
-    roles: &crate::templates::RoleBindings,
-    container: &Issue,
-) -> Result<String> {
-    let node = template.breakdown_node(roles).ok_or_else(|| {
-        anyhow!(
-            "template '{}' declares no '{}' node; bracket lookup needs a breakdown node label",
-            template.name,
-            roles.breakdown_role()
-        )
-    })?;
-    let context = InterpolationContext::for_container(container);
-    node.labels
-        .iter()
-        .find(|label| {
-            label.contains("{container.short_id}") || label.contains("{container.id}")
-        })
-        .map(|label| context.interpolate(label))
-        .ok_or_else(|| {
-            anyhow!(
-                "template '{}' breakdown node '{}' declares no container label; bracket lookup cannot resolve the applied node",
-                template.name,
-                node.role
-            )
-        })
-}
-
-/// Extract the container's `[hard]` success criteria as a newline-joined block
-/// for the `{container.hard_criteria}` token (PURE: line scan, no parser).
-///
-/// Collects each list item marked `[hard]` (after stripping a leading `-`/`*`
-/// bullet and whitespace) from the description, preserving order. Returns the
-/// empty string when none are present.
-fn extract_hard_criteria(description: &str) -> String {
-    description
-        .lines()
-        .map(str::trim)
-        .map(|line| line.trim_start_matches(['-', '*', '+']).trim())
-        .filter(|line| line.starts_with("[hard]"))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
 /// The declarations shared by the tests of every derivation that resolves a
 /// template document declaration: the apply engine here, and the capture-path
 /// and refresh derivations in [`super::template`].
@@ -794,6 +620,7 @@ applies_to = ["epic"]
 mod tests {
     use super::test_declarations::*;
     use super::*;
+    use crate::domain::artifact_directory::resolve_artifact_directory;
 
     fn plan_template() -> GraphTemplate {
         template_from(
@@ -1270,48 +1097,6 @@ applies_to = ["epic"]
     }
 
     #[test]
-    fn test_extract_hard_criteria_pulls_only_hard_items() {
-        let desc = "## Success Criteria\n\n- [hard] REQ-01: a\n- [soft] nice\n- [hard] REQ-02: b\n";
-        assert_eq!(
-            extract_hard_criteria(desc),
-            "[hard] REQ-01: a\n[hard] REQ-02: b"
-        );
-    }
-
-    #[test]
-    fn test_extract_hard_criteria_empty_when_none() {
-        assert_eq!(extract_hard_criteria("no criteria here"), "");
-    }
-
-    #[test]
-    fn test_interpolation_resolves_container_and_doc_tokens() {
-        let mut issue = crate::test_utils::fixture_issue(
-            "Auth epic".to_string(),
-            "- [hard] REQ-01: x".to_string(),
-        );
-        issue.id = crate::test_utils::issue_id(0xf456_0000_0000_0000_0000_0000_abc1_23de);
-        let node = TemplateNode {
-            role: "planning".to_string(),
-            type_name: "planning".to_string(),
-            gates: vec![],
-            doc: Some("dev/active/{container.id}-plan.md".to_string()),
-            doc_area: None,
-            description: Some(
-                "Plan {container.title} ({container.short_id}). Doc: {doc}. Cover: {container.hard_criteria}."
-                    .to_string(),
-            ),
-            labels: vec![],
-            depends_on: vec![],
-        };
-        let ctx = InterpolationContext::for_container(&issue).with_doc(&node, None);
-        let rendered = node_description(&node, &ctx);
-        assert!(rendered.contains("Auth epic"));
-        assert!(rendered.contains(&issue.short_id()));
-        assert!(rendered.contains(&format!("dev/active/{}-plan.md", issue.id)));
-        assert!(rendered.contains("[hard] REQ-01: x"));
-    }
-
-    #[test]
     fn test_node_description_falls_back_when_absent() {
         let issue = crate::test_utils::fixture_issue("Epic X".to_string(), String::new());
         let node = TemplateNode {
@@ -1324,7 +1109,8 @@ applies_to = ["epic"]
             labels: vec![],
             depends_on: vec![],
         };
-        let ctx = InterpolationContext::for_container(&issue).with_doc(&node, None);
+        let ctx =
+            InterpolationContext::for_node(&issue, &node, &documentation(), &hierarchy()).unwrap();
         let rendered = node_description(&node, &ctx);
         assert!(!rendered.is_empty());
         assert!(rendered.contains("Epic X"));
@@ -1346,23 +1132,12 @@ applies_to = ["epic"]
                 labels: vec![],
                 depends_on: vec![],
             };
-            let ctx = InterpolationContext::for_container(&issue).with_doc(&node, None);
+            let ctx = InterpolationContext::for_node(&issue, &node, &documentation(), &hierarchy())
+                .unwrap();
             let rendered = node_description(&node, &ctx);
             assert!(!rendered.trim().is_empty(), "desc {desc:?} yielded empty");
             assert!(rendered.contains("Epic Y"));
         }
-    }
-
-    #[test]
-    fn test_interpolate_leaves_unknown_token_verbatim() {
-        // The interpolation context is a fixed `{token}` substitution, not a
-        // templating language: an unsupported `{token}` is left untouched while the
-        // known container tokens around it still resolve.
-        let mut issue = crate::test_utils::fixture_issue("Auth epic".to_string(), String::new());
-        issue.id = crate::test_utils::issue_id(0xf456_0000_0000_0000_0000_0000_abc1_23de);
-        let ctx = InterpolationContext::for_container(&issue);
-        let rendered = ctx.interpolate("{container.title} then {totally.unknown} end");
-        assert_eq!(rendered, "Auth epic then {totally.unknown} end");
     }
 
     #[test]
@@ -1387,7 +1162,8 @@ applies_to = ["epic"]
             depends_on: vec![],
         };
         let inherited = inherited_membership_labels(&container);
-        let ctx = InterpolationContext::for_container(&container).with_doc(&node, None);
+        let ctx = InterpolationContext::for_node(&container, &node, &documentation(), &hierarchy())
+            .unwrap();
         let labels = node_labels(&node, &inherited, &ctx);
 
         // Inherited non-type label is carried; the container's `type:epic` is not.
