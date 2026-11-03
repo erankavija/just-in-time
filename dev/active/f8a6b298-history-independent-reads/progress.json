@@ -575,6 +575,12 @@
       "id": "2117739f-r1",
       "vendor": "lead",
       "reason": "code-review F1: accessor must check the loaded run gate_key; one-line filter + test"
+    },
+    {
+      "id": "a7314585",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "recovery onto LeaseLock; concurrency-critical; on 944edb32 path"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
