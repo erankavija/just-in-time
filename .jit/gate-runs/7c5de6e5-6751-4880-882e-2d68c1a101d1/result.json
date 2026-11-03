@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a506691d84dcc2e8af7c9b0693e511ab34cfb556",
+  "completed_at": "2026-11-03T21:26:20.805731060Z",
+  "duration_ms": 233675,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable requirements are satisfied and the prior guidance-test finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1539da29-f445-430c-a238-8613da6ae904",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7c5de6e5-6751-4880-882e-2d68c1a101d1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T21:22:27.130218115Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1865a1593, 1e4972b69, 96944aa6e, 9bc69b0c9 (`jit:1539da29`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/1539da29/requirement/REQ-01–REQ-05 and @/issue/df129d9e/requirement/REQ-11,REQ-13 (issue Markdown); @/invariant/semantic-test-assertions, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci, @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T21:20:52Z); code-review previously failed (exit 1, 2026-11-03T21:05:39Z), with its guidance-test finding addressed in 9bc69b0c9\nTruncation recovery: narrower reads of failure.rs lines 390–690 and 1444–1565; omitted plan-table content was outside the classifier impact cone\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable requirements are satisfied and the prior guidance-test finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
