@@ -66,7 +66,7 @@ impl TestHarness {
 
     /// Create an issue with minimal parameters
     pub fn create_issue(&self, title: &str) -> IssueId {
-        let (id, _) = self
+        let id = self
             .executor
             .issues()
             .create_issue(
@@ -79,13 +79,15 @@ impl TestHarness {
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         id
     }
 
     /// Create an issue with description
     pub fn create_issue_with_desc(&self, title: &str, desc: &str) -> IssueId {
-        let (id, _) = self
+        let id = self
             .executor
             .issues()
             .create_issue(
@@ -98,13 +100,15 @@ impl TestHarness {
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         id
     }
 
     /// Create an issue with priority
     pub fn create_issue_with_priority(&self, title: &str, priority: Priority) -> IssueId {
-        let (id, _) = self
+        let id = self
             .executor
             .issues()
             .create_issue(
@@ -117,7 +121,9 @@ impl TestHarness {
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         id
     }
 
@@ -145,7 +151,7 @@ impl TestHarness {
 
     /// Create an issue with gates
     pub fn create_issue_with_gates(&self, title: &str, gates: Vec<GateKey>) -> IssueId {
-        let (id, _) = self
+        let id = self
             .executor
             .issues()
             .create_issue(
@@ -158,7 +164,9 @@ impl TestHarness {
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         id
     }
 

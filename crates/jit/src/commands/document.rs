@@ -2292,16 +2292,20 @@ mod tests {
         let (temp, storage) = crate::test_utils::setup_test_repo()?;
         let executor =
             CommandExecutor::new(storage.clone()).with_layout(storage.configured_layout()?);
-        let (issue_id, _) = executor.issues().create_issue(
-            "Long History Issue".to_string(),
-            String::new(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Long History Issue".to_string(),
+                String::new(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
         std::fs::create_dir_all(temp.path().join("docs"))?;
         std::fs::write(temp.path().join("docs/plan.md"), "# Plan\n")?;
         crate::test_utils::grow_event_log_beyond(&storage, 64 * 1024 * 1024)?;

@@ -37,7 +37,7 @@ fn preset_captured_from_gates(
     preset: &str,
     gates: &[jit::domain::identity::GateKey],
 ) -> std::path::PathBuf {
-    let (reference, _) = executor
+    let reference = executor
         .issues()
         .create_issue(
             format!("Reference issue for {preset}"),
@@ -49,7 +49,9 @@ fn preset_captured_from_gates(
             None,
             false,
         )
-        .expect("create reference issue");
+        .expect("create reference issue")
+        .issue
+        .id;
     for gate in gates {
         define_gate(executor, gate);
         executor.gates().add_gate(&reference, gate).unwrap();
@@ -183,7 +185,8 @@ fn test_apply_gate_preset_appends_definition_events() {
                 false,
             )
             .expect("create issue")
-            .0
+            .issue
+            .id
     };
     // Authoring the definition to capture it appended events of its own, so
     // every count below is relative to the log the applications start from.
@@ -307,7 +310,7 @@ fn test_project_defined_preset_save_list_show_apply_in_process() {
     );
 
     // APPLY: attaching the preset to a fresh issue adds both bundled gates.
-    let (target, _) = executor
+    let target = executor
         .issues()
         .create_issue(
             "Feature issue".to_string(),
@@ -319,7 +322,9 @@ fn test_project_defined_preset_save_list_show_apply_in_process() {
             None,
             false,
         )
-        .expect("create target issue");
+        .expect("create target issue")
+        .issue
+        .id;
     let (result, _warnings) = executor
         .gates()
         .apply_gate_preset(&target, "ci", None, false, false, &[])

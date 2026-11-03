@@ -34,7 +34,7 @@ async fn test_get_document_content_missing_issue() {
 #[tokio::test]
 async fn test_get_document_content_missing_document() {
     let executor = setup();
-    let (issue_id, _) = executor
+    let issue_id = executor
         .issues()
         .create_issue(
             "Test Issue".to_string(),
@@ -46,7 +46,9 @@ async fn test_get_document_content_missing_document() {
             None,
             false,
         )
-        .expect("Failed to create issue");
+        .expect("Failed to create issue")
+        .issue
+        .id;
     let server = serve(executor);
 
     let response = server
@@ -62,7 +64,7 @@ async fn test_get_document_content_not_yet_implemented() {
     let executor = setup();
 
     // Create issue with document reference
-    let (issue_id, _) = executor
+    let issue_id = executor
         .issues()
         .create_issue(
             "Test Issue".to_string(),
@@ -74,7 +76,9 @@ async fn test_get_document_content_not_yet_implemented() {
             None,
             false,
         )
-        .expect("Failed to create issue");
+        .expect("Failed to create issue")
+        .issue
+        .id;
 
     // Add document reference (if method exists)
     // For now, this will fail because we need the document to exist

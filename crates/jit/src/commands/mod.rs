@@ -87,7 +87,7 @@ pub use gate_check::VerdictSource;
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat, GraphOps};
 pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
-pub use issue::{DescriptionUpdate, IssueLocalUpdate, IssueOps};
+pub use issue::{DescriptionUpdate, IssueCreation, IssueLocalUpdate, IssueOps};
 pub use item::{ItemListResult, ItemOps, ItemShowResult};
 pub use profile::{
     parse_profile_selector, ProfileApplyError, ProfileOps, ProfileResolutionError,
@@ -2508,11 +2508,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         draft: Issue,
         explicit_type: bool,
         force: bool,
-    ) -> Result<(IssueId, WriteValidation)>
+    ) -> Result<(Issue, WriteValidation)>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, MutationIntent, VirtualPath};
+        use crate::repository_state::{created_issue, finalize, MutationIntent, VirtualPath};
 
         let layout = self.require_layout()?;
         with_mutation_session(&self.storage, &layout, "issue creation", |session| {
@@ -2560,7 +2560,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let validation =
                 derive_write_validation(&final_draft, &declarations, declarations.config(), force)?;
             let intents = std::iter::once(MutationIntent::CreateIssue {
-                draft: Box::new(final_draft),
+                draft: Box::new(final_draft.clone()),
             })
             .chain(
                 validation
@@ -2575,8 +2575,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }),
             )
             .collect::<Vec<_>>();
+            let created = created_issue(&final_draft, context.timestamp());
             let plan = finalize(&layout, &image, context, &intents)?;
-            Ok(SessionStep::Apply(plan, (issue_id, validation)))
+            Ok(SessionStep::Apply(plan, (created, validation)))
         })
     }
 
@@ -3512,7 +3513,7 @@ mod tests {
         let expected_declared_stance = LinkedCheckoutWriteStance::Refuse;
         let expected_invocation_override = LinkedCheckoutWriteStance::Allow;
 
-        let (issue_id, _) = with_dispatch_mutation_annotation(annotation, || {
+        let issue_id = with_dispatch_mutation_annotation(annotation, || {
             executor.issues().create_issue(
                 "Permitted mutation".to_string(),
                 "Issue created while an override permitted the invocation".to_string(),
@@ -3524,7 +3525,9 @@ mod tests {
                 false,
             )
         })
-        .expect("the permitted mutation succeeds");
+        .expect("the permitted mutation succeeds")
+        .issue
+        .id;
 
         let events_after = storage
             .read_events()

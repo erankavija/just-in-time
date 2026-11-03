@@ -421,7 +421,7 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
             100,
         )
         .unwrap();
-    let (upstream, _) = executor
+    let upstream = executor
         .issues()
         .create_issue(
             "Upstream U".to_string(),
@@ -433,8 +433,10 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
             None,
             false,
         )
-        .unwrap();
-    let (container, _) = executor
+        .unwrap()
+        .issue
+        .id;
+    let container = executor
         .issues()
         .create_issue(
             "Auth epic".to_string(),
@@ -455,7 +457,9 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
     executor
         .graph()
         .add_dependency(&container, &upstream)
@@ -638,7 +642,8 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
                     false,
                 )
                 .unwrap()
-                .0;
+                .issue
+                .id;
             (id, started.elapsed())
         })
     };

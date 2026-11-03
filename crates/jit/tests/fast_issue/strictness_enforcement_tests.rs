@@ -14,7 +14,6 @@
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
-use jit::domain::identity::IssueId;
 use jit::domain::Priority;
 use jit::storage::{InMemoryStorage, IssueStore};
 
@@ -41,7 +40,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
 /// label). Returns the executor result so the caller asserts block/allow.
 fn create_violating_epic(
     executor: &CommandExecutor<InMemoryStorage>,
-) -> anyhow::Result<(IssueId, Vec<String>)> {
+) -> anyhow::Result<jit::commands::IssueCreation> {
     executor.issues().create_issue(
         "An epic".to_string(),
         String::new(),

@@ -99,7 +99,8 @@ fn new_issue(
             false,
         )
         .unwrap()
-        .0
+        .issue
+        .id
 }
 
 fn short(id: &IssueId) -> String {

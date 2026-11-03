@@ -25,7 +25,7 @@ fn seed_issue(
     labels: &[&str],
     state: State,
 ) -> IssueId {
-    let (id, _) = executor
+    let id = executor
         .issues()
         .create_issue(
             title.to_string(),
@@ -37,7 +37,9 @@ fn seed_issue(
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
     let mut issue = executor.storage().load_issue(&id).unwrap();
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
     issue.state = state;

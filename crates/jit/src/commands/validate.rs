@@ -2900,7 +2900,8 @@ depends_on = ["planning"]
                 true,
             )
             .unwrap()
-            .0;
+            .issue
+            .id;
 
         let (first, _) = executor
             .validation()
@@ -2938,7 +2939,8 @@ depends_on = ["planning"]
                 true,
             )
             .unwrap()
-            .0;
+            .issue
+            .id;
 
         let mut issue = storage.load_issue(&id).unwrap();
         issue.labels = vec!["type:story".to_string()];
