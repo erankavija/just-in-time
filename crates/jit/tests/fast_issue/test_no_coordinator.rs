@@ -11,7 +11,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
     let h = TestHarness::new();
 
     // Create issue
-    let (id, _) = h
+    let id = h
         .executor
         .issues()
         .create_issue(
@@ -24,7 +24,9 @@ fn test_issue_lifecycle_works_without_coordinator() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     // Update issue
     let _ = h

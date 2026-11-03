@@ -56,7 +56,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
             100,
         )
         .expect("define durability gate");
-    let (issue_id, _) = executor
+    let issue_id = executor
         .issues()
         .create_issue(
             "Durability carrier".to_string(),
@@ -68,7 +68,9 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
             None,
             false,
         )
-        .expect("create issue requiring durability gate");
+        .expect("create issue requiring durability gate")
+        .issue
+        .id;
     // Attaching the gate after creation records its explicit `pending` state, so
     // the assertions below read a recorded verdict rather than an absent key.
     executor

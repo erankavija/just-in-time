@@ -36,7 +36,8 @@ fn create_issue(
             false,
         )
         .unwrap()
-        .0
+        .issue
+        .id
 }
 
 /// The package carrying the generic vocabulary these suites address: the type

@@ -655,6 +655,18 @@ pub fn finalize(
     Ok(MaterializationPlan::new(image, delta))
 }
 
+/// The issue as persisted for `draft` created at `now`.
+pub(crate) fn created_issue(draft: &Issue, now: DateTime<Utc>) -> Issue {
+    let mut issue = draft.clone();
+    issue.created_at = now;
+    issue.updated_at = now;
+    issue.first_ready_at = (issue.state == State::Ready).then_some(now);
+    for gate in issue.gates_status.values_mut() {
+        gate.updated_at = now;
+    }
+    issue
+}
+
 pub(super) fn finalize_delta(
     layout: &RepositoryLayout,
     image: &RepositoryImage,
@@ -699,19 +711,8 @@ pub(super) fn finalize_delta(
     );
     for intent in intents {
         if let MutationIntent::CreateIssue { draft } = intent {
-            let now = context.timestamp();
-            let mut issue = (**draft).clone();
+            let issue = created_issue(draft, context.timestamp());
             let id = issue.id.clone();
-            issue.created_at = now;
-            issue.updated_at = now;
-            if issue.state == State::Ready {
-                issue.first_ready_at = Some(now);
-            } else {
-                issue.first_ready_at = None;
-            }
-            for gate in issue.gates_status.values_mut() {
-                gate.updated_at = now;
-            }
             actions.push(write_issue_action(image, &issue)?);
             pending_events.push(PendingEvent {
                 phase: 0,

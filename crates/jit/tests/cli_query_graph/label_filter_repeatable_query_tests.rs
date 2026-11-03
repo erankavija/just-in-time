@@ -197,3 +197,62 @@ fn test_query_bare_repeatable_label_ands() {
         .unwrap();
     assert_eq!(ids(&json), vec![both]);
 }
+
+#[test]
+fn test_query_available_added_filters_intersect_available_work() {
+    let cli = JitCli::initialised().unwrap();
+    let ready = create_labeled_issue(&cli, "Ready", &[] as &[&str]);
+    let assigned = create_labeled_issue(&cli, "Assigned", &[] as &[&str]);
+    cli.run(["issue", "assign", &assigned, "agent:worker"])
+        .unwrap();
+    let blocked = create_labeled_issue(&cli, "Blocked", &[] as &[&str]);
+    cli.run(["dep", "add", &blocked, &ready]).unwrap();
+    let matching = cli
+        .run_json(["query", "available", "--state", "ready"])
+        .unwrap();
+    assert_eq!(ids(&matching), vec![ready]);
+    for filter in [["--state", "backlog"], ["--assignee", "agent:worker"]] {
+        let narrowed = cli
+            .run_json(["query", "available", filter[0], filter[1]])
+            .unwrap();
+        assert!(ids(&narrowed).is_empty());
+    }
+}
+
+#[test]
+fn test_issue_filter_commands_preserve_json_failure_envelopes() {
+    let cli = JitCli::initialised().unwrap();
+    for command in [
+        vec!["list"],
+        vec!["query"],
+        vec!["issue", "list"],
+        vec!["issue", "search"],
+        vec!["query", "all"],
+        vec!["query", "available"],
+        vec!["query", "blocked"],
+        vec!["query", "strategic"],
+        vec!["query", "closed"],
+        vec!["query", "count", "--by", "state"],
+    ] {
+        for (flag, value, code) in [
+            ("--state", "invalid", "INVALID_ARGUMENT"),
+            ("--priority", "invalid", "INVALID_ARGUMENT"),
+            ("--label", "type:", "INVALID_LABEL_PATTERN"),
+        ] {
+            // Existing search, invalid-state, and label-query tests own these cases.
+            if (command == ["issue", "search"] && flag == "--label")
+                || (command == ["query", "all"] && flag != "--priority")
+            {
+                continue;
+            }
+            let output = cli
+                .command(command.iter().copied().chain([flag, value, "--json"]))
+                .output()
+                .unwrap();
+            assert_eq!(output.status.code(), Some(2), "{command:?} {flag}");
+            let json: Value = serde_json::from_slice(&output.stdout)
+                .unwrap_or_else(|_| panic!("missing envelope: {command:?} {flag}: {output:?}"));
+            assert_eq!(json["error"]["code"], code, "{command:?} {flag}");
+        }
+    }
+}

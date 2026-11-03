@@ -44,7 +44,7 @@ fn create_typed(worktree: &std::path::Path, type_label: &str) -> Vec<String> {
             false,
         )
         .unwrap()
-        .1
+        .warnings
 }
 
 #[test]

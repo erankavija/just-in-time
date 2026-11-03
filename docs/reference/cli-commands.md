@@ -2559,9 +2559,13 @@ dropped. Put the filter on the subcommand (`jit query available --priority high`
 or drop the subcommand to use the bare form.
 
 `--label`/`-l` (format `namespace:value`, or `namespace:*` for wildcard) is
-repeatable everywhere it appears in the query family — on the bare form and on
-every subcommand below, as well as on `jit issue list`. Repeated occurrences
-are ANDed: an issue is returned only if it matches every pattern given.
+repeatable on the bare form, all filtering query subcommands, `jit list`,
+`jit issue list`, and `jit issue search`. Repeated occurrences are ANDed:
+an issue is returned only if it matches every pattern given. Each of these
+commands accepts `--state`, `--assignee`, `--priority`, and `--label`; every
+filter narrows the command's result by AND. For example, `query available
+--assignee agent:worker-1` returns no issues because available work is unassigned.
+`query divergence` does not take field filters.
 
 ### Subcommands
 
@@ -2573,19 +2577,18 @@ are ANDed: an issue is returned only if it matches every pattern given.
 | `jit query blocked` | — | Blocked issues with blocking reasons |
 | `jit query strategic` | — | Issues carrying labels from strategic namespaces |
 | `jit query closed` | — | Effectively terminal issues (Done, Rejected, or Archived from one of those) |
-| `jit query count` | — | Counts by a dimension over a label bucket, with a done/total rollup |
+| `jit query count` | — | Counts by a dimension over filtered issues, with a done/total rollup |
 | `jit query divergence` | — | Membership labels not backed by the DAG (advisory) |
 
 ### State aggregation (`jit query count`)
 
-`jit query count --by state [--label ns:v ...]` aggregates a **label bucket**
+`jit query count --by state [filters]` aggregates matching issues
 into counts by state plus a done/total delivery rollup — the same rollup
 [`jit issue progress`](#container-progress-jit-issue-progress) produces over a
-container's children, but with membership defined by labels instead of the DAG.
+container's children, but with membership defined by field filters instead of the DAG.
 
-The bucket is every issue matching **all** `--label` patterns (repeatable and
-ANDed, as everywhere in the query family); with no `--label`, the whole
-repository is aggregated. This is the advisory-grouping counterpart to
+The bucket is every issue matching **all** supplied field filters; with no
+filters, the whole repository is aggregated. This is the advisory-grouping counterpart to
 `issue progress`: use `issue progress` when containment is a dependency edge,
 `query count` when it is a shared label.
 

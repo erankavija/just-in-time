@@ -25,7 +25,8 @@ where
             false,
         )
         .unwrap()
-        .0
+        .issue
+        .id
 }
 
 /// Assert the last event is `issue_updated` for `issue_id` with the expected
