@@ -464,7 +464,6 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         validate_repo_relative_path(path)?;
         let layout = self.exec.require_layout()?;
         let issue_path = VirtualPath::issue_record(issue_id);
-        let events_path = VirtualPath::EVENTS;
         let document_path = VirtualPath::worktree(path)
             .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
         let source = match commit {
@@ -477,7 +476,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let context = super::production_mutation_context();
 
         with_mutation_session(&self.exec.storage, &layout, "document add", |session| {
-            let initial_paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
+            let initial_paths = BTreeSet::from([issue_path.clone()]);
             let initial_spec = if skip_scan {
                 document_capture_spec(initial_paths)?
             } else {
@@ -538,10 +537,9 @@ impl<S: IssueStore> DocumentOps<'_, S> {
 
         let layout = self.exec.require_layout()?;
         let issue_path = VirtualPath::issue_record(issue_id);
-        let events_path = VirtualPath::EVENTS;
         let context = super::production_mutation_context();
         with_mutation_session(&self.exec.storage, &layout, "document removal", |session| {
-            let paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
+            let paths = BTreeSet::from([issue_path.clone()]);
             let Some(image) = capture_or_retry(session.capture(document_capture_spec(paths)?))?
             else {
                 return Ok(SessionStep::Retry);
@@ -1042,7 +1040,6 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let layout = self.exec.require_layout()?;
         let issue_path = VirtualPath::issue_record(issue_id);
         let document_path = VirtualPath::worktree(path)?;
-        let events_path = VirtualPath::EVENTS;
         let source = DocumentScanSource::Worktree(document_path);
 
         // Operation-scoped so a fresh-session retry cannot resample the update
@@ -1050,9 +1047,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let context = super::production_mutation_context();
         with_mutation_session(&self.exec.storage, &layout, "document rescan", |session| {
             let initial = document_scan_capture_spec(
-                [issue_path.clone(), events_path.clone()]
-                    .into_iter()
-                    .collect(),
+                [issue_path.clone()].into_iter().collect(),
                 &source,
                 &Default::default(),
             )?;
@@ -1637,9 +1632,11 @@ fn read_document(
 fn document_capture_spec(
     paths: std::collections::BTreeSet<crate::repository_state::VirtualPath>,
 ) -> Result<crate::repository_state::CaptureSpec> {
-    use crate::repository_state::CaptureSpec;
+    use crate::repository_state::{CaptureSpec, VirtualPath};
 
-    Ok(CaptureSpec::new(paths, document_capture_budget())?)
+    let mut spec = CaptureSpec::new(paths, document_capture_budget())?;
+    spec.discover_tail(VirtualPath::EVENTS)?;
+    Ok(spec)
 }
 
 fn document_scan_capture_spec(
@@ -2130,7 +2127,6 @@ mod tests {
 
         let layout = storage.repository_layout();
         let issue_path = VirtualPath::issue_record(&id);
-        let events_path = VirtualPath::data("events.jsonl").unwrap();
         let document_path = VirtualPath::worktree("docs/guide.md").unwrap();
         let old_asset_path = VirtualPath::worktree("docs/old.png").unwrap();
         let expected_time = chrono::DateTime::parse_from_rfc3339("2026-07-20T13:14:15Z")
@@ -2142,7 +2138,6 @@ mod tests {
         let first_image = first_session
             .capture(capture_spec([
                 issue_path.clone(),
-                events_path.clone(),
                 document_path.clone(),
                 old_asset_path,
             ]))
@@ -2181,7 +2176,6 @@ mod tests {
         let retry_image = retry_session
             .capture(capture_spec([
                 issue_path.clone(),
-                events_path,
                 document_path.clone(),
                 new_asset_path,
             ]))

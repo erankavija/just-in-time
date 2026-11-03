@@ -35,6 +35,8 @@ pub mod claim;
 mod config;
 mod dependency;
 mod document;
+#[cfg(test)]
+mod event_tail_tests;
 mod events;
 mod gate;
 mod gate_check;
@@ -153,18 +155,15 @@ pub fn production_mutation_context() -> crate::repository_state::MutationContext
 /// Bounds for the captures that mutate one named issue: a claim, a captured
 /// issue mutation, and a document reference edit.
 ///
-/// Each declares every path it reads — one issue record, the event log, and for
+/// Each declares every path it reads — one issue record, the event log's end, and for
 /// a gate transition the gate registry — and requests no listing, so no path can
 /// enter the capture that the caller did not name. Shape is what bounds it, and
 /// the depth is the deepest of those constructions: an issue record one name
 /// below the `issues` directory. A caller reaching deeper overrides `max_depth`
 /// alone, since that is the only dimension its shape decides.
 ///
-/// `max_bytes` is unbounded because nothing here can bound it. The payload that
-/// grows is the event log, whose size is the project's own accumulated history
-/// (`@/charter/D-17`); a number stated here would decide how much history a
-/// repository may accumulate before an issue can no longer be claimed at all,
-/// which is what a 16 MiB ceiling on this capture did (jit:19e7298a).
+/// `max_bytes` is unbounded: issue records and the log's final line have no
+/// declared size limit. The capture never reads earlier log lines.
 fn issue_mutation_capture_budget() -> crate::repository_state::CaptureBudget {
     use crate::repository_state::{CaptureBudget, VirtualPath};
 
@@ -2438,10 +2437,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 } else {
                     Vec::new()
                 };
-                let mut paths = BTreeSet::from([
-                    VirtualPath::issue_record(request.issue_id()),
-                    VirtualPath::EVENTS,
-                ]);
+                let mut paths = BTreeSet::from([VirtualPath::issue_record(request.issue_id())]);
                 if request.captures_gate_registry() {
                     paths.insert(VirtualPath::GATES);
                 }
@@ -2454,7 +2450,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .fold(base.max_depth, usize::max),
                     ..base
                 };
-                let spec = CaptureSpec::new(paths, budget)?;
+                let mut spec = CaptureSpec::new(paths, budget)?;
+                spec.discover_tail(VirtualPath::EVENTS)?;
                 let Some(image) = capture_or_retry(session.capture(spec))? else {
                     return Ok(SessionStep::Retry);
                 };

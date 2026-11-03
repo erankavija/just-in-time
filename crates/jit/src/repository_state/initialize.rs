@@ -383,8 +383,8 @@ impl InitializationScaffold {
             .into_iter()
             .map(|file| file.path)
             .collect();
-        // The finalizer appends to `events.jsonl` at its captured committed length,
-        // so its path must be captured for that length and the action preimage.
+        // The finalizer appends to `events.jsonl`; a command captures it
+        // through the base's tail probe and drops it from its whole-file paths.
         paths.push(VirtualPath::EVENTS);
         for profile in self.profiles() {
             paths.extend(profile.claims.target_paths());
@@ -733,7 +733,7 @@ fn events_action(base: &RepositoryImage) -> Result<Option<RepositoryAction>, Ini
             offset: 0,
             bytes: Vec::new(),
         })),
-        RepositoryEntry::File { .. } => Ok(None),
+        RepositoryEntry::File { .. } | RepositoryEntry::FileTail { .. } => Ok(None),
         _ => Err(InitializationError::UnexpectedOccupant { path }),
     }
 }
