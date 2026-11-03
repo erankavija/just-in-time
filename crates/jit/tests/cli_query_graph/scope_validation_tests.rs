@@ -1405,6 +1405,13 @@ assert = {{ label-coverage = {{ }} }}
     /// the shared taxonomy fixture. Returns the container id. The impl child credits
     /// B's REQ-01 only when `covered`.
     fn seed_spine(cli: &JitCli, taxonomy: &TestTaxonomy, covered: bool) -> String {
+        let config_path = cli.root().join(".jit/config.toml");
+        let config = fs::read_to_string(&config_path).unwrap();
+        fs::write(
+            config_path,
+            format!("{config}\n[namespaces.satisfies]\ndescription = \"Criterion coverage\"\nunique = false\n"),
+        )
+        .unwrap();
         fs::write(
             cli.root().join(".jit/rules.toml"),
             coverage_rules(taxonomy.type_at_level(3)),
