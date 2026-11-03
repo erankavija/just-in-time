@@ -1054,6 +1054,7 @@ mod proptests {
     //! Property-based coverage for hierarchy resolution over arbitrary DAGs,
     //! mirroring the graph proptest suite in [`crate::domain::type_taxonomy`].
     use super::*;
+    use crate::test_harness::arbitrary_dag;
     use proptest::prelude::*;
     use std::collections::{HashMap, HashSet};
 
@@ -1076,36 +1077,6 @@ mod proptests {
         fn type_name(&self) -> Option<&str> {
             self.type_name.as_deref()
         }
-    }
-
-    /// Generate an arbitrary acyclic graph: `n` nodes where node `k` may only
-    /// depend on lower-indexed nodes (guaranteeing acyclicity). Each node gets an
-    /// arbitrary type from the default hierarchy, or none.
-    fn arbitrary_dag() -> impl Strategy<Value = Vec<(Option<u8>, Vec<usize>)>> {
-        (1usize..=7)
-            .prop_flat_map(|n| {
-                (
-                    Just(n),
-                    prop::collection::vec(0u8..5, n),
-                    prop::collection::vec(any::<u8>(), n),
-                )
-            })
-            .prop_map(|(n, types, masks)| {
-                (0..n)
-                    .map(|k| {
-                        let ty = match types[k] {
-                            0 => Some(1),
-                            1 => Some(2),
-                            2 => Some(3),
-                            3 => Some(4),
-                            _ => None,
-                        };
-                        // Depend on a subset of the strictly-lower indices.
-                        let deps = (0..k).filter(|&i| masks[k] & (1u8 << i) != 0).collect();
-                        (ty, deps)
-                    })
-                    .collect()
-            })
     }
 
     fn build(spec: &[(Option<u8>, Vec<usize>)]) -> Vec<PropNode> {

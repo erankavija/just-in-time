@@ -9,9 +9,40 @@ use crate::domain::identity::IssueId;
 use crate::domain::{Issue, Priority, State};
 
 use crate::storage::{InMemoryStorage, IssueStore};
+#[cfg(test)]
+use proptest::prelude::*;
 
 pub mod git;
 pub mod image;
+
+/// Generate nodes as (optional hierarchy level, dependency indices), with each
+/// node depending only on lower-indexed nodes to ensure acyclicity.
+#[cfg(test)]
+pub(crate) fn arbitrary_dag() -> impl Strategy<Value = Vec<(Option<u8>, Vec<usize>)>> {
+    (1usize..=7)
+        .prop_flat_map(|n| {
+            (
+                Just(n),
+                prop::collection::vec(0u8..5, n),
+                prop::collection::vec(any::<u8>(), n),
+            )
+        })
+        .prop_map(|(n, types, masks)| {
+            (0..n)
+                .map(|k| {
+                    let ty = match types[k] {
+                        0 => Some(1),
+                        1 => Some(2),
+                        2 => Some(3),
+                        3 => Some(4),
+                        _ => None,
+                    };
+                    let deps = (0..k).filter(|&i| masks[k] & (1u8 << i) != 0).collect();
+                    (ty, deps)
+                })
+                .collect()
+        })
+}
 
 /// Test harness that provides isolated environment for each test
 pub struct TestHarness {
