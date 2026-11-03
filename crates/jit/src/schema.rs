@@ -360,10 +360,7 @@ impl CommandSchema {
             subcommands,
             args,
             flags,
-            output: Self::resolve_output_schema(
-                cmd_path,
-                crate::dispatch::registered_output_schema,
-            ),
+            output: Self::resolve_output_schema(cmd_path),
         }
     }
 
@@ -474,17 +471,15 @@ impl CommandSchema {
     }
 
     /// The output schema of the leaf at `cmd_path`: the handler registry's
-    /// entry when `registered` has one, else the legacy table's.
-    fn resolve_output_schema(
-        cmd_path: &str,
-        registered: fn(&str) -> Option<OutputSchema>,
-    ) -> Option<OutputSchema> {
-        registered(cmd_path).or_else(|| Self::get_output_schema_for_command(cmd_path))
+    /// entry when a group registers it, else the legacy table's.
+    pub(crate) fn resolve_output_schema(cmd_path: &str) -> Option<OutputSchema> {
+        crate::dispatch::registered_output_schema(cmd_path)
+            .or_else(|| Self::get_output_schema_for_command(cmd_path))
     }
 
     /// Legacy output schema table for leaves not yet registered with a
     /// handler group (e.g., "issue_show", "query_available").
-    fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
+    pub(crate) fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
         use crate::domain::Issue;
         use crate::output::*;
 
@@ -1671,25 +1666,9 @@ mod tests {
         );
     }
 
-    #[derive(JsonSchema)]
-    struct RegisteredStatus;
-
-    fn registry_with_status(cmd_path: &str) -> Option<OutputSchema> {
-        (cmd_path == "status").then(OutputSchema::of::<RegisteredStatus>)
-    }
-
-    #[test]
-    fn test_resolve_output_schema_registered_leaf_takes_registry_schema() {
-        let resolved =
-            CommandSchema::resolve_output_schema("status", registry_with_status).unwrap();
-        let legacy = CommandSchema::get_output_schema_for_command("status").unwrap();
-        assert_eq!(resolved.success, RegisteredStatus::schema_name());
-        assert_ne!(resolved.success, legacy.success);
-    }
-
     #[test]
     fn test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema() {
-        let resolved = CommandSchema::resolve_output_schema("init", registry_with_status).unwrap();
+        let resolved = CommandSchema::resolve_output_schema("init").unwrap();
         let legacy = CommandSchema::get_output_schema_for_command("init").unwrap();
         assert_eq!(resolved.success, legacy.success);
         assert_eq!(resolved.success_schema, legacy.success_schema);

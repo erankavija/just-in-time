@@ -1,7 +1,8 @@
 //! A test-only command group exercising the handler contract end to end.
 
-use super::{CommandContext, Outcome};
+use super::{registered_output_schema, CommandContext, Outcome};
 use crate::output::{ErrorCode, ExitCode, HumanRender, OutputMode};
+use crate::schema::CommandSchema;
 use crate::storage::IssueStore;
 use crate::test_harness::TestHarness;
 use schemars::JsonSchema;
@@ -177,26 +178,57 @@ fn test_dispatch_handler_error_propagates_without_writing() {
 }
 
 #[test]
-fn test_output_schema_returns_each_registered_leaf_response_schema() {
+fn test_registered_group_dispatches_and_resolves_its_leaf_schemas_through_registry() {
     fn described<T: JsonSchema>() -> (String, Value) {
         (
             T::schema_name(),
             serde_json::to_value(schemars::schema_for!(T)).unwrap(),
         )
     }
+    let harness = TestHarness::new();
+    assert_eq!(
+        run(&harness, count_command(), true).status.unwrap(),
+        ExitCode::Success
+    );
+
     let leaves = [
         ("test_count", described::<CountResponse>()),
         ("test_flag", described::<CountResponse>()),
         ("test_fail", described::<FlagReport>()),
     ];
     for (path, (name, schema)) in leaves {
-        let registered = output_schema(path).unwrap();
+        let registered = registered_output_schema(path).unwrap();
         assert_eq!(registered.success, name, "{path}");
         assert_eq!(registered.success_schema, Some(schema), "{path}");
+
+        let resolved = CommandSchema::resolve_output_schema(path).unwrap();
+        let legacy = CommandSchema::get_output_schema_for_command(path).unwrap();
+        assert_eq!(resolved.success, name, "{path}");
+        assert_ne!(resolved.success, legacy.success, "{path}");
     }
 }
 
 #[test]
-fn test_output_schema_unregistered_leaf_returns_none() {
-    assert!(output_schema("test_absent").is_none());
+fn test_registered_output_schema_unregistered_leaf_returns_none() {
+    assert!(registered_output_schema("test_absent").is_none());
+}
+
+#[test]
+fn test_output_schema_test_leaves_are_distinct_from_every_real_command_path() {
+    fn leaf_paths(command: &clap::Command, path: &str, paths: &mut Vec<String>) {
+        paths.push(path.to_owned());
+        for sub in command.get_subcommands() {
+            leaf_paths(sub, &format!("{path}_{}", sub.get_name()), paths);
+        }
+    }
+    let cli = <crate::cli::Cli as clap::CommandFactory>::command();
+    let mut paths = Vec::new();
+    for top in cli.get_subcommands() {
+        leaf_paths(top, top.get_name(), &mut paths);
+    }
+    let shadowed: Vec<_> = paths
+        .iter()
+        .filter(|path| output_schema(path).is_some())
+        .collect();
+    assert!(shadowed.is_empty(), "{shadowed:?}");
 }
