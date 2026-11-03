@@ -6012,7 +6012,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             glob,
         } => {
             let output_ctx = OutputContext::new(quiet, json);
-            use jit::search::{search, SearchOptions};
+            use jit::search::SearchOptions;
 
             let options = SearchOptions {
                 case_sensitive,
@@ -6023,42 +6023,41 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 file_patterns: Vec::new(),
             };
 
-            match search(&jit_dir, &query, options) {
-                Ok(results) => {
+            match executor.queries().search_content(&query, options) {
+                Ok(matches) => {
                     if json {
                         use jit::output::{JsonOutput, SearchResponse};
 
-                        let msg = format!("Found {} result(s)", results.len());
+                        let msg = format!("Found {} result(s)", matches.len());
+                        let results = matches.into_iter().map(|m| m.result).collect();
                         let response = SearchResponse::with_extras(
                             results,
                             jit::output::SearchQuery { query },
                         );
                         let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
-                    } else if results.is_empty() {
+                    } else if matches.is_empty() {
                         let _ =
                             output_ctx.print_info(format!("No matches found for \"{}\"", query));
                     } else {
                         let _ = output_ctx.print_info(format!(
                             "Search results for \"{}\" ({} matches):\n",
                             query,
-                            results.len()
+                            matches.len()
                         ));
 
                         let mut current_file = String::new();
-                        for result in &results {
+                        for m in &matches {
+                            let result = &m.result;
                             if result.path != current_file {
                                 current_file = result.path.clone();
 
-                                if let Some(issue_id) = &result.issue_id {
-                                    // Try to load issue for title
-                                    if let Ok(issue) = storage.load_issue(issue_id) {
-                                        println!("Issue {} | {}", issue_id, issue.title);
-                                    } else {
-                                        println!("Issue {}", issue_id);
+                                match (&result.issue_id, &m.issue_title) {
+                                    (Some(issue_id), Some(title)) => {
+                                        println!("Issue {} | {}", issue_id, title)
                                     }
-                                } else {
-                                    println!("Document {}", result.path);
+                                    (Some(issue_id), None) => println!("Issue {}", issue_id),
+                                    (None, _) => println!("Document {}", result.path),
                                 }
                             }
 
