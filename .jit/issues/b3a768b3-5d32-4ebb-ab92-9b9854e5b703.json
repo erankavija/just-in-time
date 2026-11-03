@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
   "claimed_at": "2026-11-01T14:26:00.271663203Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -29,7 +29,7 @@
     "satisfies:9876a23a/REQ-10"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "One loader parses the issue records",
-  "updated_at": "2026-11-03T23:04:04.738755873Z"
+  "updated_at": "2026-11-03T23:29:21.594889694Z"
 }
