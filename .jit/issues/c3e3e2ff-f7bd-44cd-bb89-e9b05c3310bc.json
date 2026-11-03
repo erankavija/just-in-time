@@ -8,12 +8,26 @@
   ],
   "description": "Add one activeness predicate on `Lease` and three lock-free lease reads in storage, and move every command that reads leases without the claims lock onto them.\n\n## Background\n\nLease activeness is decided by different rules: `ClaimsIndex::conflicting_lease` (`crates/jit/src/storage/claim_coordinator.rs`, not expired and not stale), `Lease::is_expired`, `commands/worktree.rs` (expiry only) and `commands/validate.rs` (its own expiry comparison, reporting expired and orphaned leases, so it needs every stored lease). `Lease::is_stale` exists. Lock-free readers load the whole index through `ClaimsIndex::load`: `refuse_foreign_leases_read` (`commands/mod.rs`), the `worktree list` claim counts (`commands/worktree.rs`, whose unit tests build a `ClaimsIndex` by hand), and `validate --leases` (`commands/validate.rs`).\n\n`validate_claims_index_with_paths` (`commands/validate.rs`) is not a lease reader: it checks the index file itself, and it leaves when the index does.\n\n## Success Criteria\n\n- [hard] REQ-01: `Lease::is_active(now)` is true when a lease is neither expired nor stale, one unit test owns its boundaries, and `conflicting_lease` decides activeness through it.\n- [hard] REQ-02: `storage/claim_coordinator.rs` offers `read_leases(&WorktreePaths)` (every stored lease), `read_active_leases(&WorktreePaths, now)` and `read_active_lease(&WorktreePaths, &IssueId, now)`, reading without the claims lock, with unit tests.\n- [hard] REQ-03: `validate --leases` reads through `read_leases`; `refuse_foreign_leases_read` and `worktree list` read through the active reads. No lease reader outside the coordinator calls `ClaimsIndex::load`, and no command compares a lease's expiry or heartbeat itself.\n- [hard] REQ-04: The worktree unit tests build leases without a `ClaimsIndex`, and the lease-validation CLI tests pass unchanged. `worktree list` counts a stale lease as inactive.\n",
   "documents": [],
+  "done_at": "2026-11-03T04:26:17.782214751Z",
   "first_ready_at": "2026-11-02T23:39:52.708770523Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d8db20dd-11a8-480e-991b-5ea38cfb11ed",
+      "status": "passed",
+      "updated_at": "2026-11-03T04:21:29.594586648Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "94c9e263-a759-4461-b929-42256d2b094d",
+      "status": "passed",
+      "updated_at": "2026-11-03T04:26:17.360502762Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c3e3e2ff-f7bd-44cd-bb89-e9b05c3310bc",
   "labels": [
     "type:task",
@@ -27,7 +41,7 @@
     "component:storage"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Lock-free lease readers use the storage read path",
-  "updated_at": "2026-11-03T04:09:56.849238307Z"
+  "updated_at": "2026-11-03T04:26:17.782214751Z"
 }

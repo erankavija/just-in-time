@@ -488,6 +488,12 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "capture read modes across both session backends"
+    },
+    {
+      "id": "dd53527f",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "concurrency-critical lease lock; implements R2 as approved"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
