@@ -28,7 +28,7 @@
     "satisfies:f8a6b298/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Latest-run readers use the gate-state accessor",
-  "updated_at": "2026-11-02T23:40:42.208968264Z"
+  "updated_at": "2026-11-03T00:15:36.578937127Z"
 }
