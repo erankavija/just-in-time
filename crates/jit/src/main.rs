@@ -1698,7 +1698,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         jit::config_manager::ConfigManager::invocation_write_override()?;
     let jit::commands::OpenedRepository {
         retained_session: mut retained_mutation_session,
-        mut executor,
+        executor,
         data_root: jit_dir,
         worktree_paths,
         layout: executor_layout,
