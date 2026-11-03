@@ -271,16 +271,22 @@ proceeds and the bypass is logged, at every level.
 > `[type_hierarchy]` tables; custom rules are authored there as well. The
 > `orphan-leaf` and `strategic-consistency` workflow warnings arrive with the
 > workflow package when it is installed.
-> The built-in rules marked `origin = "default"` derive their assertion — and
-> the family's membership — from the `[namespaces]` /
-> `[type_hierarchy]` registry in `config.toml`, in memory at load; the
-> `schemas/default-*.json` files are regenerated projections, not the validation
-> authority. So you change what a default rule checks by editing that registry
-> (a hand-declared namespace takes effect on the next command, no regeneration;
-> the next jit-driven config write — `jit config set` or re-init — also writes
-> the matching rows through to `rules.toml` so each `@/rule/<name>` address
-> resolves), and author new conventions as custom rules
-> in `rules.toml`. `strictness` tunes how all of these gate operations globally.
+> The built-in rules marked `origin = "default"` derive their assertions and
+> membership from the `[namespaces]` / `[type_hierarchy]` registry in
+> `config.toml` at load. Missing default rows still apply, including when
+> `rules.toml` is empty or holds only custom rules. Registry edits take effect
+> on the next command; `schemas/default-*.json` files are projections.
+> The next successful config write (`jit config set` or re-init), or
+> `jit validate --fix`, restores missing default rows in `rules.toml`, removes
+> defaults the registry no longer derives, and refreshes their assertions and
+> schema projections. Custom rules and existing default rows' policy edits
+> (`severity`, `enforce`, `when`, and `description`) are preserved.
+>
+> To disable a default rule, keep its `origin = "default"` row and set
+> `severity = "off"`. Deleting the row does not disable it. Under `loose`
+> strictness, `enforce = false` only stops the rule blocking writes: it still
+> reports findings, and an error-severity finding still fails `jit validate`.
+> `strict` strictness can block even unenforced findings, as described above.
 
 ### `[namespaces.*]`
 

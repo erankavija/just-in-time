@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Default validation rules apply when their rows are missing.** A repository
+  that disabled a default by deleting its row sees that rule in force again,
+  including with an empty or custom-only `rules.toml`. Config writes and
+  `jit validate --fix` restore missing rows while preserving existing policy
+  edits. To disable a default, set `severity = "off"` on its row; see
+  [Validation](docs/reference/configuration.md#validation).
+
 - **`jit doc check-links` exits `0` on warnings alone.** It exited `2` for
   advisory findings, which stopped `set -e` scripts and gates. It now fails
   (exit `1`) only on a broken link; warnings still appear in the output and

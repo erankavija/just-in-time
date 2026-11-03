@@ -27,6 +27,12 @@ types = { epic = 2, story = 3, planning = 3, breakdown = 3, task = 4 }
 [type_hierarchy.label_associations]
 epic = "epic"
 story = "story"
+
+[namespaces]
+type = { description = "Issue type", unique = true }
+component = { description = "Component", unique = false }
+brackets = { description = "Bracket container", unique = true }
+satisfies = { description = "Criterion coverage", unique = false }
 "#;
 
 const TEMPLATES_TOML: &str = r#"

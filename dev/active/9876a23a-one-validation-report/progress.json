@@ -1,7 +1,7 @@
 {
   "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
   "epic_short_id": "9876a23a",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -82,11 +82,39 @@
           "worker": "codex gpt-6-astra xhigh"
         }
       ]
+    },
+    {
+      "wave_number": 3,
+      "base": "b14656acf",
+      "issues": [
+        {
+          "short_id": "977d01d8",
+          "status": "dispatched",
+          "worker": "codex gpt-6-astra xhigh",
+          "worker_reason": "small residue + tests"
+        },
+        {
+          "short_id": "ea843d26",
+          "status": "dispatched",
+          "worker": "codex gpt-6-astra xhigh",
+          "worker_reason": "local allocation-free match"
+        },
+        {
+          "short_id": "b3a768b3",
+          "status": "dispatched",
+          "worker": "claude opus",
+          "worker_reason": "produces parsed-records contract"
+        },
+        {
+          "short_id": "f968dfe1",
+          "status": "dispatched",
+          "worker": "claude opus",
+          "worker_reason": "produces plan-document-resolver contract"
+        }
+      ]
     }
   ],
-  "held": {
-    "wave3": "waits for plan-review (2df01664) and breakdown-review (de9a7557) reruns after the amendment 9a886c0e5"
-  },
+  "held": {},
   "line_target": {
     "goal": "net production-line reduction",
     "baseline_rev": "120402067",
@@ -169,6 +197,6 @@
   ],
   "plan_reviews": {
     "plan-review 2df01664": "passed after amendment (0 findings)",
-    "breakdown-review de9a7557": "round 1 after amendment failed F1 (ea843d26 lost its B edge; restored 39f8487b3); rerun pending"
+    "breakdown-review de9a7557": "passed on rerun after restoring ea843d26 -> de9a7557 (2 advisory findings, no change)"
   }
 }
