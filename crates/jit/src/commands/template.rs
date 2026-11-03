@@ -376,7 +376,6 @@ fn template_fixed_paths() -> Vec<VirtualPath> {
     vec![
         VirtualPath::CONFIG,
         VirtualPath::INDEX,
-        VirtualPath::EVENTS,
         VirtualPath::GATES,
         VirtualPath::TEMPLATES,
         VirtualPath::RULES,
@@ -394,6 +393,7 @@ fn capture_template_image(
 ) -> Result<Option<RepositoryImage>> {
     let presets_dir = VirtualPath::GATE_PRESETS;
     let mut spec = CaptureSpec::new(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
+    spec.discover_tail(VirtualPath::EVENTS)?;
     spec.discover_listings([presets_dir.clone(), VirtualPath::ISSUES])?;
     capture_discovering(session, spec, |image, spec| {
         let declarations = crate::repository_state::captured_issue_ids(image)?
