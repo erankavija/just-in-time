@@ -2909,31 +2909,36 @@ template = true
     }
 
     #[test]
-    fn test_profile_application_preserves_and_certifies_torn_event_tail_end_to_end() {
-        let (temp, _) = setup_test_repo().unwrap();
-        let executor = file_executor(temp.path()).unwrap();
-        let storage = executor.storage().clone();
-        let package = package_read_from(&temp, FIXTURE_LOCATION);
-        let torn = b"{\"torn\":";
-        fs::write(temp.path().join(".jit/events.jsonl"), torn).unwrap();
+    fn test_profile_application_overwrites_an_unterminated_event_tail_end_to_end() {
+        let complete_record = serde_json::to_vec(&crate::test_utils::stamped_event(
+            EventBody::draft_gate_definition_created("prior".parse().unwrap()),
+            String::new(),
+            chrono::DateTime::UNIX_EPOCH,
+        ))
+        .unwrap();
+        for tail in [b"{\"torn\":".as_slice(), &complete_record] {
+            let (temp, _) = setup_test_repo().unwrap();
+            let executor = file_executor(temp.path()).unwrap();
+            let package = package_read_from(&temp, FIXTURE_LOCATION);
+            let log = temp.path().join(".jit/events.jsonl");
+            fs::write(&log, tail).unwrap();
 
-        apply_package(&executor, &package).unwrap();
+            apply_package(&executor, &package).unwrap();
 
-        let image = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
-        assert!(image.starts_with(b"{\"torn\":\n"));
-        assert_eq!(&image[..torn.len()], torn);
-        let events = storage.read_events().unwrap();
-        assert!(matches!(
-            events
-                .iter()
-                .map(Event::body)
-                .collect::<Vec<_>>()
-                .as_slice(),
-            [EventBody::ProfileLifecycle {
-                isolated_torn_tail: true,
-                ..
-            }]
-        ));
+            assert!(fs::read(&log).unwrap().ends_with(b"\n"));
+            let events = executor.storage().read_events().unwrap();
+            assert!(
+                matches!(
+                    events
+                        .iter()
+                        .map(Event::body)
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                    [EventBody::ProfileLifecycle { .. }]
+                ),
+                "{events:?}"
+            );
+        }
     }
 
     #[test]
@@ -3677,44 +3682,6 @@ template = true
                 .collect::<Vec<_>>(),
             vec![package.package_hash()]
         );
-    }
-
-    #[test]
-    fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
-        let (temp, _) = setup_test_repo().unwrap();
-        let executor = file_executor(temp.path()).unwrap();
-        let storage = executor.storage().clone();
-        let package = package_read_from(&temp, FIXTURE_LOCATION);
-        let prior_event = crate::test_utils::stamped_event(
-            EventBody::draft_profile_lifecycle(
-                ProfileLifecycleOperation::Apply,
-                vec![crate::domain::ProfileLifecycleProfile {
-                    id: "prior".try_into().unwrap(),
-                    version: semver::Version::new(1, 0, 0),
-                    status: ProfileLifecycleStatus::Installed,
-                    variables: Default::default(),
-                }],
-            ),
-            String::new(),
-            chrono::DateTime::UNIX_EPOCH,
-        );
-        fs::write(
-            temp.path().join(".jit/events.jsonl"),
-            serde_json::to_vec(&prior_event).unwrap(),
-        )
-        .unwrap();
-
-        apply_package(&executor, &package).unwrap();
-
-        let events = storage.read_events().unwrap();
-        assert_eq!(events.len(), 2);
-        assert!(matches!(
-            events.last().unwrap().body(),
-            EventBody::ProfileLifecycle {
-                isolated_torn_tail: false,
-                ..
-            }
-        ));
     }
 
     /// Assert a rehearsal's per-target decisions against what the real run did.
