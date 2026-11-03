@@ -198,7 +198,7 @@ impl Default for BulkUpdatePreview {
     }
 }
 
-impl<S: IssueStore> CommandExecutor<S> {
+impl<S: IssueStore> IssueOps<'_, S> {
     /// Apply bulk update to filtered issues
     ///
     /// Applies operations to all matched issues with per-issue atomicity.
@@ -239,12 +239,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let all_issues = self.storage.list_issues()?;
+        let all_issues = self.exec.storage.list_issues()?;
         let matched = filter.filter_issues(&all_issues)?;
 
         let mut result = BulkUpdateResult::new();
         result.matched = matched.iter().map(|i| i.id.clone()).collect();
-        result.warnings = self.refuse_foreign_leases(&result.matched)?;
+        result.warnings = self.exec.refuse_foreign_leases(&result.matched)?;
 
         let candidates: Vec<&Issue> = matched
             .iter()
@@ -292,7 +292,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // One cascade after the batch, as the single-issue update runs after
         // its terminal change.
         if entered_terminal {
-            self.check_auto_transitions()?;
+            self.exec.check_auto_transitions()?;
         }
 
         result.compute_summary();
@@ -358,16 +358,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{declarations_from_image, finalize};
         use std::collections::HashSet;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         with_mutation_session(
-            &self.storage,
+            &self.exec.storage,
             &layout,
             "bulk-update no-op verification",
             |session| {
                 let Some(crate::commands::validate::MutationBase {
                     image,
                     issues: active,
-                }) = self.capture_mutation_base(session, &[], None)?
+                }) = self.exec.capture_mutation_base(session, &[], None)?
                 else {
                     return Ok(SessionStep::Retry);
                 };
@@ -444,7 +444,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        self.publish_captured_bulk_update(&issue.id, operations, force)
+        self.exec
+            .publish_captured_bulk_update(&issue.id, operations, force)
     }
 
     /// Preview bulk update without applying changes (dry-run)
@@ -453,7 +454,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         filter: &QueryFilter,
         operations: &UpdateOperations,
     ) -> Result<BulkUpdatePreview> {
-        let all_issues = self.storage.list_issues()?;
+        let all_issues = self.exec.storage.list_issues()?;
         let matched = filter.filter_issues(&all_issues)?;
 
         let mut preview = BulkUpdatePreview::new();
@@ -470,7 +471,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let blocked = operations
                 .state
                 .filter(|target| *target != issue.state)
-                .map(|target| self.transition_blockers(issue, target))
+                .map(|target| self.exec.transition_blockers(issue, target))
                 .unwrap_or(Ok(()));
 
             if let Err(e) = blocked.and_then(|()| self.validate_update_preview(issue, operations)) {
@@ -593,7 +594,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Validate gate operations - check that gates exist in registry
         if !operations.add_gates.is_empty() {
-            let registry = self.storage.load_gate_registry()?;
+            let registry = self.exec.storage.load_gate_registry()?;
             for gate_key in &operations.add_gates {
                 if !registry.gates.contains_key(gate_key) {
                     return Err(crate::storage::GateNotFoundError::single(gate_key).into());
@@ -604,11 +605,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         // The captured mutation coordinator owns dependency and gate guards.
 
         let projected = Self::projected_after_update(issue, operations);
-        let repo_format = self.repo_content_format()?;
-        let strictness = self.cached_config()?.strictness();
-        let evaluation =
-            crate::validation::evaluate_local(&projected, self.effective_rules()?, repo_format)?
-                .with_strictness(strictness);
+        let repo_format = self.exec.repo_content_format()?;
+        let strictness = self.exec.cached_config()?.strictness();
+        let evaluation = crate::validation::evaluate_local(
+            &projected,
+            self.exec.effective_rules()?,
+            repo_format,
+        )?
+        .with_strictness(strictness);
         if let Some(message) = evaluation.rejection_message() {
             return Err(crate::errors::ValidationFailedError::new(message).into());
         }
@@ -757,7 +761,7 @@ mod tests {
         let executor =
             crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
 
-        let changes = executor.compute_changes(&issue, &ops).unwrap();
+        let changes = executor.issues().compute_changes(&issue, &ops).unwrap();
         assert_eq!(changes.len(), 1);
         assert!(changes[0].contains("ready"));
         assert!(changes[0].contains("done"));
@@ -779,7 +783,7 @@ mod tests {
         let executor =
             crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
 
-        let changes = executor.compute_changes(&issue, &ops).unwrap();
+        let changes = executor.issues().compute_changes(&issue, &ops).unwrap();
         assert_eq!(changes.len(), 2);
         assert!(changes
             .iter()
@@ -804,7 +808,7 @@ mod tests {
         let executor =
             crate::commands::test_helpers::memory_executor(crate::storage::InMemoryStorage::new());
 
-        let changes = executor.compute_changes(&issue, &ops).unwrap();
+        let changes = executor.issues().compute_changes(&issue, &ops).unwrap();
         assert!(changes.is_empty());
     }
 
@@ -826,16 +830,20 @@ mod tests {
         // executor takes ownership of `storage`.
         let reader = storage.clone();
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             assignee: Some("agent:worker-1".parse().unwrap()),
             ..Default::default()
         };
-        executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // claimed_at stamped by the bulk assignment.
         let updated = executor
+            .issues()
             .get_issue(&crate::test_utils::issue_id(
                 0x5a6a549eb9fb2027b699f39d12c939a1,
             ))
@@ -857,9 +865,13 @@ mod tests {
             assignee: Some("agent:worker-2".parse().unwrap()),
             ..Default::default()
         };
-        executor.apply_bulk_update(&filter, &ops2, false).unwrap();
+        executor
+            .issues()
+            .apply_bulk_update(&filter, &ops2, false)
+            .unwrap();
         assert_eq!(
             executor
+                .issues()
                 .get_issue(&crate::test_utils::issue_id(
                     0x5a6a549eb9fb2027b699f39d12c939a1
                 ))
@@ -884,7 +896,7 @@ mod tests {
         );
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Apply bulk update
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -893,7 +905,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 1);
@@ -901,6 +916,7 @@ mod tests {
 
         // Verify issue was updated
         let updated = executor
+            .issues()
             .get_issue(&crate::test_utils::issue_id(
                 0x5a6a549eb9fb2027b699f39d12c939a1,
             ))
@@ -936,7 +952,7 @@ mod tests {
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Update all ready issues
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -945,13 +961,17 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 2);
         assert_eq!(result.summary.total_modified, 2);
 
         // Verify labels added
         let issue1 = executor
+            .issues()
             .get_issue(&crate::test_utils::issue_id(
                 0xedeb5b73a03a451ec76b0d6a0370f495,
             ))
@@ -959,6 +979,7 @@ mod tests {
         assert!(issue1.labels.contains(&"milestone:v1.0".to_string()));
 
         let issue3 = executor
+            .issues()
             .get_issue(&crate::test_utils::issue_id(
                 0xa0cb57d0ac3469f2797837c661859fa8,
             ))
@@ -981,7 +1002,7 @@ mod tests {
             ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to set same state
         let filter = QueryFilter::parse("state:done").unwrap();
@@ -990,7 +1011,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
@@ -1013,7 +1037,7 @@ mod tests {
         issue.gates_required = vec!["tests".parse().unwrap()];
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to transition to Done without passing gates
         let filter = QueryFilter::parse("state:gated").unwrap();
@@ -1022,7 +1046,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
@@ -1066,7 +1093,7 @@ mod tests {
             ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to transition all to Done
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1075,7 +1102,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // Should succeed for 2, fail for 1
         assert_eq!(result.summary.total_matched, 3);
@@ -1110,7 +1140,7 @@ mod tests {
             ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to add label without colon (invalid format)
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1119,7 +1149,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // Should reject with error. After the a0f0f342 consolidation the rejection
         // comes from the always-enforced `label-format` rule (canonical format,
@@ -1157,7 +1190,7 @@ mod tests {
             ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Try to add another type:* label (violates uniqueness)
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1166,7 +1199,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // Should reject with error. After the a0f0f342 consolidation the rejection
         // comes from the always-enforced `namespace-unique-type` rule (origin =
@@ -1192,7 +1228,7 @@ mod tests {
             ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Valid assignee format should work
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1201,7 +1237,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // Should succeed
         assert_eq!(result.summary.total_matched, 1);
@@ -1210,6 +1249,7 @@ mod tests {
 
         // Verify assignee set correctly
         let updated = executor
+            .issues()
             .get_issue(&crate::test_utils::issue_id(
                 0xedeb5b73a03a451ec76b0d6a0370f495,
             ))
@@ -1266,13 +1306,16 @@ mod tests {
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
         let bulk_reader = bulk_storage.clone();
-        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
+        let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
             ..Default::default()
         };
-        let result = bulk.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = bulk
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
         assert_eq!(result.summary.total_modified, 2);
 
         let single_storage = InMemoryStorage::new();
@@ -1339,8 +1382,9 @@ mod tests {
 
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
-        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
+        let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let issue = bulk
+            .issues()
             .get_issue(&crate::test_utils::issue_id(0xbbbb_2222))
             .unwrap();
         let ops = UpdateOperations {
@@ -1348,6 +1392,7 @@ mod tests {
             ..Default::default()
         };
         let bulk_error = bulk
+            .issues()
             .apply_operations_to_issue(&issue, &ops, false)
             .unwrap_err()
             .downcast::<TransitionBlockedError>()
@@ -1397,8 +1442,9 @@ mod tests {
 
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
-        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
+        let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let issue = bulk
+            .issues()
             .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
             .unwrap();
         let ops = UpdateOperations {
@@ -1406,6 +1452,7 @@ mod tests {
             ..Default::default()
         };
         let bulk_error = bulk
+            .issues()
             .apply_operations_to_issue(&issue, &ops, false)
             .unwrap_err()
             .downcast::<TransitionBlockedError>()
@@ -1451,7 +1498,7 @@ mod tests {
             ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
 
         // Valid labels should work
         let filter = QueryFilter::parse("state:ready").unwrap();
@@ -1460,7 +1507,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         // Should succeed
         assert_eq!(result.summary.total_matched, 1);
@@ -1469,6 +1519,7 @@ mod tests {
 
         // Verify labels added
         let updated = executor
+            .issues()
             .get_issue(&crate::test_utils::issue_id(
                 0xedeb5b73a03a451ec76b0d6a0370f495,
             ))
@@ -1680,9 +1731,9 @@ mod tests {
                 vec![],
             ),
         );
-        let mut baseline_executor =
-            crate::commands::test_helpers::memory_executor(baseline_storage);
+        let baseline_executor = crate::commands::test_helpers::memory_executor(baseline_storage);
         let baseline_result = baseline_executor
+            .issues()
             .apply_bulk_update(&filter, &ops, false)
             .unwrap();
         assert_eq!(baseline_result.summary.total_modified, 1);
@@ -1710,8 +1761,11 @@ mod tests {
             }
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, k);
         assert_eq!(result.summary.total_modified, j);
@@ -1749,9 +1803,9 @@ mod tests {
                 vec![],
             ),
         );
-        let mut baseline_executor =
-            crate::commands::test_helpers::memory_executor(baseline_storage);
+        let baseline_executor = crate::commands::test_helpers::memory_executor(baseline_storage);
         baseline_executor
+            .issues()
             .apply_bulk_update(&filter, &ops, false)
             .unwrap();
         let sessions_per_change = baseline_counter.count();
@@ -1772,8 +1826,11 @@ mod tests {
                 ),
             );
         }
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, k);
         assert_eq!(result.summary.total_modified, k);
@@ -1806,14 +1863,17 @@ mod tests {
             issue.priority = Priority::High;
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             priority: Some(Priority::High),
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 3);
         assert_eq!(result.summary.total_modified, 0);
@@ -1847,14 +1907,17 @@ mod tests {
         issue.gates_required = vec!["tests".parse().unwrap()];
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:gated").unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
@@ -1897,7 +1960,7 @@ mod tests {
             ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         // Field-level no-op: the requested priority already holds, so this
         // issue IS nominated as a skip candidate.
@@ -1906,7 +1969,10 @@ mod tests {
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(
@@ -1965,16 +2031,19 @@ mod tests {
         // 412925b9).
         let direct_storage = InMemoryStorage::new();
         seed(&direct_storage);
-        let mut direct = crate::commands::test_helpers::memory_executor(direct_storage);
+        let direct = crate::commands::test_helpers::memory_executor(direct_storage);
         let issue = direct
+            .issues()
             .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
             .unwrap();
         let direct_error = direct
+            .issues()
             .apply_operations_to_issue(&issue, &ops, false)
             .unwrap_err()
             .downcast::<TransitionBlockedError>()
             .expect("direct per-issue path reports a typed transition blocker");
         let direct_final_state = direct
+            .issues()
             .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
             .unwrap()
             .state;
@@ -1988,9 +2057,12 @@ mod tests {
         // so the shared verification session must demote it.
         let bulk_storage = InMemoryStorage::new();
         seed(&bulk_storage);
-        let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
+        let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let filter = QueryFilter::parse("state:done").unwrap();
-        let result = bulk.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = bulk
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(
@@ -2001,7 +2073,8 @@ mod tests {
         assert_eq!(result.summary.total_errors, 1);
         assert_eq!(result.errors[0].1, direct_error.to_string());
         assert_eq!(
-            bulk.get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+            bulk.issues()
+                .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
                 .unwrap()
                 .state,
             direct_final_state,
@@ -2052,14 +2125,14 @@ mod tests {
             ),
         );
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             priority: Some(Priority::High),
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).expect(
+        let result = executor.issues().apply_bulk_update(&filter, &ops, false).expect(
             "a verification-session failure must degrade to per-issue best-effort, not abort the command",
         );
 
@@ -2079,6 +2152,7 @@ mod tests {
         );
         assert_eq!(
             executor
+                .issues()
                 .get_issue(&crate::test_utils::issue_id(
                     0xda63513d8380c6478f7f4e3c47a3b00c
                 ))
@@ -2088,6 +2162,7 @@ mod tests {
         );
         assert_eq!(
             executor
+                .issues()
                 .get_issue(&crate::test_utils::issue_id(
                     0xfd4e5e37a828861d13bc00c5f491534f
                 ))
@@ -2140,14 +2215,17 @@ mod tests {
         // found the concurrent mutation.
         storage.inject_repository_state_apply_conflicts(1);
 
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             priority: Some(Priority::High),
             ..Default::default()
         };
 
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(
@@ -2158,6 +2236,7 @@ mod tests {
         assert_eq!(result.summary.total_errors, 0);
         assert_eq!(
             executor
+                .issues()
                 .get_issue(&crate::test_utils::issue_id(
                     0xda63513d8380c6478f7f4e3c47a3b00c
                 ))
@@ -2195,13 +2274,16 @@ mod tests {
             let bulk_storage = crate::storage::InMemoryStorage::new();
             seed_blocked_dependent(&bulk_storage);
             let bulk_reader = bulk_storage.clone();
-            let mut bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
+            let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
             let filter = QueryFilter::parse("state:ready").unwrap();
             let ops = UpdateOperations {
                 state: Some(target),
                 ..Default::default()
             };
-            let result = bulk.apply_bulk_update(&filter, &ops, false).unwrap();
+            let result = bulk
+                .issues()
+                .apply_bulk_update(&filter, &ops, false)
+                .unwrap();
             assert_eq!(
                 result.modified,
                 vec![crate::test_utils::issue_id(0xbbbb_2222)]
@@ -2252,13 +2334,16 @@ mod tests {
         let storage = crate::storage::InMemoryStorage::new();
         seed_blocked_dependent(&storage);
         let reader = storage.clone();
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
             state: Some(State::InProgress),
             ..Default::default()
         };
-        executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
 
         assert_eq!(
             reader
@@ -2293,14 +2378,17 @@ mod tests {
             ),
         );
         let reader = storage.clone();
-        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
         let filter = QueryFilter::parse("state:done").unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
             add_labels: vec!["milestone:v1.0".to_string()],
             ..Default::default()
         };
-        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        let result = executor
+            .issues()
+            .apply_bulk_update(&filter, &ops, false)
+            .unwrap();
         assert_eq!(
             result.modified,
             vec![crate::test_utils::issue_id(0xbbbb_2222)]

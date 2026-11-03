@@ -4,9 +4,9 @@ use super::*;
 use crate::domain::event_catalog::EventTag;
 use crate::domain::identity::IssueIdPrefix;
 
-impl<S: IssueStore> CommandExecutor<S> {
+impl<S: IssueStore> QueryOps<'_, S> {
     pub fn tail_events(&self, n: usize) -> Result<Vec<Event>> {
-        let events = self.storage.read_events()?;
+        let events = self.exec.storage.read_events()?;
         let start = events.len().saturating_sub(n);
         Ok(events[start..].to_vec())
     }
@@ -18,7 +18,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue: Option<IssueIdPrefix>,
         limit: usize,
     ) -> Result<Vec<Event>> {
-        let events = self.storage.read_events()?;
+        let events = self.exec.storage.read_events()?;
 
         let filtered: Vec<Event> = events
             .into_iter()
@@ -72,6 +72,7 @@ mod tests {
         let expected = seed_override_event(&storage);
         let executor = crate::commands::test_helpers::memory_executor(storage);
         let events = executor
+            .queries()
             .query_events(Some(EventTag::LinkedCheckoutWriteOverridden), None, 10)
             .expect("the event query succeeds");
 
@@ -97,6 +98,7 @@ mod tests {
         let executor = crate::commands::test_helpers::memory_executor(storage);
         assert_eq!(
             executor
+                .queries()
                 .query_events(None, None, 10)
                 .expect("the event query succeeds"),
             vec![expected],
@@ -105,6 +107,7 @@ mod tests {
 
         assert!(
             executor
+                .queries()
                 .query_events(
                     None,
                     Some(IssueIdPrefix::from(&crate::test_utils::issue_id(

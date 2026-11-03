@@ -5,37 +5,49 @@
 
 use super::*;
 
+/// Query, search, and event-log operations of a [`CommandExecutor`].
+pub struct QueryOps<'a, S: IssueStore> {
+    pub(super) exec: &'a CommandExecutor<S>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The query family.
+    pub fn queries(&self) -> QueryOps<'_, S> {
+        QueryOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> QueryOps<'_, S> {
     pub fn query_ready(&self) -> Result<Vec<Issue>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         Ok(crate::domain::queries::query_ready(&issues))
     }
 
     pub fn query_blocked(
         &self,
     ) -> Result<Vec<(Issue, Vec<crate::domain::queries::BlockingReason>)>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         Ok(crate::domain::queries::query_blocked(&issues))
     }
 
     pub fn query_by_assignee(&self, assignee: &crate::domain::Assignee) -> Result<Vec<Issue>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         Ok(crate::domain::queries::query_by_assignee(&issues, assignee))
     }
 
     pub fn query_by_state(&self, state: State) -> Result<Vec<Issue>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         Ok(crate::domain::queries::query_by_state(&issues, state))
     }
 
     pub fn query_by_priority(&self, priority: Priority) -> Result<Vec<Issue>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         Ok(crate::domain::queries::query_by_priority(&issues, priority))
     }
 
     pub fn query_by_label(&self, pattern: &str) -> Result<Vec<Issue>> {
         crate::labels::validate_label_pattern(pattern)?;
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         Ok(crate::domain::queries::query_by_label(&issues, pattern))
     }
 
@@ -50,12 +62,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .iter()
             .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
 
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         Ok(crate::domain::queries::query_by_labels(&issues, patterns))
     }
 
     pub fn query_strategic(&self) -> Result<Vec<Issue>> {
-        let namespaces = self.config_manager.get_namespaces()?;
+        let namespaces = self.exec.config_manager.get_namespaces()?;
 
         // Get strategic types from config, or fall back to hierarchy-based approach
         let strategic_types: Vec<String> = if let Some(ref types) = namespaces.strategic_types {
@@ -70,7 +82,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .collect()
         };
 
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         Ok(crate::domain::queries::query_strategic(
             &issues,
             &strategic_types,
@@ -78,7 +90,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn query_closed(&self) -> Result<Vec<Issue>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         Ok(crate::domain::queries::query_closed(&issues))
     }
 
@@ -94,7 +106,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         priority_filter: Option<Priority>,
         label_filters: &[String],
     ) -> Result<Vec<Issue>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         label_filters
             .iter()
             .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
@@ -120,7 +132,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         label_filters
             .iter()
             .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         Ok(crate::domain::queries::query_available(
             &issues,
             crate::domain::queries::AvailableFilter {
@@ -213,7 +225,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     .unwrap();
     ///
     /// // No label filter aggregates the whole repository.
-    /// let rollup = executor.query_count_by_state(&[]).unwrap();
+    /// let rollup = executor.queries().query_count_by_state(&[]).unwrap();
     /// assert_eq!(rollup.extras.total, 2);
     /// assert_eq!(rollup.extras.done, 1);
     /// assert_eq!(rollup.extras.percent, 50);
@@ -268,18 +280,22 @@ mod tests {
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         let result = executor
+            .queries()
             .query_available(Some(Priority::High), &["component:api".to_string()])
             .unwrap();
         assert_eq!(result.iter().map(|i| &i.id).collect::<Vec<_>>(), [&id]);
         assert!(executor
+            .queries()
             .query_available(Some(Priority::Low), &["component:api".to_string()])
             .unwrap()
             .is_empty());
         assert!(executor
+            .queries()
             .query_available(None, &["component:web".to_string()])
             .unwrap()
             .is_empty());
         assert!(executor
+            .queries()
             .query_available(None, &["invalid".to_string()])
             .is_err());
     }

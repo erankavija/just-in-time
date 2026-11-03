@@ -333,6 +333,7 @@ pub fn memory_executor_wrapping<W: IssueStore>(
     }
     CommandExecutor::new(pristine.clone())
         .with_layout(layout.clone())
+        .profiles()
         .initialize_fresh_repository(storage.root(), None)
         .expect("product initialization seeds the memory repository");
     let initialized = pristine.repository_state().clone();
@@ -450,6 +451,7 @@ mod tests {
         reference.add_data_file("config.toml", declared);
         CommandExecutor::new(reference.clone())
             .with_layout(reference.repository_layout())
+            .profiles()
             .initialize_fresh_repository(reference.root(), None)
             .unwrap();
 
