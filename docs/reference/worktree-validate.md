@@ -341,7 +341,9 @@ behavior depends on the arguments.
   (transitively-reducible) edges, claims-index consistency, and record fidelity:
   the index, issue records, gate-run results, and event log each
   decode and reproduce what the writer would publish, and no event id appears on
-  more than one line. Advisory membership-vs-DAG divergences are reported but do
+  more than one line. An event log that does not parse is one finding naming its
+  line. This mode and the `repository_validation` checker are the only validation
+  readers of the event log's records. Advisory membership-vs-DAG divergences are reported but do
   not fail the run. A built-in `repository_validation` gate runs this same
   computation and never passes where it fails; see
   [gate presets](gate-presets.md) for its `failed` and `error` runs.
