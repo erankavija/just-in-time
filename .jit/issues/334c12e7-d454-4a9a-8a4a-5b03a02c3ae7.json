@@ -23,7 +23,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Template application returns the created issues",
-  "updated_at": "2026-11-02T23:41:30.874497286Z"
+  "updated_at": "2026-11-03T20:26:36.847450514Z"
 }

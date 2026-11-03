@@ -23,7 +23,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "CLI search runs through the executor",
-  "updated_at": "2026-11-03T02:55:04.888505736Z"
+  "updated_at": "2026-11-03T20:26:36.965782403Z"
 }
