@@ -944,7 +944,6 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
     ) -> Result<Option<MaterializationPlan>> {
         let contribution_context = selection.contribution_context();
         let inputs = selection.application_inputs();
-        let events_path = VirtualPath::EVENTS;
 
         let mut content_paths = selection
             .members
@@ -963,7 +962,6 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
         content_paths.extend(crate::repository_state::profile_contribution_target_paths(
             contribution_context,
         ));
-        content_paths.push(events_path.clone());
 
         let base = match self.exec.capture_proposed_base(
             session,
@@ -1019,7 +1017,8 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 .delta()
                 .actions()
                 .iter()
-                .map(|action| action.path().clone()),
+                .map(|action| action.path().clone())
+                .filter(|path| path != &VirtualPath::EVENTS),
         );
         let overrides = super::validation_overlay(preview.image(), preview.delta())?;
         let Some(probe) =

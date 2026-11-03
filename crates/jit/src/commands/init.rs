@@ -74,7 +74,11 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 .with_gitattributes(gitattributes.clone())
                 .with_profiles(profiles.clone());
 
-                let mut extra_paths = scaffold.delta_paths()?;
+                let mut extra_paths = scaffold
+                    .delta_paths()?
+                    .into_iter()
+                    .filter(|path| path != &VirtualPath::EVENTS)
+                    .collect::<Vec<_>>();
                 extra_paths.extend(crate::repository_state::profile_contribution_target_paths(
                     contribution_context,
                 ));
@@ -1239,7 +1243,12 @@ mod tests {
             .capture_proposed_base(
                 session.as_mut(),
                 &Default::default(),
-                &scaffold.delta_paths().unwrap(),
+                &scaffold
+                    .delta_paths()
+                    .unwrap()
+                    .into_iter()
+                    .filter(|path| path != &VirtualPath::EVENTS)
+                    .collect::<Vec<_>>(),
                 None,
             )
             .unwrap()

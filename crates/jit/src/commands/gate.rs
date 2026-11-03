@@ -306,7 +306,6 @@ fn captured_gate_preset_fixed_paths() -> Vec<crate::repository_state::VirtualPat
         VirtualPath::INVARIANTS,
         VirtualPath::RULES,
         VirtualPath::GATES,
-        VirtualPath::EVENTS,
         VirtualPath::CONFIG_DIR,
         VirtualPath::GATE_PRESETS,
         VirtualPath::ISSUES,
@@ -328,6 +327,7 @@ fn capture_gate_preset_image(
         captured_gate_preset_fixed_paths(),
         GATE_PRESET_CAPTURE_BUDGET,
     )?;
+    spec.discover_tail(VirtualPath::EVENTS)?;
     spec.discover_listings([presets_dir.clone(), issues_dir.clone()])?;
     let create_path = create_target
         .map(|name| VirtualPath::data(format!("{}/{name}.json", presets_dir.relative().as_str())))
@@ -1049,13 +1049,12 @@ impl<S: IssueStore> GateOps<'_, S> {
             max_bytes: 256 * 1024 * 1024,
             max_depth: 16,
         };
-        let registries = || -> Result<[VirtualPath; 5]> {
+        let registries = || -> Result<[VirtualPath; 4]> {
             Ok([
                 VirtualPath::CONFIG,
                 VirtualPath::INVARIANTS,
                 VirtualPath::RULES,
                 VirtualPath::GATES,
-                VirtualPath::EVENTS,
             ])
         };
 
@@ -1064,7 +1063,8 @@ impl<S: IssueStore> GateOps<'_, S> {
             &layout,
             "gate registry mutation",
             |session| {
-                let spec = CaptureSpec::new(registries()?, budget)?;
+                let mut spec = CaptureSpec::new(registries()?, budget)?;
+                spec.discover_tail(VirtualPath::EVENTS)?;
                 let Some(image) = super::capture_discovering(session, spec, |image, spec| {
                     let config = assemble_config(image)?;
                     let rules_text = super::image_virtual_bytes(

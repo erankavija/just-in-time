@@ -1,0 +1,67 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "12040206727587b6c2cce7551c6a1483ba7d5217",
+  "completed_at": "2026-11-03T21:43:01.758658058Z",
+  "duration_ms": 463928,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": ".jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json",
+        "id": "F1",
+        "line": 7,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The container retains the harmless archived 2195c98f dependency after its prerequisites were re-homed to specific roots."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F2",
+        "line": 1868,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "gate-and-search-command-docs carries history-boundary membership while only the per-key-gate-runs sink consumes it."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F3",
+        "line": 1910,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f8a6b298/requirement/REQ-01",
+          "@/inv/canonical-cutover"
+        ],
+        "severity": "medium",
+        "summary": "The multi-format rewrite tooling is borderline large but remains one cohesive non-release rewrite with one validation boundary."
+      },
+      {
+        "disposition": "advisory",
+        "id": "F4",
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "Numerous independent issues overlap shared orchestration files and will require serialization or rebasing during execution."
+      }
+    ],
+    "summary": "The 41-entry active graph matches the authoritative manifest and passes all required checks; four unchanged non-blocking geometry, membership, sizing, and overlap advisories remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "b06cee74-7635-49c0-bc13-448bcfa28324",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "421a7ad1-e914-4514-a0b1-b9770322cc18",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T21:35:17.830467141Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "The 41-entry active graph matches the authoritative manifest. All required checks passed:\n\n- Manifest validation: valid, no errors, warnings, or overrides\n- Renderer `--check`: passed\n- Native batch dry-run: 41 issues, 61 dependency edges\n- `jit validate`: zero errors and warnings\n- Stored fidelity: exact titles, descriptions, types, priorities, label sets, gates, and intra-manifest edges\n- Geometry: all nine sources depend on `B`; `C` depends on all three sinks; external re-home edges match the plan\n- `planning`: absent from stored records and batch export\n- Superseded work: 23 former nodes are rejected rather than active\n- Content standards, contract modes, unique producers, and producer reachability: passed\n\n### Finest-tier assignment simulation\n\n| Key / issue | Coherent change | Observable test boundary | Footprint credible | One focused implementation/review cycle | Not a chain link | Result |\n|---|---|---|---|---|---|---|\n| gate-state-last-run | Gate-state pointer tests | Gate evaluation unit tests | Yes | Yes | Yes | Pass |\n| gate-run-latest-captures | Latest-run capture migration | Gate capture tests | Yes | Yes | Yes | Pass |\n| gate-run-load-by-issue | Issue-qualified load contract | Storage conformance | Yes | Yes | Yes | Pass |\n| gate-latest-run-reads | One latest-run accessor and callers | CLI gate integration | Yes | Yes | Yes | Pass |\n| gate-verdict-provenance | Provenance shape across consumers | Gate reuse tests | Yes | Yes | Yes | Pass |\n| gate-verdict-record-writes | One derived verdict record | Finalizer unit tests | Yes | Yes | Yes | Pass |\n| gate-verdict-reuse-lookup | One keyed reuse lookup | Gate reuse tests | Yes | Yes | Yes | Pass |\n| gate-run-shared-reader | Shared backend reader | Storage conformance | Yes | Yes | Yes | Pass |\n| gate-run-per-issue-layout | Complete per-issue layout cutover | Storage conformance | Yes | Yes | Yes | Pass |\n| lease-test-only-api-removal | Tests move to production APIs | Coordinator tests | Yes | Yes | Yes | Pass |\n| lease-reader-migration | One lock-free read API | Lease-reader tests | Yes | Yes | Yes | Pass |\n| lease-ops-through-lock | One held-lock operation sequence | Coordinator tests | Yes | Yes | Yes | Pass |\n| lease-mutation-guard-through-lock | Mutation guard adopts held lock | CLI enforcement tests | Yes | Yes | Yes | Pass |\n| lease-recover-through-lock | Recovery adopts held lock | Claim CLI tests | Yes | Yes | Yes | Pass |\n| lease-store-fixtures | One test-storage helper | Claim CLI tests | Yes | Yes | Yes | Pass |\n| lease-per-issue-records | Store flips behind established seams | Coordinator tests | Yes | Yes | Yes | Pass |\n| lease-index-machinery-removal | Delete obsolete index machinery | Claim CLI tests | Yes | Yes | Yes | Pass |\n| lease-issue-addressed-ops | Three operations change addressing | Claim CLI tests | Yes | Yes | Yes | Pass |\n| lease-interruption-matrix | One interruption seam and matrix | Coordinator tests | Yes | Yes | Yes | Pass |\n| claim-acquire-event-from-assignee | One claim-event rule | Finalizer tests | Yes | Yes | Yes | Pass |\n| event-log-read-rule | One committed-length/parser rule | Parser tests | Yes | Yes | Yes | Pass |\n| torn-tail-marker-removal | Remove superseded marker protocol | Finalizer tests | Yes | Yes | Yes | Pass |\n| validation-skips-event-log | Validation capture/read boundary | Validation tests | Yes | Yes | Yes | Pass |\n| mutation-event-tail-captures | Capture-site migration | Mutation capture tests | Yes | Yes | Yes | Pass |\n| archive-execution-record-type | One shared payload type | Archive domain tests | Yes | Yes | Yes | Pass |\n| archive-evidence-writes | One derived evidence record | Archive finalizer tests | Yes | Yes | Yes | Pass |\n| archive-execute-reads-evidence | Execute reads keyed evidence | Archive finalizer tests | Yes | Yes | Yes | Pass |\n| archive-preview-reads-evidence | Preview adopts evidence and deletes parser | Archive command tests | Yes | Yes | Yes | Pass |\n| capture-refuses-whole-event-log | Enforce capture boundary | Capture-spec tests | Yes | Yes | Yes | Pass |\n| redo-record-refuses-log-rewrite | Add refusal and remove dead branch | Redo-record tests | Yes | Yes | Yes | Pass |\n| search-excludes-history | One declared exclusion mechanism | Search unit tests | Yes | Yes | Yes | Pass |\n| storage-records-per-key-reference | One generated reference family | Golden reference test | Yes | Yes | Yes | Pass |\n| history-isolation-test | One shared integration fixture | CLI integration tests | Yes | Yes | Yes | Pass |\n| storage-format-history-docs | One documentation family | Documentation review | Yes | Yes | Yes | Pass |\n| lease-operator-docs | One bounded topic sweep | Documentation review | Yes | Yes | Yes | Pass |\n| gate-and-search-command-docs | Four short command-doc updates | Documentation review | Yes | Yes | Yes | Pass |\n| format-rewrite-tooling | One rewrite tool and its driver | Validation on repository copies | Yes | Borderline but credible | Yes | Pass; advisory |\n| format-cutover | Lead-run cutover only, no implementation | Validation in each repository | Yes | Yes | Yes | Pass |\n\n1. **F1 — Advisory, issue-impact, low:** The container retains the harmless dependency on archived issue `2195c98f` after its prerequisites were re-homed to specific roots. This unchanged geometry does not constrain the active manifest graph. Location: `.jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json:7`.\n2. **F2 — Advisory, issue-impact, low:** `gate-and-search-command-docs` carries `story:history-boundary`, although only the `per-key-gate-runs` sink consumes it. Dependency geometry remains correct. Location: `dev/active/f8a6b298-history-independent-reads/breakdown.json:1868`.\n3. **F3 — Advisory, issue-impact, medium:** `format-rewrite-tooling` remains borderline large because it covers several stored formats and five repository copies, but it is one cohesive, non-release rewrite with one validation boundary. Location: `dev/active/f8a6b298-history-independent-reads/breakdown.json:1910`. References: `@/issue/f8a6b298/requirement/REQ-01`, `@/inv/canonical-cutover`.\n4. **F4 — Advisory, issue-impact, low:** Numerous issues overlap shared orchestration files. Same-function changes are dependency-ordered, but remaining independent overlaps will require serialization or rebasing during execution.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The 41-entry active graph matches the authoritative manifest and passes all required checks; four unchanged non-blocking geometry, membership, sizing, and overlap advisories remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The container retains the harmless archived 2195c98f dependency after its prerequisites were re-homed to specific roots.\",\"file\":\".jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json\",\"line\":7},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"gate-and-search-command-docs carries history-boundary membership while only the per-key-gate-runs sink consumes it.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":1868},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The multi-format rewrite tooling is borderline large but remains one cohesive non-release rewrite with one validation boundary.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":1910,\"references\":[\"@/issue/f8a6b298/requirement/REQ-01\",\"@/inv/canonical-cutover\"]},{\"id\":\"F4\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Numerous independent issues overlap shared orchestration files and will require serialization or rebasing during execution.\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

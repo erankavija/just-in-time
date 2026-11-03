@@ -389,7 +389,10 @@
           "short_id": "abe555e9",
           "title": "Library-side command handler contract",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (dispatched at base 7333a5f7a)",
+          "vendor": "claude",
+          "model_tier": "opus",
+          "tier_reason": "contract-setting: every handler migration copies it"
         },
         {
           "key": "mutations-return-issue",
@@ -397,7 +400,10 @@
           "short_id": "2e0f276b",
           "title": "Issue mutations return the updated issue",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (dispatched at base 7333a5f7a)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "return-shape change over seven mutations; alternation"
         },
         {
           "key": "path-read-error-codes",
@@ -405,7 +411,10 @@
           "short_id": "22189592",
           "title": "Classify document path-read failures by variant",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (dispatched at base 7333a5f7a)",
+          "vendor": "claude",
+          "model_tier": "sonnet",
+          "tier_reason": "new error code, generated reference, CLI contract change"
         }
       ]
     },
@@ -823,6 +832,11 @@
       "source": "wave 5 lead",
       "summary": "jit caps indefinite leases at 2 per agent; later dispatches use --ttl 86400 and need renewal on long waves",
       "disposition": "process note"
+    },
+    {
+      "source": "abe555e9 worker",
+      "summary": "jit --schema output order is nondeterministic run to run: CommandSchema.commands, types and subcommands are HashMaps (pre-existing). Schema identity checks must compare with sorted keys; byte-stable output would need BTreeMap.",
+      "disposition": "reconcile against da30b92a / 46fe7593 schema criteria before container gates"
     }
   ],
   "external_blockers": {},

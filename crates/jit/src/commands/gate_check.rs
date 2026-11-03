@@ -774,12 +774,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut paths = vec![
             VirtualPath::issue_record(&target_id),
             VirtualPath::GATES,
-            VirtualPath::EVENTS,
             VirtualPath::GATE_RUNS,
         ];
         paths.extend(run_paths.iter().cloned());
         let mut spec = bound.capture_spec().clone();
         spec.discover_paths(paths)?;
+        spec.discover_tail(VirtualPath::EVENTS)?;
         let Some(initial) = capture_or_retry(session.extend(bound, spec))? else {
             return Ok(None);
         };
