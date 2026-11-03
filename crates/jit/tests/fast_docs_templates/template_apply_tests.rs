@@ -255,6 +255,7 @@ fn test_apply_resolves_node_doc_location() {
     // hand-composed `area/id` path.
     let directory = h
         .executor
+        .documents()
         .resolve_issue_artifact_directory(&epic, DOCUMENT_AREA)
         .unwrap()
         .directory;
@@ -308,6 +309,7 @@ fn test_apply_resolves_the_declared_document_area_into_the_node_doc_location() {
     // that repeats no short id, because the directory already names the issue.
     let directory = h
         .executor
+        .documents()
         .resolve_issue_artifact_directory(&epic, DOCUMENT_AREA)
         .unwrap()
         .directory;
@@ -1003,6 +1005,7 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     // `repo-validate` is a config-declared REGISTRY gate with no preset of that
     // name, so the registry-key fallback WOULD match it.
     executor
+        .gates()
         .define_gate(
             &"repo-validate".parse().unwrap(),
             "Repo Validate".to_string(),

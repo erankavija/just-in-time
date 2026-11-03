@@ -321,14 +321,15 @@ impl<S: IssueStore> IssueOps<'_, S> {
 
     /// Build the [`IssueShowResponse`](crate::output::IssueShowResponse) for one
     /// already-loaded issue: enriched dependencies, gate runs, and the
-    /// documents every reader reports ([`CommandExecutor::issue_documents`]).
+    /// documents every reader reports ([`DocumentOps::issue_documents`]).
     pub fn show_response(&self, issue: Issue) -> Result<crate::output::IssueShowResponse> {
         let enriched_deps = self.get_dependencies_enriched(&issue);
         let gate_runs = self
             .exec
+            .gates()
             .list_gate_runs(&issue.id, None)
             .with_context(|| format!("Failed to load gate runs for issue {}", issue.id))?;
-        let documents = self.exec.issue_documents(&issue)?;
+        let documents = self.exec.documents().issue_documents(&issue)?;
         Ok(crate::output::IssueShowResponse {
             documents,
             ..crate::output::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs)
@@ -349,7 +350,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         issue: Issue,
     ) -> Result<crate::output::IssueStatusResponse> {
         let enriched_deps = self.get_dependencies_enriched(&issue);
-        let gate_runs = self.exec.list_gate_runs(&issue.id, None)?;
+        let gate_runs = self.exec.gates().list_gate_runs(&issue.id, None)?;
         let show = crate::output::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs);
         Ok(crate::output::IssueStatusResponse::from_show(&show))
     }
@@ -1227,6 +1228,7 @@ mod tests {
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
+            .gates()
             .add_gate(&issue_id, &"tdd-reminder".parse().unwrap())
             .unwrap();
 
@@ -1294,11 +1296,13 @@ mod tests {
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
+            .gates()
             .add_gate(&issue_id, &"tdd-reminder".parse().unwrap())
             .unwrap();
 
         // Pass the precheck manually
         executor
+            .gates()
             .pass_gate(
                 &issue_id,
                 &"tdd-reminder".parse().unwrap(),
@@ -1598,9 +1602,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         // Add gates that haven't been passed
         executor
+            .gates()
             .add_gate(&issue_id, &"tests".parse().unwrap())
             .unwrap();
         executor
+            .gates()
             .add_gate(&issue_id, &"code-review".parse().unwrap())
             .unwrap();
 
@@ -1671,6 +1677,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
+            .gates()
             .add_gate(&issue_id, &"tests".parse().unwrap())
             .unwrap();
 
@@ -1704,6 +1711,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
+            .gates()
             .add_gate(&issue_id, &"tests".parse().unwrap())
             .unwrap();
 
@@ -1788,6 +1796,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
+            .gates()
             .add_gate(&issue_id, &"tests".parse().unwrap())
             .unwrap();
 
@@ -1962,6 +1971,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
+            .gates()
             .add_gate(&issue_id, &"tests".parse().unwrap())
             .unwrap();
 
@@ -2049,6 +2059,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor
+            .gates()
             .add_gate(&issue_id, &"tests".parse().unwrap())
             .unwrap();
 
@@ -3359,8 +3370,12 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             template.id = crate::test_utils::fixture_issue(String::new(), String::new()).id;
             let combined = seed_fixture_issue(&executor, template);
 
-            executor.add_gates(&separate, &local.add_gates).unwrap();
             executor
+                .gates()
+                .add_gates(&separate, &local.add_gates)
+                .unwrap();
+            executor
+                .gates()
                 .remove_gates(&separate, &local.remove_gates)
                 .unwrap();
             match &local.assignee {

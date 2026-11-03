@@ -11,7 +11,7 @@ mod tests {
     fn test_define_manual_gate() {
         let executor = setup();
 
-        let result = executor.define_gate(
+        let result = executor.gates().define_gate(
             &"manual-review".parse().unwrap(),
             "Manual Review".to_string(),
             "Human code review".to_string(),
@@ -25,6 +25,7 @@ mod tests {
 
         // Verify gate was created
         let gate = executor
+            .gates()
             .show_gate_definition(&"manual-review".parse().unwrap())
             .unwrap();
         assert_eq!(gate.key, "manual-review".parse().unwrap());
@@ -49,7 +50,7 @@ mod tests {
             prompt_file: None,
         };
 
-        let result = executor.define_gate(
+        let result = executor.gates().define_gate(
             &"unit-tests".parse().unwrap(),
             "Unit Tests".to_string(),
             "Run all unit tests".to_string(),
@@ -63,6 +64,7 @@ mod tests {
 
         // Verify gate was created with checker
         let gate = executor
+            .gates()
             .show_gate_definition(&"unit-tests".parse().unwrap())
             .unwrap();
         assert_eq!(gate.mode, GateMode::Auto);
@@ -79,6 +81,7 @@ mod tests {
         let executor = setup();
 
         executor
+            .gates()
             .define_gate(
                 &"test-gate".parse().unwrap(),
                 "Test Gate".to_string(),
@@ -91,7 +94,7 @@ mod tests {
             .unwrap();
 
         // Try to define same gate again
-        let result = executor.define_gate(
+        let result = executor.gates().define_gate(
             &"test-gate".parse().unwrap(),
             "Test Gate 2".to_string(),
             "Test 2".to_string(),
@@ -112,6 +115,7 @@ mod tests {
 
         // Define multiple gates
         executor
+            .gates()
             .define_gate(
                 &"gate-1".parse().unwrap(),
                 "Gate 1".to_string(),
@@ -124,6 +128,7 @@ mod tests {
             .unwrap();
 
         executor
+            .gates()
             .define_gate(
                 &"gate-2".parse().unwrap(),
                 "Gate 2".to_string(),
@@ -144,7 +149,7 @@ mod tests {
             .unwrap();
 
         // List gates
-        let gates = executor.list_gates().unwrap();
+        let gates = executor.gates().list_gates().unwrap();
         assert_eq!(gates.len(), 2);
 
         let keys: Vec<_> = gates.iter().map(|g| &g.key).collect();
@@ -168,6 +173,7 @@ mod tests {
         };
 
         executor
+            .gates()
             .define_gate(
                 &"clippy".parse().unwrap(),
                 "Clippy Lints".to_string(),
@@ -181,6 +187,7 @@ mod tests {
 
         // Show gate details
         let gate = executor
+            .gates()
             .show_gate_definition(&"clippy".parse().unwrap())
             .unwrap();
         assert_eq!(gate.key, "clippy".parse().unwrap());
@@ -212,7 +219,9 @@ mod tests {
     fn test_show_nonexistent_gate_fails() {
         let executor = setup();
 
-        let result = executor.show_gate_definition(&"nonexistent".parse().unwrap());
+        let result = executor
+            .gates()
+            .show_gate_definition(&"nonexistent".parse().unwrap());
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
@@ -223,6 +232,7 @@ mod tests {
         let executor = setup();
 
         executor
+            .gates()
             .define_gate(
                 &"test-gate".parse().unwrap(),
                 "Test".to_string(),
@@ -236,16 +246,19 @@ mod tests {
 
         // Verify it exists
         assert!(executor
+            .gates()
             .show_gate_definition(&"test-gate".parse().unwrap())
             .is_ok());
 
         // Remove it
         executor
+            .gates()
             .remove_gate_definition(&"test-gate".parse().unwrap())
             .unwrap();
 
         // Verify it's gone
         assert!(executor
+            .gates()
             .show_gate_definition(&"test-gate".parse().unwrap())
             .is_err());
     }
@@ -255,7 +268,7 @@ mod tests {
     fn test_auto_gate_requires_checker() {
         let executor = setup();
 
-        let result = executor.define_gate(
+        let result = executor.gates().define_gate(
             &"auto-no-checker".parse().unwrap(),
             "Auto Gate".to_string(),
             "Test".to_string(),
@@ -285,7 +298,7 @@ mod tests {
         };
 
         // Should succeed but checker is ignored for manual gates
-        let result = executor.define_gate(
+        let result = executor.gates().define_gate(
             &"manual-with-checker".parse().unwrap(),
             "Manual".to_string(),
             "Test".to_string(),
@@ -299,6 +312,7 @@ mod tests {
 
         // Verify checker was ignored
         let gate = executor
+            .gates()
             .show_gate_definition(&"manual-with-checker".parse().unwrap())
             .unwrap();
         assert_eq!(gate.mode, GateMode::Manual);

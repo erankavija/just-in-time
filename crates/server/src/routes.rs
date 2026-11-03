@@ -143,7 +143,7 @@ async fn list_issues<S: IssueStore>(
         .executor
         .issues()
         .list_issues(None, None, None)
-        .and_then(|issues| state.executor.with_reported_documents(issues))
+        .and_then(|issues| state.executor.documents().with_reported_documents(issues))
         .map(|issues| Json(issues.into_iter().map(IssueResponse::from).collect()))
         .map_err(|e| {
             tracing::error!("Failed to list issues: {:?}", e);
@@ -177,10 +177,14 @@ async fn get_issue<S: IssueStore>(
         tracing::error!("Failed to get issue {}: {:?}", id, e);
         StatusCode::NOT_FOUND
     })?;
-    issue.documents = state.executor.issue_documents(&issue).map_err(|e| {
-        tracing::error!("Failed to list documents of issue {}: {:?}", id, e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    issue.documents = state
+        .executor
+        .documents()
+        .issue_documents(&issue)
+        .map_err(|e| {
+            tracing::error!("Failed to list documents of issue {}: {:?}", id, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
     Ok(Json(IssueResponse::from(issue)))
 }
 
@@ -370,10 +374,14 @@ async fn search_issues<S: IssueStore>(
     let start = std::time::Instant::now();
 
     // Restrict search to issue documents, explicit or derived
-    let document_paths = state.executor.get_issue_document_paths().map_err(|e| {
-        tracing::error!("Failed to get issue documents: {:?}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let document_paths = state
+        .executor
+        .documents()
+        .get_issue_document_paths()
+        .map_err(|e| {
+            tracing::error!("Failed to get issue documents: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let layout = state.executor.repository_layout().map_err(|error| {
         tracing::error!("Search has no repository layout: {:?}", error);
@@ -446,7 +454,7 @@ fn path_read_error_status(e: &PathReadError) -> StatusCode {
 /// which is useful for opening documents from search results that may not be
 /// associated with a specific issue context.
 ///
-/// Delegates I/O to `CommandExecutor::read_path_bytes` so that filesystem/git
+/// Delegates I/O to `DocumentOps::read_path_bytes` so that filesystem/git
 /// reads remain in the domain layer, not in the route handler.
 async fn get_document_by_path<S: IssueStore>(
     Query(query): Query<DocumentByPathQuery>,
@@ -454,6 +462,7 @@ async fn get_document_by_path<S: IssueStore>(
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
     let (bytes, commit_hash) = state
         .executor
+        .documents()
         .read_path_bytes(&query.path, query.commit.as_deref())
         .map_err(|e| {
             tracing::error!("Failed to read path {}: {:?}", query.path, e);
@@ -688,6 +697,7 @@ async fn get_document_content<S: IssueStore>(
 
     let (content, commit_hash) = state
         .executor
+        .documents()
         .read_document_content(&id, &path, at_commit)
         .map_err(|e| {
             tracing::error!("Failed to read document content: {:?}", e);
@@ -719,6 +729,7 @@ async fn get_document_raw<S: IssueStore>(
 
     let (bytes, _commit_hash) = state
         .executor
+        .documents()
         .read_document_bytes(&id, &path, at_commit)
         .map_err(|e| {
             tracing::error!("Failed to read raw document bytes: {:?}", e);
@@ -753,7 +764,7 @@ async fn get_document_raw<S: IssueStore>(
 
 /// Get raw document bytes (path-only variant)
 ///
-/// Delegates I/O to `CommandExecutor::read_path_bytes` so persistence stays
+/// Delegates I/O to `DocumentOps::read_path_bytes` so persistence stays
 /// in the domain layer.  Returns raw bytes with the inferred Content-Type and
 /// CSP headers.  Binary files are served faithfully without UTF-8 conversion.
 /// HTML responses get a `<base href>` injected so sibling assets resolve via
@@ -772,6 +783,7 @@ async fn get_document_raw_by_path<S: IssueStore>(
 
     let (bytes, _commit_hash) = state
         .executor
+        .documents()
         .read_path_bytes(&query.path, at_commit)
         .map_err(|e| {
             tracing::error!("Failed to read path {}: {:?}", query.path, e);
@@ -826,6 +838,7 @@ async fn get_raw_wildcard<S: IssueStore>(
 
     let (bytes, _commit_hash) = state
         .executor
+        .documents()
         .read_path_bytes(&path, at_commit)
         .map_err(|e| {
             tracing::error!("Failed to read raw path {}: {:?}", path, e);
@@ -881,6 +894,7 @@ async fn get_document_history<S: IssueStore>(
     let id = resolve_issue_path_id(&state.executor, &id)?;
     let commits = state
         .executor
+        .documents()
         .get_document_history(&id, &path)
         .map_err(|e| {
             tracing::error!("Failed to get document history: {:?}", e);
@@ -930,6 +944,7 @@ async fn get_document_diff<S: IssueStore>(
 
     let diff = state
         .executor
+        .documents()
         .get_document_diff(&id, &path, &query.from, to)
         .map_err(|e| {
             tracing::error!("Failed to get document diff: {:?}", e);
@@ -950,7 +965,7 @@ async fn get_document_diff<S: IssueStore>(
 async fn list_gates<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateDefinition>>, StatusCode> {
-    state.executor.list_gates().map(Json).map_err(|e| {
+    state.executor.gates().list_gates().map(Json).map_err(|e| {
         tracing::error!("Failed to list gates: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })
@@ -963,6 +978,7 @@ async fn get_gate_definition<S: IssueStore>(
 ) -> Result<Json<GateDefinition>, StatusCode> {
     state
         .executor
+        .gates()
         .show_gate_definition(&key)
         .map(Json)
         .map_err(|e| {
@@ -986,6 +1002,7 @@ async fn list_gate_runs<S: IssueStore>(
     let id = resolve_issue_path_id(&state.executor, &id)?;
     let runs = state
         .executor
+        .gates()
         .list_gate_runs(&id, params.gate_key.as_ref())
         .map_err(|e| {
             tracing::error!("Failed to list gate runs for {}: {:?}", id, e);
@@ -1006,6 +1023,7 @@ async fn get_gate_run<S: IssueStore>(
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     state
         .executor
+        .gates()
         .get_gate_run_result(&id, &run_id)
         .map(|r| Json(GateRunSummary::full(&r)))
         .map_err(|e| {
@@ -1266,6 +1284,7 @@ mod tests {
         let other = harness.create_issue("Other issue");
         harness
             .executor
+            .gates()
             .pass_gate(&owner, &gate_key, Some("human:reviewer".to_string()), false)
             .unwrap();
         let run = harness
@@ -2047,6 +2066,7 @@ unique = false
         std::fs::write(worktree.join(HTML_DOC), "<html><body>hello</body></html>").unwrap();
         // skip_scan avoids the git dependency.
         executor
+            .documents()
             .add_document_reference(&id, HTML_DOC, None, None, None, true)
             .unwrap();
         id
@@ -2194,6 +2214,7 @@ unique = false
         fs::write(&doc_abs, binary_fixture).unwrap();
 
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
             .unwrap();
 
@@ -2494,6 +2515,7 @@ unique = false
         // Link the directory path as a document (skip_scan=true avoids the read
         // during registration so we can store the bad reference).
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
             .unwrap();
 
@@ -2540,6 +2562,7 @@ unique = false
             )
             .unwrap();
         let directory = executor
+            .documents()
             .resolve_issue_artifact_directory(&id, "notes")
             .unwrap()
             .directory;
@@ -2547,11 +2570,13 @@ unique = false
         std::fs::create_dir_all(temp.path().join(&directory)).unwrap();
         std::fs::write(temp.path().join(&derived), "plan\n").unwrap();
         executor
+            .documents()
             .add_document_reference(&id, "linked.md", None, Some("Linked"), Some("design"), true)
             .unwrap();
         let observed = temp.path().join("observed-issue-docs.json");
         let gate_key = "docs-gate".parse().unwrap();
         executor
+            .gates()
             .define_gate(
                 &gate_key,
                 "Docs".to_string(),
@@ -2570,11 +2595,12 @@ unique = false
                 100,
             )
             .unwrap();
-        executor.add_gate(&id, &gate_key).unwrap();
+        executor.gates().add_gate(&id, &gate_key).unwrap();
         executor.check_gate(&id, &gate_key).unwrap();
 
         let listed_by_doc_list =
-            serde_json::to_value(executor.list_document_references(&id).unwrap()).unwrap();
+            serde_json::to_value(executor.documents().list_document_references(&id).unwrap())
+                .unwrap();
         let shown = executor
             .issues()
             .show_response(executor.issues().show_issue(&id).unwrap())
@@ -2660,6 +2686,7 @@ unique = false
             )
             .unwrap();
         let directory = executor
+            .documents()
             .resolve_issue_artifact_directory(&id, "notes")
             .unwrap()
             .directory;
@@ -2673,6 +2700,7 @@ unique = false
         });
 
         assert!(executor
+            .documents()
             .get_issue_document_paths()
             .unwrap()
             .contains(&doc_rel));
@@ -2732,6 +2760,7 @@ unique = false
             )
             .unwrap();
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, false)
             .unwrap();
 
@@ -2785,6 +2814,7 @@ unique = false
             .unwrap();
 
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
             .unwrap();
 
@@ -3168,6 +3198,7 @@ unique = false
         let doc_rel = "withbase.html";
         fs::write(temp.path().join(doc_rel), original).unwrap();
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
             .unwrap();
 
@@ -3314,6 +3345,7 @@ unique = false
             )
             .unwrap();
         executor
+            .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
             .unwrap();
 

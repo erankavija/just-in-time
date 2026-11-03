@@ -92,7 +92,19 @@ impl DocumentScanWarning {
     }
 }
 
+/// Document operations of a [`CommandExecutor`].
+pub struct DocumentOps<'a, S: IssueStore> {
+    exec: &'a CommandExecutor<S>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The document family.
+    pub fn documents(&self) -> DocumentOps<'_, S> {
+        DocumentOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> DocumentOps<'_, S> {
     #[allow(clippy::too_many_arguments)] // CLI command parameters - refactoring would reduce clarity
     pub fn add_document_reference(
         &self,
@@ -107,7 +119,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = issue_id.clone();
-        let lease_warnings = self.refuse_foreign_lease(&full_id)?;
+        let lease_warnings = self.exec.refuse_foreign_lease(&full_id)?;
         let (result, warnings) =
             self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)?;
         Ok((result, lease_warnings.into_iter().chain(warnings).collect()))
@@ -124,7 +136,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(
             match crate::storage::artifact_planning::inspect_artifact_evidence(
-                &self.storage,
+                &self.exec.storage,
                 root,
                 scope,
             )? {
@@ -171,11 +183,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::domain::artifact_discovery::ArtifactListingScope;
 
         let documentation = self
+            .exec
             .config_manager
             .load()?
             .documentation
             .unwrap_or_default();
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
         let files = match issues.as_slice() {
             [issue] => crate::domain::artifact_directory::owned_artifact_directories(
                 issue,
@@ -294,7 +307,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &IssueId,
     ) -> Result<crate::commands::DocumentListResult> {
         let full_id = issue_id.clone();
-        let issue = self.storage.load_issue(&full_id)?;
+        let issue = self.exec.storage.load_issue(&full_id)?;
         let documents = self.issue_documents(&issue)?;
 
         Ok(crate::commands::DocumentListResult::with_extras(
@@ -326,13 +339,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         area: &str,
     ) -> Result<crate::output::ArtifactDirectoryResponse> {
         let full_id = issue_id.clone();
-        let issue = self.storage.load_issue(&full_id)?;
+        let issue = self.exec.storage.load_issue(&full_id)?;
         let documentation = self
+            .exec
             .config_manager
             .load()?
             .documentation
             .unwrap_or_default();
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
 
         let directory = crate::domain::artifact_directory::resolve_artifact_directory(
             &issue,
@@ -384,12 +398,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::domain::artifact_discovery::ArtifactListingScope;
 
         let documentation = self
+            .exec
             .config_manager
             .load()?
             .documentation
             .unwrap_or_default();
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
-        let issues = self.storage.list_issues()?;
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
+        let issues = self.exec.storage.list_issues()?;
         let listings =
             self.list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveEntries)?;
 
@@ -428,7 +443,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = issue_id.clone();
-        let warnings = self.refuse_foreign_lease(&full_id)?;
+        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
         Ok((self.publish_document_remove(&full_id, path)?, warnings))
     }
 
@@ -453,7 +468,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use std::collections::BTreeSet;
 
         validate_repo_relative_path(path)?;
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let issue_path = VirtualPath::issue_record(issue_id);
         let events_path = VirtualPath::EVENTS;
         let document_path = VirtualPath::worktree(path)
@@ -467,7 +482,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         let context = super::production_mutation_context();
 
-        with_mutation_session(&self.storage, &layout, "document add", |session| {
+        with_mutation_session(&self.exec.storage, &layout, "document add", |session| {
             let initial_paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
             let initial_spec = if skip_scan {
                 document_capture_spec(initial_paths)?
@@ -527,11 +542,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{finalize, VirtualPath};
         use std::collections::BTreeSet;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let issue_path = VirtualPath::issue_record(issue_id);
         let events_path = VirtualPath::EVENTS;
         let context = super::production_mutation_context();
-        with_mutation_session(&self.storage, &layout, "document removal", |session| {
+        with_mutation_session(&self.exec.storage, &layout, "document removal", |session| {
             let paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
             let Some(image) = capture_or_retry(session.capture(document_capture_spec(paths)?))?
             else {
@@ -553,7 +568,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use git2::Repository;
 
         let full_id = issue_id.clone();
-        let issue = self.storage.load_issue(&full_id)?;
+        let issue = self.exec.storage.load_issue(&full_id)?;
         let doc = self.require_issue_document(issue, path)?;
 
         // Determine which commit to view
@@ -568,13 +583,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Read content: try git first, fall back to filesystem if git unavailable
         let content = if at_commit.is_some() || doc.commit.is_some() {
             // Explicit version requested - require git
-            let repo = Repository::open(self.require_layout()?.worktree_root())
+            let repo = Repository::open(self.exec.require_layout()?.worktree_root())
                 .context("Git repository required when viewing specific commit version")?;
             self.read_file_from_git(&repo, &doc.path, reference)
                 .with_context(|| format!("Failed to read {} from git at {}", doc.path, reference))?
         } else {
             // No specific version - try git, fall back to filesystem
-            match Repository::open(self.require_layout()?.worktree_root()) {
+            match Repository::open(self.exec.require_layout()?.worktree_root()) {
                 Ok(repo) => {
                     // Git available - read from git
                     self.read_file_from_git(&repo, &doc.path, "HEAD")
@@ -582,7 +597,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
                 Err(_) => {
                     // Git not available - read from filesystem via storage layer
-                    self.storage
+                    self.exec
+                        .storage
                         .read_path_text(&doc.path, None)
                         .map(|(text, _)| text)
                         .map_err(|e| {
@@ -609,10 +625,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         use git2::Repository;
 
         let full_id = issue_id.clone();
-        let issue = self.storage.load_issue(&full_id)?;
+        let issue = self.exec.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let repo = Repository::open(layout.worktree_root())
             .map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
@@ -634,10 +650,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         use git2::Repository;
 
         let full_id = issue_id.clone();
-        let issue = self.storage.load_issue(&full_id)?;
+        let issue = self.exec.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let repo = Repository::open(layout.worktree_root())
             .map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
@@ -684,7 +700,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &IssueId,
     ) -> Result<crate::domain::Issue, crate::storage::PathReadError> {
-        self.storage.load_issue_or_not_found(issue_id)
+        self.exec.storage.load_issue_or_not_found(issue_id)
     }
 
     /// Read document content from git or filesystem.
@@ -713,12 +729,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         // working-tree reads against the repo root (see
         // `JsonFileStorage::read_path_bytes`), so we pass the stored path
         // through unchanged.
-        self.storage.read_path_text(&doc.path, effective_commit)
+        self.exec
+            .storage
+            .read_path_text(&doc.path, effective_commit)
     }
 
     /// Read raw document bytes for an issue-scoped path (byte-faithful variant).
     ///
-    /// Unlike [`read_document_content`], this method does not convert file
+    /// Unlike [`Self::read_document_content`], this method does not convert file
     /// content to `String`, so binary artifacts are round-tripped without loss.
     ///
     /// Steps:
@@ -750,7 +768,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         // That makes pre-resolving to an absolute path here both unnecessary
         // and actively harmful, so we simply pass the stored repo-relative path
         // through.
-        self.storage.read_path_bytes(&doc.path, effective_commit)
+        self.exec
+            .storage
+            .read_path_bytes(&doc.path, effective_commit)
     }
 
     /// Get document history from git.
@@ -772,7 +792,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue = self.load_issue_typed(issue_id)?;
         self.find_issue_document(issue, path)?;
 
-        let layout = self.require_layout().map_err(PathReadError::Other)?;
+        let layout = self.exec.require_layout().map_err(PathReadError::Other)?;
         let repo_root = layout.worktree_root();
 
         // Try to get history from git, return empty list if not available
@@ -808,7 +828,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue = self.load_issue_typed(issue_id)?;
         self.find_issue_document(issue, path)?;
 
-        let layout = self.require_layout().map_err(PathReadError::Other)?;
+        let layout = self.exec.require_layout().map_err(PathReadError::Other)?;
         let repo_root = layout.worktree_root();
 
         // Try to get diff from git, return error message if not available
@@ -853,7 +873,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     #[allow(dead_code)]
     pub fn get_issue_document_paths(&self) -> Result<Vec<String>> {
         Ok(self
-            .with_issue_documents(self.storage.list_issues()?)?
+            .with_issue_documents(self.exec.storage.list_issues()?)?
             .into_iter()
             .flat_map(|(_, documents)| documents)
             .map(|document| document.path)
@@ -875,7 +895,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
-        self.storage.read_path_bytes(path, at_commit)
+        self.exec.storage.read_path_bytes(path, at_commit)
     }
 
     fn read_file_from_git(
@@ -961,7 +981,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut warnings = Vec::new();
 
         let full_id = issue_id.clone();
-        let issue = self.storage.load_issue(&full_id)?;
+        let issue = self.exec.storage.load_issue(&full_id)?;
 
         // Find the document in the issue
         let document = issue
@@ -1027,7 +1047,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::{finalize, MutationIntent, VirtualPath};
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let issue_path = VirtualPath::issue_record(issue_id);
         let document_path = VirtualPath::worktree(path)?;
         let events_path = VirtualPath::EVENTS;
@@ -1036,7 +1056,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Operation-scoped so a fresh-session retry cannot resample the update
         // timestamp or audit-event identity.
         let context = super::production_mutation_context();
-        with_mutation_session(&self.storage, &layout, "document rescan", |session| {
+        with_mutation_session(&self.exec.storage, &layout, "document rescan", |session| {
             let initial = document_scan_capture_spec(
                 [issue_path.clone(), events_path.clone()]
                     .into_iter()
@@ -1136,13 +1156,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::document::{AssetType, DocumentScope, LinkValidationResult, LinkValidator};
         use std::path::PathBuf;
 
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let repo_root = layout.worktree_root();
 
         // Resolve the scope to the set of issues whose documents to check.
         let issues = match scope {
-            DocumentScope::All => self.storage.list_issues()?,
-            DocumentScope::Issue(issue_id) => vec![self.storage.load_issue(issue_id)?],
+            DocumentScope::All => self.exec.storage.list_issues()?,
+            DocumentScope::Issue(issue_id) => vec![self.exec.storage.load_issue(issue_id)?],
         };
 
         // Every document in scope, explicit or derived, is checked and tracked.
@@ -1400,14 +1420,19 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        with_mutation_session(&self.storage, layout, "document link check", |session| {
-            Ok(
-                match capture_link_check_readings(session, documents, link_validator)? {
-                    Some(readings) => SessionStep::Done(readings),
-                    None => SessionStep::Retry,
-                },
-            )
-        })
+        with_mutation_session(
+            &self.exec.storage,
+            layout,
+            "document link check",
+            |session| {
+                Ok(
+                    match capture_link_check_readings(session, documents, link_validator)? {
+                        Some(readings) => SessionStep::Done(readings),
+                        None => SessionStep::Retry,
+                    },
+                )
+            },
+        )
     }
 }
 
@@ -1973,6 +1998,7 @@ mod tests {
         let executor = crate::test_utils::file_executor(repo.path()).unwrap();
 
         let error = executor
+            .documents()
             .report_artifact_conformance()
             .expect_err("invalid hierarchy must fail artifact conformance reporting");
 
@@ -2003,6 +2029,7 @@ mod tests {
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
 
         let first = executor
+            .documents()
             .list_document_assets(&id, "docs/guide.md", true)
             .unwrap();
         assert_eq!(first.items.len(), 1);
@@ -2011,6 +2038,7 @@ mod tests {
         let updated_at = storage.load_issue(&id).unwrap().updated_at;
 
         let second = executor
+            .documents()
             .list_document_assets(&id, "docs/guide.md", true)
             .unwrap();
         assert_eq!(second.items, first.items);
@@ -2063,7 +2091,7 @@ mod tests {
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage).with_layout(layout);
 
-        let listed = executor.list_document_references(&id).unwrap();
+        let listed = executor.documents().list_document_references(&id).unwrap();
         let value = serde_json::to_value(&listed).unwrap();
 
         assert_eq!(value["issue_id"], id.as_str());
@@ -2083,6 +2111,7 @@ mod tests {
         let executor = CommandExecutor::new(storage).with_layout(layout);
 
         let listed = executor
+            .documents()
             .list_document_assets(&id, "docs/guide.md", true)
             .unwrap();
         let value = serde_json::to_value(&listed).unwrap();
@@ -2243,6 +2272,7 @@ mod tests {
             CommandExecutor::new(storage.clone()).with_layout(storage.repository_layout());
 
         let error = executor
+            .documents()
             .add_document_reference(&id, "../outside.md", None, None, None, false)
             .unwrap_err();
         assert!(matches!(
@@ -2276,7 +2306,14 @@ mod tests {
         std::fs::write(temp.path().join("docs/plan.md"), "# Plan\n")?;
         crate::test_utils::grow_event_log_beyond(&storage, 64 * 1024 * 1024)?;
 
-        executor.add_document_reference(&issue_id, "docs/plan.md", None, None, None, false)?;
+        executor.documents().add_document_reference(
+            &issue_id,
+            "docs/plan.md",
+            None,
+            None,
+            None,
+            false,
+        )?;
 
         assert_eq!(
             storage
