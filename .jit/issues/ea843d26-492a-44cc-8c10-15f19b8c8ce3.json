@@ -8,6 +8,7 @@
   ],
   "description": "Make `IssueIdPrefix::matches` compare a prefix against a candidate issue id without allocating, removing the per-candidate allocation that dominates container-pointer and coverage-label resolution.\n\n## Background\n\n- `IssueIdPrefix::matches` (`crates/jit/src/domain/identity.rs:345-347`) normalises the candidate on every call: `normalise` (`:402-407`) allocates a lowercase, hyphen-free copy of the id before the `starts_with` test. The prefix already holds its own normalised form.\n- Graph evaluation calls it once per candidate issue. `resolve_container` (`crates/jit/src/validation/graph.rs:1090-1101`) tests every issue for each `container-from-label` pointer, from `evaluate_label_coverage` (`:743`) and `graph_rule_plan_source_ids` (`:431`), so resolution is O(pointers × issues) allocations; `label_credits_id` (`:122-143`) calls it for every crediting label (`:129,140`). Storage prefix resolution calls it per listed id (`crates/jit/src/storage/mod.rs:110`).\n- A release-build profile of `jit validate` on this repository attributes about 29% of inclusive time to that normalisation (`dev/active/9876a23a-one-validation-report/investigation.md`, capture part, C4).\n- Matching is covered by the identity property tests (`identity.rs:863-916`) and the container-pointer graph tests (`graph.rs:2320,2473,2515,2548,2583`).\n\n## Success Criteria\n\n- [hard] REQ-01: `IssueIdPrefix::matches` decides whether the prefix names a candidate id without allocating; `resolve_container`, `label_credits_id` and storage prefix resolution keep calling it, and `GraphEvaluationContext` is unchanged.\n- [hard] REQ-02: Every caller resolves exactly as before: unique, ambiguous and unresolved container pointers, crediting labels and storage prefixes, the minimum prefix length included; the existing identity, graph and storage tests pass unchanged.\n- [hard] REQ-03: A property test shows that `matches` agrees with comparing the normalised candidate, for generated ids and for prefixes in any case and hyphenation.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-03T23:55:03.858175059Z",
   "first_ready_at": "2026-11-03T22:11:30.530079292Z",
   "gates_required": [
     "cargo-ci",
@@ -38,7 +39,7 @@
     "satisfies:9876a23a/REQ-07"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Issue-id prefixes match without allocating",
-  "updated_at": "2026-11-03T23:54:47.995942552Z"
+  "updated_at": "2026-11-03T23:55:03.858175059Z"
 }
