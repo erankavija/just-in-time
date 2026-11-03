@@ -21,6 +21,12 @@
       "status": "passed",
       "updated_at": "2026-11-03T23:42:47.570386581Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7b379907-c52a-483b-96e2-2dbc3f39457f",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:45:28.560667913Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "b3a768b3-5d32-4ebb-ab92-9b9854e5b703",
@@ -38,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "One loader parses the issue records",
-  "updated_at": "2026-11-03T23:42:47.570386581Z"
+  "updated_at": "2026-11-03T23:45:28.560667913Z"
 }
