@@ -5,6 +5,12 @@
 //! group declares its leaves once with `command_group!`, which generates the
 //! group's `dispatch` and its `output_schema` lookup; a group joins the schema
 //! by adding that lookup to [`REGISTERED_GROUPS`].
+//!
+//! `main.rs` builds one [`CommandContext`] after bootstrap and gives each
+//! migrated group one arm,
+//! `return group::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr())`;
+//! the returned [`ExitCode`](crate::output::ExitCode) becomes the process
+//! status in `main()`.
 
 use crate::commands::CommandExecutor;
 use crate::output::{ErrorCode, OutputMode, Report};
@@ -33,6 +39,7 @@ pub enum Outcome<R> {
 /// [`crate::CommandSchema::generate`] before its legacy table. Test builds
 /// also register the test-only group, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
+    invariant::output_schema,
     #[cfg(test)]
     test_group::output_schema,
 ];
@@ -62,9 +69,7 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 /// which runs the leaf's handler and renders its outcome through
 /// [`crate::output::emit_outcome`], and `output_schema(cmd_path)`, which
 /// returns the leaf's response schema.
-// Unused outside tests until the first command group migrates onto it; child
-// modules declared below reach it by textual scope.
-#[cfg_attr(not(test), expect(unused_macros))]
+// Child modules declared below reach it by textual scope.
 macro_rules! command_group {
     (
         command: $command:ty,
@@ -96,5 +101,6 @@ macro_rules! command_group {
     };
 }
 
+pub mod invariant;
 #[cfg(test)]
 mod test_group;

@@ -782,10 +782,6 @@ impl CommandSchema {
                 Some(schema_to_value::<crate::commands::ItemListResult>()),
                 "ItemListResult",
             ),
-            "invariant_check" => (
-                Some(schema_to_value::<crate::commands::InvariantCheckResult>()),
-                "InvariantCheckResult",
-            ),
             "project_render" => (
                 Some(schema_to_value::<crate::commands::ProjectRenderResult>()),
                 "ProjectRenderResult",
