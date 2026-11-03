@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "907a38f8-f9d8-4672-bf0a-9aaf2dee18c5",
+      "status": "passed",
+      "updated_at": "2026-11-03T01:31:15.045282403Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c7e7f052-6ed5-479e-8ae9-16523ab1bdf9",
+      "status": "failed",
+      "updated_at": "2026-11-03T01:35:29.034170610Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "becea20a-ff56-4499-8b13-d88ad816448f",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Test-only lease APIs are gone",
-  "updated_at": "2026-11-03T01:16:20.346190136Z"
+  "updated_at": "2026-11-03T01:35:29.034170610Z"
 }
