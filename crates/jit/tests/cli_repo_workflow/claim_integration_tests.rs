@@ -1789,3 +1789,35 @@ fn test_issue_claim_ready_issue_transitions_to_in_progress() {
     assert_eq!(shown["assignee"], "agent:test");
     assert_eq!(shown["state"], "in_progress");
 }
+
+#[test]
+fn test_claim_list_text_marks_a_stale_unexpired_lease_with_its_heartbeat_remedy() {
+    use chrono::{Duration, Utc};
+
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Stale lease"]).unwrap());
+    let silent_since = Utc::now()
+        - Duration::seconds(jit::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64 + 60);
+    let lease = jit::storage::Lease {
+        lease_id: "00000000-0000-4000-8000-0000000000aa".parse().unwrap(),
+        issue_id,
+        agent_id: "agent:silent".parse().unwrap(),
+        worktree_id: "wt:silent".parse().unwrap(),
+        branch: None,
+        ttl_secs: 0,
+        acquired_at: silent_since,
+        expires_at: None,
+        last_beat: silent_since,
+        stale: false,
+    };
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    jit::test_lease_store::plant_lease(&paths.shared_jit, &lease).unwrap();
+
+    cli.command(["claim", "list"]).assert().success().stdout(
+        predicate::str::contains("STALE").and(predicate::str::contains(format!(
+            "jit claim heartbeat {}",
+            lease.lease_id
+        ))),
+    );
+}
