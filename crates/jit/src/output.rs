@@ -1203,21 +1203,7 @@ impl From<ErrorCode> for String {
 /// carrying the offending prefix in `details`. Any other error keeps its `fallback` unchanged, so this
 /// is a no-op for the vast majority of call sites.
 pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
-    if let Some(prefix_error) =
-        error.downcast_ref::<crate::domain::identity::InvalidIdPrefixError>()
-    {
-        return JsonError::new(ErrorCode::InvalidIdPrefix, prefix_error.to_string())
-            .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
-    }
-    if let Some(ambiguous) = error.downcast_ref::<crate::storage::AmbiguousIdError>() {
-        return JsonError::new(ErrorCode::AmbiguousId, ambiguous.to_string()).with_details(
-            serde_json::json!({
-                "prefix": ambiguous.prefix(),
-                "matches": ambiguous.matches(),
-            }),
-        );
-    }
-    fallback
+    failure::id_resolution_error(error).unwrap_or(fallback)
 }
 
 /// Helper to create common error responses
@@ -3745,24 +3731,10 @@ mod tests {
             .collect()
     }
 
+    /// Every error code `main.rs` emits comes from `classify` or a typed `ErrorCode`, never a literal.
     #[test]
-    fn test_emitted_text_error_codes_resolve_without_changing_spelling() {
-        let emitted = emitted_text_error_codes();
-        assert!(
-            !emitted.is_empty(),
-            "the source-derived emitted-code set must not be vacuous"
-        );
-
-        for text in emitted {
-            let code = text
-                .parse::<ErrorCode>()
-                .unwrap_or_else(|_| panic!("emitted code {text} must be registered"));
-            assert_eq!(code.as_str(), text);
-
-            let error = JsonError::new(code, "classification probe");
-            assert_eq!(error.error.code, code);
-            assert_eq!(error.exit_code(), code.exit_code());
-        }
+    fn test_main_emits_no_literal_error_codes() {
+        assert_eq!(emitted_text_error_codes(), BTreeSet::new());
     }
 
     /// The process status is a semantic projection of the typed classification.

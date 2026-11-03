@@ -182,6 +182,26 @@ impl NotFoundError {
     }
 }
 
+/// An addressed item that no scope declares.
+///
+/// The CLI downcasts to this type to classify the failure as
+/// [`ErrorCode::ItemNotFound`](crate::output::ErrorCode::ItemNotFound) without
+/// scanning the message text.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{message}")]
+pub struct ItemNotFoundError {
+    message: String,
+}
+
+impl ItemNotFoundError {
+    /// Build an [`ItemNotFoundError`] carrying the user-facing message verbatim.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
 /// A generic "resource already exists" failure carrying its user-facing message.
 ///
 /// Shared typed carrier for already-exists conditions outside the gate registry
