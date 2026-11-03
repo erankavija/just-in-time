@@ -22972,3 +22972,10 @@
 {"fields":["description"],"id":"ac4f5cbe-3063-4d36-b4f5-38e25e916a09","issue_id":"f0a5b90a-d717-46cc-8cb4-61e24efb187d","timestamp":"2026-11-03T20:29:25.822123200Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["description"],"id":"98642c32-0805-4550-8047-92419b93f0bc","issue_id":"f8a6b298-e6b5-4d62-b73c-3f7b217c1a01","timestamp":"2026-11-03T20:29:26.049265617Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["description"],"id":"9b03366b-ae92-4700-978d-4550773aa3b6","issue_id":"a3a99cf8-5c62-4c91-a890-7404d9cfe9c9","timestamp":"2026-11-03T20:30:33.336066291Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"cargo-ci","id":"3e8b4e6c-8c0f-47dd-a0af-35ac416f7a65","issue_id":"5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e","timestamp":"2026-11-03T20:35:47.979450949Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"f96b2a14-5c92-4d6c-bba1-12edc92f54ae","issue_id":"334c12e7-d454-4a9a-8a4a-5b03a02c3ae7","timestamp":"2026-11-03T20:37:42.242040224Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"a4a6f802-c8e0-4f80-8907-44b528bff79c","issue_id":"5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e","timestamp":"2026-11-03T20:38:40.155319839Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"98dcbccf-631c-4665-b61c-d90ec76972fb","issue_id":"5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e","timestamp":"2026-11-03T20:38:40.631550927Z","to":"done","type":"issue_state_changed"}
+{"id":"5c9e95c9-24cf-4b1a-b0ef-2e3a5024c986","issue_id":"5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e","timestamp":"2026-11-03T20:38:40.631550927Z","type":"issue_completed"}
+{"from":"backlog","id":"3413e7c0-1ee7-4924-8a07-9542e0623bd7","issue_id":"5582e39e-10d5-4079-b81f-47f23a81e45a","timestamp":"2026-11-03T20:38:40.742157774Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"61dc04f6-4b69-4cc4-ad8b-0e2eea0b12e2","issue_id":"b3a768b3-5d32-4ebb-ab92-9b9854e5b703","timestamp":"2026-11-03T20:38:40.821819558Z","to":"ready","type":"issue_state_changed"}
