@@ -6,7 +6,9 @@
 use assert_cmd::prelude::*;
 use jit::domain::identity::IssueId;
 use jit::output::ErrorCode;
+use jit::storage::worktree_paths::WorktreePaths;
 use jit::test_cli::JitCli;
+use jit::test_lease_store::{lease_path, read_lease};
 use predicates::prelude::*;
 use serde_json::Value;
 use std::fs;
@@ -84,18 +86,15 @@ fn test_claim_acquire_uses_selected_linked_worktree_identity_from_primary_cwd() 
         primary_identity["worktree_id"]
     );
 
-    let claims: Value = serde_json::from_slice(
-        &fs::read(primary.root().join(".git/jit/claims.index.json")).unwrap(),
-    )
-    .unwrap();
-    let lease = claims["leases"]
-        .as_array()
+    let paths = WorktreePaths::detect_for_data_root(&linked_store, primary.root()).unwrap();
+    let lease = read_lease(&paths.shared_jit, &parse_issue_id(&issue_id))
         .unwrap()
-        .iter()
-        .find(|lease| lease["issue_id"] == issue_id)
         .expect("selected issue has a lease");
-    assert_eq!(lease["worktree_id"], linked_identity["worktree_id"]);
-    assert_eq!(lease["branch"], linked_branch);
+    assert_eq!(
+        lease.worktree_id.as_str(),
+        linked_identity["worktree_id"].as_str().unwrap()
+    );
+    assert_eq!(lease.branch.as_deref(), Some(linked_branch));
 }
 
 #[test]
@@ -236,7 +235,8 @@ fn test_claim_renew_permission_denied_is_identical_in_plain_and_json_forms() {
     );
     let agent = "agent:permission-probe";
     let lease_id = acquire_lease(&cli, &issue_id, agent);
-    let index_path = cli.root().join(".git/jit/claims.index.json");
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    let index_path = lease_path(&paths.shared_jit, &issue_id);
     let original_mode = fs::metadata(&index_path).unwrap().permissions().mode();
     fs::set_permissions(&index_path, fs::Permissions::from_mode(0o0)).unwrap();
 
@@ -674,7 +674,8 @@ fn test_recover_rebuilds_index_when_claim_log_has_claims_but_index_is_missing() 
     cli.init_git().unwrap().commit("Initial commit").unwrap();
     let issue_id = parse_issue_id(&cli.create_issue(["--title", "Claim log recovery"]).unwrap());
     acquire_lease(&cli, &issue_id, "agent:recovery-test");
-    fs::remove_file(cli.root().join(".git/jit/claims.index.json")).unwrap();
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    fs::remove_file(lease_path(&paths.shared_jit, &issue_id)).unwrap();
 
     let recovered = cli.command(["recover", "--json"]).output().unwrap();
     assert!(recovered.status.success(), "{recovered:?}");

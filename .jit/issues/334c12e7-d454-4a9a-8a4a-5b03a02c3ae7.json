@@ -7,6 +7,7 @@
   ],
   "description": "Makes template application return the issues it created, so `jit apply` reports them without loading each one from storage.\n\n## Background\n\n`apply_template` on the profiles facade (`crates/jit/src/commands/template.rs`) returns `(TemplateApplyResult, Vec<String>)`, whose roles map to created issue ids. `print_apply_result` in `crates/jit/src/main.rs` (called from the `Commands::Apply` arm, or from its handler under `crates/jit/src/dispatch/`) then calls `storage.load_issue(id)` per role to print titles and states. That is a storage call the CLI makes only because the mutation does not hand back what it produced.\n\n## Success Criteria\n\n- [hard] REQ-01: `apply_template` returns, for each role it created, the created `Issue` alongside its role, and its warnings as today.\n- [hard] REQ-02: Rendering the result of `jit apply` makes no storage call; `print_apply_result` (or its replacement) takes the returned issues.\n- [hard] REQ-03: A harness test (`test_apply_template_returns_created_issues_by_role`) shows each returned issue equals the stored issue for its role, and `jit apply` human and JSON output are unchanged with existing suites passing unweakened.\n\n## Notes\n\n- `apply_template_with` follows the same return shape if it shares the result type.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "first_ready_at": "2026-11-02T23:41:30.874497286Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Template application returns the created issues",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-02T23:41:30.874497286Z"
 }

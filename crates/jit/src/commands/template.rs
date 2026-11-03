@@ -92,13 +92,30 @@ pub struct TemplateApplyResult {
     pub anchor_dependency_snapshots: BTreeMap<String, Vec<IssueId>>,
 }
 
+/// Template operations of a [`CommandExecutor`].
+pub struct TemplateOps<'a, S: IssueStore> {
+    exec: &'a CommandExecutor<S>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The template family.
+    pub fn templates(&self) -> TemplateOps<'_, S> {
+        TemplateOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> TemplateOps<'_, S> {
     /// The repository's name for the anchor `jit apply <template> <container>`
     /// binds to its positional `<container>` argument
     /// (`.jit/templates.toml`'s `[anchors] container`, defaulting to
     /// [`DEFAULT_CONTAINER_ANCHOR`](crate::templates::DEFAULT_CONTAINER_ANCHOR)).
     pub fn container_anchor(&self) -> Result<&str> {
-        Ok(self.cached_config()?.templates.anchors.container_anchor())
+        Ok(self
+            .exec
+            .cached_config()?
+            .templates
+            .anchors
+            .container_anchor())
     }
 
     /// Apply a graph template named `template_name` to `container_id`
@@ -160,11 +177,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("template apply", || {
             let (lease_targets, lease_mode) = {
-                let mut session = self.storage.open_mutation_session(layout.clone())?;
+                let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
                 let Some(image) =
                     capture_template_image(&mut *session, &context, &request, container_id)?
                 else {
@@ -187,7 +204,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             };
             let warnings = super::refuse_foreign_leases_read(
-                self.require_worktree_paths()?,
+                self.exec.require_worktree_paths()?,
                 lease_mode,
                 &lease_targets,
             )?
@@ -195,7 +212,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|(_, warning)| warning)
             .collect::<Vec<_>>();
 
-            let mut session = self.storage.open_mutation_session(layout.clone())?;
+            let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
             let Some(image) =
                 capture_template_image(&mut *session, &context, &request, container_id)?
             else {

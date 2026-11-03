@@ -38,6 +38,8 @@ pub mod templates;
 pub mod test_cli;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_harness;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_lease_store;
 pub mod test_mode;
 pub mod test_taxonomy;
 pub mod test_utils;

@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "44b22429-4611-4d33-b08c-12caff2d8b9c",
+      "status": "passed",
+      "updated_at": "2026-11-03T01:11:12.837687373Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ee657077-57ea-4ce0-944b-48811c667ac2",
+      "status": "failed",
+      "updated_at": "2026-11-03T01:15:06.516890198Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "083c9a91-9582-4af5-a38a-bac606392d17",
   "labels": [
     "type:task",
@@ -27,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Claim and recover operations behind a claims facade",
-  "updated_at": "2026-11-02T23:27:20.670244290Z"
+  "updated_at": "2026-11-03T01:15:06.516890198Z"
 }

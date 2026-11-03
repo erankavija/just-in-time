@@ -367,10 +367,8 @@ pub enum MutationIntent {
         /// Prevalidated intra-batch dependency index pairs.
         dependencies: Vec<(usize, usize)>,
     },
-    /// Convergently claim `issue_id` for `agent`. Idempotent over both the
-    /// captured issue assignment and the captured event-log tail: a fully
-    /// reflected claim is a complete no-op; an issue assigned without its claim
-    /// event emits exactly the missing event; a duplicate event is never emitted.
+    /// Assign `issue_id` to `agent` and append `IssueClaimed`, or do nothing when
+    /// the captured issue is already assigned to `agent`.
     ClaimIssue {
         /// Canonical full issue id (the caller resolves short ids first).
         issue_id: IssueId,
@@ -495,14 +493,6 @@ pub enum MutationError {
     /// A referenced issue was absent from the captured image.
     #[error("issue {0} is absent from the captured image")]
     MissingIssue(IssueId),
-    /// The captured `events.jsonl` ends in an uncertified torn tail and this
-    /// mutation carries no profile lifecycle marker to certify it, so appending
-    /// would produce a log the reader rejects.
-    #[error(
-        "captured events.jsonl has an uncertified torn tail and the mutation has no \
-         profile lifecycle marker to certify it; refusing to append (@/inv/event-log)"
-    )]
-    UncertifiedTornTail,
     /// A custom preset failed structural validation; carries the underlying
     /// validator's forwarded message.
     #[error("invalid custom gate preset: {0}")]
@@ -592,38 +582,36 @@ pub fn prefix_has_torn_tail(prefix: &[u8]) -> bool {
     serde_json::from_slice::<serde_json::Value>(final_line).is_err()
 }
 
-/// Compose the bytes appended at the captured log length: add one separator
-/// newline only when the log ends in an unterminated `final_line`, then append each
-/// event line with exactly one trailing newline.
-fn compose_events(final_line: &[u8], lines: &[Vec<u8>]) -> Vec<u8> {
-    let mut out = Vec::new();
-    if !final_line.is_empty() {
-        out.push(b'\n');
-    }
-    for line in lines {
-        out.extend_from_slice(line);
-        out.push(b'\n');
-    }
-    out
+/// Compose the bytes appended at the log's committed length: each event line with
+/// exactly one trailing newline.
+fn compose_events(lines: &[Vec<u8>]) -> Vec<u8> {
+    lines
+        .iter()
+        .flat_map(|line| [line.as_slice(), b"\n"].concat())
+        .collect()
 }
 
-/// The captured event log's length and the bytes after its last newline, from
-/// a whole read or a tail that holds that whole line.
+/// The captured event log's committed length, the end of its last
+/// newline-terminated line, and the uncommitted bytes after it, from a whole read
+/// or a tail that holds that whole line.
 ///
 /// # Errors
 ///
 /// [`CaptureError::TailOnlyCapture`] for a tail that holds only part of the
-/// final line, which cannot say whether that line is torn.
+/// final line, which cannot say where that line starts.
 fn captured_log_end(image: &RepositoryImage) -> Result<(u64, &[u8]), MutationError> {
-    if let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS)? {
-        let final_line = tail
-            .final_line()
-            .ok_or(CaptureError::TailOnlyCapture(VirtualPath::EVENTS))?;
-        return Ok((tail.length(), final_line));
-    }
-    let log = captured_file_bytes(image, &VirtualPath::EVENTS)?.unwrap_or_default();
-    let final_line = log.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
-    Ok((log.len() as u64, final_line))
+    let (length, final_line) =
+        if let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS)? {
+            let final_line = tail
+                .final_line()
+                .ok_or(CaptureError::TailOnlyCapture(VirtualPath::EVENTS))?;
+            (tail.length(), final_line)
+        } else {
+            let log = captured_file_bytes(image, &VirtualPath::EVENTS)?.unwrap_or_default();
+            let final_line = log.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
+            (log.len() as u64, final_line)
+        };
+    Ok((length - final_line.len() as u64, final_line))
 }
 
 /// Read the captured bytes of a `Data(...)` file entry, or `None` when absent.
@@ -646,44 +634,6 @@ fn captured_issue(image: &RepositoryImage, id: &IssueId) -> Result<Option<Issue>
             }
         }),
     }
-}
-
-/// Parse the captured event-log prefix into known events (tolerating one
-/// certified torn tail, matching the read path).
-fn captured_events(image: &RepositoryImage) -> Result<Vec<Event>, MutationError> {
-    let path = VirtualPath::EVENTS;
-    let Some(bytes) = captured_file_bytes(image, &path)? else {
-        return Ok(Vec::new());
-    };
-    let text = std::str::from_utf8(bytes).map_err(|error| MutationError::MalformedRecord {
-        path: path.clone(),
-        reason: error.to_string(),
-    })?;
-    crate::domain::event_log::parse_known_events(text).map_err(|error| {
-        MutationError::MalformedRecord {
-            path: path.clone(),
-            reason: error.to_string(),
-        }
-    })
-}
-
-/// Whether the captured event tail already reflects `agent`'s claim of `issue_id`
-/// as the current assignment: the most recent assignment-affecting event for the
-/// issue is an `IssueClaimed` by `agent` with no later release.
-fn event_tail_reflects_claim(events: &[Event], issue_id: &IssueId, agent: &Assignee) -> bool {
-    events
-        .iter()
-        .rev()
-        .find_map(|event| match event.body() {
-            EventBody::IssueClaimed {
-                issue_id: id,
-                assignee,
-                ..
-            } if id == issue_id => Some(assignee == agent),
-            EventBody::IssueReleased { issue_id: id, .. } if id == issue_id => Some(false),
-            _ => None,
-        })
-        .unwrap_or(false)
 }
 
 /// The single typed-to-byte finalizer for repository-owned records.
@@ -840,26 +790,19 @@ pub(super) fn finalize_delta(
     });
     context.reserve(gate_runs.len());
 
-    // Pass 2: convergent claim upserts (existing issues; no new identifiers).
+    // Pass 2: claims of existing issues; no new identifiers.
     for intent in intents {
         if let MutationIntent::ClaimIssue { issue_id, agent } = intent {
-            let events = captured_events(image)?;
-            let current = captured_issue(image, issue_id)?
+            let mut issue = captured_issue(image, issue_id)?
                 .ok_or_else(|| MutationError::MissingIssue(issue_id.clone()))?;
-            let issue_reflects = current.assignee.as_ref() == Some(agent);
-            let event_reflects = event_tail_reflects_claim(&events, issue_id, agent);
-
-            if !issue_reflects {
+            if issue.assignee.as_ref() != Some(agent) {
                 let now = context.timestamp();
-                let mut issue = current;
                 issue.assignee = Some(agent.clone());
                 if issue.claimed_at.is_none() {
                     issue.claimed_at = Some(now);
                 }
                 issue.updated_at = now;
                 actions.push(write_issue_action(image, &issue)?);
-            }
-            if !event_reflects {
                 pending_events.push(PendingEvent {
                     phase: 1,
                     tag: EventTag::IssueClaimed,
@@ -1118,15 +1061,13 @@ fn dispatch_annotation_event(context: &MutationContext, ordinal: usize) -> Optio
     })
 }
 
-/// Compose the audit-log append action for a set of pending events over the
-/// captured `events.jsonl` length: admit the record the context's dispatch annotation
+/// Compose the audit-log append action for a set of pending events at the captured
+/// `events.jsonl` committed length: admit the record the context's dispatch annotation
 /// contributes, order them canonically, assign identifiers (via the context, in the
-/// caller's frozen allocation order), stamp the single mutation timestamp, certify a
-/// torn tail (a profile lifecycle marker is required, and the certifier is composed
-/// immediately after the torn partial), and produce the appended bytes. Returns `None`
-/// when there are no events. This is the event pass of [`finalize`], factored out so
-/// [`finalize_audit_append`] can reuse the one torn-tail authority — and so the
-/// annotation record reaches both paths from one place.
+/// caller's frozen allocation order), stamp the single mutation timestamp, and produce
+/// the appended bytes. Returns `None` when there are no events. This is the event pass
+/// of [`finalize`], factored out so [`finalize_audit_append`] positions its append the
+/// same way, and so the annotation record reaches both paths from one place.
 fn compose_event_action(
     image: &RepositoryImage,
     context: &MutationContext,
@@ -1143,20 +1084,10 @@ fn compose_event_action(
     if let Some(record) = dispatch_annotation_event(context, pending_events.len()) {
         pending_events.push(record);
     }
-    let (length, final_line) = captured_log_end(image)?;
-    // The finalizer owns torn-tail evidence. The reader (parse_known_events) accepts
-    // a malformed, unterminated partial line only when the line IMMEDIATELY following
-    // it is a profile lifecycle `{ isolated_torn_tail: true }` certifier. Detect this
-    // before sampling time or allocating identifiers.
+    let (committed_length, final_line) = captured_log_end(image)?;
+    // No reader consults the marker's torn-tail flag or its first-line position;
+    // 97f5f2b7 removes both with the field.
     let torn_tail = prefix_has_torn_tail(final_line);
-    let has_marker = pending_events
-        .iter()
-        .any(|pending| matches!(pending.body, EventBody::ProfileLifecycle { .. }));
-    if torn_tail && !has_marker {
-        // Appending non-certifying events after an uncertified torn tail would
-        // produce a log the reader rejects; refuse instead of corrupting it.
-        return Err(MutationError::UncertifiedTornTail);
-    }
 
     let now = context.timestamp();
     // Assign identifiers in canonical event order, stamping the single mutation
@@ -1172,17 +1103,14 @@ fn compose_event_action(
             )
         })
         .collect::<Vec<_>>();
-    // Over a torn tail, the certifying marker must be composed as the line
-    // immediately following the torn partial; the remaining events keep their
-    // canonical order after it.
-    let certifier = torn_tail
+    let marker = torn_tail
         .then(|| {
             events
                 .iter()
                 .position(|event| matches!(event.body(), EventBody::ProfileLifecycle { .. }))
         })
         .flatten();
-    if let Some(marker) = certifier {
+    if let Some(marker) = marker {
         events[..=marker].rotate_right(1);
     }
     let lines = events
@@ -1192,8 +1120,8 @@ fn compose_event_action(
     Ok(Some(RepositoryAction::AppendEvents {
         owner: RepositoryActionOwner::RepositoryStateMutation,
         expected: expected_of(image, &VirtualPath::EVENTS)?,
-        offset: length,
-        bytes: compose_events(final_line, &lines),
+        offset: committed_length,
+        bytes: compose_events(&lines),
     }))
 }
 
@@ -1201,7 +1129,7 @@ fn compose_event_action(
 /// events emitted by a delta the record finalizer does not otherwise build — the
 /// init/profile finalizers, whose deltas also carry asset/registry/record file
 /// actions. Each `(phase, body)` pair is a drafted event body; this resets the context's frozen allocation order, then
-/// assigns identifiers and the single mutation timestamp and certifies a torn tail
+/// assigns identifiers and the single mutation timestamp and positions the append
 /// exactly as [`finalize`] does. Returns `None` when `events` is empty (no append,
 /// no identity or time sampling).
 ///
@@ -1566,10 +1494,7 @@ mod tests {
     /// The events a delta appends, as the event-log reader recovers them.
     fn appended_events(delta: &RepositoryDelta) -> Vec<Event> {
         appended_event_bytes(delta)
-            .map(|bytes| {
-                crate::domain::event_log::parse_known_events(std::str::from_utf8(&bytes).unwrap())
-                    .unwrap()
-            })
+            .map(|bytes| crate::domain::event_log::parse_known_events(&bytes).unwrap())
             .unwrap_or_default()
     }
 
@@ -1686,13 +1611,8 @@ mod tests {
         .expect("an issue creation appends its own events");
 
         assert!(
-            override_records(
-                &crate::domain::event_log::parse_known_events(
-                    std::str::from_utf8(&unannotated).unwrap()
-                )
-                .unwrap()
-            )
-            .is_empty(),
+            override_records(&crate::domain::event_log::parse_known_events(&unannotated).unwrap())
+                .is_empty(),
             "an invocation with no override in effect emits no override record"
         );
         assert!(
@@ -1713,18 +1633,12 @@ mod tests {
             Some(agent.clone()),
         );
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = crate::test_utils::stamped_event(
-            EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
-            "e",
-            fixed_instant(),
-        );
-        let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
             (
                 VirtualPath::issue_record(&issue.id),
                 file_entry(&issue_bytes),
             ),
-            (VirtualPath::EVENTS, file_entry(&events_bytes)),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
         ]);
         let context = MutationContext::with_annotation(
             IdAuthority::random(),
@@ -1763,11 +1677,12 @@ mod tests {
         RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), BTreeMap::new()).unwrap()
     }
 
-    /// An append over a log read as its tail lands at the log's length and
-    /// expects that tail, with no whole-log digest behind it.
+    /// An audit append over a log read as its tail lands at the log's committed
+    /// length and expects that tail, with no whole-log digest behind it.
     #[test]
-    fn test_event_append_over_a_tail_read_offsets_at_its_length_and_expects_the_tail() {
-        let log = b"{}\n".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
+    fn test_event_append_over_a_tail_read_offsets_at_its_committed_length_and_expects_the_tail() {
+        let committed = b"{}\n".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
+        let log = [committed.as_slice(), b"{\"parti"].concat();
         let tail = crate::repository_state::EventLogTail::of_bytes(&log);
         let image = tail_image(tail.clone());
 
@@ -1781,7 +1696,7 @@ mod tests {
         else {
             unreachable!("an audit append appends to the event log");
         };
-        assert_eq!(offset, log.len() as u64);
+        assert_eq!(offset, committed.len() as u64);
         assert_eq!(
             expected,
             ExpectedPreimage::FileTail {
@@ -1791,8 +1706,8 @@ mod tests {
         );
     }
 
-    /// A tail whose window starts inside the final line cannot say whether that
-    /// line is torn, so the composer refuses it rather than guess.
+    /// A tail whose window starts inside the final line cannot say where that
+    /// line starts, so the composer refuses it rather than guess the offset.
     #[test]
     fn test_event_append_refuses_a_tail_that_does_not_hold_the_final_line() {
         let window = crate::repository_state::EVENT_LOG_TAIL_WINDOW;
@@ -1821,9 +1736,7 @@ mod tests {
         let RepositoryAction::AppendEvents { bytes, .. } = &action else {
             unreachable!("an audit append appends to the event log");
         };
-        let events =
-            crate::domain::event_log::parse_known_events(std::str::from_utf8(bytes).unwrap())
-                .unwrap();
+        let events = crate::domain::event_log::parse_known_events(bytes).unwrap();
         assert_eq!(
             override_records(&events).len(),
             1,
@@ -2046,71 +1959,22 @@ mod tests {
         );
     }
 
+    /// An assignment made outside jit leaves no claim event behind, and a claim
+    /// does not repair one.
     #[test]
-    fn test_claim_noop_when_issue_and_event_reflect_claim_samples_nothing() {
-        let agent: Assignee = "agent:worker-1".parse().unwrap();
-        let issue = seeded_issue(
-            &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111),
-            Some(agent.clone()),
-        );
-        let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = crate::test_utils::stamped_event(
-            EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
-            "e",
-            fixed_instant(),
-        );
-        let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
-        let image = image_with(vec![
-            (
-                VirtualPath::issue_record(&issue.id),
-                file_entry(&issue_bytes),
-            ),
-            (VirtualPath::EVENTS, file_entry(&events_bytes)),
-        ]);
-        // The shared clock proves the no-op samples no time.
-        let context = MutationContext::new(
-            IdAuthority::from_seed([9u8; 32]),
-            Box::new(PanicMutationClock),
-        );
-        let delta = finalize(
-            &layout(),
-            &image,
-            &context,
-            &[MutationIntent::ClaimIssue {
-                issue_id: issue.id.clone(),
-                agent,
-            }],
-        )
-        .unwrap();
-        assert!(
-            delta.delta().actions().is_empty(),
-            "fully reflected claim is a no-op"
-        );
-    }
-
-    #[test]
-    fn test_noop_claim_production_authority_draws_no_id_and_no_time() {
-        // The strongest no-op guarantee: with a real production random authority
-        // and a clock that panics on use, a fully-reflected claim acquire draws
-        // neither the random source (the seed stays undrawn) nor the clock.
+    fn test_finalize_claim_of_issue_already_assigned_outside_jit_appends_nothing() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
         let issue = seeded_issue(
             &crate::test_utils::issue_id(0x4444_4444_8444_4444_4444_4444_4444_4444),
             Some(agent.clone()),
         );
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = crate::test_utils::stamped_event(
-            EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
-            "e",
-            fixed_instant(),
-        );
-        let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
             (
                 VirtualPath::issue_record(&issue.id),
                 file_entry(&issue_bytes),
             ),
-            (VirtualPath::EVENTS, file_entry(&events_bytes)),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
         ]);
         let context = MutationContext::new(IdAuthority::random(), Box::new(PanicMutationClock));
         let plan = finalize(
@@ -2123,46 +1987,57 @@ mod tests {
             }],
         )
         .unwrap();
-        assert!(
-            plan.delta().actions().is_empty(),
-            "fully reflected claim emits no bytes"
-        );
+        assert!(plan.delta().actions().is_empty());
         assert!(
             context.ids.sampled_seed().is_none(),
-            "a no-op acquire must not draw the production random seed"
+            "a no-op claim draws no identifier"
         );
     }
 
+    /// The decision follows the assignee alone: a tail no parser accepts changes
+    /// neither outcome.
     #[test]
-    fn test_claim_missing_event_only_emits_event() {
+    fn test_finalize_claim_decides_from_the_assignee_over_an_unparseable_log_tail() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
-        // Issue already assigned but the event log is empty (crash after save).
-        let issue = seeded_issue(
-            &crate::test_utils::issue_id(0x2222_4222_8222_2222_2222_2222_2222_2222),
-            Some(agent.clone()),
-        );
-        let issue_bytes = serialize_issue(&issue).unwrap();
-        let image = image_with(vec![
-            (
-                VirtualPath::issue_record(&issue.id),
-                file_entry(&issue_bytes),
-            ),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-        ]);
-        let delta = finalize(
-            &layout(),
-            &image,
-            &ctx(),
-            &[MutationIntent::ClaimIssue {
-                issue_id: issue.id.clone(),
-                agent,
-            }],
-        )
-        .unwrap();
-        // Exactly one action: the missing events.jsonl append. No issue rewrite.
-        assert_eq!(delta.delta().actions().len(), 1);
-        let action = &delta.delta().actions()[0];
-        assert_eq!(action.path(), &VirtualPath::EVENTS);
+        let tail = crate::repository_state::EventLogTail::of_bytes(b"not an event\n");
+        let claim = |assignee: Option<Assignee>| {
+            let issue = seeded_issue(
+                &crate::test_utils::issue_id(0x2222_4222_8222_2222_2222_2222_2222_2222),
+                assignee,
+            );
+            let mut spec =
+                CaptureSpec::new([VirtualPath::issue_record(&issue.id)], budget()).unwrap();
+            spec.discover_tail(VirtualPath::EVENTS).unwrap();
+            let entries = BTreeMap::from([
+                (
+                    VirtualPath::issue_record(&issue.id),
+                    file_entry(&serialize_issue(&issue).unwrap()),
+                ),
+                (
+                    VirtualPath::EVENTS,
+                    RepositoryEntry::FileTail {
+                        tail: tail.clone(),
+                        mode: FileMode::Regular,
+                    },
+                ),
+            ]);
+            let image =
+                RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), BTreeMap::new())
+                    .unwrap();
+            finalize(
+                &layout(),
+                &image,
+                &ctx(),
+                &[MutationIntent::ClaimIssue {
+                    issue_id: issue.id,
+                    agent: agent.clone(),
+                }],
+            )
+            .unwrap()
+        };
+
+        assert!(claim(Some(agent.clone())).delta().actions().is_empty());
+        assert_eq!(claim(None).delta().actions().len(), 2);
     }
 
     #[test]
@@ -2677,7 +2552,7 @@ mod tests {
     }
 
     #[test]
-    fn test_finalize_appends_at_the_captured_log_length_reading_as_the_whole_log_composition() {
+    fn test_finalize_appends_at_the_committed_length_leaving_every_line_terminated() {
         let prior = serialize_event(&crate::test_utils::stamped_event(
             EventBody::draft_gate_definition_created("prior".parse().unwrap()),
             "e0",
@@ -2685,7 +2560,8 @@ mod tests {
         ))
         .unwrap();
         let terminated = [prior.as_slice(), b"\n"].concat();
-        // A valid final line longer than the tail window, read back to its start.
+        let torn = [terminated.as_slice(), b"{\"parti"].concat();
+        // Final lines longer than the tail window, read back to their start.
         let long = serialize_event(&crate::test_utils::stamped_event(
             EventBody::draft_gate_definition_created(
                 "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize)
@@ -2696,48 +2572,51 @@ mod tests {
             fixed_instant(),
         ))
         .unwrap();
-        let long_log = [terminated.as_slice(), &long].concat();
-        let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_log));
+        let long_valid = [terminated.as_slice(), &long].concat();
+        let long_torn = [
+            terminated.as_slice(),
+            &vec![b'x'; 2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize],
+        ]
+        .concat();
+        let tail = |log: Vec<u8>| {
+            let image = tail_image(crate::repository_state::EventLogTail::of_bytes(&log));
+            (log, image)
+        };
+        let whole = |log: Vec<u8>| {
+            let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&log))]);
+            (log, image)
+        };
         let record = MutationIntent::RecordEvent {
             phase: 0,
             event: Box::new(EventBody::draft_gate_definition_created(
                 "cargo-ci".parse().unwrap(),
             )),
         };
-        let whole = |log: Vec<u8>| {
-            let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&log))]);
-            (log, image)
-        };
-        let cases = [Vec::new(), terminated, prior.clone()].map(whole);
-        for (log, image) in cases.into_iter().chain([(long_log, long_image)]) {
+        let cases = [Vec::new(), terminated.clone(), prior.clone(), torn]
+            .map(whole)
+            .into_iter()
+            .chain([long_valid, long_torn].map(tail));
+        for (log, image) in cases {
             let (offset, appended) = event_append(&image, std::slice::from_ref(&record));
 
-            assert_eq!(
-                offset,
-                log.len() as u64,
-                "the offset is the captured length"
+            let committed = log
+                .iter()
+                .rposition(|byte| *byte == b'\n')
+                .map_or(0, |newline| newline + 1);
+            assert_eq!(offset, committed as u64, "log {log:?}");
+            let result = [&log[..committed], &appended].concat();
+            assert!(
+                result.ends_with(b"\n") && !appended.starts_with(b"\n"),
+                "no separator, and every line is terminated: {result:?}"
             );
-            let unterminated = !log.is_empty() && !log.ends_with(b"\n");
             assert_eq!(
-                appended.first() == Some(&b'\n'),
-                unterminated,
-                "exactly an unterminated final line earns a leading separator"
-            );
-            let whole = [log.as_slice(), &appended].concat();
-            let read =
-                crate::domain::event_log::parse_known_events(std::str::from_utf8(&whole).unwrap())
-                    .unwrap();
-            let prior_events =
-                crate::domain::event_log::parse_known_events(std::str::from_utf8(&log).unwrap())
-                    .unwrap();
-            let new_events = crate::domain::event_log::parse_known_events(
-                std::str::from_utf8(&appended).unwrap(),
-            )
-            .unwrap();
-            assert_eq!(
-                read,
-                [prior_events, new_events].concat(),
-                "the log read after the append is the captured events then the appended ones"
+                crate::domain::event_log::parse_known_events(&result).unwrap(),
+                [
+                    crate::domain::event_log::parse_known_events(&log).unwrap(),
+                    crate::domain::event_log::parse_known_events(&appended).unwrap(),
+                ]
+                .concat(),
+                "the log read after the append is the committed events then the appended ones"
             );
         }
     }
@@ -2765,63 +2644,31 @@ mod tests {
         [serialize_event(&event).unwrap().as_slice(), b"\n{\"parti"].concat()
     }
 
-    /// A captured events.jsonl whose final line is a malformed, unterminated tail.
-    fn torn_tail_image() -> RepositoryImage {
-        image_with(vec![(VirtualPath::EVENTS, file_entry(&torn_log()))])
-    }
-
     #[test]
-    fn test_finalize_rejects_markerless_append_over_torn_tail() {
-        // A batch with no profile lifecycle certifier appended after an uncertified
-        // torn tail would produce a log the reader rejects, so finalize refuses and
-        // composes nothing, also when the torn line is longer than the tail window.
-        let window = crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize;
-        let long_torn = [torn_log().as_slice(), &vec![b'x'; 2 * window]].concat();
-        let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_torn));
-        for image in [torn_tail_image(), long_image] {
-            let event = EventBody::draft_gate_definition_created("cargo-ci".parse().unwrap());
-            let result = finalize(
-                &layout(),
-                &image,
-                &ctx(),
-                &[MutationIntent::RecordEvent {
-                    phase: 0,
-                    event: Box::new(event),
-                }],
-            );
-            assert!(matches!(result, Err(MutationError::UncertifiedTornTail)));
-        }
-    }
-
-    #[test]
-    fn test_finalize_certifier_over_torn_tail_is_the_first_appended_line() {
-        let (offset, appended) = event_append(
-            &torn_tail_image(),
-            &[MutationIntent::RecordEvent {
-                phase: 0,
-                event: Box::new(profile_lifecycle_marker()),
-            }],
+    fn test_finalize_orders_the_stamped_marker_first_over_a_torn_tail() {
+        let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&torn_log()))]);
+        let record = |event| MutationIntent::RecordEvent {
+            phase: 0,
+            event: Box::new(event),
+        };
+        let (_, appended) = event_append(
+            &image,
+            &[
+                record(EventBody::draft_gate_definition_created(
+                    "cargo-ci".parse().unwrap(),
+                )),
+                record(profile_lifecycle_marker()),
+            ],
         );
 
-        assert_eq!(offset, torn_log().len() as u64);
-        let first_line = std::str::from_utf8(&appended)
-            .unwrap()
-            .strip_prefix('\n')
-            .and_then(|text| text.lines().next())
-            .expect("a separator ends the torn partial, then the certifier follows");
+        let events = crate::domain::event_log::parse_known_events(&appended).unwrap();
         assert!(matches!(
-            serde_json::from_str::<Event>(first_line).unwrap().body(),
+            events[0].body(),
             EventBody::ProfileLifecycle {
                 isolated_torn_tail: true,
                 ..
             }
         ));
-        let whole = [torn_log().as_slice(), &appended].concat();
-        assert!(
-            crate::domain::event_log::parse_known_events(std::str::from_utf8(&whole).unwrap())
-                .is_ok(),
-            "the reader accepts the certified log"
-        );
     }
 
     #[test]

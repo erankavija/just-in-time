@@ -416,7 +416,7 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
         .collect::<Result<Vec<_>>>()?;
 
     let mut event_count = 0;
-    if let Some(events) = read_text(read, &VirtualPath::EVENTS.repository_relative())? {
+    if let Some(events) = read(&VirtualPath::EVENTS.repository_relative())? {
         event_count = parse_known_events(&events)
             .context(RepositoryJudgedInvalid(format!(
                 "invalid {}",

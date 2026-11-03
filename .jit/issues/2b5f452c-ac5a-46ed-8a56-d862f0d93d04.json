@@ -3,7 +3,6 @@
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
-    "5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e",
     "6ba4f623-99fb-420a-9c47-3f3655db3815"
   ],
   "description": "Make the validation capture return the records it already parsed, so the report and the divergence view read them instead of parsing the index and every issue again.\n\n## Background\n\n- `capture_proposed_base_inner` (`crates/jit/src/commands/validate.rs:365-513`) parses every issue during capture to plan the closure (`:478-498`) and returns the image with those issues; `capture_base_reading` (`:211-238`) keeps the issues only for document-reference discovery and returns the image alone.\n- `capture_validation_report` (`:547-586`) then builds `CapturedValidation::from_image`, which parses the records again, and `captured_divergences` (`:706-741`) parses them a third time through the records loader.\n- Capture parses the overlay-effective bytes before the overlay is applied, which equals a parse of the overlaid image.\n\n## Success Criteria\n\n- [hard] REQ-01: The validation capture returns a `CapturedValidation` holding the records it parsed, and the CLI validation path, `--fix` repair planning and the divergence view read those records; on this path the index and each issue record are parsed once.\n- [hard] REQ-02: `captured_divergences` derives divergences from the captured records and parses nothing.\n- [hard] REQ-03: Output is unchanged: the validation, divergence and repair suites pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
@@ -27,5 +26,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Validation capture hands its parsed records to the report",
-  "updated_at": "2026-10-21T20:31:36.831219070Z"
+  "updated_at": "2026-11-02T23:39:57.863206263Z"
 }

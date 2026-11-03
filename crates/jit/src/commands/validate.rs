@@ -376,8 +376,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 .chain(extra_paths.iter().cloned()),
             )?;
             spec.discover_listings([VirtualPath::ISSUES])?;
-            // A mutation appends to the log, so it reads the log's length and
-            // tail; validation parses it, so it reads it whole.
+            // A mutation appends at the log's committed length, so it reads the
+            // log's length and tail; validation parses it, so it reads it whole.
             match mutation {
                 true => spec.discover_tail(VirtualPath::EVENTS)?,
                 false => spec.discover_paths([VirtualPath::EVENTS])?,
