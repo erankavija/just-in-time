@@ -3,11 +3,11 @@
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "0851fae4-245b-4e07-bd81-3f61da54dbf2",
-    "2117739f-f6b9-4b39-9dbd-f3deb7a0885e"
+    "1630015d-101d-4e1b-bc3a-da1026998588"
   ],
   "description": "Make every caller of the gate-run record path constructor pass the run's issue, so the per-issue layout later changes only the constructor's body.\n\n## Background\n\nThe semantic-types epic makes `VirtualPath::gate_run_record(&GateRunId)` the only builder of a run record path, replacing `gate_run_result_relative_path` (`crates/jit/src/repository_state/mutation.rs:512-520`) and its spellings at `storage/gate_runs.rs:34-38` and `commands/mod.rs:2863-2871`. Its callers are the finalizer's gate-run pass (`mutation.rs:1052-1095`), the evaluation and precheck new-run captures (`commands/gate_check.rs:860`, `commands/mod.rs:2863-2871`), the latest-run captures, both backends' loaders, the storage reference projection (`storage/reference.rs:462,797`), the tracker-written paths test (`gate_execution.rs:705,1127`) and the corrupt-run CLI test (`tests/cli_gate/gate_cli_integration_test.rs:169-200`). Every caller has the run's issue at hand.\n\n## Success Criteria\n\n- [hard] REQ-01: `VirtualPath::gate_run_record` takes `(&IssueId, &GateRunId)`, and every caller passes the run's issue. The produced path is unchanged; the issue argument is `gate-run-flat-path-bridge`, an interim step whose removal is the per-issue layout.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
+  "first_ready_at": "2026-11-02T23:40:36.438082872Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,10 +22,11 @@
     "component:storage",
     "component:gates",
     "per:@/charter/D-19",
-    "satisfies:f8a6b298/REQ-01"
+    "satisfies:f8a6b298/REQ-01",
+    "resolution:merged-into-1630015d"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "The gate-run record path constructor takes the run's issue",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-02T23:41:47.860467071Z"
 }

@@ -136,16 +136,16 @@ impl Serialize for CapturedBytes {
 
 /// Bytes at the end of a file a [`ReadMode::Tail`] capture keeps at least.
 ///
-/// A byte window rather than the last complete line: the event log's torn-tail
-/// protocol admits an incomplete final line, so its end is not a line boundary.
+/// A byte window rather than the last complete line: the event log can end in an
+/// uncommitted, unterminated line, so its end is not a line boundary.
 pub const EVENT_LOG_TAIL_WINDOW: u64 = 4096;
 
 /// A file's exact length with its last `min(length, window)` bytes, reaching
 /// back to the newline before the final line when that line starts earlier.
 ///
 /// The tail is bounded by the final line, never by the file's history: it
-/// holds that line whole, so [`final_line`](Self::final_line) can judge
-/// whether it is torn.
+/// holds that line whole, so [`final_line`](Self::final_line) determines the
+/// log's committed length, the end of its last newline-terminated line.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct EventLogTail {
     length: u64,
@@ -1242,7 +1242,8 @@ pub enum RepositoryAction {
         owner: RepositoryActionOwner,
         expected: ExpectedPreimage,
     },
-    /// Write `bytes` into the event log at `offset`, the length its capture read.
+    /// Write `bytes` into the event log at `offset`, the committed length its
+    /// capture read.
     AppendEvents {
         owner: RepositoryActionOwner,
         expected: ExpectedPreimage,

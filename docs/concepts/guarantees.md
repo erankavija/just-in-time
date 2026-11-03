@@ -103,7 +103,8 @@ partially written replacement (`crates/jit/src/storage/atomic_write.rs`).
 replacing it, as the
 [storage format reference](../reference/storage-format.md#publication-and-recovery)
 specifies. The record is applied under the repository
-write lock and `.events.lock`; event readers take the same lock shared
+write lock and `.events.lock`; reading events takes no lock, since a final line
+still being written is ignored
 (`crates/jit/src/storage/json.rs`).
 
 **Multi-agent safety:**
@@ -632,7 +633,7 @@ JIT is designed with isolation and fault tolerance:
   indefinite lease is not auto-evicted and remains until a heartbeat,
   `jit claim release`, or `jit claim force-evict`. Either way the issue stays
   assigned until `jit issue release` or `jit issue unassign` clears its assignee
-- Malformed `events.jsonl` line → event *reads* fail fast with a parse error (never silently skipped); issue operations, which read only the log's length and final line, keep working, while a claim, which parses the log to reflect it, fails with a malformed-record error
+- Malformed newline-terminated `events.jsonl` line → event *reads* fail fast with a parse error naming the line (an unterminated final line is an uncommitted append, which they ignore); issue operations, which read only the log's length and final line, keep working, while a claim, which parses the log to reflect it, fails with a malformed-record error
 
 **✓ No cascading failures:**
 

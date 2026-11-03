@@ -3,7 +3,6 @@
   "context": {},
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
-    "d0d73bef-4ef9-4777-bdc3-73c4e0e98ce1",
     "d9ba0029-2a1b-4b1b-a408-11035f534c1e",
     "eaca3f52-ed73-4127-8a5f-829aa5d2ca72",
     "f56bad8d-92e6-43a1-91f5-972ff56c7734"
@@ -30,5 +29,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Archive preview runs the execute planner read-only",
-  "updated_at": "2026-10-24T21:23:33.397610257Z"
+  "updated_at": "2026-11-02T23:39:57.282194299Z"
 }
