@@ -1539,7 +1539,10 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         let image = self.exec.capture_validation_image()?;
-        plan_content_with_issues(&image, &super::captured_active_issues(&image)?, emit_for)
+        // Undecodable issue records yield no plan content; `validate_repository`
+        // reports them.
+        let all_issues = super::captured_active_issues(&image).unwrap_or_default();
+        plan_content_with_issues(&image, &all_issues, emit_for)
     }
 
     /// Run the declarative rule set (`.jit/rules.toml`) as a per-issue or
