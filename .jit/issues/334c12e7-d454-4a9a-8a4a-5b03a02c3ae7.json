@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8158bd77-d352-4baf-9c5d-d810269e6db2",
+      "status": "passed",
+      "updated_at": "2026-11-03T20:37:42.242040224Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "334c12e7-d454-4a9a-8a4a-5b03a02c3ae7",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Template application returns the created issues",
-  "updated_at": "2026-11-03T20:28:37.502578750Z"
+  "updated_at": "2026-11-03T20:37:42.242040224Z"
 }

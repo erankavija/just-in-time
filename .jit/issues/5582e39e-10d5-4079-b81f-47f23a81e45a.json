@@ -27,7 +27,7 @@
     "satisfies:f8a6b298/REQ-13"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Mutations capture the event log's end, not the whole log",
-  "updated_at": "2026-11-02T23:40:48.531361743Z"
+  "updated_at": "2026-11-03T20:38:40.742157774Z"
 }
