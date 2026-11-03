@@ -396,6 +396,16 @@ impl VirtualPath {
     /// records, and the index holding the tombstones.
     pub const RECORDS: [Self; 4] = [Self::ISSUES, Self::EVENTS, Self::GATE_RUNS, Self::INDEX];
 
+    /// Data-root paths holding history: the event log, the gate-run records, and
+    /// the redo scratch directory, which can hold appended event bytes.
+    pub fn history_paths() -> [String; 3] {
+        [
+            Self::EVENTS.relative().as_str().to_owned(),
+            Self::GATE_RUNS.relative().as_str().to_owned(),
+            RECORD_SCRATCH_DIR.to_owned(),
+        ]
+    }
+
     /// Whether profile application must refuse this target as application-owned state.
     pub(crate) fn is_reserved_application_target(&self) -> bool {
         self == &Self::EVENTS

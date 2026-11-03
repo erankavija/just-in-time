@@ -95,10 +95,11 @@ mod tests {
             evaluation_stability: crate::domain::GateEvaluationStability::Stable,
         };
 
+        let issue_id = result.issue_id.clone();
         let run_id = record_gate_run(&temp, &storage, result, 1);
 
         // Load result
-        let loaded = storage.load_gate_run_result(&run_id).unwrap();
+        let loaded = storage.load_gate_run_result(&issue_id, &run_id).unwrap();
         assert_eq!(loaded.run_id, run_id);
         assert_eq!(loaded.gate_key.as_str(), "unit-tests");
         assert_eq!(loaded.status, GateRunStatus::Passed);
@@ -236,8 +237,9 @@ mod tests {
             evaluation_stability: crate::domain::GateEvaluationStability::Stable,
         };
 
+        let issue_id = result.issue_id.clone();
         let run_id = record_gate_run(&temp, &storage, result, 1);
-        let loaded = storage.load_gate_run_result(&run_id).unwrap();
+        let loaded = storage.load_gate_run_result(&issue_id, &run_id).unwrap();
 
         assert!(loaded.commit.is_none());
         assert!(loaded.branch.is_none());
