@@ -6,8 +6,11 @@ use clap::{CommandFactory, Parser};
 use jit::cli::Cli;
 use jit::domain::identity::IssueId;
 use jit::repository_state::{FileMode, VirtualPath};
+use jit::storage::claim_coordinator::Lease;
+use jit::storage::worktree_paths::WorktreePaths;
 use jit::storage::{PutFile, RedoRecord};
 use jit::test_cli::JitCli;
+use jit::test_lease_store::{history_path, lease_path, plant_lease};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::process::Output;
@@ -683,6 +686,46 @@ fn test_strict_lease_holder_writes_its_own_leased_issue() {
     let repo = Repo::new();
 
     assert_ok(&repo.run(OWNER, &["dep", "rm", &repo.x, &repo.z]));
+}
+
+#[test]
+fn test_strict_lease_enforced_mutation_leaves_the_claims_log_unchanged() {
+    let repo = Repo::new();
+    let paths = WorktreePaths::detect_for_data_root(&repo.cli.root().join(".jit"), repo.cli.root())
+        .unwrap();
+    let y: IssueId = repo.y.parse().unwrap();
+    let acquired_at = chrono::Utc::now() - chrono::Duration::hours(1);
+    plant_lease(
+        &paths.shared_jit,
+        &Lease {
+            lease_id: "00000000-0000-4000-8000-0000000000e1".parse().unwrap(),
+            issue_id: y.clone(),
+            agent_id: OTHER.parse().unwrap(),
+            worktree_id: "lapsed-worktree".parse().unwrap(),
+            branch: None,
+            ttl_secs: 60,
+            acquired_at,
+            expires_at: Some(acquired_at + chrono::Duration::seconds(60)),
+            last_beat: acquired_at,
+            stale: false,
+        },
+    )
+    .unwrap();
+    let stored = || {
+        [
+            history_path(&paths.shared_jit),
+            lease_path(&paths.shared_jit, &y),
+        ]
+        .map(|path| std::fs::read(path).unwrap())
+    };
+    let before = stored();
+
+    for id in [&repo.x, &repo.y] {
+        assert_ok(&repo.run(OWNER, &["issue", "update", id, "--priority", "high"]));
+        assert_eq!(repo.record(id)["priority"], "high");
+    }
+
+    assert_eq!(stored(), before);
 }
 
 #[test]
