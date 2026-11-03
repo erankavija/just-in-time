@@ -106,6 +106,11 @@ impl crate::storage::RepositoryMutationSession for LimitedCaptureSession {
     > {
         self.inner.apply(plan)
     }
+    fn read_history_log(
+        &mut self,
+    ) -> std::result::Result<Option<Vec<u8>>, crate::storage::RepositoryStateStoreError> {
+        self.inner.read_history_log()
+    }
 }
 
 /// Seed one issue record without invoking a

@@ -1,6 +1,9 @@
 //! Whether stored records decode and reproduce through their writer's serializer.
 //!
 //! A record that decodes but does not reproduce loses data at its next rewrite.
+//! The event log is judged from its whole bytes: an unparseable log is one
+//! finding naming the line, and a parseable one reports each line that does not
+//! reproduce and each event id on more than one line.
 
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::GateRunId;
@@ -13,11 +16,12 @@ use anyhow::Result;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-/// One message per stored record that does not reproduce. What fails to parse
-/// or is absent from `image` is the records pass's finding.
+/// One message per stored record that does not decode or reproduce, over
+/// `image`'s records, `gate_runs`' runs and the event log's whole `events`.
 pub(crate) fn record_drift(
     image: &RepositoryImage,
     gate_runs: &RepositoryImage,
+    events: Option<&[u8]>,
 ) -> Result<Vec<String>> {
     let report = |path: &VirtualPath, check: Result<Option<String>>| {
         check
@@ -47,9 +51,7 @@ pub(crate) fn record_drift(
             Ok(report(&path, check))
         })
         .collect::<Result<Vec<_>>>()?;
-    let events = image
-        .file_bytes(&VirtualPath::EVENTS)?
-        .map_or_else(Vec::new, event_log_drift);
+    let events = events.map_or_else(Vec::new, event_log_drift);
     Ok(issues
         .into_iter()
         .chain(runs)
@@ -102,10 +104,12 @@ fn gate_run_drift(id: &GateRunId, bytes: &[u8]) -> Result<Option<String>> {
     })
 }
 
-/// Every committed line reproduces its bytes and every event id names one line.
+/// Every committed line parses and reproduces its bytes, and every event id
+/// names one line.
 fn event_log_drift(bytes: &[u8]) -> Vec<String> {
-    let Ok(events) = parse_known_events(bytes) else {
-        return Vec::new();
+    let events = match parse_known_events(bytes) {
+        Ok(events) => events,
+        Err(error) => return vec![error.to_string()],
     };
     let ids = events
         .iter()
@@ -258,6 +262,17 @@ mod tests {
         let log = format!("{line}\n{}", line.replacen(':', ": ", 1));
 
         assert_eq!(event_log_drift(log.as_bytes()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_event_log_drift_reports_an_unparseable_log_as_one_finding_naming_its_line() {
+        let line = event_line(EventTag::ALL[0]);
+        let log = format!("{line}\nnot json\n{line}\n");
+
+        let drift = event_log_drift(log.as_bytes());
+
+        assert_eq!(drift.len(), 1, "{drift:?}");
+        assert!(drift[0].contains("line 2"), "{drift:?}");
     }
 
     #[test]
