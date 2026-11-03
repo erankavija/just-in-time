@@ -11,6 +11,7 @@ use crate::domain::{Issue, Priority, State};
 use crate::storage::{InMemoryStorage, IssueStore};
 
 pub mod git;
+pub mod image;
 
 /// Test harness that provides isolated environment for each test
 pub struct TestHarness {
