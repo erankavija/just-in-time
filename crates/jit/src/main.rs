@@ -6791,53 +6791,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         } else if leases.is_empty() {
                             println!("No active leases found.");
                         } else {
-                            use chrono::Utc;
                             println!("Active leases ({}):\n", leases.len());
                             for lease in &leases {
-                                println!("Lease: {}", lease.lease_id);
-                                println!("  Issue:    {}", lease.issue_id);
-                                println!("  Agent:    {}", lease.agent_id);
-                                println!("  Worktree: {}", lease.worktree_id);
-                                if let Some(branch) = &lease.branch {
-                                    println!("  Branch:   {}", branch);
-                                }
-                                println!("  Acquired: {}", lease.acquired_at);
-
-                                if lease.ttl_secs > 0 {
-                                    // Finite lease - show expiry and remaining time
-                                    if let Some(expires_at) = lease.expires_at {
-                                        let now = Utc::now();
-                                        let remaining = expires_at.signed_duration_since(now);
-                                        println!(
-                                            "  Expires:  {} ({} seconds remaining)",
-                                            expires_at,
-                                            remaining.num_seconds().max(0)
-                                        );
-                                    }
-                                } else {
-                                    // Indefinite lease - show last beat and time since
-                                    let now = Utc::now();
-                                    let since_beat = now.signed_duration_since(lease.last_beat);
-                                    println!("  TTL:      indefinite");
-                                    println!(
-                                        "  Last beat: {} ({} seconds ago)",
-                                        lease.last_beat,
-                                        since_beat.num_seconds()
-                                    );
-
-                                    // Show stale status
-                                    if lease.stale {
-                                        println!(
-                                            "  STALE: Lease marked stale (no heartbeat for {} minutes)",
-                                            since_beat.num_minutes()
-                                        );
-                                        println!(
-                                            "     Use 'jit claim heartbeat {}' to refresh",
-                                            lease.lease_id
-                                        );
-                                    }
-                                }
-                                println!();
+                                print_lease(lease);
                             }
                         }
                     }
@@ -6865,41 +6821,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         } else if leases.is_empty() {
                             println!("No active leases.");
                         } else {
-                            use chrono::Utc;
                             println!("All active leases ({}):\n", leases.len());
                             for lease in &leases {
-                                println!("Lease: {}", lease.lease_id);
-                                println!("  Issue:    {}", lease.issue_id);
-                                println!("  Agent:    {}", lease.agent_id);
-                                println!("  Worktree: {}", lease.worktree_id);
-                                if let Some(branch) = &lease.branch {
-                                    println!("  Branch:   {}", branch);
-                                }
-                                println!("  Acquired: {}", lease.acquired_at);
-
-                                if lease.ttl_secs > 0 {
-                                    // Finite lease
-                                    if let Some(expires_at) = lease.expires_at {
-                                        let now = Utc::now();
-                                        let remaining = expires_at.signed_duration_since(now);
-                                        println!(
-                                            "  Expires:  {} ({} seconds remaining)",
-                                            expires_at,
-                                            remaining.num_seconds().max(0)
-                                        );
-                                    }
-                                } else {
-                                    // Indefinite lease
-                                    let now = Utc::now();
-                                    let since_beat = now.signed_duration_since(lease.last_beat);
-                                    println!("  TTL:      indefinite");
-                                    println!(
-                                        "  Last beat: {} ({} seconds ago)",
-                                        lease.last_beat,
-                                        since_beat.num_seconds()
-                                    );
-                                }
-                                println!();
+                                print_lease(lease);
                             }
                         }
                     }
@@ -7186,6 +7110,49 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Render one lease for plain-text `claim status` and `claim list`.
+fn print_lease(lease: &jit::storage::Lease) {
+    let now = chrono::Utc::now();
+    println!("Lease: {}", lease.lease_id);
+    println!("  Issue:    {}", lease.issue_id);
+    println!("  Agent:    {}", lease.agent_id);
+    println!("  Worktree: {}", lease.worktree_id);
+    if let Some(branch) = &lease.branch {
+        println!("  Branch:   {}", branch);
+    }
+    println!("  Acquired: {}", lease.acquired_at);
+
+    if lease.ttl_secs > 0 {
+        if let Some(expires_at) = lease.expires_at {
+            let remaining = expires_at.signed_duration_since(now);
+            println!(
+                "  Expires:  {} ({} seconds remaining)",
+                expires_at,
+                remaining.num_seconds().max(0)
+            );
+        }
+    } else {
+        let since_beat = now.signed_duration_since(lease.last_beat);
+        println!("  TTL:      indefinite");
+        println!(
+            "  Last beat: {} ({} seconds ago)",
+            lease.last_beat,
+            since_beat.num_seconds()
+        );
+        if lease.stale {
+            println!(
+                "  STALE: Lease marked stale (no heartbeat for {} minutes)",
+                since_beat.num_minutes()
+            );
+            println!(
+                "     Use 'jit claim heartbeat {}' to refresh",
+                lease.lease_id
+            );
+        }
+    }
+    println!();
 }
 
 #[cfg(test)]
