@@ -1,7 +1,7 @@
 {
   "epic_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "epic_short_id": "df129d9e",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -389,7 +389,7 @@
           "short_id": "abe555e9",
           "title": "Library-side command handler contract",
           "classification": "implementation",
-          "status": "in_progress (dispatched at base 7333a5f7a)",
+          "status": "done (merged 968119b03, rework merged e106ff343; code-review R1 failed F1: test group not in the real registry; rework 1 registers it under cfg(test); R2 passed)",
           "vendor": "claude",
           "model_tier": "opus",
           "tier_reason": "contract-setting: every handler migration copies it"
@@ -400,7 +400,7 @@
           "short_id": "2e0f276b",
           "title": "Issue mutations return the updated issue",
           "classification": "implementation",
-          "status": "in_progress (dispatched at base 7333a5f7a)",
+          "status": "done (merged 6c0549aba; Codex stopped on IssueId vs IssueIdPrefix, lead decision plan D-31; one post-merge call site fixed by a Haiku worker; cargo-ci, code-review passed)",
           "vendor": "codex",
           "model_tier": "gpt-6-astra",
           "tier_reason": "return-shape change over seven mutations; alternation"
@@ -411,7 +411,7 @@
           "short_id": "22189592",
           "title": "Classify document path-read failures by variant",
           "classification": "implementation",
-          "status": "in_progress (dispatched at base 7333a5f7a)",
+          "status": "done (merged d11ed6ed8; doc history/diff missing-document code also becomes DOCUMENT_NOT_FOUND; cargo-ci, code-review passed)",
           "vendor": "claude",
           "model_tier": "sonnet",
           "tier_reason": "new error code, generated reference, CLI contract change"
@@ -914,10 +914,13 @@
       "a3a99cf8": -98,
       "8b7f2973": 0,
       "334c12e7": -10,
-      "d05b5639": -1
+      "d05b5639": -1,
+      "abe555e9": 114,
+      "2e0f276b": 1,
+      "22189592": 3
     },
-    "epic_total": -357,
-    "head_lines": 9026,
-    "head_rev": "572d8b13a"
+    "epic_total": -239,
+    "head_lines": 9111,
+    "head_rev": "b5bd434e8"
   }
 }
