@@ -3,7 +3,6 @@
 use super::*;
 use crate::domain::identity::{GateKey, IssueIdPrefix};
 use crate::errors::{DeletionNotConfirmedError, TransitionBlocker};
-use crate::storage::StorageWarning;
 
 /// How `update_issue` should apply a new description value.
 ///
@@ -755,12 +754,12 @@ impl<S: IssueStore> IssueOps<'_, S> {
 
     /// Claim an issue for `assignee`.
     ///
-    /// Returns the persisted issue; the claim observes no storage warnings.
+    /// Returns the persisted issue.
     pub fn claim_issue(
         &self,
         id: &IssueIdPrefix,
         assignee: crate::domain::Assignee,
-    ) -> Result<IssueMutation<StorageWarning>>
+    ) -> Result<IssueMutation>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -814,7 +813,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         &self,
         assignee: crate::domain::Assignee,
         filter: Option<String>,
-    ) -> Result<IssueMutation<StorageWarning>>
+    ) -> Result<IssueMutation>
     where
         S: crate::storage::RepositoryStateStore,
     {
