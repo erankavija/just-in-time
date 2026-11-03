@@ -65,6 +65,7 @@ fn test_add_document_reference_logs_issue_updated_event() {
     let id = h.create_issue("Doc add event");
 
     h.executor
+        .documents()
         .add_document_reference(&id, "docs/spec.md", None, None, None, true)
         .unwrap();
 
@@ -77,10 +78,12 @@ fn test_remove_document_reference_logs_issue_updated_event() {
     let id = h.create_issue("Doc remove event");
 
     h.executor
+        .documents()
         .add_document_reference(&id, "docs/spec.md", None, None, None, true)
         .unwrap();
 
     h.executor
+        .documents()
         .remove_document_reference(&id, "docs/spec.md")
         .unwrap();
 
@@ -105,6 +108,7 @@ fn test_add_document_reference_same_path_updates_in_place() {
 
     let (first, _) = h
         .executor
+        .documents()
         .add_document_reference(&id, "docs/spec.md", None, None, None, true)
         .unwrap();
     assert!(
@@ -114,6 +118,7 @@ fn test_add_document_reference_same_path_updates_in_place() {
 
     let (second, _) = h
         .executor
+        .documents()
         .add_document_reference(&id, "docs/spec.md", None, None, None, true)
         .unwrap();
     assert!(
@@ -121,7 +126,11 @@ fn test_add_document_reference_same_path_updates_in_place() {
         "re-add of an already-linked path must be flagged updated"
     );
 
-    let listed = h.executor.list_document_references(&id).unwrap();
+    let listed = h
+        .executor
+        .documents()
+        .list_document_references(&id)
+        .unwrap();
     assert_eq!(
         listed.items.len(),
         1,
@@ -136,6 +145,7 @@ fn test_add_document_reference_same_path_identical_is_noop() {
     let id = h.create_issue("Doc re-add event tag");
 
     h.executor
+        .documents()
         .add_document_reference(&id, "docs/spec.md", None, None, None, true)
         .unwrap();
     assert_last_event_is_documents_update(&h, &id, "doc-add");
@@ -143,6 +153,7 @@ fn test_add_document_reference_same_path_identical_is_noop() {
     let issue_before = h.storage.load_issue(&id).unwrap();
     let events_before = h.storage.read_events().unwrap();
     h.executor
+        .documents()
         .add_document_reference(&id, "docs/spec.md", None, None, None, true)
         .unwrap();
     let issue_after = h.storage.load_issue(&id).unwrap();
@@ -157,6 +168,7 @@ fn test_add_document_reference_same_path_refreshes_given_metadata() {
     let id = h.create_issue("Doc re-add metadata refresh");
 
     h.executor
+        .documents()
         .add_document_reference(
             &id,
             "docs/spec.md",
@@ -169,6 +181,7 @@ fn test_add_document_reference_same_path_refreshes_given_metadata() {
 
     let (result, _) = h
         .executor
+        .documents()
         .add_document_reference(
             &id,
             "docs/spec.md",
@@ -184,7 +197,11 @@ fn test_add_document_reference_same_path_refreshes_given_metadata() {
     assert_eq!(result.document.doc_type.as_deref(), Some("spec"));
     assert_last_event_is_documents_update(&h, &id, "doc-update");
 
-    let listed = h.executor.list_document_references(&id).unwrap();
+    let listed = h
+        .executor
+        .documents()
+        .list_document_references(&id)
+        .unwrap();
     assert_eq!(listed.items.len(), 1);
     assert_eq!(listed.items[0].label.as_deref(), Some("Final"));
 }
@@ -195,6 +212,7 @@ fn test_add_document_reference_same_path_refreshes_pin_preserves_metadata() {
     let id = h.create_issue("Doc re-add metadata preserved");
 
     h.executor
+        .documents()
         .add_document_reference(
             &id,
             "docs/spec.md",
@@ -212,6 +230,7 @@ fn test_add_document_reference_same_path_refreshes_pin_preserves_metadata() {
     // workflow: refresh the link after the document changed).
     let (result, _) = h
         .executor
+        .documents()
         .add_document_reference(&id, "docs/spec.md", None, None, None, true)
         .unwrap();
 
@@ -229,13 +248,19 @@ fn test_add_document_reference_new_path_appends() {
     let id = h.create_issue("Doc add distinct paths");
 
     h.executor
+        .documents()
         .add_document_reference(&id, "docs/spec.md", None, None, None, true)
         .unwrap();
     h.executor
+        .documents()
         .add_document_reference(&id, "docs/other.md", None, None, None, true)
         .unwrap();
 
-    let listed = h.executor.list_document_references(&id).unwrap();
+    let listed = h
+        .executor
+        .documents()
+        .list_document_references(&id)
+        .unwrap();
     assert_eq!(listed.items.len(), 2, "distinct paths must both be kept");
 
     let paths: Vec<&str> = listed.items.iter().map(|d| d.path.as_str()).collect();
@@ -288,6 +313,7 @@ fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
     std::fs::write(temp.path().join("docs/working.png"), b"working only").unwrap();
 
     let (result, warnings) = executor
+        .documents()
         .add_document_reference(&id, "docs/guide.md", Some(&revision), None, None, false)
         .unwrap();
 
@@ -320,6 +346,7 @@ fn test_add_document_captures_an_asset_closure_of_many_named_assets() {
 
     let (result, _warnings) = h
         .executor
+        .documents()
         .add_document_reference(&id, "docs/guide.md", None, None, None, false)
         .unwrap();
 
@@ -352,6 +379,7 @@ fn test_add_document_rejects_malformed_utf8_without_writes() {
     let events_before = storage.read_events().unwrap();
 
     let error = executor
+        .documents()
         .add_document_reference(&id, "docs/guide.md", None, None, None, false)
         .unwrap_err();
 

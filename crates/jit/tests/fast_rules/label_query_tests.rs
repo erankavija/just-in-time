@@ -11,7 +11,7 @@ fn test_query_by_label_invalid_pattern() {
     let executor = memory_executor(storage);
 
     // Invalid pattern (no colon)
-    let result = executor.query_by_label("invalidlabel");
+    let result = executor.queries().query_by_label("invalidlabel");
     assert!(result.is_err());
     assert!(result
         .unwrap_err()
@@ -49,9 +49,10 @@ fn test_search_issues_with_filters_namespace_wildcard_matches_query_by_label_set
 
     let pattern = "type:*".to_string();
     let searched = executor
+        .queries()
         .search_issues_with_filters("", None, None, None, std::slice::from_ref(&pattern))
         .unwrap();
-    let queried = executor.query_by_labels(&[pattern]).unwrap();
+    let queried = executor.queries().query_by_labels(&[pattern]).unwrap();
 
     let ids = |issues: &[jit::domain::Issue]| {
         let mut ids: Vec<IssueId> = issues.iter().map(|i| i.id.clone()).collect();
@@ -70,6 +71,7 @@ fn test_search_issues_with_filters_wildcard_still_applies_text_query() {
     create_labeled(&executor, "Billing note", &["area:billing"]);
 
     let results = executor
+        .queries()
         .search_issues_with_filters("billing", None, None, None, &["type:*".to_string()])
         .unwrap();
 
@@ -84,6 +86,7 @@ fn test_search_issues_with_filters_malformed_pattern_is_invalid_label_pattern() 
     // labels as well as malformed wildcards; `labels` owns the full matrix.
     for bad in ["type", ":*", "type:", "type:a:b"] {
         let error = executor
+            .queries()
             .search_issues_with_filters("", None, None, None, &[bad.to_string()])
             .unwrap_err();
         assert!(

@@ -180,7 +180,7 @@ fn derive_issue_deletion(
 
 /// Issue lifecycle operations of a [`CommandExecutor`].
 pub struct IssueOps<'a, S: IssueStore> {
-    exec: &'a CommandExecutor<S>,
+    pub(super) exec: &'a CommandExecutor<S>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -321,7 +321,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
 
     /// Build the [`IssueShowResponse`](crate::output::IssueShowResponse) for one
     /// already-loaded issue: enriched dependencies, gate runs, and the
-    /// documents every reader reports ([`CommandExecutor::issue_documents`]).
+    /// documents every reader reports ([`DocumentOps::issue_documents`]).
     pub fn show_response(&self, issue: Issue) -> Result<crate::output::IssueShowResponse> {
         let enriched_deps = self.get_dependencies_enriched(&issue);
         let gate_runs = self
@@ -329,7 +329,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .gates()
             .list_gate_runs(&issue.id, None)
             .with_context(|| format!("Failed to load gate runs for issue {}", issue.id))?;
-        let documents = self.exec.issue_documents(&issue)?;
+        let documents = self.exec.documents().issue_documents(&issue)?;
         Ok(crate::output::IssueShowResponse {
             documents,
             ..crate::output::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs)

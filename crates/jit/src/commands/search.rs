@@ -2,9 +2,9 @@
 
 use super::*;
 
-impl<S: IssueStore> CommandExecutor<S> {
+impl<S: IssueStore> QueryOps<'_, S> {
     pub fn search_issues(&self, query: &str) -> Result<Vec<Issue>> {
-        let issues = self.storage.list_issues()?;
+        let issues = self.exec.storage.list_issues()?;
         let query_lower = query.to_lowercase();
 
         let results = issues

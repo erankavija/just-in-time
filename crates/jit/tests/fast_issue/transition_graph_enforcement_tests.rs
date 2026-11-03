@@ -750,7 +750,7 @@ fn test_bulk_update_blocked_by_enforcing_done_graph_rule() {
     use jit::commands::UpdateOperations;
     use jit::query_engine::QueryFilter;
 
-    let mut executor = memory_executor_declaring(
+    let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
             config: Some(""),
@@ -767,7 +767,10 @@ fn test_bulk_update_blocked_by_enforcing_done_graph_rule() {
         state: Some(State::Done),
         ..Default::default()
     };
-    let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, false)
+        .unwrap();
 
     assert_eq!(result.summary.total_matched, 1);
     assert_eq!(
@@ -807,7 +810,7 @@ severity = "error"
 enforce = false
 assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 "#;
-    let mut executor = memory_executor_declaring(
+    let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
             config: Some(""),
@@ -824,7 +827,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         state: Some(State::Done),
         ..Default::default()
     };
-    let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, false)
+        .unwrap();
 
     assert_eq!(result.summary.total_matched, 1);
     assert_eq!(
@@ -866,7 +872,7 @@ fn test_bulk_update_force_bypasses_enforcing_done_graph_rule() {
     use jit::commands::UpdateOperations;
     use jit::query_engine::QueryFilter;
 
-    let mut executor = memory_executor_declaring(
+    let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
             config: Some(""),
@@ -883,7 +889,10 @@ fn test_bulk_update_force_bypasses_enforcing_done_graph_rule() {
         state: Some(State::Done),
         ..Default::default()
     };
-    let result = executor.apply_bulk_update(&filter, &ops, true).unwrap();
+    let result = executor
+        .issues()
+        .apply_bulk_update(&filter, &ops, true)
+        .unwrap();
 
     assert_eq!(result.summary.total_modified, 1);
     assert_eq!(result.summary.total_errors, 0);
