@@ -89,25 +89,25 @@
       "issues": [
         {
           "short_id": "977d01d8",
-          "status": "dispatched",
+          "status": "landed 5e0ca8825; gates running",
           "worker": "codex gpt-6-astra xhigh",
           "worker_reason": "small residue + tests"
         },
         {
           "short_id": "ea843d26",
-          "status": "dispatched",
+          "status": "landed b1017884c; cargo-ci passed; code-review running",
           "worker": "codex gpt-6-astra xhigh",
           "worker_reason": "local allocation-free match"
         },
         {
           "short_id": "b3a768b3",
-          "status": "dispatched",
+          "status": "landed 9b6397f43; gates running",
           "worker": "claude opus",
           "worker_reason": "produces parsed-records contract"
         },
         {
           "short_id": "f968dfe1",
-          "status": "dispatched",
+          "status": "rework 1 done; resolving merge conflict with b3a768b3",
           "worker": "claude opus",
           "worker_reason": "produces plan-document-resolver contract"
         }
@@ -148,6 +148,10 @@
     {
       "short_id": "2a10917d",
       "note": "standalone, user-approved: code-review context states commit ancestry; under milestone 9db27a3a; not part of this epic"
+    },
+    {
+      "short_id": "14f49a28",
+      "note": "standalone, user ruling: M8 package-content check assembles outside the repo (docs-mechanical was broken by the target/ symlink); landed 7f255bf7a, docs-mechanical passed"
     }
   ],
   "escalations": [
@@ -179,7 +183,7 @@
       "to": "just-in-time-6a",
       "at": "2026-11-04",
       "subject": "docs-mechanical M8 fails: jit profile pack refuses symlinked target/",
-      "status": "open"
+      "status": "resolved: 14f49a28 (a2) landed 7f255bf7a"
     }
   ],
   "rework_counts": {
@@ -204,5 +208,6 @@
   "plan_reviews": {
     "plan-review 2df01664": "passed after amendment (0 findings)",
     "breakdown-review de9a7557": "passed on rerun after restoring ea843d26 -> de9a7557 (2 advisory findings, no change)"
-  }
+  },
+  "worker_policy": "User 2026-11-04: Codex gpt-6-luna, gpt-6.1-sol and gpt-6-astra plus Claude, liberally. Host quiet window: no new dispatch from 03:30 EET, no builds from 03:55 until just-in-time-6a releases; workers wait on 88's cargo-hold file."
 }
