@@ -428,7 +428,8 @@
   "rework_counts": {
     "becea20a": 1,
     "f9bf70a5": 1,
-    "dd53527f": 2
+    "dd53527f": 2,
+    "2117739f": 1
   },
   "surfaced_pitfalls": [
     {
@@ -569,6 +570,11 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "external v1-release bug assigned to this lead by user ruling; unblocks a7314585"
+    },
+    {
+      "id": "2117739f-r1",
+      "vendor": "lead",
+      "reason": "code-review F1: accessor must check the loaded run gate_key; one-line filter + test"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",

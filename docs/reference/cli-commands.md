@@ -3349,7 +3349,8 @@ opens ([Publication and Recovery](storage-format.md#publication-and-recovery)),
 then run the repair routines in sequence: repair declaration-derived state
 through the `jit validate --fix` path; in a Git repository, clear claim locks
 left by dead processes (checked by PID), rebuild the claims index from its
-append-only log, and evict expired leases; and remove orphaned `*.tmp` files
+append-only log, evict expired leases, and reclaim indefinite leases whose
+heartbeat is [stale](claim.md#staleness); and remove orphaned `*.tmp` files
 under `.jit/` older than the [cleanup threshold](runtime-defaults.md).
 
 ```bash
@@ -3358,6 +3359,8 @@ jit recover [--json]
 
 The report counts the leftover redo records the session open applied
 (`redo_records_applied` in JSON, "Redo records applied" in text), at most one.
+It counts expired leases evicted (`expired_leases_evicted`) apart from stale
+indefinite leases reclaimed (`stale_leases_reclaimed`).
 It removes only provably stale data and never the pending redo record, so it is
 safe to run at any time.
 

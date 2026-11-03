@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-11-03T23:48:37.513148592Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1fb644f7-31f9-4e7c-b41f-6fda9b8637ec",
+      "status": "failed",
+      "updated_at": "2026-11-03T23:53:29.772129672Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "2117739f-f6b9-4b39-9dbd-f3deb7a0885e",
@@ -38,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Latest-run readers use the gate-state accessor",
-  "updated_at": "2026-11-03T23:48:37.513148592Z"
+  "updated_at": "2026-11-03T23:53:29.772129672Z"
 }

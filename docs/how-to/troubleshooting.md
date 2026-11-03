@@ -100,7 +100,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 **Solutions:**
 
-1. **Wait for expiration** — A finite lease expires at its TTL and is evicted on the next claim acquisition (an indefinite lease never expires; force-evict it)
+1. **Wait for expiration** — A finite lease expires at its TTL and is evicted on the next claim acquisition (an indefinite lease never expires; once its heartbeat is stale, `jit recover` reclaims it)
 2. **Check who has it:**
    ```bash
    jit claim status --issue abc123
@@ -151,9 +151,9 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
    ```bash
    jit claim release <issue-id>
    ```
-3. **Force evict** if agent is gone:
+3. **Reclaim** if the agent is gone:
    ```bash
-   jit claim force-evict <lease-id> --reason "Agent abandoned"
+   jit recover
    ```
 
 ### Exceeded Indefinite Lease Limit

@@ -489,7 +489,8 @@ then runs, in sequence:
 1. Repair declaration-derived state through the `jit validate --fix` path
 2. In a Git repository, the coordination routines under `.git/jit/`: clear
    claim locks left by dead processes (checked by PID), rebuild the claims index
-   from its append-only log, and evict expired leases. Without Git they are
+   from its append-only log, evict expired leases, and reclaim indefinite
+   leases whose heartbeat is [stale](claim.md#staleness). Without Git they are
    skipped with a warning.
 3. Remove orphaned `*.tmp` files under `.jit/` older than the
    [cleanup threshold](runtime-defaults.md)
@@ -521,6 +522,7 @@ Recovery complete:
   • Stale locks cleaned: 1
   • Index rebuilt: true
   • Expired leases evicted: 2
+  • Stale leases reclaimed: 1
   • Temp files removed: 0
   • Derived-state targets repaired: 0
 ```

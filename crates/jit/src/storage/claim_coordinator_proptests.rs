@@ -343,6 +343,35 @@ proptest! {
     }
 }
 
+// Property 8b: Recovery reclaims exactly the indefinite leases listings report stale
+proptest! {
+    #![proptest_config(io_config())]
+    #[test]
+    fn test_evict_lapsed_reclaims_an_indefinite_lease_iff_it_is_stale(
+        secs_since_beat in 0u64..2 * crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS
+    ) {
+        use crate::storage::clock::FixedClock;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = chrono::Utc::now();
+        let clock = Arc::new(FixedClock::new(base));
+        let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
+        let lease = coordinator.acquire_claim_synchronized(
+            &crate::test_utils::issue_id(54), 0, Some("test lease"),
+            ClaimAcquireLimits::new(1, 1), |_| Ok(()),
+        ).unwrap().0;
+        let now = base + chrono::Duration::seconds(secs_since_beat as i64);
+        clock.set(now);
+        let mut index = coordinator.load_claims_index().unwrap();
+
+        let lapsed = coordinator.evict_lapsed(&mut index).unwrap();
+
+        let stale = lease.is_stale(now);
+        prop_assert_eq!(lapsed.reclaimed == 1, stale);
+        prop_assert_eq!(index.leases.is_empty(), stale);
+    }
+}
+
 // Property 9: Finite leases are never stale (use expiration instead)
 proptest! {
     #[test]
