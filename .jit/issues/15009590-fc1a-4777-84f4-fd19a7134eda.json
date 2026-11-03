@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a69cf207-b8cb-4ab3-b76c-1b01dc1f90f2",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:25:20.474182902Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "15009590-fc1a-4777-84f4-fd19a7134eda",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "The repository-mutation lease check reads through the held lease lock",
-  "updated_at": "2026-11-03T23:11:08.347241432Z"
+  "updated_at": "2026-11-03T23:25:20.474182902Z"
 }
