@@ -2647,43 +2647,34 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         return Ok(());
                     }
 
-                    let jit::commands::IssueMutation {
-                        issue,
-                        warnings: claim_warnings,
-                    } = match executor.issues().claim_issue(&requested, assignee) {
-                        Ok(result) => result,
-                        Err(e) => {
-                            if json {
-                                if let Some(blocked) =
-                                    e.downcast_ref::<jit::errors::TransitionBlockedError>()
-                                {
-                                    let json_error =
-                                        jit::output::JsonError::transition_blocked(blocked);
-                                    println!("{}", json_error.to_json_string()?);
-                                    std::process::exit(json_error.exit_code().code());
+                    let jit::commands::IssueMutation { issue, warnings } =
+                        match executor.issues().claim_issue(&requested, assignee) {
+                            Ok(result) => result,
+                            Err(e) => {
+                                if json {
+                                    if let Some(blocked) =
+                                        e.downcast_ref::<jit::errors::TransitionBlockedError>()
+                                    {
+                                        let json_error =
+                                            jit::output::JsonError::transition_blocked(blocked);
+                                        println!("{}", json_error.to_json_string()?);
+                                        std::process::exit(json_error.exit_code().code());
+                                    }
                                 }
+                                return Err(e);
                             }
-                            return Err(e);
-                        }
-                    };
+                        };
+
+                    for warning in warnings {
+                        output_ctx.print_warning(&warning)?;
+                    }
 
                     if json {
                         let msg = format!("Claimed issue {}", issue.short_id());
-                        // Record echo: the raw stored issue (gate list under the
-                        // storage names) plus the advisory warnings, routed
-                        // through the typed response so the schema stays in
-                        // lockstep with the emission (jit:f40f1b0a).
-                        let response = jit::output::ClaimResponse {
-                            issue,
-                            warnings: claim_warnings,
-                        };
-                        let output = JsonOutput::success(response).with_message(msg);
+                        let output = JsonOutput::success(issue).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Claimed issue: {}", issue.id));
-                        for warning in &claim_warnings {
-                            output_ctx.print_warning(warning)?;
-                        }
                     }
                 }
                 IssueCommands::Unassign { id } => {
@@ -2746,40 +2737,34 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 IssueCommands::ClaimNext { assignee, filter } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let assignee = Assignee::from_str(&assignee)?;
-                    let jit::commands::IssueMutation {
-                        issue,
-                        warnings: claim_warnings,
-                    } = match executor.issues().claim_next(assignee, filter) {
-                        Ok(result) => result,
-                        Err(e) => {
-                            if json {
-                                if let Some(blocked) =
-                                    e.downcast_ref::<jit::errors::TransitionBlockedError>()
-                                {
-                                    let json_error =
-                                        jit::output::JsonError::transition_blocked(blocked);
-                                    println!("{}", json_error.to_json_string()?);
-                                    std::process::exit(json_error.exit_code().code());
+                    let jit::commands::IssueMutation { issue, warnings } =
+                        match executor.issues().claim_next(assignee, filter) {
+                            Ok(result) => result,
+                            Err(e) => {
+                                if json {
+                                    if let Some(blocked) =
+                                        e.downcast_ref::<jit::errors::TransitionBlockedError>()
+                                    {
+                                        let json_error =
+                                            jit::output::JsonError::transition_blocked(blocked);
+                                        println!("{}", json_error.to_json_string()?);
+                                        std::process::exit(json_error.exit_code().code());
+                                    }
                                 }
+                                return Err(e);
                             }
-                            return Err(e);
-                        }
-                    };
+                        };
+
+                    for warning in warnings {
+                        output_ctx.print_warning(&warning)?;
+                    }
 
                     if json {
                         let msg = format!("Claimed issue {}", issue.short_id());
-                        // Same record-echo shape as `issue claim` (jit:f40f1b0a).
-                        let response = jit::output::ClaimResponse {
-                            issue,
-                            warnings: claim_warnings,
-                        };
-                        let output = JsonOutput::success(response).with_message(msg);
+                        let output = JsonOutput::success(issue).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Claimed issue: {}", issue.id));
-                        for warning in &claim_warnings {
-                            output_ctx.print_warning(warning)?;
-                        }
                     }
                 }
                 IssueCommands::List { filters, full } => {

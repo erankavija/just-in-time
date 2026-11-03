@@ -360,17 +360,13 @@ fn test_issue_reject_keeps_storage_gate_fields() {
 }
 
 #[test]
-fn test_issue_claim_keeps_storage_gate_fields_and_carries_warnings() {
+fn test_issue_claim_keeps_storage_gate_fields() {
     let temp = JitCli::with_repository(jit::test_taxonomy::setup_test_repo_with_taxonomy().temp);
     let id = seed_gated_issue(&temp);
     let record = temp
         .run_json(["issue", "claim", &id, "agent:worker-1"])
         .unwrap();
     assert_storage_record(&record, "issue claim");
-    assert!(
-        record.get("warnings").is_some(),
-        "issue claim record carries the advisory warnings array; got: {record}"
-    );
 }
 
 #[test]

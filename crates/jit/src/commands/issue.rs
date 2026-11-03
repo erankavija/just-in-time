@@ -3,7 +3,6 @@
 use super::*;
 use crate::domain::identity::{GateKey, IssueIdPrefix};
 use crate::errors::{DeletionNotConfirmedError, TransitionBlocker};
-use crate::storage::StorageWarning;
 
 /// How `update_issue` should apply a new description value.
 ///
@@ -755,14 +754,12 @@ impl<S: IssueStore> IssueOps<'_, S> {
 
     /// Claim an issue for `assignee`.
     ///
-    /// Returns the persisted issue and any non-fatal [`StorageWarning`]s (e.g. a worktree relocation
-    /// observed while checking leases) so the calling command can surface them
-    /// at its own output boundary; this method never writes to stderr.
+    /// Returns the persisted issue.
     pub fn claim_issue(
         &self,
         id: &IssueIdPrefix,
         assignee: crate::domain::Assignee,
-    ) -> Result<IssueMutation<StorageWarning>>
+    ) -> Result<IssueMutation>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -770,7 +767,12 @@ impl<S: IssueStore> IssueOps<'_, S> {
         // checker success and coordinator evidence cannot be applied to a
         // different captured source state.
         let id = self.exec.storage.resolve_issue_id(id)?;
-        self.exec.publish_captured_claim(&id, assignee)
+        self.exec
+            .publish_captured_claim(&id, assignee)
+            .map(|issue| IssueMutation {
+                issue,
+                warnings: Vec::new(),
+            })
     }
 
     /// Unassign an issue.
@@ -811,7 +813,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         &self,
         assignee: crate::domain::Assignee,
         filter: Option<String>,
-    ) -> Result<IssueMutation<StorageWarning>>
+    ) -> Result<IssueMutation>
     where
         S: crate::storage::RepositoryStateStore,
     {
