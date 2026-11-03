@@ -404,6 +404,7 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
         .unwrap()
         .is_some());
     executor
+        .gates()
         .define_gate(
             &"repo-validate".parse().unwrap(),
             "Repo Validate".to_string(),
@@ -449,7 +450,10 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
             false,
         )
         .unwrap();
-    executor.add_dependency(&container, &upstream).unwrap();
+    executor
+        .graph()
+        .add_dependency(&container, &upstream)
+        .unwrap();
     (executor, container, upstream)
 }
 
