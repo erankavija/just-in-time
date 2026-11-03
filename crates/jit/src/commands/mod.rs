@@ -834,24 +834,24 @@ fn refuse_foreign_leases_held(
     Ok(findings.into_iter().map(|(_, finding)| finding).collect())
 }
 
-/// [`refuse_foreign_leases`] over the leases the claims index holds now, for a
+/// [`refuse_foreign_leases`] over active leases read from storage, for a
 /// command that reaches it without taking the claims lock.
 fn refuse_foreign_leases_read(
     paths: &crate::storage::WorktreePaths,
     mode: crate::config::EnforcementMode,
     targets: &[IssueId],
 ) -> Result<Vec<(IssueId, String)>> {
-    use crate::storage::claim_coordinator::ClaimsIndex;
+    use crate::storage::claim_coordinator::read_active_leases;
 
     if mode == crate::config::EnforcementMode::Off {
         return Ok(Vec::new());
     }
-    let claims = ClaimsIndex::load(paths)?;
     let agent = crate::agent_config::resolve_agent_id(None).ok();
-    let now = chrono::Utc::now();
+    let leases = read_active_leases(paths, chrono::Utc::now())?;
     refuse_foreign_leases(mode, targets, |id| {
-        claims
-            .conflicting_lease(id, agent.as_ref(), now)
+        leases
+            .iter()
+            .find(|lease| &lease.issue_id == id && Some(&lease.agent_id) != agent.as_ref())
             .map(|lease| lease.agent_id.clone())
     })
 }
