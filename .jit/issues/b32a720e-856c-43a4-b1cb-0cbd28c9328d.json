@@ -27,7 +27,7 @@
     "per:@/charter/D-18"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Redo records refuse a rewrite of the event log",
-  "updated_at": "2026-11-02T23:40:51.480119059Z"
+  "updated_at": "2026-11-03T00:24:45.204525562Z"
 }

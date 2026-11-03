@@ -25,7 +25,7 @@
     "per:@/charter/D-18"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Validation captures read only the event log's end",
-  "updated_at": "2026-11-02T23:40:48.100539094Z"
+  "updated_at": "2026-11-03T00:24:45.129608244Z"
 }
