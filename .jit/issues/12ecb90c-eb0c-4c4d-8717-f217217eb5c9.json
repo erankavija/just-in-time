@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "run_id": "55b91d13-27c8-4e0d-8d70-d003c2cfaded",
-      "status": "passed",
-      "updated_at": "2026-10-24T21:29:22.317221515Z",
+      "run_id": "d39fdcb2-fe9a-4b97-9cf6-d3966fd38fbc",
+      "status": "failed",
+      "updated_at": "2026-11-03T21:24:30.254024173Z",
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "done",
   "title": "breakdown: Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-11-03T21:16:36.167973576Z"
+  "updated_at": "2026-11-03T21:24:30.254024173Z"
 }

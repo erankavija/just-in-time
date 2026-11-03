@@ -395,6 +395,14 @@
     {
       "item": "stale-lease visibility under R2; b697a3f7 d3c94dc5, lease-required-error, c517b88b body",
       "status": "pending with user via just-in-time-6a"
+    },
+    {
+      "item": "dd53527f REQ-02 vs satisfies REQ-05 contradiction (code-review x2)",
+      "status": "pending with user via just-in-time-6a"
+    },
+    {
+      "item": "b697a3f7 REQ-04 wording: missing-lease to foreign-lease",
+      "status": "pending with user via just-in-time-6a"
     }
   ],
   "rework_counts": {
@@ -509,11 +517,19 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "code-review F1 identity write in list/status, F2 log replay in lock()"
+    },
+    {
+      "id": "5582e39e",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "capture read-mode sweep across command families"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
   "freeze": "format-4-window: installed jit stays at last format 3 build from the 2117739f landing to the window",
   "notes": [
-    "Dispatch runs ready issues ahead of a held wave 1 remainder, per the user's maximum-parallelism instruction relayed by just-in-time-6a; dependencies still order all work. 2117739f is held to shorten the format freeze."
+    "Dispatch runs ready issues ahead of a held wave 1 remainder, per the user's maximum-parallelism instruction relayed by just-in-time-6a; dependencies still order all work. 2117739f is held to shorten the format freeze.",
+    "just-in-time-a4 may lead 9876a23a (one validation report): coordinate R1 (validate as history reader, 5b0e3d63 landed read_history_log + record_drift bytes) and merge order with it; warn it, 88 and 6a before 2117739f."
   ]
 }
