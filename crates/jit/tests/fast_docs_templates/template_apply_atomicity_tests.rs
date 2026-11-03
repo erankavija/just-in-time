@@ -717,7 +717,15 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
         "agent:holder".parse().unwrap(),
     );
     holder.init().unwrap();
-    holder.acquire_claim(&container, 600).unwrap();
+    holder
+        .acquire_claim_synchronized(
+            &container,
+            600,
+            Some("test lease"),
+            jit::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
+            |_| Ok(()),
+        )
+        .unwrap();
     let resolves_before = store.resolve_calls();
 
     let (_, warnings) = executor

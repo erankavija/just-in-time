@@ -415,6 +415,7 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
 
     let outcome = fresh
         .executor
+        .issues()
         .batch_create_from_json(export.defs.clone())
         .unwrap();
     let map = outcome.as_map();

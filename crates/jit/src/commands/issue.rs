@@ -180,7 +180,7 @@ fn derive_issue_deletion(
 
 /// Issue lifecycle operations of a [`CommandExecutor`].
 pub struct IssueOps<'a, S: IssueStore> {
-    exec: &'a CommandExecutor<S>,
+    pub(super) exec: &'a CommandExecutor<S>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {

@@ -8,12 +8,26 @@
   ],
   "description": "Make every claim unit test and property test acquire and release leases through the entry points commands use, then delete the three lease APIs only tests call.\n\n## Background\n\n`ClaimCoordinator::acquire_claim`, `acquire_claim_with_reason` and `release_lease` (`crates/jit/src/storage/claim_coordinator.rs`) have no production caller. `jit claim acquire` uses `acquire_claim_synchronized`, and `jit claim release` evicts through the claims family's release-by-issue operation. The test-only methods are called by the coordinator tests, by the property tests in `storage/claim_coordinator_proptests.rs` (including the concurrency props through `acquire_claim_when_reached`), and by tests in `commands/claim.rs`, `commands/worktree.rs` and `commands/mod.rs`. The test-only `acquire_claim` evicts and then returns without persisting the eviction.\n\n## Success Criteria\n\n- [hard] REQ-01: Every coordinator test and property test acquires through `acquire_claim_synchronized` and releases through the production release path, and the concurrency property tests race the production acquire.\n- [hard] REQ-02: The property tests still prove exclusive acquisition under concurrency and monotonically increasing sequence numbers.\n- [hard] REQ-03: `ClaimCoordinator::acquire_claim`, `acquire_claim_with_reason` and `release_lease` no longer exist.\n",
   "documents": [],
+  "done_at": "2026-11-03T02:19:07.986638757Z",
   "first_ready_at": "2026-11-02T23:39:52.536325965Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "27ce69af-c12a-4a3f-8b22-06706aeef455",
+      "status": "passed",
+      "updated_at": "2026-11-03T02:15:03.023094096Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "81dd8568-e06a-4bea-a426-75a3d00a4acf",
+      "status": "passed",
+      "updated_at": "2026-11-03T02:19:07.560032529Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "becea20a-ff56-4499-8b13-d88ad816448f",
   "labels": [
     "type:task",
@@ -27,7 +41,7 @@
     "enforces:@/invariant/convention-convergence"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Test-only lease APIs are gone",
-  "updated_at": "2026-11-03T01:16:20.346190136Z"
+  "updated_at": "2026-11-03T02:19:07.986638757Z"
 }

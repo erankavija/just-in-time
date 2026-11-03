@@ -6,7 +6,9 @@ use super::{
     MutationIntent, ProducerError, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
     RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
 };
-use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
+use crate::domain::artifact_execution::{
+    archive_executions, ArchiveExecution, ArchiveExecutionResult, ArchivePublication,
+};
 use crate::domain::artifact_plan::{
     ArtifactAction, ArtifactPlan, ContentIdentity, PlanError, PlanTarget, PlanWarning,
     ReferenceChange, WarningCode,
@@ -28,7 +30,7 @@ pub fn finalize_archive_execution(
         .map_err(ArchiveExecutionError::Plan)?;
     crate::domain::artifact_classifier::validate_proposed_layout(plan)
         .map_err(ArchiveExecutionError::Producer)?;
-    let prior = captured_archive_events(image)?;
+    let prior = archive_executions(&captured_archive_events(image)?);
     let (covered_publications, covered_changes) =
         archive_coverage(&prior, plan.target(), plan.destination_root());
     let mut actions = Vec::new();
@@ -303,12 +305,14 @@ pub fn finalize_archive_execution(
         intents.push(MutationIntent::RecordEvent {
             phase: 2,
             event: Box::new(EventBody::draft_artifact_archive_executed(
-                plan.target().clone(),
-                plan.destination_root().into(),
-                publications.clone(),
-                event_changes.clone(),
-                planned_deletions.clone(),
-                reconciling,
+                ArchiveExecution {
+                    target: plan.target().clone(),
+                    destination_root: plan.destination_root().into(),
+                    publications: publications.clone(),
+                    reference_changes: event_changes.clone(),
+                    planned_deletions: planned_deletions.clone(),
+                    reconciling,
+                },
             )),
         });
     }
@@ -551,33 +555,23 @@ pub enum ArchiveExecutionError {
 }
 
 fn archive_coverage(
-    events: &[Event],
+    executions: &[ArchiveExecution],
     target: &PlanTarget,
     root: &str,
 ) -> (Vec<(String, ContentIdentity)>, Vec<ReferenceChange>) {
-    events
+    executions
         .iter()
-        .filter_map(|event| match event.body() {
-            EventBody::ArtifactArchiveExecuted {
-                target: found,
-                destination_root,
-                publications,
-                reference_changes,
-                ..
-            } if found == target && destination_root == root => {
-                Some((publications, reference_changes))
-            }
-            _ => None,
-        })
+        .filter(|execution| &execution.target == target && execution.destination_root == root)
         .fold(
             (Vec::new(), Vec::new()),
-            |(mut publications, mut changes), (found_publications, found_changes)| {
+            |(mut publications, mut changes), execution| {
                 publications.extend(
-                    found_publications
+                    execution
+                        .publications
                         .iter()
                         .map(|p| (p.destination.clone(), p.content_identity.clone())),
                 );
-                changes.extend(found_changes.iter().cloned());
+                changes.extend(execution.reference_changes.iter().cloned());
                 (publications, changes)
             },
         )
@@ -585,6 +579,32 @@ fn archive_coverage(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_archive_coverage_collects_matching_target_and_root_only() {
+        let target = PlanTarget::Document {
+            path: "a.md".into(),
+        };
+        let executions = [
+            crate::test_utils::archive_execution(target.clone(), "arc", &[("s/1", "arc/1")]),
+            crate::test_utils::archive_execution(target.clone(), "other", &[("s/2", "other/2")]),
+            crate::test_utils::archive_execution(
+                PlanTarget::Document {
+                    path: "b.md".into(),
+                },
+                "arc",
+                &[("s/3", "arc/3")],
+            ),
+            crate::test_utils::archive_execution(target.clone(), "arc", &[("s/4", "arc/4")]),
+        ];
+        let (publications, changes) = archive_coverage(&executions, &target, "arc");
+        let destinations = publications
+            .iter()
+            .map(|(destination, _)| destination.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(destinations, ["arc/1", "arc/4"]);
+        assert!(changes.is_empty());
+    }
+
     use super::*;
     use crate::domain::artifact_plan::{
         ArtifactEdge, ArtifactPlanEntry, ArtifactVersion, EdgeKind, EdgeResolutionMode,

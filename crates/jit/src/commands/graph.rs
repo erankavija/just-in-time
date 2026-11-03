@@ -282,7 +282,7 @@ impl<S: IssueStore> GraphOps<'_, S> {
     }
 
     /// Export the graph in the `batch-create` input schema — the structural
-    /// inverse of [`batch_create_from_json`](CommandExecutor::batch_create_from_json).
+    /// inverse of [`batch_create_from_json`](crate::commands::IssueOps::batch_create_from_json).
     ///
     /// `scope = Some(container)` captures that container's containment subtree;
     /// `scope = None` captures the whole graph. Each in-scope, non-bracket node

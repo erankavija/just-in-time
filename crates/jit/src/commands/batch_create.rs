@@ -215,7 +215,7 @@ impl BatchCreateOutcome {
     }
 }
 
-impl<S: IssueStore> CommandExecutor<S> {
+impl<S: IssueStore> IssueOps<'_, S> {
     /// Run native batch pre-validation without allocating ids or writing state.
     pub fn validate_batch_from_json(&self, defs: &[BatchIssueDef]) -> Result<BatchDryRunOutcome>
     where
@@ -275,7 +275,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///         planning: None,
     ///     },
     /// ];
-    /// let outcome = executor.batch_create_from_json(defs).unwrap();
+    /// let outcome = executor.issues().batch_create_from_json(defs).unwrap();
     /// println!("spec -> {}", outcome.as_map()["spec"]);
     /// ```
     pub fn batch_create_from_json(&self, defs: Vec<BatchIssueDef>) -> Result<BatchCreateOutcome>
@@ -291,7 +291,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .enumerate()
             .map(|(index, def)| (def.key.as_str(), index))
             .collect::<HashMap<_, _>>();
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         let created_issue_ids = batch_issue_ids(&context, defs.len());
         let mut issue_paths = created_issue_ids
@@ -300,25 +300,29 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect::<Vec<_>>();
         issue_paths.push(VirtualPath::ISSUES);
 
-        with_mutation_session(&self.storage, &layout, "batch issue creation", |session| {
-            let Some(crate::commands::validate::MutationBase { image, .. }) =
-                self.capture_mutation_base(session, &issue_paths, None)?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
-            let problems = Self::collect_batch_problems_from_declarations(
-                &defs,
-                &created_issue_ids,
-                &declarations,
-            )?;
-            if !problems.is_empty() {
-                return Err(BatchValidationError { problems }.into());
-            }
-            let dependencies =
-                defs.iter()
-                    .enumerate()
-                    .try_fold(Vec::new(), |mut edges, (dependent, def)| {
+        with_mutation_session(
+            &self.exec.storage,
+            &layout,
+            "batch issue creation",
+            |session| {
+                let Some(crate::commands::validate::MutationBase { image, .. }) = self
+                    .exec
+                    .capture_mutation_base(session, &issue_paths, None)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let declarations = crate::repository_state::declarations_from_image(&image)?;
+                let problems = Self::collect_batch_problems_from_declarations(
+                    &defs,
+                    &created_issue_ids,
+                    &declarations,
+                )?;
+                if !problems.is_empty() {
+                    return Err(BatchValidationError { problems }.into());
+                }
+                let dependencies = defs.iter().enumerate().try_fold(
+                    Vec::new(),
+                    |mut edges, (dependent, def)| {
                         for dependency in &def.depends_on {
                             let dependency =
                                 positions.get(dependency.as_str()).copied().ok_or_else(|| {
@@ -327,48 +331,50 @@ impl<S: IssueStore> CommandExecutor<S> {
                             edges.push((dependent, dependency));
                         }
                         Ok::<_, anyhow::Error>(edges)
-                    })?;
-            let credit = Self::batch_credit_namespaces(&declarations)?;
-            let issue_id_of = |key: &str| {
-                positions
-                    .get(key)
-                    .map(|&index| created_issue_ids[index].clone())
-            };
-            let drafts = defs
-                .iter()
-                .zip(&created_issue_ids)
-                .map(|(def, id)| {
-                    let def = &BatchIssueDef {
-                        labels: resolve_labels(def, &credit, issue_id_of).map_err(|_| {
-                            anyhow!("validated batch contains an unresolved label key")
-                        })?,
-                        ..def.clone()
-                    };
-                    let priority = def.priority.unwrap_or(Priority::Normal);
-                    Ok(Self::batch_candidate_issue(
-                        def,
-                        id.clone(),
-                        priority,
-                        declarations.config(),
-                    ))
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let intents = [MutationIntent::CreateIssueBatch {
-                drafts,
-                dependencies,
-            }];
-            let plan = finalize(&layout, &image, &context, &intents)?;
-            Ok(SessionStep::Apply(
-                plan,
-                BatchCreateOutcome {
-                    key_to_id: defs
-                        .iter()
-                        .map(|def| def.key.clone())
-                        .zip(created_issue_ids.iter().cloned())
-                        .collect(),
-                },
-            ))
-        })
+                    },
+                )?;
+                let credit = Self::batch_credit_namespaces(&declarations)?;
+                let issue_id_of = |key: &str| {
+                    positions
+                        .get(key)
+                        .map(|&index| created_issue_ids[index].clone())
+                };
+                let drafts = defs
+                    .iter()
+                    .zip(&created_issue_ids)
+                    .map(|(def, id)| {
+                        let def = &BatchIssueDef {
+                            labels: resolve_labels(def, &credit, issue_id_of).map_err(|_| {
+                                anyhow!("validated batch contains an unresolved label key")
+                            })?,
+                            ..def.clone()
+                        };
+                        let priority = def.priority.unwrap_or(Priority::Normal);
+                        Ok(Self::batch_candidate_issue(
+                            def,
+                            id.clone(),
+                            priority,
+                            declarations.config(),
+                        ))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let intents = [MutationIntent::CreateIssueBatch {
+                    drafts,
+                    dependencies,
+                }];
+                let plan = finalize(&layout, &image, &context, &intents)?;
+                Ok(SessionStep::Apply(
+                    plan,
+                    BatchCreateOutcome {
+                        key_to_id: defs
+                            .iter()
+                            .map(|def| def.key.clone())
+                            .zip(created_issue_ids.iter().cloned())
+                            .collect(),
+                    },
+                ))
+            },
+        )
     }
 
     /// Collect EVERY pre-validation problem for a batch (does not stop at the
@@ -579,8 +585,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let mut session = self.storage.open_mutation_session(self.require_layout()?)?;
+        let mut session = self
+            .exec
+            .storage
+            .open_mutation_session(self.exec.require_layout()?)?;
         let image = self
+            .exec
             .capture_mutation_base(session.as_mut(), &[], None)?
             .ok_or_else(|| anyhow!("batch validation capture conflicted"))?
             .image;
@@ -686,7 +696,7 @@ mod tests {
             },
         );
         let defs = vec![def("a", &[]), def("a", &[])];
-        let problems = exec.collect_batch_problems(&defs).unwrap();
+        let problems = exec.issues().collect_batch_problems(&defs).unwrap();
         assert!(problems
             .iter()
             .any(|p| matches!(p, BatchValidationProblem::DuplicateKey { key } if key == "a")));
@@ -706,7 +716,7 @@ mod tests {
             },
         );
         let defs = vec![def("a", &["ghost"])];
-        let problems = exec.collect_batch_problems(&defs).unwrap();
+        let problems = exec.issues().collect_batch_problems(&defs).unwrap();
         assert!(problems.iter().any(|p| matches!(
             p,
             BatchValidationProblem::UnknownDependency { key, missing }
@@ -732,7 +742,7 @@ mod tests {
         );
         let mut d = def("a", &[]);
         d.labels = vec!["NoColon".to_string()];
-        let problems = exec.collect_batch_problems(&[d]).unwrap();
+        let problems = exec.issues().collect_batch_problems(&[d]).unwrap();
         assert!(problems.iter().any(
             |p| matches!(p, BatchValidationProblem::WriteValidation { key, .. } if key == "a")
         ));
@@ -762,7 +772,7 @@ mod tests {
         let mut d = def("bad", &[]);
         d.r#type = Some(taxonomy.type_at_level(4).to_string());
         d.labels = vec![format!("type:{}", taxonomy.type_at_level(3))];
-        let problems = exec.collect_batch_problems(&[d]).unwrap();
+        let problems = exec.issues().collect_batch_problems(&[d]).unwrap();
         assert!(problems.iter().any(
             |p| matches!(p, BatchValidationProblem::WriteValidation { key, .. } if key == "bad")
         ));
@@ -783,7 +793,7 @@ mod tests {
         );
         let mut d = def("a", &[]);
         d.gates = vec!["nonexistent-gate".parse().unwrap()];
-        let problems = exec.collect_batch_problems(&[d]).unwrap();
+        let problems = exec.issues().collect_batch_problems(&[d]).unwrap();
         assert!(problems
             .iter()
             .any(|p| matches!(p, BatchValidationProblem::UnknownGate { .. })));
@@ -806,7 +816,7 @@ mod tests {
         );
         let mut d = def("a", &[]);
         d.r#type = Some("widget".to_string());
-        let problems = exec.collect_batch_problems(&[d]).unwrap();
+        let problems = exec.issues().collect_batch_problems(&[d]).unwrap();
         assert!(problems.iter().any(
             |p| matches!(p, BatchValidationProblem::UnknownType { value, .. } if value == "widget")
         ));
@@ -826,7 +836,11 @@ mod tests {
             },
         );
         let defs = vec![def("a", &["b"]), def("b", &[])];
-        assert!(exec.collect_batch_problems(&defs).unwrap().is_empty());
+        assert!(exec
+            .issues()
+            .collect_batch_problems(&defs)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
@@ -843,7 +857,7 @@ mod tests {
             },
         );
         let defs = vec![def("spec", &[]), def("impl", &["spec"])];
-        let outcome = exec.batch_create_from_json(defs).unwrap();
+        let outcome = exec.issues().batch_create_from_json(defs).unwrap();
         let map = outcome.as_map();
         assert_eq!(map.len(), 2);
 
@@ -870,7 +884,7 @@ mod tests {
         );
         let defs = vec![def("spec", &[]), def("impl", &["spec"])];
         let before_events = exec.storage().read_events().unwrap();
-        let outcome = exec.validate_batch_from_json(&defs).unwrap();
+        let outcome = exec.issues().validate_batch_from_json(&defs).unwrap();
 
         assert_eq!(
             outcome,
@@ -899,6 +913,7 @@ mod tests {
                 ..Default::default()
             },
         )
+        .issues()
         .validate_batch_from_json(&[])
         .unwrap();
         assert_eq!(outcome.issue_count, 0);
@@ -944,6 +959,7 @@ mod tests {
                     ..Default::default()
                 },
             )
+            .issues()
             .collect_batch_problems(&case.issues)
             .unwrap()
             .into_iter()
@@ -973,7 +989,7 @@ mod tests {
             },
         );
         let defs = vec![def("a", &[]), def("a", &[])]; // duplicate key
-        let err = exec.batch_create_from_json(defs).unwrap_err();
+        let err = exec.issues().batch_create_from_json(defs).unwrap_err();
         assert!(err.downcast_ref::<BatchValidationError>().is_some());
         // Zero issues created.
         assert_eq!(exec.storage().list_issues().unwrap().len(), 0);
@@ -993,6 +1009,7 @@ mod tests {
             },
         );
         let err = exec
+            .issues()
             .batch_create_from_json(vec![def("a", &["ghost"])])
             .unwrap_err();
         let validation = err.downcast_ref::<BatchValidationError>().unwrap();
@@ -1040,6 +1057,7 @@ mod tests {
         task.labels = vec!["satisfies:{story.short_id}/REQ-01".to_string()];
 
         let map = exec
+            .issues()
             .batch_create_from_json(vec![story, task])
             .unwrap()
             .as_map();
@@ -1077,7 +1095,10 @@ mod tests {
         );
         let mut task = def("task", &[]);
         task.labels = vec!["satisfies:{ghost.short_id}/REQ-01".to_string()];
-        let err = exec.batch_create_from_json(vec![task]).unwrap_err();
+        let err = exec
+            .issues()
+            .batch_create_from_json(vec![task])
+            .unwrap_err();
         let validation = err.downcast_ref::<BatchValidationError>().unwrap();
         assert!(validation.problems.iter().any(|problem| matches!(
             problem,
@@ -1101,7 +1122,7 @@ mod tests {
             },
         );
         let defs = vec![def("a", &["b"]), def("b", &["a"])];
-        let err = exec.batch_create_from_json(defs).unwrap_err();
+        let err = exec.issues().batch_create_from_json(defs).unwrap_err();
         let verr = err.downcast_ref::<BatchValidationError>().unwrap();
         let cycle = verr
             .problems

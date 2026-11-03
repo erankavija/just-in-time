@@ -541,12 +541,13 @@ fn run_profile_apply(
     };
     let results = profile_result(
         executor
+            .profiles()
             .select_profiles(&selectors, &options)
             .and_then(|selection| {
                 if dry_run {
-                    executor.plan_profiles(&selection)
+                    executor.profiles().plan_profiles(&selection)
                 } else {
-                    executor.apply_profiles(&selection)
+                    executor.profiles().apply_profiles(&selection)
                 }
             }),
         json,
@@ -1369,7 +1370,9 @@ fn run_query_all<S: IssueStore>(
         .as_ref()
         .map(|p| Priority::from_str(p))
         .transpose()?;
-    let issues = executor.query_all(state_filter, assignee, priority_filter, &label)?;
+    let issues = executor
+        .queries()
+        .query_all(state_filter, assignee, priority_filter, &label)?;
 
     if json {
         use jit::domain::MinimalIssue;
@@ -1734,7 +1737,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         let selectors = parse_profile_selectors(profile, json)?;
         let assignments = parse_profile_variable_assignments(set, json)?;
         let selection = profile_result(
-            executor.select_profiles(
+            executor.profiles().select_profiles(
                 &selectors,
                 &ProfileVariableOptions {
                     values_file: values_file.clone(),
@@ -1753,13 +1756,16 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         // plain re-init onto it asserts `.gitattributes` exactly like a fresh or
         // profiled init, closing the prior re-init gap.
         let init_result = profile_result(
-            executor.initialize_fresh_repository(&current_dir, Some(&selection)),
+            executor
+                .profiles()
+                .initialize_fresh_repository(&current_dir, Some(&selection)),
             json,
         )?;
         // Machine-local worktree identity (gitignored, not repository state)
         // is created after the scaffold is published.
-        let (worktree_identity, init_warnings) =
-            executor.initialize_worktree_identity(&worktree_paths)?;
+        let (worktree_identity, init_warnings) = executor
+            .profiles()
+            .initialize_worktree_identity(&worktree_paths)?;
         for warning in &init_warnings {
             output_ctx.print_warning(warning)?;
         }
@@ -1836,7 +1842,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         Commands::Profile(profile_cmd) => match profile_cmd {
             ProfileCommands::Show { profile } => {
                 let selectors = parse_profile_selectors(&profile, json)?;
-                match executor.show_profiles(&selectors) {
+                match executor.profiles().show_profiles(&selectors) {
                     Ok(result) => {
                         if json {
                             let output = JsonOutput::success(&result);
@@ -1891,8 +1897,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 };
                 let plans = profile_result(
                     executor
+                        .profiles()
                         .select_profiles(&selectors, &options)
-                        .and_then(|selection| executor.diff_profiles(&selection)),
+                        .and_then(|selection| executor.profiles().diff_profiles(&selection)),
                     json,
                 )?;
                 render_profile_difference(&plans, json)?;
@@ -1919,9 +1926,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             } => {
                 let invocation_dir = std::env::current_dir()?;
                 let result = if dry_run {
-                    executor.plan_profile_pack(&invocation_dir, &source, &output)
+                    executor
+                        .profiles()
+                        .plan_profile_pack(&invocation_dir, &source, &output)
                 } else {
-                    executor.pack_profile_package(&invocation_dir, &source, &output)
+                    executor
+                        .profiles()
+                        .pack_profile_package(&invocation_dir, &source, &output)
                 };
                 match result {
                     Ok((result, warnings)) => {
@@ -1965,9 +1976,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             } => {
                 let invocation_dir = std::env::current_dir()?;
                 let result = if dry_run {
-                    executor.plan_profile_add(&invocation_dir, &archive, &destination)
+                    executor
+                        .profiles()
+                        .plan_profile_add(&invocation_dir, &archive, &destination)
                 } else {
-                    executor.add_profile_package(&invocation_dir, &archive, &destination)
+                    executor
+                        .profiles()
+                        .add_profile_package(&invocation_dir, &archive, &destination)
                 };
                 match result {
                     Ok(result) => {
@@ -2121,7 +2136,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         })?;
 
                     if dry_run {
-                        let outcome = executor.validate_batch_from_json(&defs)?;
+                        let outcome = executor.issues().validate_batch_from_json(&defs)?;
                         if json {
                             println!("{}", serde_json::to_string_pretty(&outcome)?);
                         } else {
@@ -2133,7 +2148,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         return Ok(());
                     }
 
-                    let outcome = executor.batch_create_from_json(defs)?;
+                    let outcome = executor.issues().batch_create_from_json(defs)?;
 
                     if json {
                         // Print EXACTLY the pure `{key: id}` map: every top-level
@@ -2183,7 +2198,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let assignee = assignee
                         .map(|value| Assignee::from_str(&value))
                         .transpose()?;
-                    let issues = executor.search_issues_with_filters(
+                    let issues = executor.queries().search_issues_with_filters(
                         query.as_deref().unwrap_or(""),
                         priority_filter,
                         state_filter,
@@ -2703,8 +2718,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         };
 
                         // Execute bulk update
-                        let result =
-                            executor.apply_bulk_update(&query_filter, &operations, force)?;
+                        let result = executor.issues().apply_bulk_update(
+                            &query_filter,
+                            &operations,
+                            force,
+                        )?;
 
                         if json {
                             let msg =
@@ -4814,7 +4832,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         },
         Commands::Events(event_cmd) => match event_cmd {
             EventCommands::Tail { n } => {
-                let events = executor.tail_events(n)?;
+                let events = executor.queries().tail_events(n)?;
                 if json {
                     use jit::output::{EventListResponse, JsonOutput};
                     let msg = format!("{} event(s)", events.len());
@@ -4835,7 +4853,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let issue = issue_id
                     .map(|id| resolve_issue_filter_arg(&storage, &id))
                     .transpose()?;
-                let events = executor.query_events(event_type, issue, limit)?;
+                let events = executor.queries().query_events(event_type, issue, limit)?;
                 if json {
                     use jit::output::{EventListResponse, JsonOutput};
                     let msg = format!("{} event(s)", events.len());
@@ -5330,7 +5348,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         },
         Commands::Archive(archive_cmd) => match archive_cmd {
             ArchiveCommands::Candidates => {
-                let report = executor.archive_candidates()?;
+                let report = executor.archive().archive_candidates()?;
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report)?);
                 } else {
@@ -5339,14 +5357,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             ArchiveCommands::Document { path, execute } => {
                 if execute {
-                    let result = executor.execute_archive_document(&path)?;
+                    let result = executor.archive().execute_archive_document(&path)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
                         print!("{}", jit::output::render_archive_execution(&result));
                     }
                 } else {
-                    let plan = executor.preview_archive_document(&path)?;
+                    let plan = executor.archive().preview_archive_document(&path)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&plan)?);
                     } else {
@@ -5357,14 +5375,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             ArchiveCommands::Container { id, execute } => {
                 let id = resolve_issue_arg(&storage, &id)?;
                 if execute {
-                    let result = executor.execute_archive_container(&id)?;
+                    let result = executor.archive().execute_archive_container(&id)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
                         print!("{}", jit::output::render_archive_execution(&result));
                     }
                 } else {
-                    let plan = executor.preview_archive_container(&id)?;
+                    let plan = executor.archive().preview_archive_container(&id)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&plan)?);
                     } else {
@@ -5432,7 +5450,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let issues = executor.query_available(priority_filter, &label)?;
+                        let issues = executor
+                            .queries()
+                            .query_available(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5471,7 +5491,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let blocked = executor.query_blocked_filtered(priority_filter, &label)?;
+                        let blocked = executor
+                            .queries()
+                            .query_blocked_filtered(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5554,7 +5576,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let issues = executor.query_strategic_filtered(priority_filter, &label)?;
+                        let issues = executor
+                            .queries()
+                            .query_strategic_filtered(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5593,7 +5617,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let issues = executor.query_closed_filtered(priority_filter, &label)?;
+                        let issues = executor
+                            .queries()
+                            .query_closed_filtered(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5628,7 +5654,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         // matching all --label patterns (ANDed; none = whole repo).
                         let rollup = match by {
                             jit::cli::CountDimension::State => {
-                                executor.query_count_by_state(&label)?
+                                executor.queries().query_count_by_state(&label)?
                             }
                         };
 
@@ -5695,7 +5721,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             jit::cli::LabelCommands::Values { namespace } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let values = executor.list_label_values(&namespace)?;
+                let values = executor.issues().list_label_values(&namespace)?;
                 if json {
                     use jit::output::{JsonOutput, LabelValuesResponse, LabelValuesScope};
                     let msg = format!("{} value(s)", values.len());
@@ -7468,7 +7494,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     .with_context(|| format!("Invalid format: {}", format))?;
 
                 // Determine source mode
-                let source_mode = executor.determine_snapshot_source_mode(
+                let source_mode = executor.archive().determine_snapshot_source_mode(
                     at.as_deref(),
                     working_tree,
                     committed_only,
@@ -7478,7 +7504,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     executor.validate_silent()?;
                 }
 
-                let (result, warnings) = executor.export_snapshot(
+                let (result, warnings) = executor.archive().export_snapshot(
                     &current_dir,
                     &snapshot_scope,
                     &source_mode,

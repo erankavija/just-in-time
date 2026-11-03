@@ -14,7 +14,9 @@ use crate::domain::artifact_discovery::{
     recorded_archived_copies, ArtifactClosure, ArtifactClosureState, ArtifactEvidence,
     ArtifactEvidenceMap, ArtifactListingScope,
 };
-use crate::domain::artifact_execution::ArchiveExecutionResult;
+use crate::domain::artifact_execution::{
+    archive_executions, ArchiveExecution, ArchiveExecutionResult,
+};
 use crate::domain::artifact_inventory::{
     inventory_explicit_roots, member_derived_documents, member_document_directories,
     pinned_root_requests, ExplicitRootTarget, PinnedRootEvidence, PinnedRootEvidenceMap,
@@ -26,7 +28,7 @@ use crate::domain::artifact_plan::{
 use crate::domain::artifact_plan::{ArtifactAction, WarningCode};
 use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
-use crate::domain::{Event, EventBody, Issue};
+use crate::domain::Issue;
 use crate::storage::artifact_planning::inspect_artifact_evidence;
 use crate::storage::{
     collect_artifact_classification_facts, discover_archive_artifacts,
@@ -40,6 +42,18 @@ use std::collections::{BTreeMap, BTreeSet};
 enum ArchiveTarget<'a> {
     Document(&'a str),
     Container(&'a IssueId),
+}
+
+/// Archive and snapshot-export operations of a [`CommandExecutor`].
+pub struct ArchiveOps<'a, S: IssueStore> {
+    pub(super) exec: &'a CommandExecutor<S>,
+}
+
+impl<S: IssueStore> CommandExecutor<S> {
+    /// The archive and snapshot-export family.
+    pub fn archive(&self) -> ArchiveOps<'_, S> {
+        ArchiveOps { exec: self }
+    }
 }
 
 /// Ids of configured non-leaf containers that are archive candidates: those that
@@ -110,20 +124,14 @@ fn apply_recorded_residue_identities(
     locations: &mut BTreeMap<String, ArtifactLocationFacts>,
     target: &PlanTarget,
     destination_root: &str,
-    events: &[Event],
+    executions: &[ArchiveExecution],
 ) {
-    let covered = events
+    let covered = executions
         .iter()
-        .filter_map(|event| match event.body() {
-            EventBody::ArtifactArchiveExecuted {
-                target: event_target,
-                destination_root: event_root,
-                publications,
-                ..
-            } if event_target == target && event_root == destination_root => Some(publications),
-            _ => None,
+        .filter(|execution| {
+            &execution.target == target && execution.destination_root == destination_root
         })
-        .flatten()
+        .flat_map(|execution| &execution.publications)
         .filter_map(|publication| {
             publication.source.as_ref().map(|source| {
                 (
@@ -142,7 +150,7 @@ fn apply_recorded_residue_identities(
             // Only a prior archive record turns differing source bytes into an
             // edited residue; an unrelated occupied destination still blocks.
             // Source is the stable publication identity across destination-layout
-            // cutovers, while target and destination root scope the event set.
+            // cutovers, while target and destination root scope the execution set.
             if differs
                 && covered
                     .get(&normalize_artifact_path(source_path))
@@ -154,12 +162,12 @@ fn apply_recorded_residue_identities(
     });
 }
 
-impl<S: IssueStore> CommandExecutor<S> {
+impl<S: IssueStore> ArchiveOps<'_, S> {
     /// Fully evaluate every effectively terminal configured non-leaf container
     /// without mutation.
     pub fn archive_candidates(&self) -> Result<ArchiveCandidates> {
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
-        let issues = self.storage.list_issues()?;
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
+        let issues = self.exec.storage.list_issues()?;
         let plans = effectively_terminal_container_ids(&issues, &hierarchy)
             .into_iter()
             .map(|id| self.plan_archive_target(ArchiveTarget::Container(&id)))
@@ -178,10 +186,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     fn plan_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArtifactPlan> {
-        let config = self.config_manager.load()?;
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
-        let issues = self.storage.list_issues()?;
-        let layout = self.require_layout()?;
+        let config = self.exec.config_manager.load()?;
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
+        let issues = self.exec.storage.list_issues()?;
+        let layout = self.exec.require_layout()?;
         let repo_root = layout.worktree_root();
         let resolver = GitRevisionResolver::new(repo_root);
 
@@ -215,7 +223,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     (preferred_root, Vec::new())
                 } else {
                     let resolved = resolve_container_destination(
-                        &self.storage,
+                        &self.exec.storage,
                         &preferred_root,
                         &legacy_root,
                         container_id,
@@ -259,7 +267,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .into_iter()
                 .map(|directory| {
                     match inspect_artifact_evidence(
-                        &self.storage,
+                        &self.exec.storage,
                         &directory,
                         ArtifactListingScope::RecursiveFiles,
                     )? {
@@ -279,13 +287,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
             None => inventory,
         };
-        let archive_events = self.storage.read_artifact_archive_events()?;
+        let archive_executions =
+            archive_executions(&self.exec.storage.read_artifact_archive_events()?);
         let (discovered, embedded_owners) = discover_archive_artifacts(
-            &self.storage,
+            &self.exec.storage,
             inventory,
             &issues,
             &policy,
-            recorded_archived_copies(&archive_events, &target_for_layout),
+            recorded_archived_copies(&archive_executions, &target_for_layout),
         )?;
         let plan_target = discovered.target;
         let artifacts = discovered.artifacts;
@@ -314,7 +323,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         let mut facts = collect_artifact_classification_facts(
-            &self.storage,
+            &self.exec.storage,
             &plan_target,
             &destination_root,
             &artifacts,
@@ -325,7 +334,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             &mut facts.locations,
             &plan_target,
             &destination_root,
-            &archive_events,
+            &archive_executions,
         );
         classify_artifacts(
             ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
@@ -538,13 +547,13 @@ fn capture_directory_tree(
     })
 }
 
-impl CommandExecutor<JsonFileStorage> {
+impl ArchiveOps<'_, JsonFileStorage> {
     fn capture_archive_plan(
         &self,
         session: &mut dyn RepositoryMutationSession,
         target: ArchiveTarget<'_>,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, ArtifactPlan)>> {
-        let Some(mut image) = self.capture_archive_base(session)? else {
+        let Some(mut image) = self.exec.capture_archive_base(session)? else {
             return Ok(None);
         };
         let config = crate::repository_state::assemble_config(&image)?;
@@ -773,9 +782,10 @@ impl CommandExecutor<JsonFileStorage> {
             )
             .collect::<BTreeSet<_>>();
         let mut evidence = ArtifactEvidenceMap::new();
-        let archive_events = crate::repository_state::captured_archive_events(&image)?;
+        let archive_executions =
+            archive_executions(&crate::repository_state::captured_archive_events(&image)?);
         let mut state = ArtifactClosureState::new(roots)
-            .with_archived_copies(recorded_archived_copies(&archive_events, &plan_target));
+            .with_archived_copies(recorded_archived_copies(&archive_executions, &plan_target));
         let parsed = loop {
             match expand_artifact_closure(state, &evidence) {
                 ArtifactClosure::Complete(parsed) => break parsed,
@@ -868,7 +878,7 @@ impl CommandExecutor<JsonFileStorage> {
         // scan reads the files directly, one at a time, rather than charging
         // them to the guarded image and its capture budget.
         facts.citations = crate::storage::collect_citation_scan_evidence(
-            &self.storage,
+            &self.exec.storage,
             &policy.citation_scan_roots,
             artifacts
                 .iter()
@@ -878,7 +888,7 @@ impl CommandExecutor<JsonFileStorage> {
             &mut facts.locations,
             &plan_target,
             &destination,
-            &archive_events,
+            &archive_executions,
         );
         let plan = classify_artifacts(
             ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
@@ -900,47 +910,81 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     fn execute_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArchiveExecutionResult> {
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
-        with_mutation_session(&self.storage, &layout, "archive execution", |session| {
-            let Some((image, plan)) = self.capture_archive_plan(session, target)? else {
-                return Ok(SessionStep::Retry);
-            };
-            if let Some((code, guidance)) = plan
-                .blockers()
-                .iter()
-                .chain(
-                    plan.artifacts()
-                        .iter()
-                        .flat_map(|artifact| artifact.blockers()),
-                )
-                .find_map(|blocker| {
-                    blocker
-                        .code
-                        .guidance()
-                        .map(|guidance| (blocker.code, guidance))
-                })
-            {
-                bail!("cannot archive target: {} — {guidance}", code.as_str());
-            }
-            let (materialization, result) =
-                crate::repository_state::finalize_archive_execution(&image, &context, &plan)?;
-            if materialization.delta().actions().is_empty() {
-                return Ok(SessionStep::Done(result));
-            }
-            Ok(SessionStep::Apply(materialization, result))
-        })
+        with_mutation_session(
+            &self.exec.storage,
+            &layout,
+            "archive execution",
+            |session| {
+                let Some((image, plan)) = self.capture_archive_plan(session, target)? else {
+                    return Ok(SessionStep::Retry);
+                };
+                if let Some((code, guidance)) = plan
+                    .blockers()
+                    .iter()
+                    .chain(
+                        plan.artifacts()
+                            .iter()
+                            .flat_map(|artifact| artifact.blockers()),
+                    )
+                    .find_map(|blocker| {
+                        blocker
+                            .code
+                            .guidance()
+                            .map(|guidance| (blocker.code, guidance))
+                    })
+                {
+                    bail!("cannot archive target: {} — {guidance}", code.as_str());
+                }
+                let (materialization, result) =
+                    crate::repository_state::finalize_archive_execution(&image, &context, &plan)?;
+                if materialization.delta().actions().is_empty() {
+                    return Ok(SessionStep::Done(result));
+                }
+                Ok(SessionStep::Apply(materialization, result))
+            },
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_apply_recorded_residue_identities_scopes_coverage_to_target_and_root() {
+        let target = PlanTarget::Document {
+            path: "a.md".into(),
+        };
+        let executions = [
+            archive_execution(target.clone(), "arc", &[("src/x.md", "arc/x.md")]),
+            archive_execution(target.clone(), "elsewhere", &[("src/y.md", "other/y.md")]),
+        ];
+        let bytes = |text: &[u8]| {
+            ArtifactLocation::Regular(crate::domain::artifact_plan::ContentIdentity::from_bytes(
+                text,
+            ))
+        };
+        let facts = |source: &[u8], destination: &[u8]| ArtifactLocationFacts {
+            source: bytes(source),
+            destination: bytes(destination),
+        };
+        let mut locations = BTreeMap::from([
+            ("src/x.md".to_string(), facts(b"edited", b"arc/x.md")),
+            ("src/y.md".to_string(), facts(b"edited", b"other/y.md")),
+        ]);
+        let before = locations.clone();
+        apply_recorded_residue_identities(&mut locations, &target, "arc", &executions);
+        assert_ne!(locations["src/x.md"], before["src/x.md"]);
+        assert_eq!(locations["src/y.md"], before["src/y.md"]);
+    }
+
     use super::*;
     use crate::domain::artifact_plan::EvidenceCode;
     use crate::domain::identity::IssueId;
-    use crate::domain::State;
+    use crate::domain::{EventBody, State};
     use crate::storage::JsonFileStorage;
     use crate::test_taxonomy::test_taxonomy;
+    use crate::test_utils::archive_execution;
     use crate::test_utils::{document_reference, document_reference_at};
     use std::collections::HashMap;
     use std::fs;
@@ -954,6 +998,7 @@ mod tests {
         std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
 
         let error = executor
+            .archive()
             .archive_candidates()
             .expect_err("invalid hierarchy must fail archive candidate planning");
 
@@ -998,7 +1043,7 @@ mod tests {
         let issues_before = executor.storage.list_issues().unwrap();
         let events_before = executor.storage.read_events().unwrap();
 
-        let report = executor.archive_candidates().unwrap();
+        let report = executor.archive().archive_candidates().unwrap();
 
         let target_ids = report
             .candidates()
@@ -1145,6 +1190,7 @@ mod tests {
         let id = owner.id.clone();
         seed_archive_issue_precondition(&executor.storage, owner);
         let first = executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .unwrap();
         assert!(first.event_appended);
@@ -1167,6 +1213,7 @@ mod tests {
         );
 
         let second = executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .unwrap();
         assert!(!second.event_appended);
@@ -1211,6 +1258,7 @@ mod tests {
         };
 
         let preview = executor
+            .archive()
             .preview_archive_document("fixtures/root.md")
             .unwrap();
         let mut session = executor
@@ -1218,6 +1266,7 @@ mod tests {
             .open_mutation_session(executor.require_layout().unwrap())
             .unwrap();
         let (image, _) = executor
+            .archive()
             .capture_archive_plan(
                 session.as_mut(),
                 ArchiveTarget::Document("fixtures/root.md"),
@@ -1239,6 +1288,7 @@ mod tests {
         );
         assert!(!previewed.is_empty(), "the fixture cites the moving source");
         let executed = executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .unwrap();
         assert_eq!(citations(executed.warnings), previewed);
@@ -1270,6 +1320,7 @@ mod tests {
         fs::write(repo.path().join("archive"), b"occupied").unwrap();
 
         assert!(executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .is_err());
         assert_eq!(fs::read(repo.path().join("archive")).unwrap(), b"occupied");
@@ -1306,6 +1357,7 @@ mod tests {
         .unwrap();
 
         executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .unwrap();
         assert_eq!(
@@ -1345,6 +1397,7 @@ mod tests {
         symlink("../outside.md", repo.path().join("fixtures/root.md")).unwrap();
 
         assert!(executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .is_err());
         assert_eq!(
@@ -1419,7 +1472,7 @@ mod tests {
         fs::create_dir(repo.path().join("outside")).unwrap();
         symlink("outside", repo.path().join("safe")).unwrap();
 
-        assert!(executor.execute_archive_container(&id).is_err());
+        assert!(executor.archive().execute_archive_container(&id).is_err());
         assert!(fs::read_dir(repo.path().join("outside"))
             .unwrap()
             .next()
@@ -1459,6 +1512,7 @@ mod tests {
         .unwrap();
 
         executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .unwrap();
         assert_eq!(
@@ -1493,7 +1547,11 @@ mod tests {
         let (done_sender, done_receiver) = std::sync::mpsc::channel();
         let worker = std::thread::spawn(move || {
             done_sender
-                .send(executor.execute_archive_document("fixtures/root.md"))
+                .send(
+                    executor
+                        .archive()
+                        .execute_archive_document("fixtures/root.md"),
+                )
                 .unwrap();
         });
         assert!(done_receiver
@@ -1520,6 +1578,7 @@ mod tests {
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), "zero owner").unwrap();
         let result = executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .unwrap();
         assert!(result
@@ -1553,6 +1612,7 @@ mod tests {
         issue.state = State::InProgress;
         seed_archive_issue_precondition(&active_executor.storage, issue);
         assert!(active_executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .is_err());
         assert!(active_repo.path().join("fixtures/root.md").exists());
@@ -1581,16 +1641,16 @@ mod tests {
             .is_empty());
 
         let valid = crate::test_utils::stamped_event(
-            EventBody::draft_artifact_archive_executed(
-                PlanTarget::Document {
+            EventBody::draft_artifact_archive_executed(ArchiveExecution {
+                target: PlanTarget::Document {
                     path: "fixtures/root.md".into(),
                 },
-                "archive".into(),
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                true,
-            ),
+                destination_root: "archive".into(),
+                publications: Vec::new(),
+                reference_changes: Vec::new(),
+                planned_deletions: Vec::new(),
+                reconciling: true,
+            }),
             "valid-archive",
             chrono::DateTime::UNIX_EPOCH,
         );
@@ -1670,6 +1730,7 @@ mod tests {
         fs::write(repo.path().join("fixtures/child.md"), "child").unwrap();
         fs::write(repo.path().join("shared/global.md"), "shared").unwrap();
         let result = executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .unwrap();
         assert!(result.event_appended);
@@ -1706,6 +1767,7 @@ mod tests {
         fs::create_dir(repo.path().join("archive/fixtures")).unwrap();
         fs::write(repo.path().join("archive/fixtures/root.md"), b"identical").unwrap();
         let result = executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .unwrap();
         assert!(result.publications.iter().any(|publication| {
@@ -1748,6 +1810,7 @@ mod tests {
         )
         .unwrap();
         assert!(conflict_executor
+            .archive()
             .execute_archive_document("fixtures/root.md")
             .is_err());
         assert_eq!(
@@ -1770,6 +1833,7 @@ mod tests {
         fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
         fs::write(repo.path().join("dev/guides/permanent.md"), b"permanent").unwrap();
         let result = executor
+            .archive()
             .execute_archive_document("dev/guides/permanent.md")
             .unwrap();
         assert!(result.event_appended);
@@ -1804,6 +1868,7 @@ mod tests {
         )
         .unwrap();
         let first = executor
+            .archive()
             .execute_archive_document("dev/guides/permanent.md")
             .unwrap();
         assert!(first.event_appended);
@@ -1814,6 +1879,7 @@ mod tests {
         }));
         assert!(repo.path().join("dev/guides/permanent.md").exists());
         let second = executor
+            .archive()
             .execute_archive_document("dev/guides/permanent.md")
             .unwrap();
         assert!(!second.event_appended);
@@ -1881,7 +1947,7 @@ mod tests {
         .collect();
         let id = epic.id.clone();
         seed_archive_issue_precondition(&executor.storage, epic);
-        let first = executor.execute_archive_container(&id).unwrap();
+        let first = executor.archive().execute_archive_container(&id).unwrap();
         let destination_root = format!("archive/{}-archive-fixture", id.short_id());
         assert_eq!(
             fs::read_to_string(repo.path().join(&destination_root).join(".jit-container")).unwrap(),
@@ -1902,7 +1968,7 @@ mod tests {
             .unwrap()
             .len();
 
-        let second = executor.execute_archive_container(&id).unwrap();
+        let second = executor.archive().execute_archive_container(&id).unwrap();
         assert!(!second.event_appended);
         assert!(second.publications.is_empty());
         assert!(second.reference_changes.is_empty());
@@ -1967,7 +2033,7 @@ mod tests {
             ),
         ];
 
-        let preview = executor.preview_archive_container(&id).unwrap();
+        let preview = executor.archive().preview_archive_container(&id).unwrap();
         expected.iter().for_each(|(source, destination)| {
             let artifact = preview
                 .artifacts()
@@ -1977,7 +2043,7 @@ mod tests {
             assert_eq!(artifact.destination(), Some(destination.as_str()));
         });
 
-        let execution = executor.execute_archive_container(&id).unwrap();
+        let execution = executor.archive().execute_archive_container(&id).unwrap();
         expected.iter().for_each(|(source, destination)| {
             assert!(execution.publications.iter().any(|publication| {
                 publication.source.as_deref() == Some(*source)
@@ -2012,7 +2078,7 @@ mod tests {
         seed_archive_issue_precondition(&executor.storage, container.clone());
         let destination_root = format!("workspace/archive/{}", container.short_id());
 
-        let preview = executor.preview_archive_container(&id).unwrap();
+        let preview = executor.archive().preview_archive_container(&id).unwrap();
         for (source, destination) in [
             (&linked, format!("{destination_root}/active/linked.md")),
             (
@@ -2029,7 +2095,7 @@ mod tests {
             assert_eq!(matching[0].destination(), Some(destination.as_str()));
         }
 
-        executor.execute_archive_container(&id).unwrap();
+        executor.archive().execute_archive_container(&id).unwrap();
         assert!(!repo.path().join(&derived).exists());
         assert!(repo
             .path()
@@ -2088,7 +2154,10 @@ mod tests {
         let outside_id = outside.id.clone();
         seed_archive_issue_precondition(&executor.storage, outside);
 
-        let result = executor.execute_archive_container(&container_id).unwrap();
+        let result = executor
+            .archive()
+            .execute_archive_container(&container_id)
+            .unwrap();
         let destination = format!("archive/{}/fixtures/root.md", container_id.short_id());
         let container = executor.storage.load_issue(&container_id).unwrap();
         let outside = executor.storage.load_issue(&outside_id).unwrap();
@@ -2158,8 +2227,8 @@ mod tests {
         let events_before = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
         let issues_before = executor.storage.list_issues().unwrap();
 
-        let first = executor.preview_archive_container(&id).unwrap();
-        let second = executor.preview_archive_container(&id).unwrap();
+        let first = executor.archive().preview_archive_container(&id).unwrap();
+        let second = executor.archive().preview_archive_container(&id).unwrap();
 
         assert_eq!(first, second);
         assert_eq!(first.schema_version(), 1);
@@ -2207,7 +2276,10 @@ mod tests {
             crate::test_utils::setup_test_repo_with_config(&test_taxonomy().config_fragment())
                 .unwrap();
         fs::write(repo.path().join("root.csv"), "a,b").unwrap();
-        let unconfigured = executor.preview_archive_document("root.csv").unwrap();
+        let unconfigured = executor
+            .archive()
+            .preview_archive_document("root.csv")
+            .unwrap();
         assert_eq!(
             unconfigured.policy_status(),
             crate::domain::artifact_plan::PolicyStatus::Unconfigured
@@ -2223,7 +2295,10 @@ mod tests {
             "[documentation]\nmanaged_paths = [\".\"]\n",
         )
         .unwrap();
-        let incomplete = executor.preview_archive_document("root.csv").unwrap();
+        let incomplete = executor
+            .archive()
+            .preview_archive_document("root.csv")
+            .unwrap();
         assert_eq!(
             incomplete.policy_status(),
             crate::domain::artifact_plan::PolicyStatus::Incomplete
@@ -2260,7 +2335,10 @@ mod tests {
                 format!("[documentation]\n{authored}\n"),
             )
             .unwrap();
-            let plan = executor.preview_archive_document("root.csv").unwrap();
+            let plan = executor
+                .archive()
+                .preview_archive_document("root.csv")
+                .unwrap();
             assert_eq!(
                 plan.policy_status(),
                 crate::domain::artifact_plan::PolicyStatus::Incomplete,
@@ -2274,7 +2352,10 @@ mod tests {
             "[documentation]\nmanaged_paths = []\npermanent_paths = []\narchive_root = \"\"\n",
         )
         .unwrap();
-        let configured = executor.preview_archive_document("root.csv").unwrap();
+        let configured = executor
+            .archive()
+            .preview_archive_document("root.csv")
+            .unwrap();
         assert_eq!(
             configured.policy_status(),
             crate::domain::artifact_plan::PolicyStatus::Configured
@@ -2328,6 +2409,7 @@ mod tests {
         }
 
         let plan = executor
+            .archive()
             .preview_archive_document("workspace/active/target.md")
             .unwrap();
         let artifact = plan
@@ -2380,6 +2462,7 @@ mod tests {
         }
 
         let outside = executor
+            .archive()
             .preview_archive_document("scripts/install.sh")
             .unwrap();
         assert!(outside
@@ -2397,6 +2480,7 @@ mod tests {
         assert!(artifact.pending_deletions().is_empty());
 
         let inside = executor
+            .archive()
             .preview_archive_document("workspace/scratch/notes.md")
             .unwrap();
         assert!(inside
@@ -2433,6 +2517,7 @@ mod tests {
         }
 
         let result = executor
+            .archive()
             .execute_archive_document("workspace/active/target.md")
             .unwrap();
 
@@ -2482,12 +2567,12 @@ mod tests {
         fs::write(repo.path().join(source), b"# Edited residue\n").unwrap();
 
         let historical_event = crate::test_utils::stamped_event(
-            EventBody::draft_artifact_archive_executed(
-                PlanTarget::Document {
+            EventBody::draft_artifact_archive_executed(ArchiveExecution {
+                target: PlanTarget::Document {
                     path: source.into(),
                 },
-                "workspace/archive".into(),
-                vec![crate::domain::artifact_execution::ArchivePublication {
+                destination_root: "workspace/archive".into(),
+                publications: vec![crate::domain::artifact_execution::ArchivePublication {
                     source: Some(source.into()),
                     destination: historical_destination.into(),
                     content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
@@ -2495,10 +2580,10 @@ mod tests {
                     ),
                     adopted: false,
                 }],
-                Vec::new(),
-                Vec::new(),
-                false,
-            ),
+                reference_changes: Vec::new(),
+                planned_deletions: Vec::new(),
+                reconciling: false,
+            }),
             "historical-archive",
             chrono::DateTime::UNIX_EPOCH,
         );
@@ -2508,7 +2593,7 @@ mod tests {
         event_bytes.push(b'\n');
         fs::write(&events_path, event_bytes).unwrap();
 
-        let result = executor.execute_archive_document(source).unwrap();
+        let result = executor.archive().execute_archive_document(source).unwrap();
 
         assert!(result.event_appended);
         assert!(result.reconciling);
@@ -2602,7 +2687,7 @@ mod tests {
         fs::create_dir_all(&destination).unwrap();
         fs::write(destination.join(".jit-container"), "foreign-container-id\n").unwrap();
 
-        let plan = executor.preview_archive_container(&id).unwrap();
+        let plan = executor.archive().preview_archive_container(&id).unwrap();
         assert!(!plan.eligible());
         assert!(plan
             .blockers()
@@ -2615,7 +2700,7 @@ mod tests {
 
         fs::remove_file(destination.join(".jit-container")).unwrap();
         fs::write(destination.join("foreign.txt"), "not in the plan").unwrap();
-        let markerless = executor.preview_archive_container(&id).unwrap();
+        let markerless = executor.archive().preview_archive_container(&id).unwrap();
         assert!(markerless
             .blockers()
             .iter()
@@ -2642,6 +2727,7 @@ mod tests {
         .unwrap();
 
         let plan = executor
+            .archive()
             .preview_archive_document("fixtures/link.md")
             .unwrap();
         let artifact = plan
@@ -2671,6 +2757,7 @@ mod tests {
         )
         .unwrap();
         let destination_symlink = regular_executor
+            .archive()
             .preview_archive_document("fixtures/root.md")
             .unwrap();
         assert!(destination_symlink.artifacts()[0]
@@ -2701,6 +2788,7 @@ mod tests {
         seed_archive_issue_precondition(&owner_executor.storage, outside);
 
         let owner_plan = owner_executor
+            .archive()
             .preview_archive_document("fixtures/selected.md")
             .unwrap();
         let selected = &owner_plan.artifacts()[0];
@@ -2743,7 +2831,7 @@ mod tests {
         fs::create_dir_all(repo.path().join("fixtures/section")).unwrap();
         fs::write(repo.path().join("fixtures/section/child.md"), "child").unwrap();
 
-        let plan = executor.preview_archive_container(&id).unwrap();
+        let plan = executor.archive().preview_archive_container(&id).unwrap();
 
         assert!(plan
             .artifacts()
@@ -2796,7 +2884,7 @@ mod tests {
         )
         .unwrap();
 
-        let plan = executor.preview_archive_container(&id).unwrap();
+        let plan = executor.archive().preview_archive_container(&id).unwrap();
 
         assert!(plan
             .artifacts()
@@ -2837,7 +2925,7 @@ mod tests {
         container.documents = vec![document_reference("fixtures/root.md")];
         let id = container.id.clone();
         seed_archive_issue_precondition(&executor.storage, container);
-        let result = executor.execute_archive_container(&id).unwrap();
+        let result = executor.archive().execute_archive_container(&id).unwrap();
         assert!(result.event_appended);
         // The document was relocated out of its source into the archive mirror
         // (a container uses its own destination subtree, so assert on the source).
@@ -2867,7 +2955,7 @@ mod tests {
         container.documents = vec![document_reference("fixtures/root.md")];
         let id = container.id.clone();
         seed_archive_issue_precondition(&executor.storage, container);
-        executor.execute_archive_container(&id).unwrap();
+        executor.archive().execute_archive_container(&id).unwrap();
         let container = executor.storage.load_issue(&id).unwrap();
         assert_eq!(container.state, State::Archived);
         assert_eq!(container.archived_from, Some(State::Rejected));
@@ -2890,6 +2978,7 @@ mod tests {
         let id = container.id.clone();
         seed_archive_issue_precondition(&executor.storage, container);
         let error = executor
+            .archive()
             .execute_archive_container(&id)
             .expect_err("archiving a non-terminal container must be refused");
         let rendered = format!("{error:#}");
@@ -2921,10 +3010,10 @@ mod tests {
         container.documents = vec![document_reference("fixtures/root.md")];
         let id = container.id.clone();
         seed_archive_issue_precondition(&executor.storage, container);
-        executor.execute_archive_container(&id).unwrap();
+        executor.archive().execute_archive_container(&id).unwrap();
         // The container is now Archived-from-Done, still effectively terminal, so a
         // rerun is eligible and reconciles to a no-op rather than erroring.
-        let rerun = executor.execute_archive_container(&id).unwrap();
+        let rerun = executor.archive().execute_archive_container(&id).unwrap();
         assert!(!rerun.event_appended, "a fully-archived rerun is a no-op");
         let container = executor.storage.load_issue(&id).unwrap();
         assert_eq!(container.state, State::Archived);
@@ -2960,11 +3049,11 @@ mod tests {
             .push(document_reference("fixtures/b.md"));
         seed_archive_issue_precondition(&executor.storage, container);
 
-        let first = executor.execute_archive_container(&id).unwrap();
+        let first = executor.archive().execute_archive_container(&id).unwrap();
         assert_eq!(first.deleted_sources, vec!["fixtures/root.md"]);
         // The archived root still cites b at its source path, so b stays there
         // through every rerun.
-        let rerun = executor.execute_archive_container(&id).unwrap();
+        let rerun = executor.archive().execute_archive_container(&id).unwrap();
         assert!(!rerun.event_appended, "{:?}", rerun.deleted_sources);
         assert!(repo.path().join("fixtures/b.md").exists());
     }
@@ -2990,14 +3079,17 @@ mod tests {
         let id = container.id.clone();
         seed_archive_issue_precondition(&executor.storage, container);
 
-        let preview = executor.preview_archive_container(&id).unwrap();
+        let preview = executor.archive().preview_archive_container(&id).unwrap();
         assert!(preview
             .artifacts()
             .iter()
             .flat_map(|artifact| artifact.blockers())
             .any(|blocker| blocker.code == BlockerCode::RepositoryEscape));
         // Execution reaches the same plan rather than failing on the path.
-        let error = executor.execute_archive_container(&id).unwrap_err();
+        let error = executor
+            .archive()
+            .execute_archive_container(&id)
+            .unwrap_err();
         assert!(error.to_string().contains("not eligible"), "{error}");
     }
 
@@ -3035,6 +3127,7 @@ mod tests {
         seed_archive_issue_precondition(&executor.storage, archived_owner.clone());
 
         let plan = executor
+            .archive()
             .preview_archive_document("fixtures/root.md")
             .unwrap();
         let artifact = &plan.artifacts()[0];
@@ -3049,6 +3142,7 @@ mod tests {
         parked.archived_from = Some(State::InProgress);
         seed_archive_issue_precondition(&executor.storage, parked);
         let plan = executor
+            .archive()
             .preview_archive_document("fixtures/root.md")
             .unwrap();
         let artifact = &plan.artifacts()[0];
