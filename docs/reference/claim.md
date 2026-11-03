@@ -83,8 +83,8 @@ jit claim acquire abc123 --json
 
 ### Expiry, assignment, and availability
 
-When a later `jit claim acquire` finds an expired finite lease, the coordinator
-evicts it before deciding whether a new lease can be acquired. Lease expiry does
+When a later `jit claim acquire` finds an expired finite lease on the issue, the
+coordinator evicts it before deciding whether a new lease can be acquired. Lease expiry does
 not clear the issue's assignee, however. `jit query available` selects only
 ready, unassigned issues, so release or unassign the issue separately before
 expecting it in that query:
@@ -310,7 +310,7 @@ jit claim status [OPTIONS]
 
 ### Description
 
-Shows active leases. By default shows leases for the current agent. Use filters to query specific issues or agents.
+Shows unexpired leases, marking stale ones. By default shows leases for the current agent. Use filters to query specific issues or agents. The read takes no lock and writes nothing, so it never waits on a running claim operation; an expired lease is omitted until a later claim operation on its issue or `jit recover` evicts it.
 
 ### Options
 
@@ -387,7 +387,7 @@ jit claim list [OPTIONS]
 
 ### Description
 
-Shows all active leases across all agents and worktrees. Useful for seeing global state of who is working on what.
+Shows all unexpired leases across all agents and worktrees, marking stale ones. Useful for seeing global state of who is working on what. Like `jit claim status`, it takes no lock and writes nothing.
 
 ### Options
 

@@ -190,8 +190,6 @@ pub struct Assignee {
 }
 
 impl Assignee {
-    /// Coordinator actor for listing active leases.
-    pub const SYSTEM_LIST: Self = Self::engine_actor("system", "list");
     /// Coordinator actor for checking a lease.
     pub const SYSTEM_CHECK: Self = Self::engine_actor("system", "check");
     /// Coordinator actor for force-evicting a lease.
@@ -2723,7 +2721,6 @@ mod tests {
         #[test]
         fn test_assignee_system_actor_constants_equal_parsed_spelling() {
             for (constant, spelling) in [
-                (Assignee::SYSTEM_LIST, "system:list"),
                 (Assignee::SYSTEM_CHECK, "system:check"),
                 (Assignee::SYSTEM_ADMIN, "system:admin"),
                 (Assignee::SYSTEM_RECOVERY, "system:recovery"),
