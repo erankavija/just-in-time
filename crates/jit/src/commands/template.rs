@@ -86,10 +86,32 @@ pub struct TemplateApplyResult {
     pub anchor_bindings: BTreeMap<String, IssueId>,
     /// Template node role → the created (or `--force`-refreshed) issue id.
     pub created_node_ids_by_role: BTreeMap<String, IssueId>,
+    /// Created or refreshed issues by role, including finalized timestamps.
+    /// The CLI response serializes these alongside the result's metadata.
+    #[serde(skip_serializing)]
+    pub created_issues: BTreeMap<String, Issue>,
     /// Anchor name → that anchor's `dependencies` as snapshotted BEFORE any
     /// mutation. Consumed by the `move-upstream-to-role` transform and surfaced
     /// for callers inspecting the pre-apply shape.
     pub anchor_dependency_snapshots: BTreeMap<String, Vec<IssueId>>,
+}
+
+impl TemplateApplyResult {
+    fn populate_created_issues(&mut self, image: &RepositoryImage) -> Result<()> {
+        self.created_issues = self
+            .created_node_ids_by_role
+            .iter()
+            .map(|(role, id)| {
+                let path = VirtualPath::issue_record(id);
+                let bytes = image
+                    .file_bytes(&path)?
+                    .ok_or_else(|| IssueNotFoundError::new(id.clone()))?;
+                let issue = crate::repository_state::decode_issue_record(&path, bytes)?;
+                Ok((role.clone(), issue))
+            })
+            .collect::<Result<_>>()?;
+        Ok(())
+    }
 }
 
 /// Template operations of a [`CommandExecutor`].
@@ -235,6 +257,7 @@ impl<S: IssueStore> TemplateOps<'_, S> {
                 return Ok(AttemptOutcome::Retry);
             }
             if captured.derived.intents.is_empty() {
+                captured.derived.result.populate_created_issues(&image)?;
                 return Ok(AttemptOutcome::Done((captured.derived.result, warnings)));
             }
             captured.declarations.gates = captured.derived.registry;
@@ -258,6 +281,11 @@ impl<S: IssueStore> TemplateOps<'_, S> {
                 // declaration, and event byte.
                 finalize(&layout, &image, &context, &captured.derived.intents)?
             };
+            let proposed = crate::repository_state::apply_overlay(
+                &image,
+                super::validation_overlay(&image, plan.delta())?,
+            )?;
+            captured.derived.result.populate_created_issues(&proposed)?;
             classify_apply(session.apply(&plan), (captured.derived.result, warnings))
         })
     }
@@ -827,6 +855,7 @@ fn derive_template_apply(
             template: template.name.clone(),
             anchor_bindings: resolved_bindings,
             created_node_ids_by_role,
+            created_issues: BTreeMap::new(),
             anchor_dependency_snapshots,
         },
         registry,

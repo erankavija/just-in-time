@@ -1500,6 +1500,31 @@ fn test_apply_template_appends_a_dependency_add_event_for_every_wired_edge() {
     }
 }
 
+#[test]
+fn test_apply_template_returns_created_issues_by_role() {
+    let h = TestHarness::new();
+    let mut template = plan_template();
+    let epic = create_epic(&h, "Returned issues");
+    let upstream = h.create_issue("Upstream");
+    h.executor.graph().add_dependency(&epic, &upstream).unwrap();
+
+    for force in [false, true, true] {
+        let (result, _) = h
+            .executor
+            .templates()
+            .apply_template_with(&template, &epic, &container_binding(&epic), force)
+            .unwrap();
+
+        assert_eq!(result.created_issues.len(), template.nodes.len());
+        for node in &template.nodes {
+            let issue = &result.created_issues[&node.role];
+            assert_eq!(issue.id, result.created_node_ids_by_role[&node.role]);
+            assert_eq!(*issue, h.get_issue(&issue.id));
+        }
+        template.nodes[0].description = Some("Refreshed description".to_string());
+    }
+}
+
 // === TSTA-02: the JSON apply-result output ===
 
 #[test]
