@@ -22,9 +22,9 @@
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "run_id": "24ad76a3-59b9-4ea4-ab0d-c2373e21b2d0",
+      "run_id": "c919e42c-390f-4416-bbb2-d6b70b949728",
       "status": "passed",
-      "updated_at": "2026-11-03T21:05:58.416864223Z",
+      "updated_at": "2026-11-03T21:35:17.343969761Z",
       "updated_by": "auto:executor"
     }
   },
@@ -45,5 +45,5 @@
   "priority": "high",
   "state": "done",
   "title": "breakdown: Restructure storage so reads never scale with project history",
-  "updated_at": "2026-11-03T21:11:50.512484876Z"
+  "updated_at": "2026-11-03T21:35:17.343969761Z"
 }

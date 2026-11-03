@@ -832,6 +832,11 @@
       "source": "wave 5 lead",
       "summary": "jit caps indefinite leases at 2 per agent; later dispatches use --ttl 86400 and need renewal on long waves",
       "disposition": "process note"
+    },
+    {
+      "source": "abe555e9 worker",
+      "summary": "jit --schema output order is nondeterministic run to run: CommandSchema.commands, types and subcommands are HashMaps (pre-existing). Schema identity checks must compare with sorted keys; byte-stable output would need BTreeMap.",
+      "disposition": "reconcile against da30b92a / 46fe7593 schema criteria before container gates"
     }
   ],
   "external_blockers": {},
