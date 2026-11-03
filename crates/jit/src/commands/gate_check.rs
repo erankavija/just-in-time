@@ -1273,8 +1273,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             .filter_map(|id| input.issues.iter().find(|candidate| candidate.id == *id))
             .map(crate::domain::MinimalIssue::from)
             .collect();
+        let latest_runs: Vec<_> = input
+            .issue
+            .gates_status
+            .iter()
+            .filter_map(|(key, state)| state.projected_run(key, input.runs).cloned())
+            .collect();
         let mut issue_view =
-            IssueShowResponse::from_issue(input.issue.clone(), enriched, input.runs);
+            IssueShowResponse::from_issue(input.issue.clone(), enriched, &latest_runs);
         issue_view.documents = documents.to_vec();
         omit_current_gate_projection(&mut issue_view, &input.gate.key);
         Ok(Some(GateContext {
@@ -1338,12 +1344,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore> GateOps<'_, S> {
-    /// Return the latest published run for each registered required gate on an
-    /// issue, an automated gate's checker run or a manual gate's attestation, as
-    /// [`Self::get_last_gate_run`] selects it.
+    /// Load the run named by every gate state, without listing run history.
     ///
-    /// Results are ordered by gate priority, preserving insertion order for ties.
-    /// The second vector contains the gate keys that have no recorded run.
+    /// Registered required gates come first on priority ties; unregistered
+    /// states sort last. The second vector includes states and registered
+    /// required gates with no run id.
     pub fn get_last_gate_runs_for_issue(
         &self,
         issue_id: &IssueId,
@@ -1352,17 +1357,25 @@ impl<S: IssueStore> GateOps<'_, S> {
         let issue = self.exec.storage.load_issue(&full_id)?;
         let registry = self.exec.storage.load_gate_registry()?;
 
-        // Sort by priority (stable sort preserves insertion order for ties)
         let mut gates: Vec<_> = issue
             .gates_required
             .iter()
-            .filter_map(|key| registry.gates.get(key).map(|g| (key, g)))
+            .filter(|key| registry.gates.contains_key(*key))
             .collect();
-        gates.sort_by_key(|(_, gate)| gate.priority);
+        let remaining: Vec<_> = issue
+            .gates_status
+            .keys()
+            .filter(|key| !gates.contains(key))
+            .collect();
+        gates.extend(remaining);
+        gates.sort_by_key(|key| {
+            let priority = registry.gates.get(*key).map(|gate| gate.priority);
+            (priority.is_none(), priority)
+        });
 
         gates.into_iter().try_fold(
             (Vec::new(), Vec::new()),
-            |(mut results, mut not_run), (gate_key, _)| {
+            |(mut results, mut not_run), gate_key| {
                 match self.exec.projected_gate_run(&issue, gate_key)? {
                     Some(result) => results.push(result),
                     None => not_run.push(gate_key.clone()),
@@ -1826,6 +1839,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
 
     #[test]
     fn test_projected_precheck_run_matches_next_checker_issue_view() {
+        let executor = setup();
         let mut issue = crate::test_utils::fixture_issue("Test".into(), String::new());
         issue.id = crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725);
         issue.gates_required = vec!["first".parse().unwrap(), "second".parse().unwrap()];
@@ -1840,22 +1854,34 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             .gates_status
             .insert("first".parse().unwrap(), super::gate_state_from_run(&run));
 
-        let second = issue.gates_status.get(&"second".parse().unwrap()).cloned();
-        let mut view = crate::output::IssueShowResponse::from_issue(
-            issue,
-            Vec::new(),
-            std::slice::from_ref(&run),
-        );
-        omit_current_gate_projection(&mut view, &"second".parse().unwrap());
+        let mut older = run.clone();
+        older.run_id = crate::test_utils::gate_run_id(6);
+        older.started_at -= chrono::Duration::seconds(1);
+        let mut gate = make_auto_gate(&"second".parse().unwrap(), "exit 0");
+        let checker = gate.checker.as_mut().unwrap();
+        if let GateChecker::Exec { pass_context, .. } = checker {
+            *pass_context = true;
+        }
+        let image = crate::test_harness::image::ImageBuilder::new().build();
+        let runs = [run.clone(), older];
+        let input = super::CapturedGateExecution {
+            run_id: &crate::test_utils::gate_run_id(8),
+            image: &image,
+            issue: &issue,
+            issues: &[],
+            gate: &gate,
+            runs: &runs,
+            prompt: None,
+        };
+        let context = executor
+            .build_captured_gate_context(gate.checker.as_ref().unwrap(), &input, &[])
+            .unwrap()
+            .unwrap();
 
-        assert_eq!(view.gates[0].status, GateStatus::Passed);
-        assert!(view.gates[0].last_run_at.is_some());
-        assert!(compact_run_history_for_context(
-            &[run],
-            &"second".parse().unwrap(),
-            second.as_ref()
-        )
-        .is_empty());
+        assert_eq!(
+            context.issue["gates"][0]["last_run_at"],
+            run.started_at.to_rfc3339()
+        );
     }
 
     #[test]
@@ -4094,6 +4120,82 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             })
             .collect::<Vec<_>>();
         assert_eq!(latest_status, readiness);
+    }
+
+    #[test]
+    fn test_get_last_gate_runs_for_issue_loads_named_runs_for_every_gate_state() {
+        let executor = setup();
+        let mut issue = crate::test_utils::fixture_issue("T".into(), String::new());
+        let mut expected = Vec::new();
+        for (index, key) in ["required", "optional"].into_iter().enumerate() {
+            let key: GateKey = key.parse().unwrap();
+            let older = GateRunResult::attestation(
+                &crate::test_utils::gate_run_id(index as u128 * 2 + 1),
+                &issue.id,
+                &key,
+                GateStage::Postcheck,
+                GateStatus::Failed,
+                None,
+            );
+            let mut named = older.clone();
+            named.run_id = crate::test_utils::gate_run_id(index as u128 * 2 + 2);
+            named.status = GateRunStatus::Passed;
+            for run in [&older, &named] {
+                executor.storage.add_data_file(
+                    crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
+                        .relative()
+                        .as_path(),
+                    &serde_json::to_string(run).unwrap(),
+                );
+            }
+            issue
+                .gates_status
+                .insert(key, super::gate_state_from_run(&named));
+            expected.push(named.run_id);
+        }
+        issue.gates_required.push("required".parse().unwrap());
+        seed_issue(executor.storage(), issue.clone());
+
+        let (runs, not_run) = executor
+            .gates()
+            .get_last_gate_runs_for_issue(&issue.id)
+            .unwrap();
+        let actual: std::collections::BTreeSet<_> =
+            runs.iter().map(|run| run.run_id.clone()).collect();
+        assert_eq!(actual, expected.into_iter().collect());
+        assert!(not_run.is_empty());
+    }
+
+    #[test]
+    fn test_get_last_gate_runs_for_issue_ignores_history_without_state_run_id() {
+        let executor = setup();
+        let mut issue = crate::test_utils::fixture_issue("T".into(), String::new());
+        let key: GateKey = "review".parse().unwrap();
+        let run = GateRunResult::attestation(
+            &crate::test_utils::gate_run_id(1),
+            &issue.id,
+            &key,
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        executor.storage.add_data_file(
+            crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
+                .relative()
+                .as_path(),
+            &serde_json::to_string(&run).unwrap(),
+        );
+        let mut state = super::gate_state_from_run(&run);
+        state.run_id = None;
+        issue.gates_status.insert(key.clone(), state);
+        seed_issue(executor.storage(), issue.clone());
+
+        let (runs, not_run) = executor
+            .gates()
+            .get_last_gate_runs_for_issue(&issue.id)
+            .unwrap();
+        assert!(runs.is_empty());
+        assert_eq!(not_run, vec![key]);
     }
 
     #[test]
