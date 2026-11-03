@@ -28,8 +28,8 @@ The Rust workspace contains the core CLI/library in `crates/jit/` and the HTTP s
 
 Layer boundaries are mandatory:
 
-- **CLI and output** (`cli.rs`, `main.rs`, `output.rs`) own parsing, dispatch, and rendering.
-- **Commands** (`commands/`, `CommandExecutor`) orchestrate domain and storage; they do not parse CLI arguments or format output.
+- **CLI and output** (`cli.rs`, `main.rs`, `dispatch/`, `output.rs`) own parsing, dispatch, and rendering; `dispatch/` holds the library-side command handlers.
+- **Commands** (`commands/`, `CommandExecutor`) orchestrate domain and storage; they do not parse CLI arguments or format output, and they do not import `dispatch/`.
 - **Domain and graph** (`domain/`, `graph/`) own types, rules, queries, and DAG behavior; they must remain pure and I/O-free.
 - **Storage** (`storage/`) owns persistence behind `IssueStore`, including JSON-file and in-memory implementations.
 

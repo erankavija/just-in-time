@@ -13,7 +13,10 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use thiserror::Error;
 
+mod emit;
 pub mod failure;
+
+pub use emit::{emit_outcome, HumanRender, Report, Response};
 
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
