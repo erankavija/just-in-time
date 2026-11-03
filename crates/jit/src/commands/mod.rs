@@ -81,7 +81,8 @@ pub use config::{
 pub use document::DocumentOps;
 pub use gate::{
     FieldEdit, GateNotRequiredError, GateOps, GatePassAllEntry, GatePassFailed, GatePassOutcome,
-    GateUpdate, ManualGateAttestationRequiredError, PassAllOutcome,
+    GateStatusArgumentsTransposedError, GateUpdate, ManualGateAttestationRequiredError,
+    PassAllOutcome,
 };
 pub use gate_check::VerdictSource;
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat, GraphOps};
@@ -90,9 +91,9 @@ pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueLocalUpdate, IssueOps};
 pub use item::{ItemListResult, ItemOps, ItemShowResult};
 pub use profile::{
-    parse_profile_selector, ProfileApplyError, ProfileOps, ProfileResolutionError,
-    ProfileSelection, ProfileSelectorError, ProfileVariableOptions, SelectedProfile,
-    UNCOMMITTED_TARGETS_RESOLUTION,
+    parse_profile_selector, ProfileApplyError, ProfileNotFoundError, ProfileOps,
+    ProfileResolutionError, ProfileSelection, ProfileSelectorError, ProfileVariableOptions,
+    SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use query::QueryOps;

@@ -43,6 +43,29 @@ pub struct GateNotRequiredError {
     pub gate_key: GateKey,
 }
 
+/// Error returned by `jit gate status` when its two positionals look swapped:
+/// the first names a registered gate and the second resolves to an issue.
+///
+/// Raised before any lookup, so it is an invalid-argument condition (exit code
+/// `2`) that names the canonical argument order.
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "'{gate_key}' is a gate key and '{issue}' is an issue; the issue id and gate key look transposed."
+)]
+pub struct GateStatusArgumentsTransposedError {
+    /// The issue, as written in the gate position.
+    pub issue: String,
+    /// The gate key, as written in the issue position.
+    pub gate_key: String,
+}
+
+impl GateStatusArgumentsTransposedError {
+    /// The invocation with the arguments in canonical order.
+    pub fn canonical_command(&self) -> String {
+        format!("jit gate status {} {}", self.issue, self.gate_key)
+    }
+}
+
 /// Error returned when `jit gate evaluate`/`pass` targets a MANUAL gate with no
 /// `--by` attestor.
 ///

@@ -40,138 +40,6 @@ use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-/// Build the `--json` error envelope for a rejected `jit dep add` batch
-/// (jit:c8518f2a). Every rejected edge is named under `details.rejected`
-/// (REQ-02), each carrying its own classified `code` — the same per-edge
-/// classification the single-edge path used before the batch was made atomic
-/// (jit:a05b87ae). The top-level `code`/`message` mirror the batch's dominant
-/// edge, matching [`classify`]'s dominant-edge tiering exactly (both walk
-/// the same rejected list and stop at the first non-`ValidationFailed`
-/// classification), so the JSON and non-JSON paths always agree on exit code.
-fn dep_add_batch_json_error(
-    batch: &jit::errors::DependencyBatchRejectedError,
-) -> jit::output::JsonError {
-    use jit::graph::GraphError;
-    use jit::output::{ErrorCode, JsonError};
-
-    let from_id = batch.from_id();
-
-    // Classify every rejected edge (for the `details.rejected` array): the
-    // SAME per-edge classification the single-edge path used before the
-    // batch was made atomic (jit:a05b87ae).
-    let edge_code = |err: &anyhow::Error| -> &'static str {
-        if matches!(
-            err.downcast_ref::<GraphError<IssueId>>(),
-            Some(GraphError::CycleDetected)
-        ) {
-            ErrorCode::CycleDetected.as_str()
-        } else if err
-            .downcast_ref::<jit::errors::RedundantDependencyError>()
-            .is_some()
-        {
-            ErrorCode::ValidationFailed.as_str()
-        } else if err
-            .downcast_ref::<jit::storage::IssueNotFoundError>()
-            .is_some()
-            || matches!(
-                err.downcast_ref::<GraphError<IssueId>>(),
-                Some(GraphError::NodeNotFound { .. })
-            )
-        {
-            ErrorCode::IssueNotFound.as_str()
-        } else if err
-            .downcast_ref::<jit::domain::identity::InvalidIdPrefixError>()
-            .is_some()
-        {
-            ErrorCode::InvalidIdPrefix.as_str()
-        } else if err
-            .downcast_ref::<jit::storage::AmbiguousIdError>()
-            .is_some()
-        {
-            ErrorCode::AmbiguousId.as_str()
-        } else {
-            "DEPENDENCY_ERROR"
-        }
-    };
-    let edge_message = |to: &str, err: &anyhow::Error| -> String {
-        // The nicer templated cycle message names both ends of the edge;
-        // every other kind's `Display` already names what's needed.
-        if matches!(
-            err.downcast_ref::<GraphError<IssueId>>(),
-            Some(GraphError::CycleDetected)
-        ) {
-            format!("Adding dependency would create a cycle: {from_id} -> {to}")
-        } else {
-            err.to_string()
-        }
-    };
-
-    let rejected_details: Vec<serde_json::Value> = batch
-        .rejected()
-        .iter()
-        .map(|(to, err)| {
-            serde_json::json!({
-                "from": from_id,
-                "to": to,
-                "code": edge_code(err),
-                "message": edge_message(to, err),
-            })
-        })
-        .collect();
-
-    // The dominant edge — the same tiering `classify` uses
-    // (a resolution failure always wins over a graph-validation failure) —
-    // drives the top-level `code`/`message`/`suggestions`. Built via the SAME
-    // per-kind constructor the single-edge path used (`cycle_detected`,
-    // `issue_not_found`, `refine_id_error`), so this batch wrapper preserves
-    // their suggestions and kind-specific detail fields; the batch-wide
-    // per-edge listing is then merged in alongside them, not in place of them.
-    let dominant_index = batch
-        .rejected()
-        .iter()
-        .position(|(_, err)| classify(err).exit_code() != ExitCode::ValidationFailed)
-        .unwrap_or(0);
-    let (to, err) = &batch.rejected()[dominant_index];
-
-    let mut json_error = if matches!(
-        err.downcast_ref::<GraphError<IssueId>>(),
-        Some(GraphError::CycleDetected)
-    ) {
-        JsonError::cycle_detected(from_id, to)
-    } else if err
-        .downcast_ref::<jit::errors::RedundantDependencyError>()
-        .is_some()
-    {
-        command_json_error(err, ErrorCode::ValidationFailed)
-    } else if err
-        .downcast_ref::<jit::storage::IssueNotFoundError>()
-        .is_some()
-        || matches!(
-            err.downcast_ref::<GraphError<IssueId>>(),
-            Some(GraphError::NodeNotFound { .. })
-        )
-    {
-        JsonError::issue_not_found(to)
-    } else {
-        jit::output::refine_id_error(err, command_json_error(err, ErrorCode::DependencyError))
-    };
-
-    let mut details = json_error
-        .error
-        .details
-        .take()
-        .unwrap_or_else(|| serde_json::json!({}));
-    if let serde_json::Value::Object(ref mut map) = details {
-        map.insert("from_id".to_string(), serde_json::json!(from_id));
-        map.insert(
-            "rejected".to_string(),
-            serde_json::Value::Array(rejected_details),
-        );
-    }
-    json_error.error.details = Some(details);
-    json_error
-}
-
 /// Report a `jit recover` failure as `recovery_failed` and exit.
 fn exit_recovery_failed(error: &anyhow::Error, json: bool) -> ! {
     if json {
@@ -257,74 +125,19 @@ fn report_gate_check_error<T>(e: anyhow::Error, json: bool) -> Result<T> {
 /// evaluation. Keeping the classifier shared preserves the `gate evaluate`
 /// taxonomy when a batch contains checker, runner, lookup, or argument errors.
 fn gate_pass_json_error(e: &anyhow::Error, requested: &str) -> jit::output::JsonError {
-    use jit::output::{ErrorCode, GateRunSummary, JsonError};
-    let json_error = if let Some(gate_failure) = e.downcast_ref::<jit::commands::GatePassFailed>() {
-        // Distinguish a checker failure (verdict `fail`, exit 4) from a
-        // runner/infra error (verdict `error`, exit 10). The error code drives
-        // the exit code, so the JSON and non-JSON paths agree.
-        let (error_code, verdict) = match gate_failure.status {
-            jit::domain::GateRunStatus::Error => (ErrorCode::IoError, "error"),
-            _ => (ErrorCode::GateFailed, "fail"),
-        };
-        command_json_error(e, error_code)
-            .with_details(serde_json::json!({
-                "issue_id": gate_failure.issue_id,
-                "key": gate_failure.gate_key,
-                "status": "failed",
-                "verdict": verdict,
-                "checker_result": GateRunSummary::full(&gate_failure.result),
-                "warnings": gate_failure.warnings,
-            }))
-            .with_suggestion(format!(
-                "Inspect the checker result with: jit gate status {} {}",
-                gate_failure.issue_id, gate_failure.gate_key
-            ))
-            .with_suggestion(format!(
-                "View run history with: jit gate status {} {} --all",
-                gate_failure.issue_id, gate_failure.gate_key
-            ))
-            .with_suggestion(format!(
-                "Fix the failing gate and rerun: jit gate evaluate {} {}",
-                gate_failure.issue_id, gate_failure.gate_key
-            ))
-    } else if let Some(not_required) = e.downcast_ref::<jit::commands::GateNotRequiredError>() {
-        // Pre-verdict argument error: not a gate verdict, so it carries no
-        // `verdict` field.
-        command_json_error(e, jit::output::ErrorCode::InvalidArgument)
-            .with_details(serde_json::json!({
-                "issue_id": not_required.issue_id,
-                "key": not_required.gate_key,
-            }))
-            .with_suggestion(format!(
-                "Add the gate first: jit gate add {} {}",
-                not_required.issue_id, not_required.gate_key
-            ))
-    } else if let Some(needs_attestor) =
-        e.downcast_ref::<jit::commands::ManualGateAttestationRequiredError>()
+    use jit::commands::{GateNotRequiredError, GatePassFailed, ManualGateAttestationRequiredError};
+    if e.is::<GatePassFailed>()
+        || e.is::<GateNotRequiredError>()
+        || e.is::<ManualGateAttestationRequiredError>()
     {
-        // Pre-verdict argument error (jit:1d59070d REQ-03): a manual gate has
-        // no checker to run, so a bare evaluate would silently record an
-        // unattributed pass. No write happened, so — like `GateNotRequiredError`
-        // above — this carries no `verdict` field.
-        command_json_error(e, jit::output::ErrorCode::InvalidArgument)
-            .with_details(serde_json::json!({
-                "issue_id": needs_attestor.issue_id,
-                "key": needs_attestor.gate_key,
-            }))
-            .with_suggestion(format!(
-                "Record the pass with: jit gate evaluate {} {} --by <attestor>",
-                needs_attestor.issue_id, needs_attestor.gate_key
-            ))
-    } else if e
-        .downcast_ref::<jit::storage::IssueNotFoundError>()
-        .is_some()
-    {
-        // Pre-verdict lookup error: issue id did not resolve.
+        classify(e)
+    } else if e.is::<jit::storage::IssueNotFoundError>() {
+        // Pre-verdict lookup error: the request text, not the resolved id,
+        // names what did not resolve.
         JsonError::issue_not_found(requested)
     } else {
         command_json_error(e, ErrorCode::GateError)
-    };
-    json_error
+    }
 }
 
 /// Print the outcome of a graph-template apply (`jit apply <template> <container>`).
@@ -1601,30 +1414,7 @@ fn main() {
 /// Emit one structured envelope for a failure propagated to the top level.
 /// Handler-owned JSON failures terminate before reaching this boundary.
 fn emit_top_level_json_error(error: &anyhow::Error) -> ExitCode {
-    let json_error = if error
-        .downcast_ref::<jit::errors::InvalidLabelPatternError>()
-        .is_some()
-    {
-        command_json_error(error, ErrorCode::InvalidLabelPattern).with_suggestion(
-            "Use 'namespace:value' for an exact match or 'namespace:*' for a wildcard",
-        )
-    } else if let Some(refusal) =
-        error.downcast_ref::<jit::errors::LinkedCheckoutWriteRefusedError>()
-    {
-        // The machine-readable refusal carries the same three facts the rendered
-        // one does, from the same error: the checkout, the stance that refused
-        // it, and how to permit the operation (jit:f52567ed REQ-02).
-        command_json_error(error, ErrorCode::LinkedCheckoutWriteRefused)
-            .with_details(serde_json::json!({
-                "checkout": refusal.checkout(),
-                "stance": refusal.stance(),
-            }))
-            .with_suggestions(
-                jit::errors::LinkedCheckoutWriteRefusedError::permit_guidance().to_vec(),
-            )
-    } else {
-        classify(error)
-    };
+    let json_error = classify(error);
     let exit_code = json_error.exit_code();
 
     let rendered = json_error.to_json_string().unwrap_or_else(|_| {
@@ -3147,7 +2937,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             e.downcast_ref::<jit::errors::DependencyBatchRejectedError>()
                         {
                             if json {
-                                let json_error = dep_add_batch_json_error(batch);
+                                let json_error =
+                                    jit::output::failure::dependency_batch_json_error(batch);
                                 let code = json_error.exit_code().code();
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(code);
@@ -3861,27 +3652,18 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 .map(|gates| gates.iter().any(|g| g.key.as_str() == id))
                                 .unwrap_or(false);
                             if id_is_gate && resolve_issue_arg(&storage, &gate_key).is_ok() {
-                                let canonical = format!("jit gate status {} {}", gate_key, id);
-                                let message = format!(
-                                    "'{id}' is a gate key and '{gate_key}' is an issue; the issue id and gate key look transposed."
-                                );
+                                let transposed =
+                                    jit::commands::GateStatusArgumentsTransposedError {
+                                        issue: gate_key,
+                                        gate_key: id,
+                                    };
                                 if json {
-                                    use jit::output::JsonError;
-                                    let json_error = JsonError::new(
-                                        jit::output::ErrorCode::InvalidArgument,
-                                        message,
-                                    )
-                                    .with_details(serde_json::json!({
-                                        "issue_id": gate_key,
-                                        "key": id,
-                                        "transposed": true,
-                                    }))
-                                    .with_suggestion(format!("Did you mean: {canonical}"));
+                                    let json_error = classify(&transposed.into());
                                     println!("{}", json_error.to_json_string()?);
                                     std::process::exit(json_error.exit_code().code());
                                 } else {
-                                    eprintln!("Error: {message}");
-                                    eprintln!("  Did you mean: {canonical}");
+                                    eprintln!("Error: {transposed}");
+                                    eprintln!("  Did you mean: {}", transposed.canonical_command());
                                     std::process::exit(2);
                                 }
                             }
@@ -6069,34 +5851,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 Err(e) => {
                     if json {
-                        use jit::output::ErrorCode;
-
-                        // Classify by downcast against the typed SearchError, not by
-                        // scanning the message text. RipgrepNotInstalled -> the
-                        // not-found code; every other failure (rg ran and failed, an
-                        // io/spawn error, a parse error) -> the generic search code.
-                        let error_code = if matches!(
-                            e.downcast_ref::<jit::search::SearchError>(),
-                            Some(jit::search::SearchError::RipgrepNotInstalled)
-                        ) {
-                            ErrorCode::RipgrepNotFound
+                        // A typed SearchError classifies itself; any other failure
+                        // (an io/spawn error, say) is the generic search failure.
+                        let json_error = if e.is::<jit::search::SearchError>() {
+                            classify(&e)
                         } else {
-                            ErrorCode::SearchFailed
+                            command_json_error(&e, jit::output::ErrorCode::SearchFailed)
                         };
-
-                        let suggestion = if error_code == ErrorCode::RipgrepNotFound {
-                            Some(
-                                "Install ripgrep from https://github.com/BurntSushi/ripgrep"
-                                    .to_string(),
-                            )
-                        } else {
-                            None
-                        };
-
-                        let mut json_error = command_json_error(&e, error_code);
-                        if let Some(sug) = suggestion {
-                            json_error = json_error.with_suggestion(sug);
-                        }
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
                     } else {

@@ -2,17 +2,213 @@
 //!
 //! [`classify`] is the one library classifier shared by every consumer: it maps
 //! a typed failure to its registered [`ErrorCode`], whose
-//! [`ErrorCode::exit_code`] is the process status.
+//! [`ErrorCode::exit_code`] is the process status, and to the details and
+//! suggestions its type determines.
 
 use super::{ErrorCode, ExitCode, JsonError};
+use crate::domain::identity::IssueId;
 
 /// Classify a propagated failure by its typed cause.
 ///
-/// The envelope carries the registered code and the error's message; its
-/// [`JsonError::exit_code`] is that code's [`ErrorCode::exit_code`], so the
-/// reported code and the process status cannot drift.
+/// The envelope carries the registered code, the error's message, and the
+/// details and suggestions its type determines; its [`JsonError::exit_code`] is
+/// that code's [`ErrorCode::exit_code`], so the reported code and the process
+/// status cannot drift.
 pub fn classify(error: &anyhow::Error) -> JsonError {
-    JsonError::new(classify_code(error), error.to_string())
+    derive_guidance(error).apply(JsonError::new(classify_code(error), error.to_string()))
+}
+
+/// The details and suggestions a failure's type determines.
+#[derive(Default)]
+struct Guidance {
+    details: Option<serde_json::Value>,
+    suggestions: Vec<String>,
+}
+
+impl Guidance {
+    fn of(json: JsonError) -> Self {
+        Self {
+            details: json.error.details,
+            suggestions: json.error.suggestions,
+        }
+    }
+
+    fn apply(self, json: JsonError) -> JsonError {
+        let json = match self.details {
+            Some(details) => json.with_details(details),
+            None => json,
+        };
+        json.with_suggestions(self.suggestions)
+    }
+}
+
+/// The guidance of the one typed failure `error` is; empty for an untyped or
+/// self-explanatory one.
+fn derive_guidance(error: &anyhow::Error) -> Guidance {
+    use crate::commands::{
+        GateNotRequiredError, GatePassFailed, GateStatusArgumentsTransposedError,
+        ManualGateAttestationRequiredError, ProfileApplyError, ProfileNotFoundError,
+        ProfileResolutionError,
+    };
+    use crate::errors::{
+        DependencyBatchRejectedError, InvalidLabelPatternError, LinkedCheckoutWriteRefusedError,
+        TransitionBlockedError,
+    };
+    use crate::profile::ProfileGraphError;
+    use crate::repository_state::RepositoryStateError;
+
+    if let Some(failure) = error.downcast_ref::<GatePassFailed>() {
+        let verdict = match failure.status {
+            crate::domain::GateRunStatus::Error => "error",
+            _ => "fail",
+        };
+        let (issue, key) = (&failure.issue_id, &failure.gate_key);
+        return Guidance {
+            details: Some(serde_json::json!({
+                "issue_id": issue,
+                "key": key,
+                "status": "failed",
+                "verdict": verdict,
+                "checker_result": super::GateRunSummary::full(&failure.result),
+                "warnings": failure.warnings,
+            })),
+            suggestions: vec![
+                format!("Inspect the checker result with: jit gate status {issue} {key}"),
+                format!("View run history with: jit gate status {issue} {key} --all"),
+                format!("Fix the failing gate and rerun: jit gate evaluate {issue} {key}"),
+            ],
+        };
+    }
+    if let Some(not_required) = error.downcast_ref::<GateNotRequiredError>() {
+        let (issue, key) = (&not_required.issue_id, &not_required.gate_key);
+        return Guidance {
+            details: Some(serde_json::json!({ "issue_id": issue, "key": key })),
+            suggestions: vec![format!("Add the gate first: jit gate add {issue} {key}")],
+        };
+    }
+    if let Some(needs_attestor) = error.downcast_ref::<ManualGateAttestationRequiredError>() {
+        let (issue, key) = (&needs_attestor.issue_id, &needs_attestor.gate_key);
+        return Guidance {
+            details: Some(serde_json::json!({ "issue_id": issue, "key": key })),
+            suggestions: vec![format!(
+                "Record the pass with: jit gate evaluate {issue} {key} --by <attestor>"
+            )],
+        };
+    }
+    if let Some(transposed) = error.downcast_ref::<GateStatusArgumentsTransposedError>() {
+        return Guidance {
+            details: Some(serde_json::json!({
+                "issue_id": transposed.issue,
+                "key": transposed.gate_key,
+                "transposed": true,
+            })),
+            suggestions: vec![format!("Did you mean: {}", transposed.canonical_command())],
+        };
+    }
+    if let Some(not_found) = error.downcast_ref::<crate::storage::IssueNotFoundError>() {
+        return Guidance::of(JsonError::issue_not_found(not_found.id()));
+    }
+    if let Some(blocked) = error.downcast_ref::<TransitionBlockedError>() {
+        return Guidance::of(JsonError::transition_blocked(blocked));
+    }
+    if error.is::<InvalidLabelPatternError>() {
+        return Guidance {
+            details: None,
+            suggestions: vec![INVALID_LABEL_PATTERN_SUGGESTION.to_owned()],
+        };
+    }
+    if let Some(refusal) = error.downcast_ref::<LinkedCheckoutWriteRefusedError>() {
+        // The checkout, the stance that refused it, and how to permit the
+        // operation (jit:f52567ed REQ-02).
+        return Guidance {
+            details: Some(serde_json::json!({
+                "checkout": refusal.checkout(),
+                "stance": refusal.stance(),
+            })),
+            suggestions: LinkedCheckoutWriteRefusedError::permit_guidance().to_vec(),
+        };
+    }
+    if let Some(batch) = error.downcast_ref::<DependencyBatchRejectedError>() {
+        return Guidance::of(dependency_batch_json_error(batch));
+    }
+    if let Some(id_error) = id_resolution_error(error) {
+        return Guidance::of(id_error);
+    }
+    if let Some(ProfileApplyError::UncommittedTargets { paths }) =
+        error.downcast_ref::<ProfileApplyError>()
+    {
+        return Guidance {
+            details: Some(serde_json::json!({
+                "paths": paths,
+                "resolution": crate::commands::UNCOMMITTED_TARGETS_RESOLUTION,
+            })),
+            suggestions: Vec::new(),
+        };
+    }
+    if error.is::<ProfileNotFoundError>()
+        || matches!(
+            error.downcast_ref::<ProfileResolutionError>(),
+            Some(ProfileResolutionError::UnresolvableDependency { .. })
+        )
+        || matches!(
+            error.downcast_ref::<ProfileGraphError>(),
+            Some(ProfileGraphError::MissingDependency { .. })
+        )
+    {
+        return Guidance {
+            details: None,
+            suggestions: vec![MISSING_PROFILE_SUGGESTION.to_owned()],
+        };
+    }
+    if let Some(RepositoryStateError::ProfileTargetConflicts(conflicts)) =
+        error.downcast_ref::<RepositoryStateError>()
+    {
+        return Guidance {
+            details: serde_json::to_value(conflicts).ok(),
+            suggestions: Vec::new(),
+        };
+    }
+    if let Some(search_error) = error.downcast_ref::<crate::search::SearchError>() {
+        return Guidance {
+            details: None,
+            suggestions: match search_error {
+                crate::search::SearchError::RipgrepNotInstalled => {
+                    vec![RIPGREP_INSTALL_SUGGESTION.to_owned()]
+                }
+                crate::search::SearchError::Failed(_) => Vec::new(),
+            },
+        };
+    }
+    Guidance::default()
+}
+
+const INVALID_LABEL_PATTERN_SUGGESTION: &str =
+    "Use 'namespace:value' for an exact match or 'namespace:*' for a wildcard";
+const MISSING_PROFILE_SUGGESTION: &str = "Place the package it depends on beside it";
+const RIPGREP_INSTALL_SUGGESTION: &str =
+    "Install ripgrep from https://github.com/BurntSushi/ripgrep";
+
+/// The envelope of an ambiguous or too-short id prefix, carrying the offending
+/// prefix (and the candidates it matches) in `details`.
+pub(super) fn id_resolution_error(error: &anyhow::Error) -> Option<JsonError> {
+    if let Some(prefix_error) =
+        error.downcast_ref::<crate::domain::identity::InvalidIdPrefixError>()
+    {
+        return Some(
+            JsonError::new(ErrorCode::InvalidIdPrefix, prefix_error.to_string())
+                .with_details(serde_json::json!({ "prefix": prefix_error.prefix() })),
+        );
+    }
+    error
+        .downcast_ref::<crate::storage::AmbiguousIdError>()
+        .map(|ambiguous| {
+            JsonError::new(ErrorCode::AmbiguousId, ambiguous.to_string()).with_details(
+                serde_json::json!({
+                    "prefix": ambiguous.prefix(),
+                    "matches": ambiguous.matches(),
+                }),
+            )
+        })
 }
 
 /// The registered code of a failure. Human message text is deliberately absent
@@ -43,6 +239,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     if error
         .downcast_ref::<crate::commands::GateNotRequiredError>()
         .is_some()
+        || error
+            .downcast_ref::<crate::commands::GateStatusArgumentsTransposedError>()
+            .is_some()
     {
         return ErrorCode::InvalidArgument;
     }
@@ -65,11 +264,8 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     {
         return ErrorCode::LinkedCheckoutWriteRefused;
     }
-    if error
-        .downcast_ref::<crate::errors::TransitionBlockedError>()
-        .is_some()
-    {
-        return ErrorCode::Blocked;
+    if let Some(blocked) = error.downcast_ref::<crate::errors::TransitionBlockedError>() {
+        return blocked.error_code();
     }
     if error
         .downcast_ref::<crate::errors::ValidationFailedError>()
@@ -109,10 +305,27 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         .downcast_ref::<crate::commands::ProfileResolutionError>()
         .is_some()
         || error
+            .downcast_ref::<crate::commands::ProfileNotFoundError>()
+            .is_some()
+        || error
             .downcast_ref::<crate::profile::ProfileGraphError>()
             .is_some()
     {
         return ErrorCode::ProfileError;
+    }
+    // A search that could not run, or ran and failed (jit search).
+    if let Some(search_error) = error.downcast_ref::<crate::search::SearchError>() {
+        return match search_error {
+            crate::search::SearchError::RipgrepNotInstalled => ErrorCode::RipgrepNotFound,
+            crate::search::SearchError::Failed(_) => ErrorCode::SearchFailed,
+        };
+    }
+    // An addressed item no scope declares.
+    if error
+        .downcast_ref::<crate::errors::ItemNotFoundError>()
+        .is_some()
+    {
+        return ErrorCode::ItemNotFound;
     }
 
     // The repository-state derivation error is classified by an exhaustive match
@@ -444,67 +657,123 @@ pub fn validate_fix_json_error(error: &anyhow::Error) -> JsonError {
     JsonError::new(classify_code(error), format!("{error:#}"))
 }
 
-/// Build the JSON error envelope for a failed profile command, attaching the
-/// details and suggestions a profile failure carries.
+/// Build the JSON error envelope for a failed profile command: the code the
+/// profile command family assigns, with the details and suggestions the
+/// failure's type determines.
 pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
-    use crate::repository_state::RepositoryStateError;
+    use crate::commands::ProfileApplyError;
 
-    if let Some(crate::commands::ProfileApplyError::UncommittedTargets { paths }) =
-        error.downcast_ref::<crate::commands::ProfileApplyError>()
-    {
-        return Ok(
-            command_json_error(error, ErrorCode::ProfileUncommittedTargets).with_details(
-                serde_json::json!({
-                    "paths": paths,
-                    "resolution": crate::commands::UNCOMMITTED_TARGETS_RESOLUTION,
-                }),
-            ),
-        );
-    }
-    if error
+    let code = if matches!(
+        error.downcast_ref::<ProfileApplyError>(),
+        Some(ProfileApplyError::UncommittedTargets { .. })
+    ) {
+        ErrorCode::ProfileUncommittedTargets
+    } else if error
         .downcast_ref::<crate::profile::ProfileClaimError>()
         .is_some()
-        || error
-            .downcast_ref::<crate::commands::ProfileApplyError>()
-            .is_some()
+        || error.is::<ProfileApplyError>()
+        // The single sanctioned downcast of the anyhow CLI transport to the typed
+        // repository-state error: every refused target decision is a conflict;
+        // every other variant, an unreadable or unparseable registry included,
+        // keeps the generic profile-error code.
+        || matches!(
+            error.downcast_ref::<crate::repository_state::RepositoryStateError>(),
+            Some(crate::repository_state::RepositoryStateError::ProfileTargetConflicts(_))
+        )
     {
-        return Ok(command_json_error(error, ErrorCode::ProfileConflict));
-    }
-    // Stated rather than left to the fallback below, so this envelope and
-    // [`classify`]'s classification of the same failure are read from
-    // one decision.
-    if matches!(
-        error.downcast_ref::<crate::commands::ProfileResolutionError>(),
-        Some(crate::commands::ProfileResolutionError::UnresolvableDependency { .. })
-    ) || matches!(
-        error.downcast_ref::<crate::profile::ProfileGraphError>(),
-        Some(crate::profile::ProfileGraphError::MissingDependency { .. })
-    ) {
-        return Ok(command_json_error(error, ErrorCode::ProfileError)
-            .with_suggestion("Place the package it depends on beside it"));
-    }
-    if error
-        .downcast_ref::<crate::commands::ProfileResolutionError>()
-        .is_some()
-        || error
-            .downcast_ref::<crate::profile::ProfileGraphError>()
-            .is_some()
-    {
-        return Ok(command_json_error(error, ErrorCode::ProfileError));
-    }
-    // The single sanctioned downcast of the anyhow CLI transport to the typed
-    // repository-state error: every refused profile decision — a target or a
-    // declaration, raised directly or through initialization — is a conflict; an
-    // unreadable or unparseable profile registry is a generic profile error. Every
-    // other variant keeps the generic profile-error code.
-    if let Some(state_error) = error.downcast_ref::<RepositoryStateError>() {
-        if let RepositoryStateError::ProfileTargetConflicts(conflicts) = state_error {
-            return Ok(command_json_error(error, ErrorCode::ProfileConflict)
-                .with_details(serde_json::to_value(conflicts)?));
+        ErrorCode::ProfileConflict
+    } else {
+        ErrorCode::ProfileError
+    };
+    Ok(derive_guidance(error).apply(command_json_error(error, code)))
+}
+
+/// Build the `jit dep add` envelope for a rejected batch (jit:c8518f2a).
+///
+/// Every rejected edge is named under `details.rejected`, each carrying its own
+/// classified `code`. The top-level `code`, `message`, and `suggestions` mirror
+/// the batch's dominant edge, the one [`classify_code`] picks, so the JSON and
+/// non-JSON paths agree on the exit code. That edge's kind-specific details are
+/// kept and the batch-wide listing merged beside them.
+pub fn dependency_batch_json_error(
+    batch: &crate::errors::DependencyBatchRejectedError,
+) -> JsonError {
+    use crate::graph::GraphError;
+
+    let from_id = batch.from_id();
+    let is_cycle = |err: &anyhow::Error| {
+        matches!(
+            err.downcast_ref::<GraphError<IssueId>>(),
+            Some(GraphError::CycleDetected)
+        )
+    };
+    let is_missing_issue = |err: &anyhow::Error| {
+        err.is::<crate::storage::IssueNotFoundError>()
+            || matches!(
+                err.downcast_ref::<GraphError<IssueId>>(),
+                Some(GraphError::NodeNotFound { .. })
+            )
+    };
+    let edge_code = |err: &anyhow::Error| {
+        if is_cycle(err) {
+            ErrorCode::CycleDetected
+        } else if err.is::<crate::errors::RedundantDependencyError>() {
+            ErrorCode::ValidationFailed
+        } else if is_missing_issue(err) {
+            ErrorCode::IssueNotFound
+        } else if err.is::<crate::domain::identity::InvalidIdPrefixError>() {
+            ErrorCode::InvalidIdPrefix
+        } else if err.is::<crate::storage::AmbiguousIdError>() {
+            ErrorCode::AmbiguousId
+        } else {
+            ErrorCode::DependencyError
         }
-        return Ok(command_json_error(error, ErrorCode::ProfileError));
+    };
+
+    let rejected = batch
+        .rejected()
+        .iter()
+        .map(|(to, err)| {
+            let message = if is_cycle(err) {
+                format!("Adding dependency would create a cycle: {from_id} -> {to}")
+            } else {
+                err.to_string()
+            };
+            serde_json::json!({
+                "from": from_id,
+                "to": to,
+                "code": edge_code(err).as_str(),
+                "message": message,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let (to, err) = &batch.rejected()[batch
+        .rejected()
+        .iter()
+        .position(|(_, err)| classify_code(err).exit_code() != ExitCode::ValidationFailed)
+        .unwrap_or(0)];
+    let mut json_error = if is_cycle(err) {
+        JsonError::cycle_detected(from_id, to)
+    } else if err.is::<crate::errors::RedundantDependencyError>() {
+        command_json_error(err, ErrorCode::ValidationFailed)
+    } else if is_missing_issue(err) {
+        JsonError::issue_not_found(to)
+    } else {
+        super::refine_id_error(err, command_json_error(err, ErrorCode::DependencyError))
+    };
+
+    let mut details = json_error
+        .error
+        .details
+        .take()
+        .unwrap_or_else(|| serde_json::json!({}));
+    if let serde_json::Value::Object(map) = &mut details {
+        map.insert("from_id".to_string(), serde_json::json!(from_id));
+        map.insert("rejected".to_string(), serde_json::Value::Array(rejected));
     }
-    Ok(command_json_error(error, ErrorCode::ProfileError))
+    json_error.error.details = Some(details);
+    json_error
 }
 
 #[cfg(test)]
@@ -528,7 +797,7 @@ mod exit_code_projection_tests {
     /// `gate evaluate` / `gate evaluate-all` exception rows (checker verdict `4`,
     /// runner error `10`) are pinned to the real classifier: `classify`
     /// splits `GatePassFailed` on this status.
-    fn gate_pass_failed(status: GateRunStatus) -> anyhow::Error {
+    pub(super) fn gate_pass_failed(status: GateRunStatus) -> anyhow::Error {
         let result = GateRunResult {
             schema_version: 1,
             run_id: crate::test_utils::gate_run_id(1),
@@ -1169,5 +1438,399 @@ mod lock_timeout_classification_tests {
             command_json_error(&error, ErrorCode::GateError).exit_code(),
             ErrorCode::GateError.exit_code()
         );
+    }
+}
+
+#[cfg(test)]
+mod derived_guidance_tests {
+    //! The details and suggestions [`classify`] derives from a failure's type
+    //! alone, so a call site never has to build them. Each test owns one
+    //! derivation and asserts what the guidance says about the failure.
+
+    use super::exit_code_projection_tests::gate_pass_failed;
+    use super::{classify, dependency_batch_json_error};
+    use crate::commands::{
+        GateNotRequiredError, GateStatusArgumentsTransposedError,
+        ManualGateAttestationRequiredError, ProfileApplyError, ProfileNotFoundError,
+        ProfileResolutionError,
+    };
+    use crate::domain::identity::{InvalidIdPrefixError, ProfileId};
+    use crate::domain::{GateRunStatus, GateStatus, State};
+    use crate::errors::{
+        DependencyBatchRejectedError, InvalidLabelPatternError, ItemNotFoundError,
+        LinkedCheckoutWriteRefusedError, TransitionBlockedError, TransitionBlocker,
+    };
+    use crate::output::{ErrorCode, JsonError};
+    use crate::storage::{AmbiguousIdError, IssueNotFoundError};
+    use crate::test_utils::issue_id;
+
+    fn gate_key() -> crate::domain::identity::GateKey {
+        "tests".parse().unwrap()
+    }
+
+    fn details_of(json: &JsonError) -> &serde_json::Value {
+        json.error
+            .details
+            .as_ref()
+            .expect("the failure carries details")
+    }
+
+    fn suggestions_mention(json: &JsonError, needles: &[&str]) -> bool {
+        !json.error.suggestions.is_empty()
+            && json
+                .error
+                .suggestions
+                .iter()
+                .all(|suggestion| needles.iter().all(|needle| suggestion.contains(needle)))
+    }
+
+    #[test]
+    fn test_classify_gate_pass_failed_carries_verdict_checker_result_and_gate_commands() {
+        for (status, verdict, code) in [
+            (GateRunStatus::Failed, "fail", ErrorCode::GateFailed),
+            (GateRunStatus::Error, "error", ErrorCode::IoError),
+        ] {
+            let json = classify(&gate_pass_failed(status));
+
+            assert_eq!(json.error.code, code);
+            let details = details_of(&json);
+            assert_eq!(details["verdict"], verdict);
+            assert_eq!(details["issue_id"], issue_id(85).to_string());
+            assert_eq!(details["key"], "tests");
+            assert!(details.get("checker_result").is_some());
+            assert!(details.get("warnings").is_some());
+            let issue = issue_id(85).to_string();
+            assert!(
+                suggestions_mention(&json, &[issue.as_str(), "tests"]),
+                "{:?}",
+                json.error.suggestions
+            );
+        }
+    }
+
+    #[test]
+    fn test_classify_gate_not_required_names_the_gate_and_how_to_add_it() {
+        let error: anyhow::Error = GateNotRequiredError {
+            issue_id: issue_id(1),
+            gate_key: gate_key(),
+        }
+        .into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::InvalidArgument);
+        let details = details_of(&json);
+        assert_eq!(details["issue_id"], issue_id(1).to_string());
+        assert_eq!(details["key"], "tests");
+        assert!(details.get("verdict").is_none(), "no checker ran");
+        assert!(suggestions_mention(&json, &["gate add", "tests"]));
+    }
+
+    #[test]
+    fn test_classify_manual_gate_without_attestor_suggests_supplying_one() {
+        let error: anyhow::Error = ManualGateAttestationRequiredError {
+            issue_id: issue_id(1),
+            gate_key: gate_key(),
+        }
+        .into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::InvalidArgument);
+        assert_eq!(details_of(&json)["key"], "tests");
+        assert!(details_of(&json).get("verdict").is_none());
+        assert!(suggestions_mention(
+            &json,
+            &["gate evaluate", "--by", "tests"]
+        ));
+    }
+
+    #[test]
+    fn test_classify_transposed_gate_status_arguments_suggests_the_canonical_order() {
+        let transposed = GateStatusArgumentsTransposedError {
+            issue: "abc12345".to_owned(),
+            gate_key: "tests".to_owned(),
+        };
+        let error: anyhow::Error = transposed.into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::InvalidArgument);
+        let details = details_of(&json);
+        assert_eq!(details["transposed"], true);
+        assert_eq!(details["issue_id"], "abc12345");
+        assert_eq!(details["key"], "tests");
+        let [suggestion] = json.error.suggestions.as_slice() else {
+            panic!("one suggestion expected: {:?}", json.error.suggestions);
+        };
+        assert!(
+            suggestion.find("abc12345") < suggestion.find("tests"),
+            "the issue comes before the gate: {suggestion}"
+        );
+        assert!(error.to_string().contains("transposed"));
+    }
+
+    #[test]
+    fn test_classify_issue_not_found_names_the_missing_id_in_details() {
+        let error: anyhow::Error = IssueNotFoundError::new(issue_id(7)).into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::IssueNotFound);
+        assert_eq!(details_of(&json)["issue_id"], issue_id(7).to_string());
+        assert!(!json.error.suggestions.is_empty());
+        assert_eq!(json.error.message, error.to_string());
+    }
+
+    #[test]
+    fn test_classify_transition_blocked_carries_blockers_and_remediation() {
+        let blocked = TransitionBlockedError::dependencies(
+            issue_id(1),
+            State::Ready,
+            State::Backlog,
+            vec![TransitionBlocker::MissingDependency {
+                issue_id: issue_id(2),
+            }],
+        );
+        let remediation = blocked.remediation_commands();
+        let error: anyhow::Error = blocked.into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::Blocked);
+        let details = details_of(&json);
+        assert_eq!(details["issue_id"], issue_id(1).to_string());
+        assert_eq!(details["blockers"].as_array().map(Vec::len), Some(1));
+        assert_eq!(json.error.suggestions, remediation);
+    }
+
+    #[test]
+    fn test_classify_transition_blocked_by_gate_is_a_validation_failure() {
+        let error: anyhow::Error = TransitionBlockedError::gates(
+            issue_id(1),
+            State::Done,
+            State::Gated,
+            vec![(
+                gate_key(),
+                GateStatus::Pending,
+                crate::declarations::GateMode::Manual,
+            )],
+        )
+        .into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::ValidationFailed);
+        assert!(!json.error.suggestions.is_empty());
+    }
+
+    #[test]
+    fn test_classify_invalid_label_pattern_suggests_the_accepted_forms() {
+        let error: anyhow::Error = InvalidLabelPatternError::new("bad").into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::InvalidLabelPattern);
+        assert!(suggestions_mention(
+            &json,
+            &["namespace:value", "namespace:*"]
+        ));
+    }
+
+    #[test]
+    fn test_classify_linked_checkout_refusal_names_checkout_stance_and_permit_routes() {
+        let refusal = LinkedCheckoutWriteRefusedError::new(
+            "/work/linked",
+            crate::domain::LinkedCheckoutWriteStance::Refuse,
+        );
+        let stance = refusal.stance();
+        let error: anyhow::Error = refusal.into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::LinkedCheckoutWriteRefused);
+        let details = details_of(&json);
+        assert_eq!(details["checkout"], "/work/linked");
+        assert_eq!(details["stance"], serde_json::to_value(stance).unwrap());
+        assert_eq!(
+            json.error.suggestions,
+            LinkedCheckoutWriteRefusedError::permit_guidance().to_vec()
+        );
+    }
+
+    #[test]
+    fn test_classify_ambiguous_id_lists_the_prefix_and_its_candidates() {
+        let error: anyhow::Error =
+            AmbiguousIdError::issue("aaaa", ["aaaa1111".to_string(), "aaaa2222".to_string()])
+                .into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::AmbiguousId);
+        let details = details_of(&json);
+        assert_eq!(details["prefix"], "aaaa");
+        assert_eq!(details["matches"].as_array().map(Vec::len), Some(2));
+    }
+
+    #[test]
+    fn test_classify_invalid_id_prefix_names_the_prefix() {
+        let error: anyhow::Error = InvalidIdPrefixError::new("ab").into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::InvalidIdPrefix);
+        assert_eq!(details_of(&json)["prefix"], "ab");
+    }
+
+    fn batch(rejected: Vec<(&str, anyhow::Error)>) -> anyhow::Error {
+        DependencyBatchRejectedError::new(
+            issue_id(1),
+            rejected
+                .into_iter()
+                .map(|(to, error)| (to.to_owned(), error))
+                .collect(),
+        )
+        .into()
+    }
+
+    #[test]
+    fn test_classify_dependency_batch_names_every_rejected_edge_beside_the_dominant_edge() {
+        let error = batch(vec![
+            (
+                "cycle-target",
+                crate::graph::GraphError::<crate::domain::identity::IssueId>::CycleDetected.into(),
+            ),
+            ("ghost", IssueNotFoundError::new(issue_id(9)).into()),
+        ]);
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::IssueNotFound, "resolution wins");
+        let details = details_of(&json);
+        assert_eq!(details["from_id"], issue_id(1).to_string());
+        let rejected = details["rejected"].as_array().expect("edge listing");
+        assert_eq!(rejected.len(), 2);
+        assert_eq!(rejected[0]["code"], ErrorCode::CycleDetected.as_str());
+        assert_eq!(rejected[0]["to"], "cycle-target");
+        assert_eq!(rejected[1]["code"], ErrorCode::IssueNotFound.as_str());
+        assert_eq!(
+            details["issue_id"], "ghost",
+            "the dominant edge's own details survive"
+        );
+        assert!(!json.error.suggestions.is_empty());
+    }
+
+    #[test]
+    fn test_classify_dependency_batch_agrees_with_its_dedicated_envelope() {
+        let error = batch(vec![(
+            "loop",
+            crate::graph::GraphError::<crate::domain::identity::IssueId>::CycleDetected.into(),
+        )]);
+        let batch_error = error
+            .downcast_ref::<DependencyBatchRejectedError>()
+            .expect("a batch");
+
+        let classified = classify(&error);
+        let dedicated = dependency_batch_json_error(batch_error);
+
+        assert_eq!(classified.exit_code(), dedicated.exit_code());
+        assert_eq!(classified.error.details, dedicated.error.details);
+        assert_eq!(classified.error.suggestions, dedicated.error.suggestions);
+    }
+
+    #[test]
+    fn test_classify_uncommitted_profile_targets_names_paths_and_resolution() {
+        let error: anyhow::Error = ProfileApplyError::UncommittedTargets {
+            paths: vec!["docs/a.md".to_owned()],
+        }
+        .into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::ProfileUncommittedTargets);
+        let details = details_of(&json);
+        assert_eq!(details["paths"][0], "docs/a.md");
+        assert!(details["resolution"]
+            .as_str()
+            .is_some_and(|r| !r.is_empty()));
+    }
+
+    #[test]
+    fn test_classify_profile_target_conflicts_attach_the_conflict_list() {
+        let error: anyhow::Error = crate::repository_state::RepositoryStateError::from(
+            crate::repository_state::ProfileTargetConflictsError::new(vec![
+                crate::repository_state::ProfileTargetConflictEntry {
+                    owner: "candidate".try_into().expect("a canonical profile id"),
+                    subject: crate::repository_state::ProfileTargetSubject::File {
+                        path: crate::repository_state::VirtualPath::data("issues/a.json").unwrap(),
+                    },
+                    conflict: crate::repository_state::ProfileTargetConflict::Contested {
+                        owners: vec![ProfileId::try_from("candidate").unwrap()],
+                    },
+                },
+            ]),
+        )
+        .into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::ValidationFailed);
+        assert_eq!(
+            details_of(&json)["conflicts"].as_array().map(Vec::len),
+            Some(1)
+        );
+        assert!(json.error.suggestions.is_empty());
+    }
+
+    #[test]
+    fn test_classify_missing_profile_dependency_suggests_placing_the_package() {
+        let missing: Vec<anyhow::Error> = vec![
+            ProfileNotFoundError {
+                profile: ProfileId::try_from("base").unwrap(),
+            }
+            .into(),
+            ProfileResolutionError::UnresolvableDependency {
+                package: "workflow".to_owned(),
+                dependency: "base".to_owned(),
+                cause: anyhow::anyhow!("absent"),
+            }
+            .into(),
+            crate::profile::ProfileGraphError::MissingDependency {
+                package: "workflow".to_owned(),
+                dependency: "base".to_owned(),
+            }
+            .into(),
+        ];
+
+        for error in missing {
+            let json = classify(&error);
+
+            assert_eq!(json.error.code, ErrorCode::ProfileError, "{error}");
+            assert_eq!(json.error.suggestions.len(), 1, "{error}");
+        }
+    }
+
+    #[test]
+    fn test_classify_search_error_picks_search_code_and_installs_hint_only_for_missing_ripgrep() {
+        use crate::search::SearchError;
+
+        let missing = classify(&SearchError::RipgrepNotInstalled.into());
+        let failed = classify(&SearchError::Failed("boom".to_owned()).into());
+
+        assert_eq!(missing.error.code, ErrorCode::RipgrepNotFound);
+        assert!(suggestions_mention(&missing, &["ripgrep"]));
+        assert_eq!(failed.error.code, ErrorCode::SearchFailed);
+        assert!(failed.error.suggestions.is_empty());
+    }
+
+    #[test]
+    fn test_classify_item_not_found_has_its_own_code_without_guidance() {
+        let error: anyhow::Error = ItemNotFoundError::new("no such item").into();
+
+        let json = classify(&error);
+
+        assert_eq!(json.error.code, ErrorCode::ItemNotFound);
+        assert!(json.error.details.is_none());
+        assert!(json.error.suggestions.is_empty());
     }
 }

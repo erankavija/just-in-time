@@ -96,6 +96,14 @@ pub fn parse_profile_selector(selector: &str) -> Result<PathBuf, ProfileSelector
     }
 }
 
+/// A profile no package location supplies.
+#[derive(Debug, thiserror::Error)]
+#[error("Profile not found: {profile}")]
+pub struct ProfileNotFoundError {
+    /// The profile that was looked for.
+    pub profile: ProfileId,
+}
+
 /// Failure resolving which package bytes a command reads.
 ///
 /// Resolution names the route a selector addressed together with what failed.
@@ -900,7 +908,10 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
         dependency: &ProfileId,
     ) -> Result<ProfilePackage> {
         let not_found = || -> anyhow::Error {
-            crate::errors::NotFoundError::new(format!("Profile not found: {dependency}")).into()
+            ProfileNotFoundError {
+                profile: dependency.clone(),
+            }
+            .into()
         };
         let Some(location) = declaring
             .directory()

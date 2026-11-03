@@ -16,6 +16,7 @@ use crate::domain::item::{
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, resolve_kind_alias,
     AddressableItem, ItemError, ItemKind, ProjectSource, Scope, PROJECT_SCOPE_SENTINEL,
 };
+use crate::errors::ItemNotFoundError;
 
 /// Collection key of [`ItemListResult`].
 pub enum ItemsKey {}
@@ -354,10 +355,10 @@ impl<S: IssueStore> ItemOps<'_, S> {
                     .into_iter()
                     .find(|i| i.kind == kind && i.self_id == self_id)
                     .ok_or_else(|| {
-                        anyhow!(
+                        ItemNotFoundError::new(format!(
                             "project scope '@' declares no addressable item of kind '{kind}' \
                              with self-id '{self_id}'"
-                        )
+                        ))
                     })?;
                 Ok(ItemShowResult {
                     item,
@@ -409,17 +410,18 @@ impl<S: IssueStore> ItemOps<'_, S> {
                 let item = match matched.len() {
                     1 => matched.remove(0),
                     0 => {
-                        return Err(match &kind {
-                            Some(k) => anyhow!(
+                        return Err(ItemNotFoundError::new(match &kind {
+                            Some(k) => format!(
                                 "issue {} declares no addressable item of kind '{k}' \
                                  with self-id '{self_id}'",
                                 issue.short_id()
                             ),
-                            None => anyhow!(
+                            None => format!(
                                 "issue {} declares no addressable item with self-id '{self_id}'",
                                 issue.short_id()
                             ),
-                        });
+                        })
+                        .into());
                     }
                     _ => {
                         let kinds_found: Vec<&str> =
