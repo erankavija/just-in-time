@@ -404,6 +404,7 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
         .unwrap()
         .is_some());
     executor
+        .gates()
         .define_gate(
             &"repo-validate".parse().unwrap(),
             "Repo Validate".to_string(),

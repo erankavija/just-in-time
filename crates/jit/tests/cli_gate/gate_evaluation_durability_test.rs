@@ -37,6 +37,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
         .initialize_fresh_repository(repo.root(), None)
         .expect("initialize fresh repository");
     executor
+        .gates()
         .define_gate(
             &"durability-check".parse().unwrap(),
             "Durability check".to_string(),
@@ -71,6 +72,7 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
     // Attaching the gate after creation records its explicit `pending` state, so
     // the assertions below read a recorded verdict rather than an absent key.
     executor
+        .gates()
         .add_gate(&issue_id, &"durability-check".parse().unwrap())
         .expect("require the durability gate on the issue");
 

@@ -965,7 +965,7 @@ async fn get_document_diff<S: IssueStore>(
 async fn list_gates<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateDefinition>>, StatusCode> {
-    state.executor.list_gates().map(Json).map_err(|e| {
+    state.executor.gates().list_gates().map(Json).map_err(|e| {
         tracing::error!("Failed to list gates: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })
@@ -978,6 +978,7 @@ async fn get_gate_definition<S: IssueStore>(
 ) -> Result<Json<GateDefinition>, StatusCode> {
     state
         .executor
+        .gates()
         .show_gate_definition(&key)
         .map(Json)
         .map_err(|e| {
@@ -1001,6 +1002,7 @@ async fn list_gate_runs<S: IssueStore>(
     let id = resolve_issue_path_id(&state.executor, &id)?;
     let runs = state
         .executor
+        .gates()
         .list_gate_runs(&id, params.gate_key.as_ref())
         .map_err(|e| {
             tracing::error!("Failed to list gate runs for {}: {:?}", id, e);
@@ -1021,6 +1023,7 @@ async fn get_gate_run<S: IssueStore>(
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     state
         .executor
+        .gates()
         .get_gate_run_result(&id, &run_id)
         .map(|r| Json(GateRunSummary::full(&r)))
         .map_err(|e| {
@@ -1281,6 +1284,7 @@ mod tests {
         let other = harness.create_issue("Other issue");
         harness
             .executor
+            .gates()
             .pass_gate(&owner, &gate_key, Some("human:reviewer".to_string()), false)
             .unwrap();
         let run = harness
@@ -2569,6 +2573,7 @@ unique = false
         let observed = temp.path().join("observed-issue-docs.json");
         let gate_key = "docs-gate".parse().unwrap();
         executor
+            .gates()
             .define_gate(
                 &gate_key,
                 "Docs".to_string(),
@@ -2587,7 +2592,7 @@ unique = false
                 100,
             )
             .unwrap();
-        executor.add_gate(&id, &gate_key).unwrap();
+        executor.gates().add_gate(&id, &gate_key).unwrap();
         executor.check_gate(&id, &gate_key).unwrap();
 
         let listed_by_doc_list =
