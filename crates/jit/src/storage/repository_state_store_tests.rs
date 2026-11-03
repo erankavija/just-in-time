@@ -918,6 +918,45 @@ fn test_conformance_tail_capture_holds_length_and_final_line_on_both_backends() 
     }
 }
 
+/// The history read returns the whole log, longer than any tail, or `None`
+/// over an absent one.
+#[test]
+fn test_conformance_read_history_log_returns_the_whole_log_on_both_backends() {
+    let log = vec![b'x'; EVENT_LOG_TAIL_WINDOW as usize * 3];
+    let (_worktree, sessions) = sessions_over(&[(VirtualPath::EVENTS, &log)]);
+    for (mut session, _) in sessions {
+        assert_eq!(session.read_history_log().unwrap(), Some(log.clone()));
+    }
+    let (_worktree, sessions) = sessions_over(&[]);
+    for (mut session, _) in sessions {
+        assert_eq!(session.read_history_log().unwrap(), None);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn test_read_history_log_refuses_a_symbolic_link() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    std::fs::write(data.join("linked.jsonl"), b"{}\n").unwrap();
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    std::os::unix::fs::symlink(
+        "linked.jsonl",
+        layout.resolve(&VirtualPath::EVENTS).unwrap(),
+    )
+    .unwrap();
+    let mut session = JsonFileStorage::new(&data)
+        .open_mutation_session(layout)
+        .unwrap();
+
+    let outcome = session.read_history_log();
+    assert!(
+        matches!(outcome, Err(RepositoryStateStoreError::UnsafeTarget(_))),
+        "{outcome:?}"
+    );
+}
+
 fn capture_listing_errors(
     children: &[(&str, &[u8])],
     budget: CaptureBudget,
