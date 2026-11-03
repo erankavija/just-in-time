@@ -728,10 +728,22 @@ mod tests {
 
         // A short (1s TTL) and a long (600s TTL) lease, both acquired "now".
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(86), 1)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(86),
+                1,
+                Some("test lease"),
+                crate::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(87), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(87),
+                600,
+                Some("test lease"),
+                crate::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         let active_total = |clock: &FixedClock| -> usize {
