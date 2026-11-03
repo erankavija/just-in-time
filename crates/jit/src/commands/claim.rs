@@ -826,28 +826,14 @@ mod tests {
         coordinator.init()?;
 
         // Acquire claim
-        let lease = coordinator.acquire_claim(&full_id, ttl_secs)?;
+        let (lease, ()) = coordinator.acquire_claim_synchronized(
+            &full_id,
+            ttl_secs,
+            Some("test lease"),
+            ClaimAcquireLimits::new(100, 100),
+            |_| Ok(()),
+        )?;
         Ok(lease.lease_id)
-    }
-
-    /// Execute claim release with manually constructed paths (for testing)
-    fn execute_claim_release_test(
-        temp: &TempDir,
-        lease_id: &LeaseId,
-        agent_id: &str,
-    ) -> Result<()> {
-        let paths = create_test_paths(temp);
-
-        // Create coordinator
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator =
-            ClaimCoordinator::new(paths, locker, "wt:test".parse().unwrap(), agent_id.parse()?);
-
-        // Release lease
-        coordinator.release_lease(lease_id)?;
-        Ok(())
     }
 
     /// Execute claim release-by-issue with manually constructed paths (for testing).
@@ -1421,45 +1407,6 @@ mod tests {
 
     // Tests for claim release command
     #[test]
-    fn test_claim_release_fails_for_nonexistent_lease() -> Result<()> {
-        let (temp, _storage) = setup_test_repo()?;
-
-        let result = execute_claim_release_test(
-            &temp,
-            &"00000000-0000-4000-8000-000000000008".parse().unwrap(),
-            "agent:test",
-        );
-
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn test_claim_release_succeeds_for_valid_lease() -> Result<()> {
-        let (temp, executor) = setup_test_repo_with_config("")?;
-        let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
-
-        // Acquire a claim first
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
-
-        // Release it
-        let result = execute_claim_release_test(&temp, &lease_id, "agent:test");
-
-        assert!(result.is_ok(), "Should successfully release valid lease");
-        Ok(())
-    }
-
-    #[test]
     fn test_claim_release_allows_re_acquisition_after_release() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
@@ -1475,10 +1422,10 @@ mod tests {
         )?;
 
         // Acquire claim
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
 
         // Release it
-        execute_claim_release_test(&temp, &lease_id, "agent:first")?;
+        execute_claim_release_by_issue_test(&temp, &storage, &issue_id, "agent:first")?;
 
         // Should be able to acquire again
         let second_lease =
@@ -1918,7 +1865,15 @@ mod tests {
             agent_id.parse()?,
         );
         coordinator.init()?;
-        coordinator.acquire_claim(issue_id, 600)
+        coordinator
+            .acquire_claim_synchronized(
+                issue_id,
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .map(|(lease, ())| lease)
     }
 
     /// Count claim events for one issue by a given agent in the event log.

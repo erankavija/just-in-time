@@ -4449,7 +4449,15 @@ assert = {}
         );
         coordinator.init().unwrap();
         let issue_id = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0f0e_0d0c);
-        coordinator.acquire_claim(&issue_id, 600).unwrap();
+        coordinator
+            .acquire_claim_synchronized(
+                &issue_id,
+                600,
+                Some("test lease"),
+                crate::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
         let guard = claims_mutation_guard(&paths).unwrap().unwrap();
 
         let stranger = "agent:stranger".parse().unwrap();

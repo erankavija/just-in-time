@@ -427,10 +427,8 @@ proptest's default is 256 generated cases per property. `crates/jit/src/storage/
 runs its concurrency and rebuild properties against a real on-disk store, with real file
 locks and real threads per case. It sets `with_fsync(false)`: these properties verify index
 and rebuild invariants rather than crash durability, so the cost is the file and lock work
-itself. Its own comment records that each case creates a temp directory and does several
-real filesystem writes and reads, so the default 256 cases pushed these tests to seconds —
-and to minutes with fsync on — and it caps the file-touching properties at 64 cases while
-leaving the pure-logic ones at the default. `crates/jit/tests/fast_docs_templates/template_apply_tests.rs`
+itself. It bounds filesystem work with fewer generated cases while leaving pure-logic
+properties at the default case count. `crates/jit/tests/fast_docs_templates/template_apply_tests.rs`
 and `crates/jit/tests/fast_issue/readiness_coherence_tests.rs` run each case through a
 fresh in-memory `TestHarness`/`CommandExecutor` pipeline rather than a synthetic
 data structure, and cap at 48 cases for the same reason. Both caps trade case count for
@@ -439,15 +437,15 @@ files' own configuration comments for the exact rationale.
 
 | Test | Warm (ms) |
 | --- | ---: |
-| `storage::claim_coordinator::proptests::prop_concurrent_different_issues_succeed` | 3,008 |
-| `storage::claim_coordinator::proptests::prop_concurrent_claims_exclusive` | 2,931 |
+| `storage::claim_coordinator::proptests::test_concurrent_different_issues_succeed` | 3,008 |
+| `storage::claim_coordinator::proptests::test_concurrent_claims_exclusive` | 2,931 |
 | `template_apply_tests::prop_apply_yields_transitively_reduced_graph` | 2,430 |
 | `template_apply_tests::prop_force_refresh_is_idempotent_on_node_and_edge_set` | 2,420 |
 | `template_apply_tests::prop_apply_always_yields_acyclic_dag` | 2,262 |
 | `readiness_coherence_tests::prop_stored_readiness_agrees_with_the_blocked_predicate_after_dependency_edits` | 1,732 |
-| `storage::claim_coordinator::proptests::prop_sequence_numbers_monotonic` | 1,247 |
-| `storage::claim_coordinator::proptests::prop_lease_count_invariant` | 571 |
-| `storage::claim_coordinator::proptests::prop_no_data_loss_in_rebuild` | 524 |
+| `storage::claim_coordinator::proptests::test_sequence_numbers_monotonic` | 1,247 |
+| `storage::claim_coordinator::proptests::test_lease_count_invariant` | 571 |
+| `storage::claim_coordinator::proptests::test_no_data_loss_in_rebuild` | 524 |
 
 ### CLI subprocess publishing durable state
 
