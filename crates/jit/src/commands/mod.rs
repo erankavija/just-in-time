@@ -73,6 +73,7 @@ pub use batch_create::{
 };
 pub use bootstrap::{open_repository, OpenedRepository, RecoveryFailedError, RepositoryInvocation};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
+pub use claim::ClaimOps;
 pub use config::{resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigSetOutcome};
 pub use gate::{
     FieldEdit, GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, GateUpdate,
@@ -89,7 +90,7 @@ pub use profile::{
     ProfileSelectorError, ProfileVariableOptions, SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
-pub use template::TemplateApplyResult;
+pub use template::{TemplateApplyResult, TemplateOps};
 pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
     TemplateDelta,

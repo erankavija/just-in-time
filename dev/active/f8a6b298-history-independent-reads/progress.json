@@ -1,0 +1,457 @@
+{
+  "epic_id": "f8a6b298-e6b5-4d62-b73c-3f7b217c1a01",
+  "epic_short_id": "f8a6b298",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "short_id": "77f3db10",
+          "key": "gate-state-last-run",
+          "title": "Gate state names the run that produced it",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "803b107c",
+          "key": "gate-run-load-by-issue",
+          "title": "Gate-run records load by issue and run id",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "becea20a",
+          "key": "lease-test-only-api-removal",
+          "title": "Test-only lease APIs are gone",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "c3e3e2ff",
+          "key": "lease-reader-migration",
+          "title": "Lock-free lease readers use the storage read path",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "cc6ef886",
+          "key": "lease-store-fixtures",
+          "title": "CLI tests reach lease storage through one test helper",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "63de0883",
+          "key": "claim-acquire-event-from-assignee",
+          "title": "Claim acquire emits its event exactly when the assignee changes",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "84e1e27a",
+          "key": "event-log-read-rule",
+          "title": "Event-log readers ignore an unterminated final line that the next append overwrites",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        },
+        {
+          "short_id": "f9bf70a5",
+          "key": "archive-execution-record-type",
+          "title": "Archive executions are one domain record type",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "7a8773ca",
+          "key": "search-excludes-history",
+          "title": "Default search reads no history file",
+          "classification": "implementation",
+          "type": "task",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "short_id": "2117739f",
+          "key": "gate-latest-run-reads",
+          "title": "Latest-run readers use the gate-state accessor",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "dd53527f",
+          "key": "lease-ops-through-lock",
+          "title": "Lease operations run through the lease lock",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "5b0e3d63",
+          "key": "validation-skips-event-log",
+          "title": "Validation captures read only the event log's end",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "b32a720e",
+          "key": "redo-record-refuses-log-rewrite",
+          "title": "Redo records refuse a rewrite of the event log",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "short_id": "93b7f1dd",
+          "key": "gate-verdict-provenance",
+          "title": "Reused verdicts name their source issue and source run",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "15009590",
+          "key": "lease-mutation-guard-through-lock",
+          "title": "The repository-mutation lease check reads through the held lease lock",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "a7314585",
+          "key": "lease-recover-through-lock",
+          "title": "Recovery evicts and reclaims leases through the lease lock",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "97f5f2b7",
+          "key": "torn-tail-marker-removal",
+          "title": "The profile torn-tail marker is gone",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "5582e39e",
+          "key": "mutation-event-tail-captures",
+          "title": "Mutations capture the event log's end, not the whole log",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "db9bcf12",
+          "key": "archive-evidence-writes",
+          "title": "Archive executions write a per-target evidence record",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "short_id": "0bd2c797",
+          "key": "gate-run-latest-captures",
+          "title": "Gate captures hold only the evaluated issue's latest runs",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "2f563673",
+          "key": "lease-per-issue-records",
+          "title": "Each lease is one record under the lease lock",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "7fc08dff",
+          "key": "archive-execute-reads-evidence",
+          "title": "Archive execute reads the per-target evidence record",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "short_id": "b33ed7eb",
+          "key": "gate-verdict-record-writes",
+          "title": "Recorded runs write their per-key verdict record",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "53d19851",
+          "key": "lease-index-machinery-removal",
+          "title": "Claims-index rebuild machinery is gone",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "5e1ba005",
+          "key": "archive-preview-reads-evidence",
+          "title": "Archive preview reads the per-target evidence record",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "short_id": "6c0f8739",
+          "key": "gate-verdict-reuse-lookup",
+          "title": "Gate reuse reads one verdict record",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "614a6f97",
+          "key": "lease-issue-addressed-ops",
+          "title": "Renew, heartbeat and force-evict address a lease by issue",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "725af076",
+          "key": "capture-refuses-whole-event-log",
+          "title": "Captures refuse a whole read of the event log",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "09ca911e",
+          "key": "storage-records-per-key-reference",
+          "title": "The storage-record reference describes verdict and archive-evidence records",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "short_id": "0851fae4",
+          "key": "gate-run-shared-reader",
+          "title": "Both storage backends read gate-run records through one reader",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "7244ecb2",
+          "key": "lease-interruption-matrix",
+          "title": "An interrupted lease operation leaves the prior or the next lease",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "short_id": "1630015d",
+          "key": "gate-run-per-issue-layout",
+          "title": "Gate-run records live under their issue",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "f0a5b90a",
+          "key": "lease-operator-docs",
+          "title": "Lease command and recovery docs match per-issue lease records",
+          "classification": "documentation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "short_id": "4466395d",
+          "key": "history-isolation-test",
+          "title": "Ordinary commands succeed over unparseable history",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "ac8f07c2",
+          "key": "storage-format-history-docs",
+          "title": "The storage-format reference describes per-key records and history files",
+          "classification": "documentation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "ba4c6054",
+          "key": "gate-and-search-command-docs",
+          "title": "Gate provenance, gate-run lookup and search docs match per-key reads",
+          "classification": "documentation",
+          "type": "task",
+          "status": "pending"
+        },
+        {
+          "short_id": "944edb32",
+          "key": "format-rewrite-tooling",
+          "title": "A rewrite script and window driver move a repository to format 4",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "short_id": "655273d9",
+          "key": "format-cutover",
+          "title": "Five repositories move to repository format 4 in one window",
+          "classification": "implementation",
+          "type": "task",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 11,
+      "issues": [
+        {
+          "short_id": "735949ef",
+          "key": "per-key-gate-runs",
+          "title": "Gate runs are addressed per issue, per gate and per inputs digest",
+          "classification": "implementation",
+          "type": "story",
+          "status": "pending"
+        },
+        {
+          "short_id": "5ee85aed",
+          "key": "per-key-leases",
+          "title": "Leases are per-issue records under one lease sequence",
+          "classification": "implementation",
+          "type": "story",
+          "status": "pending"
+        },
+        {
+          "short_id": "dc5fa7f8",
+          "key": "history-boundary",
+          "title": "Only history-reporting commands read history files",
+          "classification": "implementation",
+          "type": "story",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [
+    "944edb32",
+    "655273d9"
+  ],
+  "escalations": [
+    {
+      "item": "stale-lease visibility under R2; b697a3f7 d3c94dc5, lease-required-error, c517b88b body",
+      "status": "pending with user via just-in-time-6a"
+    }
+  ],
+  "rework_counts": {},
+  "surfaced_pitfalls": [
+    {
+      "from": "84e1e27a",
+      "note": "97f5f2b7 body lists UncertifiedTornTail and append prose already removed; worker should treat as met"
+    },
+    {
+      "from": "gate reviewer b06cee74",
+      "note": "gate-and-search-command-docs membership label; format-rewrite-tooling borderline large"
+    }
+  ],
+  "dispatch_log": [
+    {
+      "id": "84e1e27a",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "sets the shared event-log rule"
+    },
+    {
+      "id": "7a8773ca",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "narrow, fully specified"
+    },
+    {
+      "id": "77f3db10",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "tests only"
+    },
+    {
+      "id": "803b107c",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "mechanical signature change across backends"
+    },
+    {
+      "id": "cc6ef886",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "test fixture consolidation"
+    },
+    {
+      "id": "b32a720e",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "narrow refusal plus branch deletion"
+    }
+  ],
+  "started_at": "2026-11-02T23:48:34.925324+00:00",
+  "freeze": "format-4-window: installed jit stays at last format 3 build from the 2117739f landing to the window",
+  "notes": [
+    "Dispatch runs ready issues ahead of a held wave 1 remainder, per the user's maximum-parallelism instruction relayed by just-in-time-6a; dependencies still order all work. 2117739f is held to shorten the format freeze."
+  ]
+}

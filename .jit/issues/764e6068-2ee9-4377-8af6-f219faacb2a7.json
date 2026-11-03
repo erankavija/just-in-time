@@ -7,6 +7,7 @@
   ],
   "description": "Prove at the CLI that the event history commands read a log holding retired-tag records and omit those records, so this repository's append-only log stays readable.\n\n## Background\n\nThe one domain parser, `domain::parse_known_events` (`crates/jit/src/domain/event_log.rs:42-80`), skips a well-formed record whose tag is not a current `EventTag` (`:66`). Both storage backends read through it, and a cross-backend storage test owns that rule (the in-memory event parser change 47a082ef). `jit events query --event-type` parses its argument into an `EventTag` (the event tag vocabulary change e98ae5a4). The history-reporting commands that parse the log are `jit events tail`, `jit events query` and `jit worktree store-divergence` (`commands/events.rs`, `commands/worktree.rs:347-348` through `storage/json.rs:76` `read_exact_store`). This repository's log holds retired-tag records (`document_archived`), and history is append-only, so they stay. No CLI test shows these commands over such a log; their existing tests live in `crates/jit/tests/cli_repo_workflow/integration_test.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: A CLI test plants a well-formed retired-tag record between two current records and shows that `jit events tail` and `jit events query` succeed and report both current records and not the retired one.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
+  "first_ready_at": "2026-11-02T23:40:41.172567855Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -21,10 +22,11 @@
     "component:cli",
     "component:testing",
     "per:@/charter/D-19",
-    "satisfies:f8a6b298/REQ-10"
+    "satisfies:f8a6b298/REQ-10",
+    "resolution:superseded-by-unknown-tag-rule"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "History commands report a log holding retired-tag records",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-02T23:41:55.162215960Z"
 }

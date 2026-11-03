@@ -150,8 +150,8 @@ pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot>
                 VirtualPath::EVENTS.relative().as_str(),
             )
             .with_context(|| format!("Failed to open event log at {}", events_path.display()))?;
-            let mut contents = String::new();
-            file.read_to_string(&mut contents).with_context(|| {
+            let mut contents = Vec::new();
+            file.read_to_end(&mut contents).with_context(|| {
                 format!("Failed to read event log at {}", events_path.display())
             })?;
             parse_known_events(&contents).with_context(|| {
@@ -1166,10 +1166,8 @@ impl IssueStore for JsonFileStorage {
             return Ok(Vec::new());
         }
 
-        let events_lock_path = self.root.join(EVENTS_LOCK_FILE);
-        let _lock = self.locker.lock_shared(&events_lock_path)?;
-
-        let contents = fs::read_to_string(&events_path).context("Failed to read events file")?;
+        // Lock-free (`@/charter/D-22`): the parser ignores a partly written final line.
+        let contents = fs::read(&events_path).context("Failed to read events file")?;
         parse_known_events(&contents).context("Failed to deserialize event log")
     }
 
@@ -1211,7 +1209,11 @@ impl IssueStore for JsonFileStorage {
         Ok(events)
     }
 
-    fn load_gate_run_result(&self, run_id: &GateRunId) -> Result<crate::domain::GateRunResult> {
+    fn load_gate_run_result(
+        &self,
+        issue_id: &IssueId,
+        run_id: &GateRunId,
+    ) -> Result<crate::domain::GateRunResult> {
         let result_path = self.resolve_virtual_path(&VirtualPath::gate_run_record(run_id))?;
         let data = match super::repository_state_store::open_absolute_dir_nofollow(&self.root) {
             Ok(data) => data,
@@ -1285,13 +1287,17 @@ impl IssueStore for JsonFileStorage {
                 result_path.display()
             )
         })?;
-        let result = serde_json::from_slice(&contents).with_context(|| {
-            format!(
-                "Failed to deserialize gate run result at {}",
-                result_path.display()
-            )
-        })?;
+        let result: crate::domain::GateRunResult =
+            serde_json::from_slice(&contents).with_context(|| {
+                format!(
+                    "Failed to deserialize gate run result at {}",
+                    result_path.display()
+                )
+            })?;
 
+        if &result.issue_id != issue_id {
+            return Err(GateRunNotFoundError::new(run_id.clone()).into());
+        }
         Ok(result)
     }
 
@@ -1415,12 +1421,8 @@ impl IssueStore for JsonFileStorage {
 }
 
 fn is_torn_event_prefix(line: &str, error: &serde_json::Error) -> bool {
-    // The canonical mutation finalizer isolates a non-newline tail before
-    // publishing the next event. Before that retry it is still the final line. Such a record
-    // is therefore recognizable as an object-shaped JSON prefix that fails
-    // only because input ended. This admits a final torn append and every
-    // number of independently isolated predecessors (including prefixes ending
-    // after a nested `}`), while syntax and shape/data corruption remain fatal.
+    // An object-shaped JSON prefix that fails only because input ended, including
+    // one ending after a nested `}`. Syntax and shape corruption remain fatal.
     line.trim_start().starts_with('{') && error.is_eof()
 }
 
@@ -1558,6 +1560,20 @@ mod tests {
 
         assert_eq!(result.unwrap(), "verdict");
         drop(retained);
+    }
+
+    #[test]
+    fn test_read_events_does_not_wait_on_a_writer_holding_the_events_lock() {
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        fs::write(temp.path().join(".jit/events.jsonl"), "").unwrap();
+        let root = storage.root().to_path_buf();
+        drop(storage);
+        let storage =
+            JsonFileStorage::with_lock_timeout(root, std::time::Duration::from_millis(50));
+        let _writer = storage.acquire_events_write_lock().unwrap();
+
+        assert_eq!(storage.read_events().unwrap(), Vec::new());
     }
 
     #[test]
@@ -1700,7 +1716,9 @@ mod tests {
         fs::write(&target, "{}").unwrap();
         std::os::unix::fs::symlink(target, record).unwrap();
 
-        let error = storage.load_gate_run_result(&run_id).unwrap_err();
+        let error = storage
+            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+            .unwrap_err();
         assert!(format!("{error:#}").contains("ordinary file"));
     }
 
@@ -1729,7 +1747,9 @@ mod tests {
         .unwrap();
         let storage = JsonFileStorage::new(data);
 
-        let error = storage.load_gate_run_result(&run_id).unwrap_err();
+        let error = storage
+            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+            .unwrap_err();
         assert!(format!("{error:#}").contains("ordinary directory"));
     }
 
@@ -1752,7 +1772,9 @@ mod tests {
         .unwrap();
         let storage = JsonFileStorage::new(data);
 
-        let error = storage.load_gate_run_result(&run_id).unwrap_err();
+        let error = storage
+            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+            .unwrap_err();
         assert!(format!("{error:#}").contains("ordinary directory"));
         assert!(storage
             .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))

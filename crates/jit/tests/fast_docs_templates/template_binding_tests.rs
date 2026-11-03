@@ -160,13 +160,14 @@ fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
     // The auto-bound anchor is the repository's, not a compiled-in name. This is
     // the binding `jit apply <template> <container>` fills from its positional
     // argument.
-    let anchor = executor.container_anchor().unwrap().to_string();
+    let anchor = executor.templates().container_anchor().unwrap().to_string();
     assert_eq!(anchor, "target");
 
     // --- apply ---
     let container = create_container(&executor, "Auth epic");
     let bindings = BTreeMap::from([(anchor.clone(), container.clone())]);
     let (applied, _) = executor
+        .templates()
         .apply_template("plan", &container, &bindings, false)
         .expect("apply resolves the renamed anchor and creates the renamed roles");
 
@@ -191,6 +192,7 @@ fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
     jit::test_harness::seed_memory_issue(executor.storage(), &c);
 
     let (refreshed, _) = executor
+        .templates()
         .apply_template("plan", &container, &bindings, true)
         .expect("--force refresh locates the applied bracket through the renamed roles");
     assert_eq!(
@@ -242,17 +244,22 @@ fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
             ..MemoryDeclarations::default()
         },
     );
-    assert_eq!(executor.container_anchor().unwrap(), "container");
+    assert_eq!(
+        executor.templates().container_anchor().unwrap(),
+        "container"
+    );
 
     let container = create_container(&executor, "Auth epic");
     let bindings = BTreeMap::from([("container".to_string(), container.clone())]);
     let (applied, _) = executor
+        .templates()
         .apply_template("plan", &container, &bindings, false)
         .unwrap();
     let planning_id = applied.created_node_ids_by_role["planning"].clone();
     let breakdown_id = applied.created_node_ids_by_role["breakdown"].clone();
 
     let (refreshed, _) = executor
+        .templates()
         .apply_template("plan", &container, &bindings, true)
         .unwrap();
     assert_eq!(refreshed.created_node_ids_by_role["planning"], planning_id);
@@ -267,5 +274,8 @@ fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
 #[test]
 fn test_container_anchor_defaults_without_a_templates_file() {
     let executor = memory_executor_declaring(InMemoryStorage::new(), MemoryDeclarations::default());
-    assert_eq!(executor.container_anchor().unwrap(), "container");
+    assert_eq!(
+        executor.templates().container_anchor().unwrap(),
+        "container"
+    );
 }
