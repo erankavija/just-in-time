@@ -397,7 +397,9 @@
       "status": "pending with user via just-in-time-6a"
     }
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "becea20a": 1
+  },
   "surfaced_pitfalls": [
     {
       "from": "84e1e27a",
