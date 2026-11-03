@@ -36,7 +36,8 @@ pub struct PutFile {
     pub mode: FileMode,
 }
 
-/// Event-log bytes written at the offset the mutation captured as the log's length.
+/// Event-log bytes written at the log's captured committed length: the end of
+/// its last newline-terminated line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventAppend {
     pub offset: u64,
@@ -68,11 +69,13 @@ impl RedoRecord {
     /// overlap: no operation's path may be an ancestor of another's, and no
     /// two operations may name the same path. The event append's implicit
     /// target, [`VirtualPath::EVENTS`], participates alongside every
-    /// make-directory, put and delete.
+    /// make-directory, put and delete. Puts and deletes at the event log are
+    /// forbidden.
     ///
     /// # Errors
     ///
-    /// Returns [`RedoRecordError::OverlappingAncestor`] or
+    /// Returns [`RedoRecordError::EventLogRewrite`] for a put or delete at the
+    /// event log, or [`RedoRecordError::OverlappingAncestor`] or
     /// [`RedoRecordError::DuplicatePath`] when the operation set contradicts
     /// itself.
     pub fn new(
@@ -81,6 +84,14 @@ impl RedoRecord {
         deletes: Vec<VirtualPath>,
         event_append: Option<EventAppend>,
     ) -> Result<Self, RedoRecordError> {
+        if puts
+            .iter()
+            .map(|put| &put.path)
+            .chain(deletes.iter())
+            .any(|path| *path == VirtualPath::EVENTS)
+        {
+            return Err(RedoRecordError::EventLogRewrite);
+        }
         let record = Self {
             make_directories,
             puts,
@@ -222,7 +233,8 @@ impl RedoRecord {
     ///
     /// Returns [`RedoRecordError`] when the bytes carry no header, a header this
     /// build cannot read, a path outside the repository roots, fewer content
-    /// bytes than the header declares, or bytes beyond them.
+    /// bytes than the header declares, bytes beyond them, or an operation set
+    /// rejected by [`Self::new`].
     pub fn parse(bytes: &[u8]) -> Result<Self, RedoRecordError> {
         let end = bytes
             .iter()
@@ -267,16 +279,7 @@ impl RedoRecord {
             })
             .transpose()?;
         match content.len() - read {
-            0 => {
-                let record = Self {
-                    make_directories,
-                    puts,
-                    deletes,
-                    event_append,
-                };
-                record.ensure_disjoint_paths()?;
-                Ok(record)
-            }
+            0 => Self::new(make_directories, puts, deletes, event_append),
             trailing => Err(RedoRecordError::TrailingBytes(trailing)),
         }
     }
@@ -300,6 +303,8 @@ pub enum RedoRecordError {
     OverlappingAncestor(VirtualPath, VirtualPath),
     #[error("redo record names path {0:?} in more than one operation")]
     DuplicatePath(VirtualPath),
+    #[error("the event log changes only by a positioned append")]
+    EventLogRewrite,
     #[error(transparent)]
     Path(#[from] RepositoryLayoutError),
 }
@@ -611,41 +616,49 @@ mod tests {
     }
 
     #[test]
-    fn test_new_rejects_a_delete_naming_the_event_log_while_appending_to_it() {
-        let error = RedoRecord::new(
-            Vec::new(),
-            Vec::new(),
-            vec![VirtualPath::EVENTS],
+    fn test_new_rejects_a_put_or_delete_at_the_event_log_with_or_without_an_append() {
+        for event_append in [
+            None,
             Some(EventAppend {
                 offset: 0,
                 bytes: Vec::new(),
             }),
-        )
-        .unwrap_err();
-
-        assert_eq!(error, RedoRecordError::DuplicatePath(VirtualPath::EVENTS));
+        ] {
+            for (puts, deletes) in [
+                (vec![put(VirtualPath::EVENTS)], Vec::new()),
+                (Vec::new(), vec![VirtualPath::EVENTS]),
+            ] {
+                assert!(
+                    RedoRecord::new(Vec::new(), puts, deletes, event_append.clone()).is_err(),
+                    "the event log must reject puts and deletes regardless of an append"
+                );
+            }
+        }
     }
 
     #[test]
-    fn test_parse_rejects_the_same_overlap_new_rejects() {
+    fn test_parse_rejects_the_same_operation_sets_new_rejects() {
         let path = VirtualPath::data("records/a.json").unwrap();
-        let puts = vec![put(path.clone()), put(path)];
-        // Built directly through the struct literal: `serialize` carries no
-        // validation of its own, so this is the same bytes a corrupted or
-        // adversarial process could hand `parse`.
-        let bytes = RedoRecord {
-            make_directories: Vec::new(),
-            puts: puts.clone(),
-            deletes: Vec::new(),
-            event_append: None,
-        }
-        .serialize()
-        .unwrap();
+        for (puts, deletes) in [
+            (vec![put(path.clone()), put(path)], Vec::new()),
+            (vec![put(VirtualPath::EVENTS)], Vec::new()),
+            (Vec::new(), vec![VirtualPath::EVENTS]),
+        ] {
+            // Bypass construction to represent corrupt serialized input.
+            let bytes = RedoRecord {
+                make_directories: Vec::new(),
+                puts: puts.clone(),
+                deletes: deletes.clone(),
+                event_append: None,
+            }
+            .serialize()
+            .unwrap();
 
-        assert_eq!(
-            RedoRecord::parse(&bytes).unwrap_err(),
-            RedoRecord::new(Vec::new(), puts, Vec::new(), None).unwrap_err(),
-        );
+            assert_eq!(
+                RedoRecord::parse(&bytes).unwrap_err(),
+                RedoRecord::new(Vec::new(), puts, deletes, None).unwrap_err(),
+            );
+        }
     }
 
     #[test]
