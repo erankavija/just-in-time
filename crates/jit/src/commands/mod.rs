@@ -88,7 +88,7 @@ pub use gate_check::VerdictSource;
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat, GraphOps};
 pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
-pub use issue::{DescriptionUpdate, IssueCreation, IssueLocalUpdate, IssueOps};
+pub use issue::{DescriptionUpdate, IssueCreation, IssueLocalUpdate, IssueMutation, IssueOps};
 pub use item::{ItemListResult, ItemOps, ItemShowResult};
 pub use profile::{
     parse_profile_selector, ProfileApplyError, ProfileNotFoundError, ProfileOps,
@@ -928,6 +928,7 @@ struct PrecheckPreflight {
 }
 
 struct CapturedLifecycleOutcome {
+    issue: Issue,
     changed: bool,
     storage_warnings: Vec<crate::storage::StorageWarning>,
 }
@@ -1082,7 +1083,7 @@ struct DerivedFieldUpdate {
 
 #[derive(Debug)]
 struct CapturedFieldUpdateOutcome {
-    target_id: IssueId,
+    issue: Issue,
     changed: bool,
     entered_terminal: bool,
     warnings: Vec<String>,
@@ -2419,7 +2420,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn publish_captured_issue_mutation(
         &self,
         request: CapturedIssueMutation,
-    ) -> Result<CapturedIssueMutationOutcome>
+    ) -> Result<(Issue, CapturedIssueMutationOutcome)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -2493,11 +2494,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                 };
 
                 let derived = derive_captured_issue_mutation(issue, &registry, &request, &context)?;
+                let issue_result = crate::repository_state::mutated_issue(
+                    &image,
+                    request.issue_id(),
+                    &derived.intents,
+                    context.timestamp(),
+                )?;
                 if derived.intents.is_empty() {
-                    return Ok(SessionStep::Done(derived.outcome));
+                    return Ok(SessionStep::Done((issue_result, derived.outcome)));
                 }
                 let plan = finalize(&layout, &image, &context, &derived.intents)?;
-                Ok(SessionStep::Apply(plan, derived.outcome))
+                Ok(SessionStep::Apply(plan, (issue_result, derived.outcome)))
             },
         )
     }
@@ -2783,11 +2790,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             let mut lease_warnings = lease_warnings;
             lease_warnings.append(&mut derived.warnings);
             derived.warnings = lease_warnings;
+            let issue_result = crate::repository_state::mutated_issue(
+                &image,
+                &target,
+                &derived.intents,
+                context.timestamp(),
+            )?;
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.with_warnings(derived.warnings).into()),
                     None => Ok(AttemptOutcome::Done(CapturedFieldUpdateOutcome {
-                        target_id: target,
+                        issue: issue_result,
                         changed: derived.changed,
                         entered_terminal: derived.entered_terminal,
                         warnings: derived.warnings,
@@ -2801,7 +2814,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             match derived.error_after_apply {
                 Some(error) => Err(error.with_warnings(derived.warnings).into()),
                 None => Ok(AttemptOutcome::Done(CapturedFieldUpdateOutcome {
-                    target_id: target,
+                    issue: issue_result,
                     changed: derived.changed,
                     entered_terminal: derived.entered_terminal,
                     warnings: derived.warnings,
@@ -2827,29 +2840,33 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &IssueId,
         assignee: crate::domain::Assignee,
-    ) -> Result<Vec<crate::storage::StorageWarning>>
+    ) -> Result<IssueMutation<crate::storage::StorageWarning>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        Ok(self
-            .publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
+        let outcome =
+            self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
                 issue_id: issue_id.clone(),
                 assignee,
-            })?
-            .storage_warnings)
+            })?;
+        Ok(IssueMutation {
+            issue: outcome.issue,
+            warnings: outcome.storage_warnings,
+        })
     }
 
-    fn publish_captured_release(&self, issue_id: &IssueId, reason: String) -> Result<()>
+    fn publish_captured_release(&self, issue_id: &IssueId, reason: String) -> Result<Issue>
     where
         S: crate::storage::RepositoryStateStore,
     {
         let released_by = claim::resolve_release_actor(self.require_layout()?.worktree_root())?;
-        self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Release {
-            issue_id: issue_id.clone(),
-            reason,
-            released_by,
-        })?;
-        Ok(())
+        let outcome =
+            self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Release {
+                issue_id: issue_id.clone(),
+                reason,
+                released_by,
+            })?;
+        Ok(outcome.issue)
     }
 
     fn publish_captured_auto_transition(&self, issue_id: &IssueId, target: State) -> Result<bool>
@@ -3103,6 +3120,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         }
                         if issue.state == State::InProgress {
                             return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
+                                issue,
                                 changed: false,
                                 storage_warnings,
                             }));
@@ -3140,6 +3158,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let resolved = crate::domain::queries::build_issue_map(&issues);
                     if !issue.should_auto_transition_to_ready(&resolved) {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
+                            issue,
                             changed: false,
                             storage_warnings,
                         }));
@@ -3152,6 +3171,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         != Some(ReadinessCorrection::Demote)
                     {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
+                            issue,
                             changed: false,
                             storage_warnings,
                         }));
@@ -3161,6 +3181,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 CapturedLifecycleMutation::AutoDone { .. } => {
                     if !issue.should_auto_transition_to_done() {
                         return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
+                            issue,
                             changed: false,
                             storage_warnings,
                         }));
@@ -3261,8 +3282,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                         }),
                 )
                 .collect::<Vec<_>>();
+            let issue_result = crate::repository_state::mutated_issue(
+                &image,
+                &expected_target,
+                &intents,
+                context.timestamp(),
+            )?;
             if intents.is_empty() {
                 return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
+                    issue: issue_result,
                     changed,
                     storage_warnings,
                 }));
@@ -3275,6 +3303,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Err(error.with_warnings(std::mem::take(&mut warnings)).into());
             }
             Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
+                issue: issue_result,
                 changed,
                 storage_warnings,
             }))
