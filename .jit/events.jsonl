@@ -23281,3 +23281,6 @@
 {"id":"358f1ad2-2db2-445d-bb0e-f6c0b4bdeb2a","issue_id":"06177584-1c3e-4344-8116-b60d44c1e3a4","priority":"normal","timestamp":"2026-11-03T23:39:07.666304377Z","title":"Dependency tree repeats shared subtrees at every path","type":"issue_created"}
 {"from":"ready","id":"e720fc91-c75f-47ce-89cb-72560c8f538b","issue_id":"16c53cc2-f324-4e1e-8881-039bce61d96d","timestamp":"2026-11-03T23:39:08.184631985Z","to":"backlog","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"0508f998-eaef-461e-9cdd-956cf3f2bf6d","issue_id":"16c53cc2-f324-4e1e-8881-039bce61d96d","timestamp":"2026-11-03T23:39:08.184631985Z","type":"issue_updated","updated_by":"dependency-add"}
+{"id":"3f2c2e16-fff0-459d-b6c7-9bb100c094ae","issue_id":"14f49a28-0f6e-4645-80ce-b8f300f497b2","priority":"normal","timestamp":"2026-11-03T23:39:55.842992240Z","title":"Package-content docs check assembles its packages outside the repository","type":"issue_created"}
+{"gate_key":"code-review","id":"1c84902f-67ac-4d6e-8093-6fddc1e9f170","issue_id":"14f49a28-0f6e-4645-80ce-b8f300f497b2","timestamp":"2026-11-03T23:39:56.029843031Z","type":"gate_added"}
+{"fields":["dependencies"],"id":"7cf2676d-8652-4f5f-a298-cb1faaf42cc7","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-11-03T23:39:56.431320793Z","type":"issue_updated","updated_by":"dependency-add"}
