@@ -571,7 +571,10 @@
           "short_id": "b23faa59",
           "title": "Invariant command moves to a library handler",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress",
+          "vendor": "claude",
+          "model_tier": "opus",
+          "tier_reason": "pathfinder: first real group sets the main.rs glue and registration form the other wave 7 handlers copy"
         },
         {
           "key": "handlers-project",
@@ -611,7 +614,10 @@
           "short_id": "1eb949a5",
           "title": "Measure per-test durations and derive the per-test limits",
           "classification": "research",
-          "status": "pending"
+          "status": "in_progress",
+          "vendor": "claude",
+          "model_tier": "sonnet",
+          "tier_reason": "measurement and limit derivation; needs judgment, runs under the cargo-ci host lock"
         }
       ]
     },
@@ -922,5 +928,8 @@
     "epic_total": -239,
     "head_lines": 9111,
     "head_rev": "b5bd434e8"
+  },
+  "wave_notes": {
+    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet."
   }
 }
