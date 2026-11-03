@@ -16,6 +16,7 @@
       "path": "dev/active/9876a23a-one-validation-report/evidence-70ac98fc-ci-ancestry.md"
     }
   ],
+  "done_at": "2026-11-03T22:41:25.800104712Z",
   "first_ready_at": "2026-11-03T22:11:30.801919415Z",
   "gates_required": [
     "cargo-ci",
@@ -29,9 +30,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "bb4fa0cd-010d-4ee4-9cfa-b1771245aa7b",
-      "status": "failed",
-      "updated_at": "2026-11-03T22:31:45.291817692Z",
+      "run_id": "7f99dbe5-a018-4903-ae1a-6d0a08cd8176",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:41:03.990540079Z",
       "updated_by": "auto:executor"
     }
   },
@@ -46,7 +47,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Export, initialization and profile test images use the shared builder",
-  "updated_at": "2026-11-03T22:36:58.095397868Z"
+  "updated_at": "2026-11-03T22:41:25.800104712Z"
 }

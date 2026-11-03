@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-03T22:41:07.183165076Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -24,7 +25,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Repository-state and document test images use the shared builder",
-  "updated_at": "2026-11-03T22:37:32.174770119Z"
+  "updated_at": "2026-11-03T22:41:07.183165076Z"
 }
