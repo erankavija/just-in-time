@@ -1370,7 +1370,9 @@ fn run_query_all<S: IssueStore>(
         .as_ref()
         .map(|p| Priority::from_str(p))
         .transpose()?;
-    let issues = executor.query_all(state_filter, assignee, priority_filter, &label)?;
+    let issues = executor
+        .queries()
+        .query_all(state_filter, assignee, priority_filter, &label)?;
 
     if json {
         use jit::domain::MinimalIssue;
@@ -2196,7 +2198,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let assignee = assignee
                         .map(|value| Assignee::from_str(&value))
                         .transpose()?;
-                    let issues = executor.search_issues_with_filters(
+                    let issues = executor.queries().search_issues_with_filters(
                         query.as_deref().unwrap_or(""),
                         priority_filter,
                         state_filter,
@@ -4826,7 +4828,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         },
         Commands::Events(event_cmd) => match event_cmd {
             EventCommands::Tail { n } => {
-                let events = executor.tail_events(n)?;
+                let events = executor.queries().tail_events(n)?;
                 if json {
                     use jit::output::{EventListResponse, JsonOutput};
                     let msg = format!("{} event(s)", events.len());
@@ -4847,7 +4849,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let issue = issue_id
                     .map(|id| resolve_issue_filter_arg(&storage, &id))
                     .transpose()?;
-                let events = executor.query_events(event_type, issue, limit)?;
+                let events = executor.queries().query_events(event_type, issue, limit)?;
                 if json {
                     use jit::output::{EventListResponse, JsonOutput};
                     let msg = format!("{} event(s)", events.len());
@@ -5444,7 +5446,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let issues = executor.query_available(priority_filter, &label)?;
+                        let issues = executor
+                            .queries()
+                            .query_available(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5483,7 +5487,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let blocked = executor.query_blocked_filtered(priority_filter, &label)?;
+                        let blocked = executor
+                            .queries()
+                            .query_blocked_filtered(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5566,7 +5572,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let issues = executor.query_strategic_filtered(priority_filter, &label)?;
+                        let issues = executor
+                            .queries()
+                            .query_strategic_filtered(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5605,7 +5613,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let issues = executor.query_closed_filtered(priority_filter, &label)?;
+                        let issues = executor
+                            .queries()
+                            .query_closed_filtered(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5640,7 +5650,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         // matching all --label patterns (ANDed; none = whole repo).
                         let rollup = match by {
                             jit::cli::CountDimension::State => {
-                                executor.query_count_by_state(&label)?
+                                executor.queries().query_count_by_state(&label)?
                             }
                         };
 
