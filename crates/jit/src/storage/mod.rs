@@ -294,13 +294,15 @@ pub trait IssueStore: Clone {
             .collect())
     }
 
-    /// Load a gate run result by run ID.
+    /// Load a gate run result by issue and run ID.
     ///
     /// # Errors
     ///
-    /// Returns an error if the result does not exist or cannot be deserialized.
+    /// Returns not found if the result is absent or belongs to another issue,
+    /// or an error if it cannot be read or deserialized.
     fn load_gate_run_result(
         &self,
+        issue_id: &IssueId,
         run_id: &crate::domain::identity::GateRunId,
     ) -> Result<crate::domain::GateRunResult>;
 

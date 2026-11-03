@@ -859,7 +859,11 @@ impl IssueStore for InMemoryStorage {
         &self.root_path
     }
 
-    fn load_gate_run_result(&self, run_id: &GateRunId) -> Result<GateRunResult> {
+    fn load_gate_run_result(
+        &self,
+        issue_id: &IssueId,
+        run_id: &GateRunId,
+    ) -> Result<GateRunResult> {
         let path = VirtualPath::gate_run_record(run_id);
         let run_dir = VirtualPath::gate_run_directory(run_id);
         let state = self.repository_state();
@@ -868,7 +872,7 @@ impl IssueStore for InMemoryStorage {
         {
             return Err(GateRunNotFoundError::new(run_id.clone()).into());
         }
-        match state.entries.get(&path) {
+        let result: GateRunResult = match state.entries.get(&path) {
             None | Some(RepositoryEntry::Absent) => {
                 Err(GateRunNotFoundError::new(run_id.clone()).into())
             }
@@ -883,7 +887,11 @@ impl IssueStore for InMemoryStorage {
                 "Gate run result at {} must be an ordinary file",
                 path.relative().as_path().display()
             ),
+        }?;
+        if &result.issue_id != issue_id {
+            return Err(GateRunNotFoundError::new(run_id.clone()).into());
         }
+        Ok(result)
     }
 
     fn list_gate_runs_for_issue(&self, issue_id: &IssueId) -> Result<Vec<GateRunResult>> {
@@ -1015,7 +1023,10 @@ mod tests {
                 .entries
                 .insert(VirtualPath::GATE_RUNS, gate_run_parent_entry(kind));
 
-            let loaded = storage.load_gate_run_result(&crate::test_utils::gate_run_id(1));
+            let loaded = storage.load_gate_run_result(
+                &crate::test_utils::issue_id(2),
+                &crate::test_utils::gate_run_id(1),
+            );
             let listed = storage.list_gate_runs_for_issue(&crate::test_utils::issue_id(2));
             if kind == "absent" {
                 assert!(loaded
@@ -1043,7 +1054,10 @@ mod tests {
             state.entries.insert(run_dir, gate_run_parent_entry(kind));
             drop(state);
 
-            let loaded = storage.load_gate_run_result(&crate::test_utils::gate_run_id(1));
+            let loaded = storage.load_gate_run_result(
+                &crate::test_utils::issue_id(2),
+                &crate::test_utils::gate_run_id(1),
+            );
             let listed = storage.list_gate_runs_for_issue(&crate::test_utils::issue_id(2));
             if matches!(kind, "absent" | "directory") {
                 assert!(loaded

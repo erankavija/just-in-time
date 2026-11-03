@@ -4,6 +4,7 @@
 
 use jit::output::ErrorCode;
 use jit::test_cli::JitCli;
+use jit::test_lease_store::history_path;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::process::Output;
@@ -92,7 +93,7 @@ fn test_linked_checkouts_over_external_store_share_claims_under_the_repository_c
 
     let acquired = acquire(&primary, &store, &from_primary, "agent:primary");
     assert!(acquired.status.success(), "{acquired:?}");
-    assert!(common_dir.join("jit/claims.jsonl").is_file());
+    assert!(history_path(&common_dir.join("jit")).is_file());
     assert_eq!(
         listed_issues(&linked, &store),
         std::slice::from_ref(&from_primary)
