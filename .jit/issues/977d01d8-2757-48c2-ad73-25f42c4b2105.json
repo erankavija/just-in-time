@@ -15,7 +15,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8a941b4c-6e7a-48d5-b4a4-450674f827db",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:42:25.279383305Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "977d01d8-2757-48c2-ad73-25f42c4b2105",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Configuration accessors for content format and strictness",
-  "updated_at": "2026-11-03T23:36:48.150292305Z"
+  "updated_at": "2026-11-03T23:42:25.279383305Z"
 }

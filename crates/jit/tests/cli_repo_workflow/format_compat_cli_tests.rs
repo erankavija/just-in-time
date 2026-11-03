@@ -8,6 +8,15 @@
 use jit::test_cli::JitCli;
 use std::fs;
 
+fn supported_version() -> u64 {
+    serde_json::from_slice::<serde_json::Value>(
+        &jit::repository_state::fresh_index_bytes().unwrap(),
+    )
+    .unwrap()["schema_version"]
+        .as_u64()
+        .unwrap()
+}
+
 /// Rewrite the repository's `index.json` to a format version far newer than
 /// any binary supports, simulating a repo written by a future `jit`.
 fn make_repository_too_new(cli: &JitCli) {
@@ -26,8 +35,8 @@ fn assert_too_new_refusal(out: &std::process::Output, cmd: &str) {
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("99") && stderr.contains("3"),
-        "{cmd} error must name both the repo version (99) and the binary's supported version (3); got: {stderr}"
+        stderr.contains("99") && stderr.contains(&supported_version().to_string()),
+        "{cmd} error must name both the repo version (99) and the binary's supported version; got: {stderr}"
     );
     // Single-line message (one trailing newline at most).
     let msg = stderr.trim_end();
@@ -78,7 +87,7 @@ fn listed_ids(cli: &JitCli) -> std::collections::BTreeSet<String> {
 
 #[test]
 fn test_every_other_format_exits_10_naming_both_versions() {
-    for found in [2, 4] {
+    for found in [supported_version() - 1, supported_version() + 1] {
         let cli = JitCli::initialised().unwrap();
         fs::write(
             cli.root().join(".jit/index.json"),
@@ -89,20 +98,28 @@ fn test_every_other_format_exits_10_naming_both_versions() {
         let out = cli.command(["query", "all"]).output().unwrap();
 
         assert_eq!(out.status.code(), Some(10), "{out:?}");
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr)
+                .trim_end()
+                .lines()
+                .count(),
+            1
+        );
         let stderr = String::from_utf8_lossy(&out.stderr);
         assert!(
-            stderr.contains(&found.to_string()) && stderr.contains('3'),
+            stderr.contains(&found.to_string())
+                && stderr.contains(&supported_version().to_string()),
             "{stderr}"
         );
     }
 }
 
 #[test]
-fn test_validate_fails_on_a_format_3_index_carrying_all_ids() {
+fn test_validate_fails_on_a_format_4_index_carrying_all_ids() {
     let cli = JitCli::initialised().unwrap();
     fs::write(
         cli.root().join(".jit/index.json"),
-        r#"{"schema_version": 3, "all_ids": [], "deleted_ids": []}"#,
+        r#"{"schema_version": 4, "all_ids": [], "deleted_ids": []}"#,
     )
     .unwrap();
 

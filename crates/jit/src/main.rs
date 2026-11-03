@@ -1845,9 +1845,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     if json {
                         let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
                         let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
-                        let gate_runs = executor
+                        let (gate_runs, _) = executor
                             .gates()
-                            .list_gate_runs(&issue.id, None)
+                            .get_last_gate_runs_for_issue(&issue.id)
                             .with_context(|| {
                                 format!("Failed to load gate runs for issue {}", issue.id)
                             })?;
