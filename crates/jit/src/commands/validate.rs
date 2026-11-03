@@ -2279,26 +2279,24 @@ impl<S: IssueStore> ValidationOps<'_, S> {
     /// # Returns
     /// Vector of invalid lease descriptions with fix suggestions
     pub fn validate_leases(&self) -> Result<Vec<String>> {
-        use crate::storage::claim_coordinator::ClaimsIndex;
+        use crate::storage::claim_coordinator::read_leases;
         use chrono::Utc;
         use std::collections::HashSet;
 
-        // Load the active-lease index through storage (an absent index yields an
-        // empty one, so there are no leases to validate).
-        let index = ClaimsIndex::load(self.exec.require_worktree_paths()?)?;
+        let leases = read_leases(self.exec.require_worktree_paths()?)?;
 
         let mut invalid_leases = Vec::new();
         let now = Utc::now();
-        let recorded_worktrees = if index.leases.is_empty() {
+        let recorded_worktrees = if leases.is_empty() {
             HashSet::new()
         } else {
             recorded_worktree_ids(self.exec.require_worktree_paths()?)?
         };
 
-        for lease in &index.leases {
+        for lease in &leases {
             // Check if lease has expired
-            if let Some(expires_at) = lease.expires_at {
-                if expires_at < now {
+            if lease.is_expired(now) {
+                if let Some(expires_at) = lease.expires_at {
                     let duration = now.signed_duration_since(expires_at);
                     invalid_leases.push(format!(
                         "Lease {} (Issue {}): Expired {} ago\n  Fix: jit claim release {}",

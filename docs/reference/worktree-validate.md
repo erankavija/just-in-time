@@ -101,7 +101,7 @@ jit worktree list [OPTIONS]
 
 #### Description
 
-Shows all worktrees associated with the repository, including their worktree ID, current branch, path, and count of active claims. Useful for seeing which worktrees exist and what work is happening in each.
+Shows all worktrees associated with the repository, including their worktree ID, current branch, path, and count of active claims. Expired leases and indefinite leases with stale heartbeats do not count as active. Useful for seeing which worktrees exist and what work is happening in each.
 
 #### Options
 

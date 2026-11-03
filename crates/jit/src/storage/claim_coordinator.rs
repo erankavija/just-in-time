@@ -67,14 +67,8 @@ where
 }
 
 impl Lease {
-    /// Returns whether this lease has expired as of `now`.
-    ///
-    /// Only finite leases expire: a lease counts as expired when it has a
-    /// positive TTL (`ttl_secs > 0`) and its `expires_at` instant has passed.
-    /// Indefinite leases (`ttl_secs == 0`) and leases without an `expires_at`
-    /// never expire. This is the single source of truth for lease liveness,
-    /// shared by index eviction, index rebuild, and read-only callers (e.g.
-    /// `worktree list`) so their views cannot drift.
+    /// Finite leases expire strictly after `expires_at`; indefinite leases and
+    /// leases without an expiry never expire.
     pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
         if self.ttl_secs > 0 {
             if let Some(expires_at) = self.expires_at {
@@ -92,6 +86,11 @@ impl Lease {
         self.ttl_secs == 0
             && now.signed_duration_since(self.last_beat).num_seconds()
                 > crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64
+    }
+
+    /// Active leases are neither expired nor stale at `now`.
+    pub fn is_active(&self, now: DateTime<Utc>) -> bool {
+        !self.is_expired(now) && !self.is_stale(now)
     }
 }
 
@@ -182,17 +181,8 @@ impl ClaimAcquireLimits {
 }
 
 impl ClaimsIndex {
-    /// Load the active-lease index from the shared control plane described by
-    /// `paths`, returning an empty (well-formed) index when no
-    /// `claims.index.json` exists yet.
-    ///
-    /// This is the single read path for the claims index: it owns the
-    /// `claims.index.json` filename under the shared control plane plus the
-    /// read-and-deserialize, so command/validation callers never construct that
-    /// path or parse the file inline (they go through this method or
-    /// [`ClaimCoordinator::load_claims_index`], which delegates here). A missing
-    /// file is normal — no claims coordination has happened yet — and yields an
-    /// empty index rather than an error.
+    /// Load the stored index without locking, returning an empty index if absent.
+    /// Lease readers use [`read_leases`] or its active variants.
     pub fn load(paths: &WorktreePaths) -> Result<ClaimsIndex> {
         let index_path = paths.shared_jit.join("claims.index.json");
 
@@ -234,8 +224,7 @@ impl ClaimsIndex {
     ) -> Option<&Lease> {
         self.leases.iter().find(|lease| {
             &lease.issue_id == issue_id
-                && !lease.is_expired(now)
-                && !lease.is_stale(now)
+                && lease.is_active(now)
                 && current_agent.is_none_or(|agent| &lease.agent_id != agent)
         })
     }
@@ -261,6 +250,30 @@ impl ClaimsIndex {
     pub fn find_lease_by_id(&self, lease_id: &LeaseId) -> Option<&Lease> {
         self.leases.iter().find(|l| &l.lease_id == lease_id)
     }
+}
+
+/// Read every stored lease without locking or evicting, including inactive leases.
+pub fn read_leases(paths: &WorktreePaths) -> Result<Vec<Lease>> {
+    Ok(ClaimsIndex::load(paths)?.leases)
+}
+
+/// Read active leases without locking or evicting.
+pub fn read_active_leases(paths: &WorktreePaths, now: DateTime<Utc>) -> Result<Vec<Lease>> {
+    Ok(read_leases(paths)?
+        .into_iter()
+        .filter(|lease| lease.is_active(now))
+        .collect())
+}
+
+/// Read an issue's active lease without locking or evicting.
+pub fn read_active_lease(
+    paths: &WorktreePaths,
+    issue_id: &IssueId,
+    now: DateTime<Utc>,
+) -> Result<Option<Lease>> {
+    Ok(read_leases(paths)?
+        .into_iter()
+        .find(|lease| &lease.issue_id == issue_id && lease.is_active(now)))
 }
 
 /// Claim coordinator for atomic lease operations
@@ -991,9 +1004,7 @@ impl ClaimCoordinator {
             }
         }
 
-        // Filter out expired finite leases. Uses the same single source of
-        // truth (`Lease::is_expired`) as eviction and `worktree list`, so the
-        // rebuilt index cannot diverge from those views at the TTL boundary.
+        // Expired leases leave the rebuilt index; stale ones stay, flagged below.
         if !include_expired {
             active.retain(|_, lease| !lease.is_expired(now));
         }
@@ -1196,16 +1207,117 @@ mod tests {
     }
 
     #[test]
-    fn test_lease_is_expired_predicate() {
+    fn test_lease_is_active_at_expiry_and_heartbeat_boundaries() {
         let now = Utc::now();
-        // Finite TTL, expiry in the past -> expired
-        assert!(make_lease(600, Some(now - Duration::seconds(1))).is_expired(now));
-        // Finite TTL, expiry in the future -> not expired
-        assert!(!make_lease(600, Some(now + Duration::seconds(300))).is_expired(now));
-        // Indefinite lease (ttl_secs == 0) -> never expired
-        assert!(!make_lease(0, None).is_expired(now));
-        // Finite TTL but no expires_at recorded -> not expired
-        assert!(!make_lease(600, None).is_expired(now));
+        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64;
+        let cases = [
+            (600, Some(now - Duration::nanoseconds(1)), now, false),
+            (600, Some(now), now, true),
+            (600, Some(now + Duration::nanoseconds(1)), now, true),
+            (600, None, now, true),
+            (600, Some(now), now - Duration::seconds(threshold + 1), true),
+            (0, None, now - Duration::seconds(threshold), true),
+            (0, None, now - Duration::seconds(threshold + 1), false),
+            (0, Some(now - Duration::seconds(1)), now, true),
+        ];
+        for (ttl_secs, expires_at, last_beat, expected) in cases {
+            for stale in [false, true] {
+                let lease = Lease {
+                    last_beat,
+                    stale,
+                    ..make_lease(ttl_secs, expires_at)
+                };
+                assert_eq!(lease.is_active(now), expected, "{lease:?}");
+            }
+        }
+    }
+
+    fn stored_read_leases(coordinator: &ClaimCoordinator, now: DateTime<Utc>) -> Vec<Lease> {
+        let leases = vec![
+            make_lease(600, Some(now + Duration::seconds(600))),
+            Lease {
+                issue_id: crate::test_utils::issue_id(9),
+                ..make_lease(600, Some(now - Duration::seconds(1)))
+            },
+            Lease {
+                issue_id: crate::test_utils::issue_id(10),
+                last_beat: now
+                    - Duration::seconds(
+                        crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64 + 1,
+                    ),
+                ..make_lease(0, None)
+            },
+        ];
+        coordinator
+            .write_index_atomic(&ClaimsIndex {
+                leases: leases.clone(),
+                ..ClaimsIndex::default()
+            })
+            .unwrap();
+        leases
+    }
+
+    #[test]
+    fn test_read_leases_returns_every_stored_lease_without_locking_or_writing() {
+        let temp = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp);
+        let leases = stored_read_leases(&coordinator, Utc::now());
+        let index_path = coordinator.paths.shared_jit.join("claims.index.json");
+        let before = fs::read(&index_path).unwrap();
+        let _lock = hold_claims_lock(&temp);
+
+        assert_eq!(read_leases(&coordinator.paths).unwrap(), leases);
+        assert_eq!(fs::read(index_path).unwrap(), before);
+    }
+
+    #[test]
+    fn test_read_active_leases_filters_stored_leases_without_locking() {
+        let temp = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp);
+        let now = Utc::now();
+        let leases = stored_read_leases(&coordinator, now);
+        let _lock = hold_claims_lock(&temp);
+
+        assert_eq!(
+            read_active_leases(&coordinator.paths, now).unwrap(),
+            leases
+                .into_iter()
+                .filter(|lease| lease.is_active(now))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_read_active_lease_selects_only_the_requested_active_issue_without_locking() {
+        let temp = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp);
+        let now = Utc::now();
+        let leases = stored_read_leases(&coordinator, now);
+        let _lock = hold_claims_lock(&temp);
+
+        for lease in &leases {
+            assert_eq!(
+                read_active_lease(&coordinator.paths, &lease.issue_id, now).unwrap(),
+                lease.is_active(now).then(|| lease.clone())
+            );
+        }
+        assert_eq!(
+            read_active_lease(&coordinator.paths, &crate::test_utils::issue_id(11), now).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn test_read_leases_missing_index_is_empty_and_corrupt_index_is_an_error() {
+        let temp = TempDir::new().unwrap();
+        let paths = crate::test_utils::primary_checkout_paths(temp.path());
+        assert!(read_leases(&paths).unwrap().is_empty());
+        fs::create_dir_all(&paths.shared_jit).unwrap();
+        fs::write(paths.shared_jit.join("claims.index.json"), "invalid json").unwrap();
+        assert!(read_leases(&paths)
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to parse claims index"));
     }
 
     fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
@@ -2520,19 +2632,6 @@ mod tests {
             }],
             "Duplicate lease must surface a DuplicateLease warning"
         );
-    }
-
-    #[test]
-    fn test_lease_is_stale_past_built_in_threshold() {
-        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64;
-        let now = Utc::now();
-        let beaten_secs_ago = |secs: i64| Lease {
-            last_beat: now - Duration::seconds(secs),
-            ..make_lease(0, None)
-        };
-
-        assert!(!beaten_secs_ago(threshold).is_stale(now));
-        assert!(beaten_secs_ago(threshold + 1).is_stale(now));
     }
 
     #[test]

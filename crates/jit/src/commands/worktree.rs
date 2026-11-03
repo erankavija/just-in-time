@@ -6,7 +6,7 @@ use crate::domain::identity::WorktreeId;
 use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
 use crate::output::ExitCode;
 use crate::repository_state::{RepositoryLayout, RECORD_SCRATCH_DIR};
-use crate::storage::claim_coordinator::ClaimsIndex;
+use crate::storage::claim_coordinator::{read_active_leases, Lease};
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{read_exact_store, IssueStore, StorageWarning, RECORD_FILE_NAME};
@@ -157,32 +157,11 @@ fn parse_git_worktree_porcelain(output: &str) -> Result<Vec<GitWorktreeEntry>> {
     Ok(entries)
 }
 
-/// Count active claims for a specific worktree.
-///
-/// Filters the claims index to count leases where the worktree_id matches
-/// the provided identifier.
-///
-/// Expiry is evaluated against `now` (supplied by the caller via the
-/// [`Clock`](crate::storage::clock::Clock) abstraction) rather than read from
-/// the system clock here, so the count is a
-/// pure function of its inputs and can be exercised deterministically in tests.
-///
-/// # Arguments
-/// * `index` - Claims index containing all active leases
-/// * `worktree_id` - Worktree identifier to filter by (e.g., "wt:abc12345")
-/// * `now` - Instant to evaluate lease expiry against
-///
-/// # Returns
-/// Number of active claims (leases) for the worktree
-fn count_claims_for_worktree(
-    index: &ClaimsIndex,
-    worktree_id: &WorktreeId,
-    now: chrono::DateTime<chrono::Utc>,
-) -> usize {
-    index
-        .leases
+/// Group leases already filtered for activeness by worktree.
+fn count_claims_for_worktree(leases: &[Lease], worktree_id: &WorktreeId) -> usize {
+    leases
         .iter()
-        .filter(|lease| &lease.worktree_id == worktree_id && !lease.is_expired(now))
+        .filter(|lease| &lease.worktree_id == worktree_id)
         .count()
 }
 
@@ -259,7 +238,6 @@ fn execute_worktree_list_at(
     paths: &WorktreePaths,
     clock: &dyn crate::storage::clock::Clock,
 ) -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
-    use crate::storage::claim_coordinator::ClaimsIndex;
     use std::path::PathBuf;
 
     // Execute git worktree list --porcelain from this worktree's root.
@@ -282,13 +260,7 @@ fn execute_worktree_list_at(
 
     let git_entries = parse_git_worktree_porcelain(&porcelain_output)?;
 
-    // Load the active-lease index through storage to count active claims per
-    // worktree (an absent index yields an empty one, i.e. no active claims).
-    let claims_index = ClaimsIndex::load(paths)?;
-
-    // Single "now" for all per-worktree expiry checks, read once from the
-    // injected clock.
-    let now = clock.now();
+    let leases = read_active_leases(paths, clock.now())?;
 
     // Enrich git entries with JIT data, collecting any relocation warnings
     // observed while loading each worktree's identity.
@@ -331,7 +303,7 @@ fn execute_worktree_list_at(
             };
 
             // Count active claims for this worktree
-            let active_claims = count_claims_for_worktree(&claims_index, &worktree_id, now);
+            let active_claims = count_claims_for_worktree(&leases, &worktree_id);
 
             let is_main = paths.is_primary_worktree_path(&worktree_path)?;
 
@@ -575,120 +547,41 @@ mod tests {
     }
 
     #[test]
-    fn test_count_claims_per_worktree() {
-        use crate::storage::claim_coordinator::{ClaimsIndex, Lease};
-        use chrono::Utc;
-
-        // Create mock claims index with leases for different worktrees
-        let index = ClaimsIndex {
-            schema_version: 1,
-            generated_at: Utc::now(),
-            last_seq: 3,
-            sequence_gaps: Vec::new(),
-            leases: vec![
-                Lease {
-                    lease_id: "00000000-0000-4000-8000-000000000002".parse().unwrap(),
-                    issue_id: crate::test_utils::issue_id(7),
-                    agent_id: "agent:1".parse().unwrap(),
-                    worktree_id: "wt:abc123".parse().unwrap(),
-                    branch: Some("main".to_string()),
-                    ttl_secs: 600,
-                    acquired_at: Utc::now(),
-                    expires_at: None,
-                    last_beat: Utc::now(),
-                    stale: false,
-                },
-                Lease {
-                    lease_id: "00000000-0000-4000-8000-000000000003".parse().unwrap(),
-                    issue_id: crate::test_utils::issue_id(43),
-                    agent_id: "agent:1".parse().unwrap(),
-                    worktree_id: "wt:abc123".parse().unwrap(),
-                    branch: Some("main".to_string()),
-                    ttl_secs: 600,
-                    acquired_at: Utc::now(),
-                    expires_at: None,
-                    last_beat: Utc::now(),
-                    stale: false,
-                },
-                Lease {
-                    lease_id: "00000000-0000-4000-8000-000000000004".parse().unwrap(),
-                    issue_id: crate::test_utils::issue_id(44),
-                    agent_id: "agent:2".parse().unwrap(),
-                    worktree_id: "wt:def456".parse().unwrap(),
-                    branch: Some("feature/test".to_string()),
-                    ttl_secs: 600,
-                    acquired_at: Utc::now(),
-                    expires_at: None,
-                    last_beat: Utc::now(),
-                    stale: false,
-                },
-            ],
-        };
-
-        let now = Utc::now();
-        let count_abc = count_claims_for_worktree(&index, &"wt:abc123".parse().unwrap(), now);
-        let count_def = count_claims_for_worktree(&index, &"wt:def456".parse().unwrap(), now);
-        let count_xyz = count_claims_for_worktree(&index, &"wt:xyz789".parse().unwrap(), now);
-
-        assert_eq!(count_abc, 2);
-        assert_eq!(count_def, 1);
-        assert_eq!(count_xyz, 0);
-    }
-
-    #[test]
-    fn test_count_claims_excludes_expired_leases() {
-        use crate::storage::claim_coordinator::{ClaimsIndex, Lease};
-        use chrono::{Duration, Utc};
-
-        let now = Utc::now();
-        let make_lease =
-            |seed: u128, ttl_secs: u64, expires_at: Option<chrono::DateTime<Utc>>| Lease {
+    fn test_count_claims_for_worktree_groups_leases_by_worktree() {
+        let now = chrono::Utc::now();
+        let leases: Vec<_> = ["wt:abc123", "wt:abc123", "wt:def456"]
+            .into_iter()
+            .enumerate()
+            .map(|(seed, worktree)| Lease {
                 lease_id: uuid::Uuid::new_v4().to_string().parse().unwrap(),
-                issue_id: crate::test_utils::issue_id(seed),
+                issue_id: crate::test_utils::issue_id(seed as u128),
                 agent_id: "agent:1".parse().unwrap(),
-                worktree_id: "wt:abc123".parse().unwrap(),
-                branch: Some("main".to_string()),
-                ttl_secs,
+                worktree_id: worktree.parse().unwrap(),
+                branch: None,
+                ttl_secs: 0,
                 acquired_at: now,
-                expires_at,
+                expires_at: None,
                 last_beat: now,
                 stale: false,
-            };
+            })
+            .collect();
 
-        let index = ClaimsIndex {
-            schema_version: 1,
-            generated_at: now,
-            last_seq: 3,
-            sequence_gaps: Vec::new(),
-            leases: vec![
-                // Live: finite TTL, expiry in the future
-                make_lease(1, 600, Some(now + Duration::seconds(300))),
-                // Expired: finite TTL, expiry in the past -> must not be counted
-                make_lease(2, 600, Some(now - Duration::seconds(1))),
-                // Indefinite: ttl_secs == 0, no expiry -> always live
-                make_lease(3, 0, None),
-            ],
-        };
-
-        // Only the live and indefinite leases count; the expired one is excluded,
-        // matching `claim list` which evicts expired leases before reporting.
         assert_eq!(
-            count_claims_for_worktree(&index, &"wt:abc123".parse().unwrap(), now),
+            count_claims_for_worktree(&leases, &"wt:abc123".parse().unwrap()),
             2
+        );
+        assert_eq!(
+            count_claims_for_worktree(&leases, &"wt:def456".parse().unwrap()),
+            1
+        );
+        assert_eq!(
+            count_claims_for_worktree(&leases, &"wt:xyz789".parse().unwrap()),
+            0
         );
     }
 
-    /// REQ-02: expiry is driven through an injected [`Clock`] rather than a real
-    /// `sleep`, exercising the real `execute_worktree_list_at` command path (the
-    /// core of `execute_worktree_list`) against a temporary git repo.
-    ///
-    /// The former subprocess test slept 1600ms to let a 1s TTL elapse; here a
-    /// [`FixedClock`] is advanced past the short lease's TTL and the real command
-    /// path is re-run, asserting the expired lease drops out of the reported
-    /// `active_claims`. See `tests/worktree_cli_tests.rs` for the CLI-boundary
-    /// happy-path smoke test.
     #[test]
-    fn test_worktree_list_excludes_expired_leases() {
+    fn test_execute_worktree_list_at_excludes_inactive_leases() {
         use crate::storage::clock::FixedClock;
         use crate::storage::{ClaimCoordinator, FileLocker};
         use chrono::Utc;
@@ -726,7 +619,7 @@ mod tests {
         .with_clock(clock.clone());
         coordinator.init().unwrap();
 
-        // A short (1s TTL) and a long (600s TTL) lease, both acquired "now".
+        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS;
         coordinator
             .acquire_claim_synchronized(
                 &crate::test_utils::issue_id(86),
@@ -739,7 +632,17 @@ mod tests {
         coordinator
             .acquire_claim_synchronized(
                 &crate::test_utils::issue_id(87),
-                600,
+                threshold * 2,
+                Some("test lease"),
+                crate::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
+
+        coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(88),
+                0,
                 Some("test lease"),
                 crate::storage::claim_coordinator::ClaimAcquireLimits::new(100, 100),
                 |_| Ok(()),
@@ -751,17 +654,9 @@ mod tests {
             entries.iter().map(|e| e.active_claims).sum()
         };
 
-        // Before expiry: both live leases are counted by the real command path.
-        assert_eq!(active_total(clock.as_ref()), 2, "both live leases counted");
-
-        // Advance time past the short lease's TTL (no real sleep) and re-run the
-        // same command path: the expired lease must be excluded.
-        clock.set(base + chrono::Duration::seconds(5));
-        assert_eq!(
-            active_total(clock.as_ref()),
-            1,
-            "expired lease excluded from list"
-        );
+        assert_eq!(active_total(clock.as_ref()), 3);
+        clock.set(base + chrono::Duration::seconds(threshold as i64 + 1));
+        assert_eq!(active_total(clock.as_ref()), 1);
     }
 
     mod store_divergence {
