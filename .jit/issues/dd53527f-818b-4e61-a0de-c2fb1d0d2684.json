@@ -22,9 +22,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "35ed61bd-8b8a-437d-b95a-1fa1fd71d041",
+      "run_id": "6aa70df4-6713-447f-87d8-7268af970614",
       "status": "failed",
-      "updated_at": "2026-11-03T21:29:59.413160604Z",
+      "updated_at": "2026-11-03T22:05:11.381302362Z",
       "updated_by": "auto:executor"
     }
   },
@@ -44,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Lease operations run through the lease lock",
-  "updated_at": "2026-11-03T21:32:04.751301593Z"
+  "updated_at": "2026-11-03T22:05:11.381302362Z"
 }
