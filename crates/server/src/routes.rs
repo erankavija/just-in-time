@@ -1015,13 +1015,13 @@ async fn get_gate_run<S: IssueStore>(
     Path((id, run_id)): Path<(String, String)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateRunSummary>, StatusCode> {
-    let _id = resolve_issue_path_id(&state.executor, &id)?;
+    let id = resolve_issue_path_id(&state.executor, &id)?;
     let run_id = run_id
         .parse::<GateRunId>()
         .map_err(|_| StatusCode::BAD_REQUEST)?;
     state
         .executor
-        .get_gate_run_result(&run_id)
+        .get_gate_run_result(&id, &run_id)
         .map(|r| Json(GateRunSummary::full(&r)))
         .map_err(|e| {
             tracing::error!("Failed to get gate run {}: {:?}", run_id, e);
@@ -1264,6 +1264,40 @@ mod tests {
             .add_query_param("gate_key", "unknown-gate")
             .await
             .assert_status_ok();
+    }
+
+    #[tokio::test]
+    async fn test_get_gate_run_returns_not_found_under_another_issues_path() {
+        let harness = jit::test_harness::TestHarness::new();
+        let gate_key = "review".parse().unwrap();
+        harness.add_gate(
+            &gate_key,
+            "Review",
+            "Manual review",
+            jit::declarations::GateMode::Manual,
+            None,
+        );
+        let owner = harness.create_issue_with_gates("Run owner", vec![gate_key.clone()]);
+        let other = harness.create_issue("Other issue");
+        harness
+            .executor
+            .pass_gate(&owner, &gate_key, Some("human:reviewer".to_string()), false)
+            .unwrap();
+        let run = harness
+            .executor
+            .get_last_gate_run(&owner, &gate_key)
+            .unwrap()
+            .unwrap();
+        let server = test_app(harness.executor);
+
+        server
+            .get(&format!("/issues/{owner}/gate-runs/{}", run.run_id))
+            .await
+            .assert_status_ok();
+        server
+            .get(&format!("/issues/{other}/gate-runs/{}", run.run_id))
+            .await
+            .assert_status(StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

@@ -3,12 +3,11 @@
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "34dd339e-38cf-4898-a15d-02bdd89f06de",
-    "63de0883-1cfb-4d01-a7d2-b444221783b2",
-    "d0d73bef-4ef9-4777-bdc3-73c4e0e98ce1"
+    "725af076-76e0-40ea-91e3-a1b43f720cc6"
   ],
   "description": "Make every test image and test capture spec request the event log through the end-of-log probe, so no test depends on a whole read of the log.\n\n## Background\n\nEvery production mutation captures the event log through `CaptureSpec::discover_tail` (`crates/jit/src/repository_state/image.rs:581-589`). Test images still put it into `CaptureSpec::new` or `discover_paths` whole:\n\n- `repository_state/mutation.rs`: the `image_with` helper (`:1414`), used with the log at `:1507,1571,1724,1760,1763,1816,1870,2034,2077,2114,2129,2139,2188,2294,2475,2528`;\n- `repository_state/archive.rs:628-640` (`image_with` adds an absent log by default);\n- `repository_state/overlay.rs:213-222`;\n- `repository_state/mod.rs:1550-1556`;\n- `repository_state/materialize.rs:710-727` (the `image` helper, given the log at `:1023`);\n- `commands/document.rs:1978`;\n- `commands/mod.rs:3700-3735` (`captured_issue_spec` and `captured_gate_issue_spec`);\n- `commands/gate.rs:2213-2225`;\n- `storage/repository_state_store_tests.rs` (about 60 references between `:678` and `:3387`, among them `:1137` and the conformance cases at `:2843-3170`).\n\n## Success Criteria\n\n- [hard] REQ-01: Every listed test image and test spec captures the event log through `discover_tail`, and the tests' assertions are unchanged.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
+  "first_ready_at": "2026-11-02T23:40:39.559315549Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,10 +21,11 @@
     "story:history-boundary",
     "component:testing",
     "per:@/charter/D-19",
-    "satisfies:f8a6b298/REQ-13"
+    "satisfies:f8a6b298/REQ-13",
+    "resolution:merged-into-725af076"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Test images capture the event log as a tail",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-02T23:41:52.675278425Z"
 }

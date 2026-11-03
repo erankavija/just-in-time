@@ -1,0 +1,74 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d689a612f9e9c8dcbefd7b64299fe35402d6826a",
+  "completed_at": "2026-11-02T23:31:28.711377849Z",
+  "duration_ms": 245703,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F1",
+        "line": 1515,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f8a6b298/requirement/REQ-13"
+        ],
+        "severity": "high",
+        "summary": "The event-log capture refusal can land before production mutation captures migrate to tail reads, breaking those mutations."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F2",
+        "line": 1927,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "The format window lacks the required dependency on torn-tail marker removal, contrary to the plan's stored-layout ordering."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F3",
+        "line": 1907,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f8a6b298/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "format-cutover combines tooling implementation with a five-repository confirmation-dependent release window and is not worker-sized."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F4",
+        "line": 1958,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The format-cutover footprint omits newly created .git/jit/leases and .git/jit/claims.seq paths."
+      }
+    ],
+    "summary": "The manifest passes structural validation but has two missing ordering edges, one materially oversized release leaf, and one advisory footprint omission.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "5e615dc2-5ca4-4a8c-b94a-dd8689894069",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4f666ccb-9a4b-482a-977e-416d9278bbb9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-02T23:27:23.007591892Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5626 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a19e96-c40f-7c41-85bc-a466d42ccb88\n--------\nuser\n--- 5613 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact.** `capture-refuses-whole-event-log` can run before `mutation-event-tail-captures`, despite rejecting whole event-log captures. Current production mutation captures still request the whole log, so this creates a broken intermediate state. Add `mutation-event-tail-captures` to its `depends_on`. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/breakdown.json:1515) [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/plan.md:141) (`@/issue/f8a6b298/requirement/REQ-13`)\n\n2. **F2 — blocking, issue-impact.** The plan requires every stored-layout change, including `torn-tail-marker-removal`, to reach the format window, but `format-cutover` does not depend on that task. The window can therefore remove marker fields from data while the code still emits or expects them. Add `torn-tail-marker-removal` as a direct dependency of `format-cutover`. [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/plan.md:98) [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/breakdown.json:1927) (`@/inv/canonical-cutover`)\n\n3. **F3 — blocking, issue-impact.** `format-cutover` combines implementation and validation of two scripts with the externally coordinated five-repository release window, installs, commits, and confirmation-dependent writes. It cannot be completed in one focused worker cycle. Split it into a tooling-and-copy-validation leaf and a dependent window-execution/release leaf, retaining the cited single-window decision. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/breakdown.json:1907) [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/plan.md:106) (`@/issue/f8a6b298/requirement/REQ-01`)\n\n4. **F4 — advisory, issue-impact.** The cutover footprint marks `.git/jit` as touched, but the current checkout confirms that the new `leases/` directory and `claims.seq` file are absent and will be created. List those paths under `creates` to keep the greenfield footprint complete. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/breakdown.json:1958)\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The manifest passes structural validation but has two missing ordering edges, one materially oversized release leaf, and one advisory footprint omission.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The event-log capture refusal can land before production mutation captures migrate to tail reads, breaking those mutations.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":1515,\"references\":[\"@/issue/f8a6b298/requirement/REQ-13\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The format window lacks the required dependency on torn-tail marker removal, contrary to the plan's stored-layout ordering.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":1927,\"references\":[\"@/inv/canonical-cutover\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"format-cutover combines tooling implementation with a five-repository confirmation-dependent release window and is not worker-sized.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":1907,\"references\":[\"@/issue/f8a6b298/requirement/REQ-01\"]},{\"id\":\"F4\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The format-cutover footprint omits newly created .git/jit/leases and .git/jit/claims.seq paths.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":1958}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

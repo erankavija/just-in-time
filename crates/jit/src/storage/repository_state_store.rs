@@ -938,15 +938,8 @@ fn ensure_write_set_unchanged_against(
         .iter()
         .chain(record.puts().iter().map(|put| &put.path))
         .chain(record.deletes().iter())
-        .filter(|path| **path != VirtualPath::EVENTS)
         .try_for_each(|path| ensure_target_unchanged(captured, path, live))?;
-    let touches_event_log = record.event_append().is_some()
-        || record
-            .puts()
-            .iter()
-            .any(|put| put.path == VirtualPath::EVENTS)
-        || record.deletes().contains(&VirtualPath::EVENTS);
-    if !touches_event_log {
+    if record.event_append().is_none() {
         return Ok(());
     }
     // An ordinary captured log is the only state carrying a tail to compare;

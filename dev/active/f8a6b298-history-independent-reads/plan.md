@@ -21,7 +21,7 @@ Every per-key read gets a record addressed by that key, written in the same redo
 | REQ-10 | Appends land at the committed length and the parser keeps one torn-line rule (DEC-15, DEC-21). The marker protocol is deleted, and the file backend's second parser goes with the archive readers. | Events §5.1; drift audit, history |
 | REQ-11 | Anchored ripgrep negations are built from one history-path declaration. | Events §5.4; drift audit, history |
 | REQ-12 | The claims index and its rebuild machinery are deleted, and `RedoRecord` refuses a put or delete at the log. Nothing is seeded from history at runtime; `format-4-window` is a one-off outside the product. The only bytes the tracker overwrites in the log are an uncommitted unterminated final line (DEC-21). | Leases R12c; Events §4 |
-| REQ-13 | Validation, mutation captures, claim and archive move to the tail probe, test images follow, and then `CaptureSpec` refuses a whole read of the log. Whole-repository fidelity reads the log through `history-log-read`. The storage-format reference names the readers (DEC-19). | Events §3.1; drift audit, history |
+| REQ-13 | Validation, mutation captures, claim and archive move to the tail probe, with the archive base keeping its whole read until archive execute reads evidence. Test images follow, and then `CaptureSpec` refuses a whole read of the log. Whole-repository fidelity reads the log through `history-log-read`. The storage-format reference names the readers (DEC-19). | Events §3.1; drift audit, history |
 | REQ-14 | One CLI integration module in `cli_repo_workflow`, with one shared fixture and corruption helper and one test per command family (DEC-20). | Events §5.6 |
 | REQ-15 | The generated storage-record reference is regenerated where a change moves it, and new records get one section entry. Hand-written pages are covered by three docs entries and the marker-removal sweep. | Gate runs §1 REQ-15; Leases §2 |
 
@@ -37,7 +37,7 @@ A run record lives at `gate-runs/<issue-id>/<run-id>.json`, built only by `Virtu
 
 ### `latest-run-accessor` [implementation-produced] — One latest-run lookup
 
-`CommandExecutor::get_last_gate_runs_for_issue` returns, for an issue, the run each gate state's `run_id` names, loaded by `(issue, run)`; it lists no runs. Producer: `gate-latest-run-reads`.
+`get_last_gate_runs_for_issue`, in the gate-check family, returns, for an issue, the run each gate state's `run_id` names, loaded by `(issue, run)`; it lists no runs. Producer: `gate-latest-run-reads`.
 
 ### `gate-verdict-record` [plan-fixed] — Per-key reusable verdict
 
@@ -95,15 +95,15 @@ An ordinary command reaches the event log only through `CaptureSpec::discover_ta
 
 Everything this epic changes on disk is repository format 4. There is one bump and one window across this repository, gf2, mealie-fi, inflected-messages and research.
 
-**The bump.** `SUPPORTED_INDEX_SCHEMA_VERSION` (`repository_state/index.rs`) goes from 3 to 4 in `gate-latest-run-reads`, the first `gate-run-cutover` landing. From there a gate state without `run_id` has no latest run, and four repositories hold thousands of such states, so that is the first change a format 3 repository cannot be read under. Every entry that changes a layout or a stored record reaches it through the graph: all of `gate-run-cutover`, `lease-cutover` and `archive-evidence-cutover`, and `torn-tail-marker-removal`. Those landing groups name related integrations; none lands with data.
+**The bump.** `SUPPORTED_INDEX_SCHEMA_VERSION` (`repository_state/index.rs`) goes from 3 to 4 in `gate-latest-run-reads`, the first `gate-run-cutover` landing. From there a gate state without `run_id` has no latest run, and four repositories hold thousands of such states, so that is the first change a format 3 repository cannot be read under. Every entry that changes a layout or a stored record depends on it, directly or transitively: all of `gate-run-cutover`, `lease-cutover` and `archive-evidence-cutover`, and `torn-tail-marker-removal`. Those landing groups name related integrations; none lands with data.
 
 **Between landings.** Immediately before that landing the lead installs the last format 3 build and records its commit. The installed `jit` stays that binary until the window. It reads and writes this repository's format 3 tracker throughout; gates run through it (`repo-validate` is `jit validate` from `PATH`), and `cargo-ci` tests only temporary repositories. A build of main refuses the tracker with the existing one-line error, which is the intended failure for an accidental reinstall. No reinstall happens between the bump and the window, whichever epic asks. The freeze therefore lasts from the first gate-run landing to the window, so the lead keeps the three groups moving together.
 
-**The rewrite.** `format-cutover` absorbs the run relayout, the `run_id` backfill, the reused-verdict rewrite, verdict records, evidence seeding, the `isolated_torn_tail` line rewrite, and the lease rewrite into one idempotent script per checkout. Counts are derived when it runs.
+**The rewrite.** `format-rewrite-tooling` folds the run relayout, the `run_id` backfill, the reused-verdict rewrite, verdict records, evidence seeding, the `isolated_torn_tail` line rewrite, and the lease rewrite into one idempotent script per checkout, with one window driver. It depends on the last entry of each format change: `gate-run-per-issue-layout`, `lease-index-machinery-removal`, `archive-preview-reads-evidence` and `torn-tail-marker-removal`. Counts are derived when it runs.
 
 **Leases in other checkouts.** Leases live under `git rev-parse --git-common-dir`/`jit`, which linked checkouts share, so one rewrite per repository covers them. They are machine-local and never committed. Each unexpired lease is carried, including a stale one, and `claims.seq` starts from the greater of the log's highest sequence and the index's `last_seq`. A linked checkout's tracked `.jit` arrives by merging main; re-running the script there converts what its branch added.
 
-**The window.** The worker builds the script and driver and dry-runs them on copies, and writes nothing in another repository. The lead runs the window with no tracker writer anywhere: live sessions are coordinated first, the old binaries are copied for rollback, the new ones are installed, and each repository is rewritten, validated and committed. Each write to another repository takes its own user confirmation, per repository. Staging is limited to tracked `.jit` paths, since gf2 and research ignore `gate-runs`, and gf2's uncommitted work outside `.jit` stays untouched. A repository with uncommitted `.jit` paths stops the window. An older binary refuses a format 4 repository and a newer one refuses format 3; neither reads an empty tree.
+**The window.** A worker delivers `format-rewrite-tooling`, dry-running on copies under its worktree and writing nothing outside it. The lead executes `format-cutover`, which depends on that tooling, as one window with no tracker writer anywhere: live sessions are coordinated first, the old binaries are copied for rollback, the new ones are installed, and each repository is rewritten, validated and committed. Each write to another repository takes its own user confirmation, per repository. Staging is limited to tracked `.jit` paths, since gf2 and research ignore `gate-runs`, and gf2's uncommitted work outside `.jit` stays untouched. A repository with uncommitted `.jit` paths stops the window. An older binary refuses a format 4 repository and a newer one refuses format 3; neither reads an empty tree.
 
 ## Generated decomposition overview
 
@@ -111,7 +111,7 @@ Everything this epic changes on disk is repository format 4. There is one bump a
 | Key | Title | Type | Outcome | Contracts | Sources | Footprint | Landing | Depends on |
 |---|---|---|---|---|---|---|---|---|
 | gate-state-last-run | Gate state names the run that produced it | task | Tests pin that a gate state names the latest run recorded for that gate. | gate-state-run-id | REQ-02, DEC-05, DEC-01 | touches 2 | — | — |
-| gate-run-latest-captures | Gate captures hold only the evaluated issue's latest runs | task | Gate captures request the evaluated issue's named runs by path and list no gate-run root. | gate-state-run-id, gate-run-record-layout | REQ-04, DEC-05 | touches 3 | gate-run-cutover | mutation-event-tail-captures |
+| gate-run-latest-captures | Gate captures hold only the evaluated issue's latest runs | task | Gate captures request the evaluated issue's named runs by path and list no gate-run root. | gate-state-run-id, gate-run-record-layout | REQ-04, DEC-05 | touches 3 | gate-run-cutover | gate-latest-run-reads, mutation-event-tail-captures |
 | gate-run-load-by-issue | Gate-run records load by issue and run id | task | One gate-run record loads by its issue id and run id through storage, the executor and the server route. | gate-run-record-layout | REQ-01, DEC-05, DEC-01 | touches 10 | — | — |
 | gate-latest-run-reads | Latest-run readers use the gate-state accessor | task | Readers of an issue's latest gate runs load one record per gate through one accessor under repository format 4. | gate-state-run-id, format-4-window | REQ-01, REQ-02, DEC-05, DEC-22, DEC-23 | touches 9 | gate-run-cutover | gate-run-load-by-issue |
 | gate-verdict-provenance | Reused verdicts name their source issue and source run | task | A reused verdict's provenance names its source issue and source run in the store, the server and the web type. | format-4-window | REQ-01, DEC-07, DEC-01 | touches 7 | gate-run-cutover | gate-latest-run-reads |
@@ -131,22 +131,23 @@ Everything this epic changes on disk is repository format 4. There is one bump a
 | lease-interruption-matrix | An interrupted lease operation leaves the prior or the next lease | task | One matrix test proves an interrupted lease operation leaves the prior or the next lease, and recover clears its residue. | lease-sequence, lease-record-layout | REQ-07, DEC-09 | touches 4 | — | lease-issue-addressed-ops |
 | claim-acquire-event-from-assignee | Claim acquire emits its event exactly when the assignee changes | task | Claim acquire and issue claim append their claim event exactly when the assignee changes. | event-append-probe | REQ-08, DEC-04, DEC-12, DEC-16, DEC-01 | touches 4 | — | — |
 | event-log-read-rule | Event-log readers ignore an unterminated final line that the next append overwrites | task | Appends land at the log's committed length, and the parser ignores only an unterminated final line. | — | REQ-10, DEC-15, DEC-21, REQ-12, DEC-01 | touches 5 | — | — |
-| torn-tail-marker-removal | The profile torn-tail marker is gone | task | No torn-tail marker field, stamping or refusal remains, and append-position prose says committed length. | event-log-rule, format-4-window | REQ-10, DEC-15, DEC-21 | touches 12 | — | event-log-read-rule, gate-latest-run-reads |
+| torn-tail-marker-removal | The profile torn-tail marker is gone | task | No torn-tail marker field, stamping or refusal remains, and append-position prose says committed length. | event-log-rule, format-4-window | REQ-10, DEC-15, DEC-21 | touches 13 | — | event-log-read-rule, gate-latest-run-reads |
 | validation-skips-event-log | Validation captures read only the event log's end | task | Validation captures read only the log's bounded end, and record fidelity reads the whole log through one named path. | event-append-probe | REQ-13, DEC-19, DEC-01 | touches 6 | — | event-log-read-rule |
-| mutation-event-tail-captures | Mutations capture the event log's end, not the whole log | task | Event-appending mutations capture only the event log's bounded end. | event-append-probe | REQ-13, DEC-19 | touches 8 | — | torn-tail-marker-removal, validation-skips-event-log |
+| mutation-event-tail-captures | Mutations capture the event log's end, not the whole log | task | Event-appending mutations capture only the event log's bounded end. | event-append-probe | REQ-13, DEC-19 | touches 8 | — | validation-skips-event-log |
 | archive-execution-record-type | Archive executions are one domain record type | task | Archive evidence folds read one domain execution record type shared with the event. | — | REQ-09, DEC-17, DEC-01 | touches 8 | — | — |
-| archive-evidence-writes | Archive executions write a per-target evidence record | task | Each archive execution writes its target's evidence record in the same redo record. | archive-evidence-record, archive-execution-record, format-4-window | REQ-09, DEC-17 | touches 6 | archive-evidence-cutover | archive-execution-record-type, gate-run-per-issue-layout |
+| archive-evidence-writes | Archive executions write a per-target evidence record | task | Each archive execution writes its target's evidence record in the same redo record. | archive-evidence-record, archive-execution-record, format-4-window | REQ-09, DEC-17 | touches 6 | archive-evidence-cutover | archive-execution-record-type, gate-latest-run-reads |
 | archive-execute-reads-evidence | Archive execute reads the per-target evidence record | task | Archive execute reads a target's evidence from its record once. | archive-evidence-record, event-append-probe | REQ-09, DEC-17 | touches 4 | archive-evidence-cutover | archive-evidence-writes |
 | archive-preview-reads-evidence | Archive preview reads the per-target evidence record | task | Archive preview reads each target's evidence record once, and no archive reader of the event log remains. | archive-evidence-record | REQ-09, DEC-17, DEC-03, REQ-10, DEC-15 | touches 7 | archive-evidence-cutover | archive-execute-reads-evidence |
-| capture-refuses-whole-event-log | Captures refuse a whole read of the event log | task | The capture layer admits only the end-of-log probe on the event log, and no code handles a whole-log entry. | event-append-probe, history-log-read | REQ-13, DEC-19 | touches 12 | — | archive-preview-reads-evidence, claim-acquire-event-from-assignee |
+| capture-refuses-whole-event-log | Captures refuse a whole read of the event log | task | The capture layer admits only the end-of-log probe on the event log, and no code handles a whole-log entry. | event-append-probe, history-log-read | REQ-13, DEC-19 | touches 12 | — | archive-preview-reads-evidence, claim-acquire-event-from-assignee, mutation-event-tail-captures |
 | redo-record-refuses-log-rewrite | Redo records refuse a rewrite of the event log | task | A redo record can change the event log only by its positioned append, and the publish check has no other branch. | event-append-probe | REQ-12, DEC-19 | touches 2 | — | event-log-read-rule |
 | search-excludes-history | Default search reads no history file | task | A search without an explicit file selection excludes the declared history paths. | — | REQ-11, DEC-18, DEC-01 | touches 2 | — | — |
-| storage-records-per-key-reference | The storage-record reference describes verdict and archive-evidence records | task | The generated storage-record reference covers verdict and archive-evidence records. | gate-verdict-record, archive-evidence-record | REQ-15, DEC-06, DEC-17 | touches 2 | — | archive-evidence-writes |
-| history-isolation-test | Ordinary commands succeed over unparseable history | task | A CLI integration module proves ordinary commands succeed over unparseable history files. | — | REQ-14, DEC-20, DEC-16 | creates 1, touches 1 | — | lease-issue-addressed-ops, capture-refuses-whole-event-log |
-| storage-format-history-docs | The storage-format reference describes per-key records and history files | task | The storage-format and concepts pages describe per-key records and name history files and their readers. | gate-run-record-layout, gate-verdict-record, lease-record-layout, archive-evidence-record, history-paths, history-log-read | REQ-12, REQ-13, REQ-15, DEC-19 | touches 4 | — | lease-issue-addressed-ops, capture-refuses-whole-event-log, search-excludes-history, storage-records-per-key-reference |
+| storage-records-per-key-reference | The storage-record reference describes verdict and archive-evidence records | task | The generated storage-record reference covers verdict and archive-evidence records. | gate-verdict-record, archive-evidence-record | REQ-15, DEC-06, DEC-17 | touches 2 | — | archive-evidence-writes, gate-verdict-record-writes |
+| history-isolation-test | Ordinary commands succeed over unparseable history | task | A CLI integration module proves ordinary commands succeed over unparseable history files. | — | REQ-14, DEC-20, DEC-16 | creates 1, touches 1 | — | lease-issue-addressed-ops, capture-refuses-whole-event-log, gate-run-per-issue-layout |
+| storage-format-history-docs | The storage-format reference describes per-key records and history files | task | The storage-format and concepts pages describe per-key records and name history files and their readers. | gate-run-record-layout, gate-verdict-record, lease-record-layout, archive-evidence-record, history-paths, history-log-read | REQ-12, REQ-13, REQ-15, DEC-19 | touches 4 | — | lease-issue-addressed-ops, capture-refuses-whole-event-log, gate-run-per-issue-layout, search-excludes-history, storage-records-per-key-reference |
 | lease-operator-docs | Lease command and recovery docs match per-issue lease records | task | Lease command, recovery and testing pages match issue-addressed lease commands and lease records. | lease-record-layout | REQ-12, REQ-15, DEC-11 | touches 11 | — | lease-interruption-matrix |
 | gate-and-search-command-docs | Gate provenance, gate-run lookup and search docs match per-key reads | task | Command docs show reused-verdict provenance with its source issue and the default history exclusion of search. | reused-verdict-provenance, history-paths | REQ-11, DEC-07, DEC-18 | touches 4 | gate-run-cutover | gate-run-per-issue-layout, search-excludes-history |
-| format-cutover | Five repositories move to repository format 4 in one window | task | This repository, gf2, mealie-fi, inflected-messages and research hold format 4 data, and the installed binary reads it. | format-4-window, gate-run-record-layout, gate-verdict-record, gate-state-run-id, reused-verdict-provenance, lease-record-layout, archive-evidence-record, event-log-rule | REQ-01, REQ-05, REQ-09, REQ-10, DEC-08, DEC-14, DEC-17, DEC-22 | creates 3, touches 5 | — | lease-index-machinery-removal, archive-preview-reads-evidence |
+| format-rewrite-tooling | A rewrite script and window driver move a repository to format 4 | task | An idempotent format 4 rewrite script and a window driver pass on copies of the five repositories. | format-4-window, gate-run-record-layout, gate-verdict-record, gate-state-run-id, reused-verdict-provenance, lease-record-layout, archive-evidence-record, event-log-rule | REQ-01, REQ-05, REQ-09, REQ-10, DEC-08, DEC-14, DEC-17, DEC-22 | creates 2 | — | gate-run-per-issue-layout, lease-index-machinery-removal, archive-preview-reads-evidence, torn-tail-marker-removal |
+| format-cutover | Five repositories move to repository format 4 in one window | task | This repository, gf2, mealie-fi, inflected-messages and research hold format 4 data, and the installed binary reads it. | format-4-window, gate-run-record-layout | REQ-01, REQ-05, REQ-09, REQ-10, DEC-08, DEC-14, DEC-17, DEC-22 | creates 3, touches 5 | — | format-rewrite-tooling |
 | per-key-gate-runs | Gate runs are addressed per issue, per gate and per inputs digest | story | Gate-run records are stored and read per issue, per gate and per inputs digest. | — | REQ-01, REQ-02, REQ-03, REQ-04 | — | — | gate-state-last-run, format-cutover, gate-and-search-command-docs |
 | per-key-leases | Leases are per-issue records under one lease sequence | story | Leases are per-issue records under one held lease lock, and claims decide their event from the assignee. | — | REQ-05, REQ-06, REQ-07, REQ-08 | — | — | format-cutover, lease-operator-docs, claim-acquire-event-from-assignee |
 | history-boundary | Only history-reporting commands read history files | story | Only history-reporting commands read history files, and the boundary is enforced, documented and tested. | — | REQ-09, REQ-10, REQ-11, REQ-12, REQ-13, REQ-14, REQ-15 | — | — | history-isolation-test, storage-format-history-docs, format-cutover, redo-record-refuses-log-rewrite |
@@ -189,10 +190,12 @@ flowchart LR
     N33["storage-format-history-docs: The storage-format reference describes per-key records and history files"]
     N34["lease-operator-docs: Lease command and recovery docs match per-issue lease records"]
     N35["gate-and-search-command-docs: Gate provenance, gate-run lookup and search docs match per-key reads"]
-    N36["format-cutover: Five repositories move to repository format 4 in one window"]
-    N37["per-key-gate-runs: Gate runs are addressed per issue, per gate and per inputs digest"]
-    N38["per-key-leases: Leases are per-issue records under one lease sequence"]
-    N39["history-boundary: Only history-reporting commands read history files"]
+    N36["format-rewrite-tooling: A rewrite script and window driver move a repository to format 4"]
+    N37["format-cutover: Five repositories move to repository format 4 in one window"]
+    N38["per-key-gate-runs: Gate runs are addressed per issue, per gate and per inputs digest"]
+    N39["per-key-leases: Leases are per-issue records under one lease sequence"]
+    N40["history-boundary: Only history-reporting commands read history files"]
+    N3 --> N1
     N23 --> N1
     N2 --> N3
     N3 --> N4
@@ -216,37 +219,43 @@ flowchart LR
     N20 --> N21
     N3 --> N21
     N20 --> N22
-    N21 --> N23
     N22 --> N23
     N24 --> N25
-    N8 --> N25
+    N3 --> N25
     N25 --> N26
     N26 --> N27
     N27 --> N28
     N19 --> N28
+    N23 --> N28
     N20 --> N29
     N25 --> N31
+    N5 --> N31
     N17 --> N32
     N28 --> N32
+    N8 --> N32
     N17 --> N33
     N28 --> N33
+    N8 --> N33
     N30 --> N33
     N31 --> N33
     N18 --> N34
     N8 --> N35
     N30 --> N35
+    N8 --> N36
     N16 --> N36
     N27 --> N36
-    N0 --> N37
+    N21 --> N36
     N36 --> N37
-    N35 --> N37
-    N36 --> N38
-    N34 --> N38
-    N19 --> N38
-    N32 --> N39
-    N33 --> N39
-    N36 --> N39
-    N29 --> N39
+    N0 --> N38
+    N37 --> N38
+    N35 --> N38
+    N37 --> N39
+    N34 --> N39
+    N19 --> N39
+    N32 --> N40
+    N33 --> N40
+    N37 --> N40
+    N29 --> N40
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -261,32 +270,32 @@ flowchart LR
 | DEC-05 Latest run | Chosen: `gate-state-run-id` plus `gate-runs/<issue>/<run>.json`. Rejected: time-ordered run filenames, which read other runs' names, and a `latest.json` pointer, an extra file. Rejected: renaming the landed `run_id` to `last_run`, which rewrites stored states for no behaviour. |
 | DEC-06 Reuse key | Chosen: `gate-verdict-record`, latest recorded wins. Rejected: scanning runs by digest. |
 | DEC-07 Provenance | Chosen: `Reused` carries the source issue and run. Rejected: run id only. |
-| DEC-08 Existing runs | Chosen: `format-cutover` rewrites them in `format-4-window`. Rejected: deleting history, since run ids are cited. No migration reader remains. |
+| DEC-08 Existing runs | Chosen: `format-rewrite-tooling` rewrites them in `format-4-window`. Rejected: deleting history, since run ids are cited. No migration reader remains. |
 | DEC-09 Lease layout | Chosen: `lease-record-layout`. `claims.index.json` is a second authority, not a cache (investigation C3), and is deleted. Rejected: one `leases.json`, which reads other leases. |
 | DEC-10 One sequence | Chosen: `lease-sequence`. Tests move to production entry points as the test-only APIs go, so the property tests drive production. |
 | DEC-11 Issue addressing | Chosen: renew, heartbeat and force-evict take an issue id. Renew and heartbeat resolve through the issue store; force-evict resolves against stored lease records, so a lease on a deleted issue stays evictable. Rejected: a per-lease-id pointer file. |
 | DEC-12 Claim event | Chosen: `IssueClaimed` exactly when the assignee changes, for both `claim acquire` and `issue claim`. Fixes acquire → unassign → acquire emitting nothing. |
 | DEC-13 Limit check | Chosen: the indefinite-lease limits read current lease records only (REQ-05 amended). |
-| DEC-14 Checkout leases | Chosen: `format-cutover` rewrites them, per `format-4-window`. No reader of the old index remains. |
-| DEC-15 Parser rule | Chosen (owner): `event-log-rule`. An unknown tag stays an error naming its line, as landed by c47d78c8; the logs hold no retired-tag lines, since 2a504b17 and b01208cb rewrote them. Rejected: skipping retired tags, which hides real corruption and needs a parser exception. The marker protocol is removed. Kept: `@/issue/c88822a5/decision/D-1`. `format-cutover` rewrites gf2's marker lines. |
+| DEC-14 Checkout leases | Chosen: `format-rewrite-tooling` rewrites them, per `format-4-window`. No reader of the old index remains. |
+| DEC-15 Parser rule | Chosen (owner): `event-log-rule`. An unknown tag stays an error naming its line, as landed by c47d78c8; the logs hold no retired-tag lines, since 2a504b17 and b01208cb rewrote them. Rejected: skipping retired tags, which hides real corruption and needs a parser exception. The marker protocol is removed. Kept: `@/issue/c88822a5/decision/D-1`. `format-rewrite-tooling` rewrites gf2's marker lines. |
 | DEC-16 Content | Chosen: `event-append-probe`. The bounded probe is allowed, and no record is parsed. |
-| DEC-17 Archive evidence | Chosen: `archive-evidence-record`, seeded by `format-cutover`. A repository left unseeded would silently lose re-archive coverage and residue identities. Rejected: evidence on the `.jit-container` marker or on the issue record. |
+| DEC-17 Archive evidence | Chosen: `archive-evidence-record`, seeded by `format-rewrite-tooling`. A repository left unseeded would silently lose re-archive coverage and residue identities. Rejected: evidence on the `.jit-container` marker or on the issue record. |
 | DEC-18 Search | Chosen: anchored negations from `history-paths`, with `rg` running at the data root as landed by d98b59261, so a nested file of the same name stays searchable. Result paths stay absolute. |
 | DEC-19 History readers | Chosen (owner): `jit events`, `jit worktree store-divergence`, `gate status --all` and `--limit`, the server gate-run list, whole-repository `jit validate` and the `repository_validation` checker. Fidelity reads the whole log through `history-log-read` and every run through a dedicated listing budget, because duplicate-id detection has no other home and `merge=union` keeps producing the risk. Every other validation capture stays on the tail probe. Rejected: `CaptureSpec` carve-out, which would keep whole-log arms alive in every consumer of a captured entry. Rejected: moving fidelity to `jit events`, which amends 0a6fd04e's landed criteria. |
 | DEC-20 REQ-14 test | Chosen: a module in `cli_repo_workflow` with one shared file-backed fixture and no new target (`@/inv/bounded-rust-build-footprint`). |
 | DEC-21 Torn tail | Chosen: a final line without its terminating newline is an uncommitted append, so the parser's only torn rule is "ignore an unterminated final line", and the length a mutation reads is the committed length. An append at that length overwrites an uncommitted tail and complies with `@/inv/atomic-writes` as written; it also satisfies REQ-12, since no committed line is rewritten, and both backends already truncate to the append offset. Only a foreign writer can leave such a tail, since a crash mid-apply leaves a record the next session completes. In that edge the log's length can stay equal or shrink, which the charter's "length counts commits" wording does not cover; admission stays safe because eaca3f52 compares the whole tail. Rejected: newline-prefixing the next append, which turns the fragment into a permanent malformed middle line. |
-| DEC-22 Format cutover | Chosen (owner): `format-4-window`. Rejected: one bump per landing group, which means three reinstalls and three rewrites across five repositories. Rejected: bumping at the end, which leaves builds of main accepting format 3 and silently reading no latest runs. Rejected: rewriting this repository per landing while others wait, which makes a single installed binary unable to serve both. |
+| DEC-22 Format cutover | Chosen (owner): `format-4-window`, with tooling and window as separate entries because the window is lead-run, confirmation-gated release work. Rejected: one bump per landing group, which means three reinstalls and three rewrites across five repositories. Rejected: bumping at the end, which leaves builds of main accepting format 3 and silently reading no latest runs. Rejected: rewriting this repository per landing while others wait, which makes a single installed binary unable to serve both. |
 | DEC-23 Redo order | Chosen: the finalizer orders a run record's write ahead of the issue record naming it, so an apply window or crash never exposes a `run_id` without a record. Rejected: accepting the window until `@/charter/D-22` reads land, since `issue show` would hard-fail with not-found in it. |
 | Attestation runs | 8673dc5e (done) records a manual attestation as a run named by `run_id`. |
 | Investigation seams | External dependency 72d89161 → `gate-latest-run-reads`. External dependency 8673dc5e → `gate-run-per-issue-layout`. Both are done. |
 | Fidelity on new records | Verdict and evidence records join `record_drift` in the entries that write them, so the pass stays the guard that stored records reproduce. |
-| Freeze length | `format-4-window` holds the dogfood binary at the last format 3 build from the first gate-run landing to the window. Other epics landing in that span wait for the reinstall. Mitigation: everything ahead of `gate-latest-run-reads` stays installable, and the groups have no reason to land far apart. |
+| Freeze length | `format-4-window` holds the dogfood binary at the last format 3 build from the first gate-run landing to the window. Other epics landing in that span wait for the reinstall. Mitigation: format-free work such as the lease lock, the parser rule and the tail captures stays installable ahead of `gate-latest-run-reads`, and the groups have no reason to land far apart. |
 | Live branches over the relayout | A linked checkout on an older branch is refused after the window until it merges main and re-runs the script. Mitigation: sessions finish or merge first, and the script converts what a merge brings back. |
-| b697a3f7 overlap | Its `read-session` and `read-session-driver` work rebases over `history-log-read` and the fidelity capture. c517b88b's event composition follows `torn-tail-marker-removal` transitively, through 01a88d32 and 0851fae4. Any format change another epic needs joins format 4 before the window. |
-| Shared-file contention | `commands/gate_check.rs`, `commands/mod.rs`, `storage/claim_coordinator.rs`, `storage/json.rs`, `storage/memory.rs` and `repository_state/mutation.rs` are edited by several entries. Edges order every same-function edit: gate-run entries chain through the layout, `archive-evidence-writes` follows the layout (both edit the tracker-written-paths test in `gate_execution.rs`), lease entries chain through the lease lock, and event entries chain through the parser and the capture refusal. The remaining footprint advisories are distinct functions; workers rebase. |
+| b697a3f7 overlap | Its `read-session` and `read-session-driver` work rebases over `history-log-read` and the fidelity capture. External dependency 97f5f2b7 → c517b88b, whose event composition follows the marker's removal. Any format change another epic needs joins format 4 before the window. |
+| Shared-file contention | `commands/gate_check.rs`, `commands/mod.rs`, `storage/claim_coordinator.rs`, `storage/json.rs`, `storage/memory.rs` and `repository_state/mutation.rs` are edited by several entries. Edges order every same-function edit: gate-run entries chain through the layout, lease entries chain through the lease lock, and event entries chain through the parser and the capture refusal. The remaining footprint advisories are distinct functions, such as `archive-evidence-writes` beside the layout in the tracker-written-paths test and `storage-records-per-key-reference` beside the layout in the generated page; workers rebase or regenerate. |
 
 ## Investigation sources
 
 - [Investigation](investigation.md) holds the consumer sweeps, primitive verification and option analyses for gate runs, leases and claims, and the event log, archive, search and history boundary.
 - [Drift audit](drift-audit.md) holds the audit of every issue body against the code at 804acc4d6, including the REQ-08 reachable-state table.
-- [Format 3 window](../../archive/3d9a0ce3-lead-friction/active/format3-window.sh) is the precedent for `format-cutover`.
+- [Format 3 window](../../archive/3d9a0ce3-lead-friction/active/format3-window.sh) is the precedent for `format-rewrite-tooling`.
