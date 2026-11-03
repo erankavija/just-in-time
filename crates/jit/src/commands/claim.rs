@@ -5,6 +5,7 @@
 use super::CommandExecutor;
 use crate::config::JitConfig;
 use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId};
+use crate::storage::claim_coordinator::{read_leases, LeaseChange};
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{
@@ -327,14 +328,9 @@ pub(super) fn resolve_release_actor(worktree_root: &Path) -> Result<crate::domai
 impl<S: IssueStore> ClaimOps<'_, S> {
     /// Execute `jit claim release <issue-id>` command.
     ///
-    /// Resolves the issue's active lease and releases it regardless of the lease
-    /// owner, recording the acting identity in the eviction audit trail. Reuses the
-    /// admin/owner-bypass [`ClaimCoordinator::force_evict_lease`] path so a non-owner
-    /// (or an actor with no configured agent identity) can release the lease.
-    ///
-    /// The argument is a resolved issue id. If the issue holds more than one active lease (which should not happen
-    /// under exclusive claiming), every active lease is released; the returned
-    /// [`ReleasedLeaseInfo`] reports the last one released.
+    /// Releases the issue's lease regardless of its owner, under one held
+    /// [`LeaseLock`](crate::storage::claim_coordinator::LeaseLock), recording the
+    /// acting identity in the eviction audit trail.
     ///
     /// # Errors
     ///
@@ -387,38 +383,26 @@ impl<S: IssueStore> ClaimOps<'_, S> {
             )
         })?;
 
-        // Resolve the issue's active (non-expired) lease(s).
-        let leases = coordinator
-            .get_active_leases(None, None)
-            .with_context(|| format!("Failed to look up active leases for issue {}", full_id))?
-            .into_iter()
-            .filter(|lease| lease.issue_id == full_id)
-            .collect::<Vec<_>>();
-
-        let released = leases
-            .into_iter()
-            .map(|lease| {
-                let reason = format!("released by {} via claim release", actor);
-                coordinator
-                    .force_evict_lease(&lease.lease_id, &reason)
-                    .with_context(|| {
-                        format!(
-                            "Failed to release lease {} for issue {}",
-                            lease.lease_id, full_id
-                        )
-                    })?;
-                Ok(ReleasedLeaseInfo {
-                    lease_id: lease.lease_id,
-                    issue_id: lease.issue_id,
-                    previous_owner: lease.agent_id.to_string(),
-                    actor: actor.to_string(),
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        let info = released.into_iter().next_back().ok_or_else(|| {
-            crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(&full_id))
+        let no_active_lease = || {
+            anyhow::Error::from(crate::errors::LeaseNotFoundError::new(
+                &crate::errors::no_active_lease(&full_id),
+            ))
+        };
+        let mut lock = coordinator.lock()?;
+        let lease = lock.load(&full_id)?.ok_or_else(no_active_lease)?;
+        let reason = format!("released by {} via claim release", actor);
+        // An expired lease is evicted as expired, and the release then fails.
+        lock.apply(&full_id, |current, _| match current {
+            Some(current) if current.lease_id == lease.lease_id => Ok(LeaseChange::Remove(reason)),
+            _ => Err(no_active_lease()),
         })?;
+
+        let info = ReleasedLeaseInfo {
+            lease_id: lease.lease_id,
+            issue_id: lease.issue_id,
+            previous_owner: lease.agent_id.to_string(),
+            actor: actor.to_string(),
+        };
         Ok((info, warnings))
     }
 }
@@ -475,7 +459,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
 }
 
 impl<S: IssueStore> ClaimOps<'_, S> {
-    /// Shows status of active leases.
+    /// Shows unexpired leases, stale ones marked, read without the claims lock.
     ///
     /// # Arguments
     ///
@@ -484,7 +468,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     ///
     /// # Returns
     ///
-    /// Vector of active leases matching the filters, paired with any non-fatal
+    /// Vector of unexpired leases matching the filters, paired with any non-fatal
     /// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
     /// relocation), for the caller's output layer to render. This function never
     /// writes to stderr itself.
@@ -505,39 +489,48 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         let branch = get_current_branch(&paths.worktree_root)?;
 
         // Load worktree identity, surfacing relocation as a warning
-        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        let (_, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-        // Resolve current agent ID using proper priority: JIT_AGENT_ID > ~/.config/jit/agent.toml > error
-        let current_agent_id = resolve_agent_id(None)?;
-
-        // Create claim coordinator
-        let locker = FileLocker::with_configured_timeout();
-        let coordinator = ClaimCoordinator::new(
-            paths.clone(),
-            locker,
-            identity.worktree_id,
-            current_agent_id.clone(),
-        );
-        coordinator.init()?;
-
-        // Get active leases (default to current agent if no filters specified)
-        let filter_agent = if agent_id.is_none() && issue.is_none() {
-            Some(current_agent_id.to_string())
-        } else {
-            agent_id.map(str::to_string)
+        // Default to the current agent when no filter is given.
+        let filter_agent = match (issue, agent_id) {
+            (None, None) => Some(resolve_agent_id(None)?.to_string()),
+            (_, agent_id) => agent_id.map(str::to_string),
         };
 
-        let leases = coordinator.get_active_leases(issue, filter_agent.as_deref())?;
+        let leases = unexpired_leases(paths, issue, filter_agent.as_deref())?;
         Ok((leases, warnings))
     }
 }
 
+/// Unexpired leases matching the filters, most recently acquired first, read
+/// without the claims lock. A stale lease is kept and marked stale as of now.
+fn unexpired_leases(
+    paths: &WorktreePaths,
+    issue: Option<&IssueIdPrefix>,
+    agent_id: Option<&str>,
+) -> Result<Vec<Lease>> {
+    let now = chrono::Utc::now();
+    let mut leases = read_leases(paths)?
+        .into_iter()
+        .filter(|lease| !lease.is_expired(now))
+        .map(|lease| Lease {
+            stale: lease.is_stale(now),
+            ..lease
+        })
+        .filter(|lease| issue.is_none_or(|issue| issue.matches(&lease.issue_id)))
+        .filter(|lease| agent_id.is_none_or(|agent| lease.agent_id.to_string() == agent))
+        .collect::<Vec<_>>();
+    leases.sort_by_key(|lease| std::cmp::Reverse(lease.acquired_at));
+    Ok(leases)
+}
+
 impl<S: IssueStore> ClaimOps<'_, S> {
-    /// Lists all active leases across all agents and worktrees.
+    /// Lists unexpired leases across all agents and worktrees, stale ones marked,
+    /// read without the claims lock.
     ///
     /// # Returns
     ///
-    /// Vector of all active leases, paired with any non-fatal [`StorageWarning`]s
+    /// Vector of all unexpired leases, paired with any non-fatal [`StorageWarning`]s
     /// observed while loading the worktree identity (e.g. a relocation), for the
     /// caller's output layer to render. This function never writes to stderr itself.
     ///
@@ -551,19 +544,9 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         let branch = get_current_branch(&paths.worktree_root)?;
 
         // Load worktree identity, surfacing relocation as a warning
-        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        let (_, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
-        // We need an agent ID for coordinator, but it doesn't matter which one for listing
-        let agent = crate::domain::Assignee::SYSTEM_LIST;
-
-        // Create claim coordinator
-        let locker = FileLocker::with_configured_timeout();
-        let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
-        coordinator.init()?;
-
-        // Get all active leases (no filters)
-        let leases = coordinator.get_active_leases(None, None)?;
-        Ok((leases, warnings))
+        Ok((unexpired_leases(paths, None, None)?, warnings))
     }
 }
 
@@ -1003,32 +986,17 @@ mod tests {
         Ok(())
     }
 
-    /// Execute claim status with manually constructed paths (for testing)
+    /// The leases `jit claim status` reports for explicit filters.
     fn execute_claim_status_test(
         temp: &TempDir,
         issue_id: Option<&crate::domain::identity::IssueId>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
-        let paths = create_test_paths(temp);
-
-        // Create coordinator
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            locker,
-            "wt:test".parse().unwrap(),
-            agent_id.unwrap_or("agent:test").parse().unwrap(),
-        );
-
-        // Initialize coordinator (creates directories)
-        coordinator.init()?;
-
-        // Get active leases
-        let leases =
-            coordinator.get_active_leases(issue_id.map(IssueIdPrefix::from).as_ref(), agent_id)?;
-        Ok(leases)
+        unexpired_leases(
+            &create_test_paths(temp),
+            issue_id.map(IssueIdPrefix::from).as_ref(),
+            agent_id,
+        )
     }
 
     /// Seed an exact identifier precondition for short-id collision tests.
@@ -1288,19 +1256,7 @@ mod tests {
         // Acquire a claim
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
-        // Get original lease
-        let paths = create_test_paths(&temp);
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            locker,
-            "wt:test".parse().unwrap(),
-            "agent:test".parse().unwrap(),
-        );
-        let original = coordinator
-            .get_active_leases(None, None)?
+        let original = execute_claim_list_test(&temp)?
             .into_iter()
             .find(|l| l.lease_id == lease_id)
             .unwrap();
@@ -1704,22 +1660,75 @@ mod tests {
         Ok(())
     }
 
-    /// Helper to execute claim list in tests
+    /// The leases `jit claim list` reports.
     fn execute_claim_list_test(temp: &TempDir) -> Result<Vec<Lease>> {
-        let paths = create_test_paths(temp);
+        unexpired_leases(&create_test_paths(temp), None, None)
+    }
 
-        let locker = FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ));
-        let coordinator = ClaimCoordinator::new(
-            paths,
-            locker,
-            "wt:test".parse().unwrap(),
-            crate::domain::Assignee::SYSTEM_LIST,
-        );
-        coordinator.init()?;
+    #[test]
+    fn test_list_and_status_omit_expired_and_mark_stale_leases_without_the_claims_lock_or_a_write(
+    ) -> Result<()> {
+        use crate::storage::clock::FixedClock;
+        use crate::test_lease_store::history_path;
 
-        coordinator.get_active_leases(None, None)
+        let (temp, executor) = setup_test_repo_with_config("")?;
+        ensure_git_checkout(&temp)?;
+        let paths = create_test_paths(&temp);
+        let expired_id = crate::test_utils::issue_id(0x5000_4000_8000_0000_0000_0001_abcd_ef77);
+        let stale_id = crate::test_utils::issue_id(0x5000_4000_8000_0000_0000_0001_abcd_ef78);
+        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64;
+        let past = ClaimCoordinator::new(
+            paths.clone(),
+            FileLocker::new(Duration::from_secs(
+                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+            )),
+            "wt:test".parse()?,
+            "agent:test".parse()?,
+        )
+        .with_clock(std::sync::Arc::new(FixedClock::new(
+            chrono::Utc::now() - chrono::Duration::seconds(threshold + 60),
+        )));
+        let acquire = |issue_id, ttl_secs| {
+            past.acquire_claim_synchronized(
+                issue_id,
+                ttl_secs,
+                Some("test lease"),
+                ClaimAcquireLimits::new(1, 1),
+                |_| Ok(()),
+            )
+            .map(|(lease, ())| lease)
+        };
+        acquire(&expired_id, 60)?;
+        let stale = acquire(&stale_id, 0)?;
+        let store = || -> Result<(Vec<Lease>, Vec<u8>)> {
+            Ok((
+                crate::storage::claim_coordinator::read_leases(&paths)?,
+                fs::read(history_path(&paths.shared_jit))?,
+            ))
+        };
+        let before = store()?;
+        let _held = FileLocker::new(Duration::from_millis(1))
+            .try_lock_exclusive(&paths.shared_jit.join("locks/claims.lock"))?
+            .expect("no claim operation is running");
+        let executor = executor.with_worktree_paths(paths.clone());
+        let status = |issue_id| {
+            executor
+                .claims()
+                .status(Some(&IssueIdPrefix::from(issue_id)), None)
+                .map(|(leases, _)| leases)
+        };
+        let marked = Lease {
+            stale: true,
+            ..stale
+        };
+
+        let (listed, _) = executor.claims().list()?;
+
+        assert_eq!(listed, vec![marked.clone()]);
+        assert_eq!(status(&stale_id)?, vec![marked]);
+        assert!(status(&expired_id)?.is_empty());
+        assert_eq!(store()?, before);
+        Ok(())
     }
 
     // Tests for claim force-evict command
