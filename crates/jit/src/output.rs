@@ -3714,6 +3714,29 @@ mod tests {
         );
     }
 
+    fn emitted_text_error_codes() -> BTreeSet<&'static str> {
+        regex::Regex::new(r#""([A-Za-z_]+)""#)
+            .expect("error-code literal regex should compile")
+            .captures_iter(include_str!("main.rs"))
+            .filter_map(|captures| captures.get(1).map(|capture| capture.as_str()))
+            .filter(|text| {
+                *text == "recovery_failed"
+                    || (text
+                        .bytes()
+                        .all(|byte| byte == b'_' || byte.is_ascii_uppercase())
+                        && ["ERROR", "FAILED", "NOT_FOUND"]
+                            .iter()
+                            .any(|suffix| text.ends_with(suffix)))
+            })
+            .collect()
+    }
+
+    /// Every error code `main.rs` emits comes from `classify` or a typed `ErrorCode`, never a literal.
+    #[test]
+    fn test_main_emits_no_literal_error_codes() {
+        assert_eq!(emitted_text_error_codes(), BTreeSet::new());
+    }
+
     /// The process status is a semantic projection of the typed classification.
     ///
     /// Assigning an [`ErrorCode`] directly to the envelope makes a textual code
