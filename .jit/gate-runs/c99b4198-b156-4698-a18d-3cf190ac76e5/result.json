@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5b0f29b68e7b6f686df37fe1ba406d7a0775823f",
+  "completed_at": "2026-11-03T21:10:00.133943999Z",
+  "duration_ms": 260597,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/output/failure.rs",
+        "id": "F1",
+        "line": 1478,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/semantic-test-assertions"
+        ],
+        "severity": "high",
+        "summary": "Guidance tests accept arbitrary suggestion text for gate failures and missing profiles, leaving hard REQ-04 unmet."
+      }
+    ],
+    "summary": "Guidance tests do not semantically verify all newly derived suggestions.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1539da29-f445-430c-a238-8613da6ae904",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c99b4198-b156-4698-a18d-3cf190ac76e5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T21:05:39.536888114Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9493 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a33b-6036-78f2-8f06-d7ce8617b769\n--------\nuser\n--- 9480 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 1865a159 (tracker-only), 1e4972b (implementation), 96944aa6 (test), all tagged `jit:1539da29`\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-11 and REQ-13 (issue description); @/invariant/semantic-test-assertions, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T21:03:59Z); code-review pending\nTruncation recovery: focused reads of config and plan sections, each tagged patch/path, and bounded failure.rs line ranges\n\n1. **[blocking, issue-impact]** `crates/jit/src/output/failure.rs:1478` — The new guidance tests do not verify suggestion meaning for every derivation, leaving hard REQ-04 unmet. `suggestions_mention` only checks common context terms, so the gate-failure test accepts any suggestions containing the issue ID and key (lines 1502–1507); the missing-profile test checks only that one arbitrary suggestion exists (line 1809). These tests would pass if the required remediation actions changed or disappeared. Assert semantic action markers for each suggestion without copying full strings. References: `@/invariant/semantic-test-assertions`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Guidance tests do not semantically verify all newly derived suggestions.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Guidance tests accept arbitrary suggestion text for gate failures and missing profiles, leaving hard REQ-04 unmet.\",\"file\":\"crates/jit/src/output/failure.rs\",\"line\":1478,\"references\":[\"@/invariant/semantic-test-assertions\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
