@@ -1,6 +1,9 @@
 use super::CommandExecutor;
 use crate::declarations::{GateChecker, GateMode, GateStage};
-use crate::domain::{identity::IssueId, Priority};
+use crate::domain::{
+    identity::{IssueId, IssueIdPrefix},
+    Priority,
+};
 use crate::storage::JsonFileStorage;
 use crate::test_utils::{file_executor, profile_package_fixture, setup_test_repo_with_taxonomy};
 use anyhow::Result;
@@ -130,7 +133,7 @@ fn test_mutations_append_over_unparseable_history_without_capturing_the_whole_lo
         ("issue", |f| {
             f.executor
                 .issues()
-                .assign_issue(&f.issue, "human:reader".parse()?)?;
+                .assign_issue(&IssueIdPrefix::from(&f.issue), "human:reader".parse()?)?;
             Ok(())
         }),
         ("document add", |f| {
