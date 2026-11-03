@@ -285,10 +285,11 @@ A stale lease is:
 - Marked stale in `jit claim status`
 - Not counted as active: with `enforce_leases = "strict"` it no longer refuses
   other agents' writes to the issue
-- A candidate for `jit claim force-evict`
+- Reclaimed by the next `jit recover`, which records a `Reclaim` operation in
+  the claims log
 
-Staleness never auto-evicts the lease. It persists until a heartbeat,
-`jit claim release`, or force-eviction.
+Until then it persists unless a heartbeat, `jit claim release`, or
+`jit claim force-evict` intervenes.
 
 ### Failure modes
 

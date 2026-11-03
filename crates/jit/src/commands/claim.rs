@@ -575,6 +575,8 @@ pub struct RecoveryReport {
     pub index_rebuilt: bool,
     /// Number of expired leases evicted
     pub expired_leases_evicted: usize,
+    /// Number of indefinite leases reclaimed for a stale heartbeat
+    pub stale_leases_reclaimed: usize,
     /// Number of orphaned temp files removed
     pub temp_files_removed: usize,
     /// Number of derived-state targets repaired during recovery.
@@ -668,12 +670,12 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
         report.index_rebuilt = true;
     }
 
-    // 3. Evict expired leases.
+    // 3. Evict expired leases and reclaim stale indefinite ones.
     let mut index = coordinator.load_claims_index()?;
-    let leases_before = index.leases.len();
-    coordinator.evict_expired(&mut index)?;
+    let lapsed = coordinator.evict_lapsed(&mut index)?;
     coordinator.write_index_atomic(&index)?;
-    report.expired_leases_evicted = leases_before.saturating_sub(index.leases.len());
+    report.expired_leases_evicted = lapsed.expired;
+    report.stale_leases_reclaimed = lapsed.reclaimed;
 
     Ok(())
 }
@@ -686,7 +688,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
     /// - Repairs declaration-derived state through the `jit validate --fix` path
     /// - With claims coordination: cleans up stale claim locks from crashed processes
     ///   (PID check), rebuilds a corrupted claims index from its append-only log,
-    ///   and evicts expired leases; without Git, skips these with a warning
+    ///   evicts expired leases, and reclaims indefinite leases whose heartbeat is
+    ///   stale; without Git, skips these with a warning
     /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
     ///
     /// Safe to run at any time: it removes only provably stale data and never

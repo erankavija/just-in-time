@@ -701,6 +701,45 @@ fn test_recover_rebuilds_index_when_claim_log_has_claims_but_index_is_missing() 
 }
 
 #[test]
+fn test_recover_reports_a_reclaimed_stale_lease_without_appending_an_event() {
+    use chrono::{Duration, Utc};
+
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Abandoned lease"]).unwrap());
+    let silent_since = Utc::now()
+        - Duration::seconds(jit::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64 + 60);
+    let lease = jit::storage::Lease {
+        lease_id: "00000000-0000-4000-8000-0000000000ab".parse().unwrap(),
+        issue_id: issue_id.clone(),
+        agent_id: "agent:gone".parse().unwrap(),
+        worktree_id: "wt:gone".parse().unwrap(),
+        branch: None,
+        ttl_secs: 0,
+        acquired_at: silent_since,
+        expires_at: None,
+        last_beat: silent_since,
+        stale: false,
+    };
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    jit::test_lease_store::plant_lease(&paths.shared_jit, &lease).unwrap();
+    let events = || fs::read(cli.root().join(".jit/events.jsonl")).unwrap_or_default();
+    let events_before = events();
+
+    let recovered = cli.command(["recover", "--json"]).output().unwrap();
+
+    assert!(recovered.status.success(), "{recovered:?}");
+    let report: Value = serde_json::from_slice(&recovered.stdout).unwrap();
+    assert_eq!(report["stale_leases_reclaimed"], 1, "{report}");
+    assert_eq!(report["expired_leases_evicted"], 0, "{report}");
+    assert_eq!(
+        jit::test_lease_store::read_lease(&paths.shared_jit, &issue_id).unwrap(),
+        None
+    );
+    assert_eq!(events(), events_before, "reclamation appends no event");
+}
+
+#[test]
 fn test_claim_status_shows_lease_details() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("Initial commit").unwrap();
