@@ -6774,24 +6774,17 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             ClaimCommands::Status { issue, agent } => {
-                use jit::output::{
-                    JsonOutput, LeaseListResponse, LeaseListWarnings, OutputContext,
-                };
+                use jit::output::{JsonOutput, LeaseListResponse};
 
                 match issue
                     .map(|id| resolve_issue_filter_arg(&storage, &id))
                     .transpose()
                     .and_then(|issue| executor.claims().status(issue.as_ref(), agent.as_deref()))
                 {
-                    Ok((leases, warnings)) => {
+                    Ok(leases) => {
                         if json {
                             let msg = format!("{} active lease(s)", leases.len());
-                            let response = LeaseListResponse::with_extras(
-                                leases,
-                                LeaseListWarnings {
-                                    warnings: warnings.clone(),
-                                },
-                            );
+                            let response = LeaseListResponse::new(leases);
                             let output = JsonOutput::success(response).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if leases.is_empty() {
@@ -6846,12 +6839,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 println!();
                             }
                         }
-                        if !json {
-                            let output_ctx = OutputContext::new(quiet, json);
-                            for warning in &warnings {
-                                output_ctx.print_warning(warning)?;
-                            }
-                        }
                     }
                     Err(e) => {
                         if json {
@@ -6865,20 +6852,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
             }
             ClaimCommands::List => {
-                use jit::output::{
-                    JsonOutput, LeaseListResponse, LeaseListWarnings, OutputContext,
-                };
+                use jit::output::{JsonOutput, LeaseListResponse};
 
                 match executor.claims().list() {
-                    Ok((leases, warnings)) => {
+                    Ok(leases) => {
                         if json {
                             let msg = format!("{} lease(s) found", leases.len());
-                            let response = LeaseListResponse::with_extras(
-                                leases,
-                                LeaseListWarnings {
-                                    warnings: warnings.clone(),
-                                },
-                            );
+                            let response = LeaseListResponse::new(leases);
                             let output = JsonOutput::success(response).with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else if leases.is_empty() {
@@ -6919,12 +6899,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                     );
                                 }
                                 println!();
-                            }
-                        }
-                        if !json {
-                            let output_ctx = OutputContext::new(quiet, json);
-                            for warning in &warnings {
-                                output_ctx.print_warning(warning)?;
                             }
                         }
                     }

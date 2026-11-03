@@ -2836,16 +2836,8 @@ pub struct LabelValuesScope {
     pub namespace: String,
 }
 
-/// Response for `claim status` and `claim list`: the leases beside the
-/// storage warnings raised while reading them.
-pub type LeaseListResponse =
-    ListEnvelope<LeasesKey, crate::storage::claim_coordinator::Lease, LeaseListWarnings>;
-
-/// The storage warnings a [`LeaseListResponse`] carries.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct LeaseListWarnings {
-    pub warnings: Vec<crate::storage::StorageWarning>,
-}
+/// Response for `claim status` and `claim list`.
+pub type LeaseListResponse = ListEnvelope<LeasesKey, crate::storage::claim_coordinator::Lease>;
 
 /// Response for `worktree list` command
 pub type WorktreeListResponse =
@@ -3935,11 +3927,8 @@ mod tests {
             last_beat: now,
             stale: false,
         };
-        let response =
-            LeaseListResponse::with_extras(vec![lease], LeaseListWarnings { warnings: vec![] });
-        let value = serde_json::to_value(response).unwrap();
+        let value = serde_json::to_value(LeaseListResponse::new(vec![lease])).unwrap();
         assert_envelope_value(&value, "leases", 1);
-        assert_eq!(value["warnings"], json!([]));
         assert!(value["leases"][0]["expires_at"].is_null());
         assert!(value["leases"][0]["branch"].is_null());
     }

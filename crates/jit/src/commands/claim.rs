@@ -459,37 +459,24 @@ impl<S: IssueStore> ClaimOps<'_, S> {
 }
 
 impl<S: IssueStore> ClaimOps<'_, S> {
-    /// Shows unexpired leases, stale ones marked, read without the claims lock.
-    ///
-    /// # Arguments
-    ///
-    /// * `issue` - Optional filter matching each lease's stored issue id
-    /// * `agent_id` - Optional filter by agent ID
-    ///
-    /// # Returns
-    ///
-    /// Vector of unexpired leases matching the filters, paired with any non-fatal
-    /// [`StorageWarning`]s observed while loading the worktree identity (e.g. a
-    /// relocation), for the caller's output layer to render. This function never
-    /// writes to stderr itself.
+    /// Shows unexpired leases matching `issue` and `agent_id`, stale ones
+    /// marked; with neither filter, the current agent's. Takes no lock and
+    /// writes nothing.
     ///
     /// # Errors
     ///
-    /// Returns an error if the selected worktree's branch cannot be resolved or the
-    /// leases cannot be read.
+    /// The selected worktree is not a git checkout with a commit, or the leases
+    /// cannot be read.
     pub fn status(
         &self,
         issue: Option<&IssueIdPrefix>,
         agent_id: Option<&str>,
-    ) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
+    ) -> Result<Vec<Lease>> {
         let paths = self.exec.require_worktree_paths()?;
         use crate::agent_config::resolve_agent_id;
 
-        // Get current branch for identity
-        let branch = get_current_branch(&paths.worktree_root)?;
-
-        // Load worktree identity, surfacing relocation as a warning
-        let (_, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+        // Claims require git (`@/charter/D-4`).
+        get_current_branch(&paths.worktree_root)?;
 
         // Default to the current agent when no filter is given.
         let filter_agent = match (issue, agent_id) {
@@ -497,8 +484,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
             (_, agent_id) => agent_id.map(str::to_string),
         };
 
-        let leases = unexpired_leases(paths, issue, filter_agent.as_deref())?;
-        Ok((leases, warnings))
+        unexpired_leases(paths, issue, filter_agent.as_deref())
     }
 }
 
@@ -525,28 +511,18 @@ fn unexpired_leases(
 }
 
 impl<S: IssueStore> ClaimOps<'_, S> {
-    /// Lists unexpired leases across all agents and worktrees, stale ones marked,
-    /// read without the claims lock.
-    ///
-    /// # Returns
-    ///
-    /// Vector of all unexpired leases, paired with any non-fatal [`StorageWarning`]s
-    /// observed while loading the worktree identity (e.g. a relocation), for the
-    /// caller's output layer to render. This function never writes to stderr itself.
+    /// Lists unexpired leases across all agents and worktrees, stale ones
+    /// marked. Takes no lock and writes nothing.
     ///
     /// # Errors
     ///
-    /// Returns an error if the selected worktree's branch cannot be resolved or the
-    /// leases cannot be read.
-    pub fn list(&self) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
+    /// The selected worktree is not a git checkout with a commit, or the leases
+    /// cannot be read.
+    pub fn list(&self) -> Result<Vec<Lease>> {
         let paths = self.exec.require_worktree_paths()?;
-        // Get current branch for identity
-        let branch = get_current_branch(&paths.worktree_root)?;
-
-        // Load worktree identity, surfacing relocation as a warning
-        let (_, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
-
-        Ok((unexpired_leases(paths, None, None)?, warnings))
+        // Claims require git (`@/charter/D-4`).
+        get_current_branch(&paths.worktree_root)?;
+        unexpired_leases(paths, None, None)
     }
 }
 
@@ -1666,7 +1642,7 @@ mod tests {
     }
 
     #[test]
-    fn test_list_and_status_omit_expired_and_mark_stale_leases_without_the_claims_lock_or_a_write(
+    fn test_list_and_status_omit_expired_and_mark_stale_leases_without_a_lock_or_a_write(
     ) -> Result<()> {
         use crate::storage::clock::FixedClock;
         use crate::test_lease_store::history_path;
@@ -1715,19 +1691,23 @@ mod tests {
             executor
                 .claims()
                 .status(Some(&IssueIdPrefix::from(issue_id)), None)
-                .map(|(leases, _)| leases)
         };
         let marked = Lease {
             stale: true,
             ..stale
         };
 
-        let (listed, _) = executor.claims().list()?;
+        let listed = executor.claims().list()?;
 
         assert_eq!(listed, vec![marked.clone()]);
         assert_eq!(status(&stale_id)?, vec![marked]);
         assert!(status(&expired_id)?.is_empty());
         assert_eq!(store()?, before);
+        assert_eq!(
+            crate::storage::worktree_identity::read_worktree_id(&paths)?,
+            None,
+            "reads record no worktree identity"
+        );
         Ok(())
     }
 
