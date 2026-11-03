@@ -7,6 +7,7 @@
   ],
   "description": "Share one `SchemaEngine` across the issues repository validation evaluates, so each local rule's JSON Schema compiles once per report instead of once per issue.\n\n## Background\n\n- `evaluate_local` (`crates/jit/src/validation/local.rs:230`) desugars each matching rule's schema (`rule_schema`, `:272-278,343`) and builds a new `SchemaEngine` per call (`:289-290`). The engine already caches compiled validators by schema key (`crates/jit/src/validation/engine.rs:113-119`, `validator_for` `:317`, test `test_validator_is_cached_not_recompiled` `:947`), but the cache lives only for that one call.\n- Repository validation calls `evaluate_local` once per issue (`collect_rule_findings`, `crates/jit/src/validation/repository.rs:543-552`), so each schema compiles once per issue.\n- Single-issue write paths also call `evaluate_local` (`commands/mod.rs`, `commands/template.rs`, `commands/bulk_update.rs`, `commands/gate_check.rs`, `commands/validate.rs`), as do its tests (`validation/local.rs`, `repository_state/default_rules.rs`, `tests/fast_docs_templates/content_format_dispatch.rs`, `tests/fast_rules/example_rulesets_tests.rs`, `tests/fast_rules/default_rules_registry_derivation_tests.rs`). `SchemaEngine` is `!Sync`, which suits a single-threaded report.\n\n## Success Criteria\n\n- [hard] REQ-01: Local-rule evaluation accepts a caller's `SchemaEngine`, and repository validation evaluates every issue against one engine per report, so each distinct schema compiles once per report; no new compiled-rule-set type is introduced.\n- [hard] REQ-02: `evaluate_local` keeps its signature and evaluates against an engine of its own, so its callers are unchanged.\n- [hard] REQ-03: A unit test evaluates two issues against one shared engine and shows that a schema both match is compiled once.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "first_ready_at": "2026-11-03T23:46:17.389651066Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "satisfies:9876a23a/REQ-11"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Local rules compile each schema once per report",
-  "updated_at": "2026-11-03T23:04:04.637393627Z"
+  "updated_at": "2026-11-03T23:46:17.389651066Z"
 }
