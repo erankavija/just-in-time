@@ -3,56 +3,38 @@
 //! Tests `jit validate --leases` command with real git worktrees and claims.
 
 use chrono::{Duration, Utc};
+use jit::storage::claim_coordinator::Lease;
+use jit::storage::worktree_paths::WorktreePaths;
 use jit::test_cli::JitCli;
+use jit::test_lease_store::{corrupt_lease, plant_lease, LeaseCorruption};
 use serde_json::Value;
-use std::fs;
-use std::path::Path;
 
-/// Write a claims index file
-fn write_claims_index(repo_path: &Path, leases: Vec<Value>) {
-    let git_jit_dir = repo_path.join(".git/jit");
-    fs::create_dir_all(&git_jit_dir).unwrap();
-
-    let claims_index = serde_json::json!({
-        "schema_version": 1,
-        "generated_at": Utc::now(),
-        "last_seq": leases.len(),
-        "leases": leases
-    });
-
-    let claims_path = git_jit_dir.join("claims.index.json");
-    fs::write(
-        claims_path,
-        serde_json::to_string_pretty(&claims_index).unwrap(),
-    )
-    .unwrap();
-}
-
-/// Create a test lease JSON object
+/// Create a lease with an explicit acquisition time.
 fn create_test_lease(
     lease_id: &str,
     issue_id: &str,
     worktree_id: &str,
     ttl_secs: i64,
     acquired_at: chrono::DateTime<Utc>,
-) -> Value {
+) -> Lease {
     let expires_at = if ttl_secs > 0 {
         Some(acquired_at + Duration::seconds(ttl_secs))
     } else {
         None
     };
 
-    serde_json::json!({
-        "lease_id": lease_id,
-        "issue_id": issue_id,
-        "agent_id": "agent:test",
-        "worktree_id": worktree_id,
-        "branch": Some("test-branch"),
-        "ttl_secs": ttl_secs,
-        "acquired_at": acquired_at,
-        "expires_at": expires_at,
-        "last_beat": acquired_at
-    })
+    Lease {
+        lease_id: lease_id.parse().unwrap(),
+        issue_id: issue_id.parse().unwrap(),
+        agent_id: "agent:test".parse().unwrap(),
+        worktree_id: worktree_id.parse().unwrap(),
+        branch: Some("test-branch".into()),
+        ttl_secs: ttl_secs.try_into().unwrap(),
+        acquired_at,
+        expires_at,
+        last_beat: acquired_at,
+        stale: false,
+    }
 }
 
 #[test]
@@ -67,17 +49,12 @@ fn test_validate_leases_no_claims_index() {
 #[test]
 fn test_validate_repository_detects_invalid_claims_index() {
     let (primary, _linked) = JitCli::linked_checkouts().unwrap();
-    let claims_dir = primary.root().join(".git/jit");
-    fs::create_dir_all(&claims_dir).unwrap();
-    fs::write(
-        claims_dir.join("claims.index.json"),
-        serde_json::json!({
-            "schema_version": 2,
-            "generated_at": Utc::now(),
-            "last_seq": 0,
-            "leases": []
-        })
-        .to_string(),
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    corrupt_lease(
+        &paths.shared_jit,
+        &jit::test_utils::issue_id(1),
+        LeaseCorruption::InvalidSchema,
     )
     .unwrap();
 
@@ -127,7 +104,9 @@ fn test_validate_leases_detects_expired_lease() {
         3600,
         Utc::now() - Duration::days(2),
     );
-    write_claims_index(primary.root(), vec![expired_lease]);
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    plant_lease(&paths.shared_jit, &expired_lease).unwrap();
 
     let output = primary.command(["validate", "--leases"]).output().unwrap();
 
@@ -158,7 +137,9 @@ fn test_validate_leases_detects_missing_worktree() {
         7200,
         Utc::now(),
     );
-    write_claims_index(primary.root(), vec![lease]);
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    plant_lease(&paths.shared_jit, &lease).unwrap();
 
     // `--force`: the linked checkout carries untracked `.jit` state.
     primary
@@ -202,7 +183,9 @@ fn test_validate_leases_detects_missing_issue() {
         7200,
         Utc::now(),
     );
-    write_claims_index(primary.root(), vec![lease]);
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    plant_lease(&paths.shared_jit, &lease).unwrap();
 
     let output = primary.command(["validate", "--leases"]).output().unwrap();
 
@@ -234,7 +217,9 @@ fn test_validate_leases_all_valid_succeeds() {
         7200,
         Utc::now(),
     );
-    write_claims_index(primary.root(), vec![lease]);
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    plant_lease(&paths.shared_jit, &lease).unwrap();
 
     let json = primary.run_json(["validate", "--leases"]).unwrap();
 
@@ -256,7 +241,9 @@ fn test_validate_leases_json_output_on_failure() {
         3600,
         Utc::now() - Duration::days(1),
     );
-    write_claims_index(primary.root(), vec![expired_lease]);
+    let paths =
+        WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
+    plant_lease(&paths.shared_jit, &expired_lease).unwrap();
 
     let output = primary
         .command(["validate", "--leases", "--json"])
