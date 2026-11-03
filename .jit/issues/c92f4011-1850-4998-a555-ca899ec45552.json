@@ -14,9 +14,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "741e8192-4af6-4a6b-a534-1763fa4f65fc",
+      "run_id": "6cef4ea7-2a06-4d54-8587-3d5c6d037822",
       "status": "passed",
-      "updated_at": "2026-11-03T23:29:12.627209518Z",
+      "updated_at": "2026-11-03T23:49:16.946149445Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -26,9 +26,9 @@
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "run_id": "f7b120f9-8bb0-4281-a1b7-04d2d5f1b4a8",
-      "status": "failed",
-      "updated_at": "2026-11-03T23:29:15.661269918Z",
+      "run_id": "64199cca-08ec-4096-9e55-353c70296e72",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:49:19.668780365Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Keep default rules in force when rules.toml holds only custom rules",
-  "updated_at": "2026-11-03T23:32:50.523152016Z"
+  "updated_at": "2026-11-03T23:49:19.668780365Z"
 }
