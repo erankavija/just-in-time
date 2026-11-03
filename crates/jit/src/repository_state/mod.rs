@@ -468,7 +468,7 @@ pub(crate) fn validation_declarations_from_image(
                 })
                 .collect::<Result<Vec<_>, DeclarationParseError>>()?;
             let parsed = RuleSet::parse(content, Some(&config), schemas)?;
-            Ok(reconcile_default_rules_with_config(parsed, &namespaces))
+            Ok(reconcile_default_rules_with_config(parsed, &namespaces)?)
         })(),
         None => Ok(default_ruleset(&namespaces)),
     };

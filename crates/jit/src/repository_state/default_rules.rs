@@ -44,7 +44,8 @@
 //! rules. A repo wanting those authors them directly in `rules.toml`.
 
 use crate::declarations::rules::{
-    Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, DEFAULT_ORIGIN,
+    Assertion, Rule, RuleConfigError, RuleScope, RuleSet, SchemaSource, Selector, Severity,
+    DEFAULT_ORIGIN,
 };
 use crate::domain::LabelNamespaces;
 use std::collections::{HashMap, HashSet};
@@ -169,13 +170,19 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
 /// empty or custom-only file; `severity = "off"` disables a default.
 ///
 /// Defaults the registry no longer derives are dropped. Missing defaults are
-/// appended in generator order unless a custom rule already owns the name.
-/// Pure: no I/O, deterministic, and total.
+/// appended in generator order. A custom rule occupying a derived default's name
+/// is a configuration error.
 pub fn reconcile_default_rules_with_config(
     loaded: RuleSet,
     namespaces: &LabelNamespaces,
-) -> RuleSet {
-    let derived = default_ruleset(namespaces);
+) -> Result<RuleSet, RuleConfigError> {
+    let derived = checked_default_ruleset(
+        loaded
+            .rules
+            .iter()
+            .map(|rule| (rule.name.as_str(), rule.origin.as_deref())),
+        namespaces,
+    )?;
     let derived_by_name: HashMap<&str, &Rule> =
         derived.rules.iter().map(|r| (r.name.as_str(), r)).collect();
 
@@ -199,17 +206,34 @@ pub fn reconcile_default_rules_with_config(
 
     // Append the default rules the registry now generates that `loaded` lacked
     // (e.g. a uniqueness rule for a newly-declared namespace), in default order.
-    // A name already present — including a CUSTOM rule shadowing the derived
-    // default name — suppresses the append, so reconciliation never yields two
-    // rules with one name (jit:d74a9ed1 review F1, round 10).
-    let present: HashSet<String> = rules.iter().map(|r| r.name.clone()).collect();
     for rule in &derived.rules {
-        if !consumed.contains(rule.name.as_str()) && !present.contains(&rule.name) {
+        if !consumed.contains(rule.name.as_str()) {
             rules.push(rule.clone());
         }
     }
 
-    RuleSet { rules }
+    Ok(RuleSet { rules })
+}
+
+fn checked_default_ruleset<'a>(
+    existing_rules: impl IntoIterator<Item = (&'a str, Option<&'a str>)>,
+    namespaces: &LabelNamespaces,
+) -> Result<RuleSet, RuleConfigError> {
+    let derived = default_ruleset(namespaces);
+    let names: HashSet<&str> = derived
+        .rules
+        .iter()
+        .map(|rule| rule.name.as_str())
+        .collect();
+    if let Some((name, _)) = existing_rules
+        .into_iter()
+        .find(|(name, origin)| *origin != Some(DEFAULT_ORIGIN) && names.contains(name))
+    {
+        return Err(RuleConfigError::DefaultRuleNameCollision {
+            name: name.to_string(),
+        });
+    }
+    Ok(derived)
 }
 
 /// The default-family file-membership delta between the rules currently
@@ -257,36 +281,30 @@ pub struct DefaultRuleMembershipDiff {
 ///   in `to_add`.
 /// - An `origin = "default"` row that [`default_ruleset`] no longer emits is in
 ///   `to_drop`.
-/// - A rule sharing a derived name but a different `origin` is never dropped
-///   and suppresses the append of the derived default, so the write never
-///   produces a duplicate-name file.
+/// - A custom rule sharing a derived name is a configuration error.
 ///
 /// Pure: no I/O, deterministic; `to_add` and `to_drop` are sorted by rule name.
 pub(crate) fn default_rule_membership_diff_from_identities(
     existing_rules: &[(String, Option<String>)],
     namespaces: &LabelNamespaces,
-) -> DefaultRuleMembershipDiff {
+) -> Result<DefaultRuleMembershipDiff, RuleConfigError> {
+    let derived = checked_default_ruleset(
+        existing_rules
+            .iter()
+            .map(|(name, origin)| (name.as_str(), origin.as_deref())),
+        namespaces,
+    )?;
     let existing: HashSet<&str> = existing_rules
         .iter()
         .filter(|(_, origin)| origin.as_deref() == Some(DEFAULT_ORIGIN))
         .map(|(name, _)| name.as_str())
         .collect();
-    // EVERY existing rule name, regardless of origin: a custom rule shadowing a
-    // derived default name must suppress the append, or the sync would write a
-    // duplicate-name file that the production rules loader rejects (jit:d74a9ed1 review F1,
-    // round 10).
-    let taken: HashSet<&str> = existing_rules
-        .iter()
-        .map(|(name, _)| name.as_str())
-        .collect();
-
-    let derived = default_ruleset(namespaces);
     let desired_names: HashSet<&str> = derived.rules.iter().map(|r| r.name.as_str()).collect();
 
     let mut to_add: Vec<Rule> = derived
         .rules
         .iter()
-        .filter(|r| !taken.contains(r.name.as_str()))
+        .filter(|r| !existing.contains(r.name.as_str()))
         .cloned()
         .collect();
     to_add.sort_by(|a, b| a.name.cmp(&b.name));
@@ -297,7 +315,7 @@ pub(crate) fn default_rule_membership_diff_from_identities(
         .collect();
     to_drop.sort();
 
-    DefaultRuleMembershipDiff { to_add, to_drop }
+    Ok(DefaultRuleMembershipDiff { to_add, to_drop })
 }
 
 /// The stable schema file name the `type-hierarchy-known` rule (`origin =
@@ -487,7 +505,7 @@ mod tests {
             .iter()
             .map(|r| (r.name.clone(), r.origin.clone()))
             .collect();
-        default_rule_membership_diff_from_identities(&identities, namespaces)
+        default_rule_membership_diff_from_identities(&identities, namespaces).unwrap()
     }
 
     fn issue_with(labels: &[&str]) -> Issue {
@@ -762,7 +780,7 @@ mod tests {
             ("type", LabelNamespace::new("Type", true)),
             ("team", LabelNamespace::new("Team", true)),
         ]);
-        let reconciled = reconcile_default_rules_with_config(loaded, &now);
+        let reconciled = reconcile_default_rules_with_config(loaded, &now).unwrap();
         let team = reconciled
             .rules
             .iter()
@@ -796,7 +814,7 @@ mod tests {
             .any(|r| r.name == "namespace-unique-team"));
 
         let now = registry(vec![("type", LabelNamespace::new("Type", true))]);
-        let reconciled = reconcile_default_rules_with_config(loaded, &now);
+        let reconciled = reconcile_default_rules_with_config(loaded, &now).unwrap();
         assert!(
             !reconciled
                 .rules
@@ -830,7 +848,7 @@ mod tests {
             ("enforces", LabelNamespace::new("Enforces", false)),
         ]);
 
-        let reconciled = reconcile_default_rules_with_config(loaded, &now);
+        let reconciled = reconcile_default_rules_with_config(loaded, &now).unwrap();
         let reg_rule = reconciled
             .rules
             .iter()
@@ -874,7 +892,7 @@ mod tests {
                     .chain(defaults.rules.iter().take(retained).cloned())
                     .collect(),
             };
-            let reconciled = reconcile_default_rules_with_config(loaded, &reg);
+            let reconciled = reconcile_default_rules_with_config(loaded, &reg).unwrap();
             assert_eq!(reconciled.rules[0], custom);
             assert_eq!(reconciled.rules[1..], defaults.rules);
         }
@@ -891,7 +909,7 @@ mod tests {
             policy.when.label = Some("guarded:*".to_string());
             policy.description = Some("Edited policy".to_string());
             let expected = loaded.clone();
-            let reconciled = reconcile_default_rules_with_config(loaded, &reg);
+            let reconciled = reconcile_default_rules_with_config(loaded, &reg).unwrap();
             assert_eq!(reconciled.rules, expected.rules);
         }
     }
@@ -927,7 +945,8 @@ mod tests {
             label_associations: None,
             strategic_types: None,
         };
-        let reconciled = reconcile_default_rules_with_config(RuleSet { rules: vec![stale] }, &reg);
+        let reconciled =
+            reconcile_default_rules_with_config(RuleSet { rules: vec![stale] }, &reg).unwrap();
         let rule = reconciled
             .rules
             .iter()
@@ -969,27 +988,35 @@ mod tests {
     // -- default_rule_membership_diff_from_identities (jit:d74a9ed1) -------------------------
 
     #[test]
-    fn test_reconcile_custom_rule_shadowing_default_name_is_not_duplicated() {
-        // In-memory reconciliation must agree with the write-path diff: the
-        // derived default whose name a custom rule occupies is not appended, so
-        // the reconciled set never carries two rules with one name.
-        let mut loaded =
-            default_ruleset(&registry(vec![("type", LabelNamespace::new("Type", true))]));
-        let mut shadow = custom_json_rule("namespace-unique-team");
-        shadow.origin = None;
-        loaded.rules.push(shadow.clone());
-        let now = registry(vec![
-            ("type", LabelNamespace::new("Type", true)),
-            ("team", LabelNamespace::new("Team", true)),
-        ]);
-        let reconciled = reconcile_default_rules_with_config(loaded, &now);
-        let with_name: Vec<_> = reconciled
-            .rules
-            .iter()
-            .filter(|r| r.name == "namespace-unique-team")
-            .collect();
-        assert_eq!(with_name.len(), 1, "exactly one rule owns the name");
-        assert_eq!(with_name[0], &shadow, "the custom rule wins verbatim");
+    fn test_default_rule_name_collision_refuses_reconciliation_and_restoration() {
+        let reg = registry(vec![("team", LabelNamespace::new("Team", true))]);
+        for default in default_ruleset(&reg).rules {
+            for origin in [None, Some("bracket".to_string())] {
+                let mut custom = custom_json_rule(&default.name);
+                custom.origin = origin;
+                let identities = vec![(custom.name.clone(), custom.origin.clone())];
+                for error in [
+                    reconcile_default_rules_with_config(
+                        RuleSet {
+                            rules: vec![custom],
+                        },
+                        &reg,
+                    )
+                    .unwrap_err(),
+                    default_rule_membership_diff_from_identities(&identities, &reg).unwrap_err(),
+                ] {
+                    assert!(matches!(
+                        &error,
+                        crate::declarations::rules::RuleConfigError::DefaultRuleNameCollision { name }
+                            if name == &default.name
+                    ));
+                    let message = error.to_string();
+                    assert!(message.contains(&default.name));
+                    assert!(message.contains("severity = \"off\""));
+                    assert!(message.contains("default row"));
+                }
+            }
+        }
     }
 
     #[test]
@@ -1052,28 +1079,6 @@ mod tests {
             diff == DefaultRuleMembershipDiff::default(),
             "unchanged registry yields no delta: {diff:?}"
         );
-    }
-
-    #[test]
-    fn test_membership_diff_ignores_custom_rule_with_colliding_name() {
-        // A CUSTOM rule (non-default origin) happens to be named
-        // `namespace-unique-team`. It is never counted as "existing" for this
-        // family, never a drop target, and OWNS the name: the derived default
-        // row is suppressed rather than appended beside it, so the sync can
-        // never write a duplicate-name file that the production rules loader rejects
-        // (jit:d74a9ed1 review F1, round 10).
-        let loaded = RuleSet {
-            rules: vec![custom_json_rule("namespace-unique-team")],
-        };
-        let reg = registry(vec![("team", LabelNamespace::new("Team", true))]);
-        let diff = diff_of(&loaded, &reg);
-        let expected: Vec<_> = default_ruleset(&reg)
-            .rules
-            .into_iter()
-            .filter(|r| r.name != "namespace-unique-team")
-            .collect();
-        assert_eq!(diff.to_add, expected);
-        assert!(diff.to_drop.is_empty(), "shadowing rule is never dropped");
     }
 
     #[test]

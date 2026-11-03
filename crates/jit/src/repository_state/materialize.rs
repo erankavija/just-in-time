@@ -513,7 +513,8 @@ pub(crate) fn compose_default_ruleset(
 
     // rules.toml: splice only the generated default-family membership + assertions,
     // preserving every authored byte outside those proven-generated spans.
-    let diff = default_rule_membership_diff_from_identities(&identities, &namespaces);
+    let diff = default_rule_membership_diff_from_identities(&identities, &namespaces)
+        .map_err(ProducerError::from)?;
     let rendered_add: Vec<String> = diff
         .to_add
         .iter()

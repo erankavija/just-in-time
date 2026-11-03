@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-11-03T23:38:38.996897311Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6c628f29-566e-48d6-93b5-7e3825eefac8",
+      "status": "failed",
+      "updated_at": "2026-11-03T23:44:36.241929097Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "ea843d26-492a-44cc-8c10-15f19b8c8ce3",
@@ -34,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue-id prefixes match without allocating",
-  "updated_at": "2026-11-03T23:38:38.996897311Z"
+  "updated_at": "2026-11-03T23:44:36.241929097Z"
 }

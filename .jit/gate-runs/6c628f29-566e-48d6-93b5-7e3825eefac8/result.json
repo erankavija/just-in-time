@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5e0ca8825c52497ca5fb2fca27316a3b96f8673a",
+  "completed_at": "2026-11-03T23:44:35.941330751Z",
+  "duration_ms": 356496,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/identity.rs",
+        "id": "F1",
+        "line": 913,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/ea843d26/requirement/REQ-03",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "The equivalence property omits accepted trailing-hyphen prefix spellings."
+      }
+    ],
+    "summary": "The allocation-free matcher is correct on inspected callers, but its required equivalence property omits valid trailing-hyphen prefixes.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ea843d26-492a-44cc-8c10-15f19b8c8ce3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6c628f29-566e-48d6-93b5-7e3825eefac8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T23:38:39.445319446Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2557 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a3c7-72b6-7123-bb92-1913bcb2b36e\n--------\nuser\n--- 2544 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `9e2bbc586` (`perf(jit:ea843d26): match issue-id prefixes without allocating`)\nPolicy sources: `AGENTS.md`; `.jit/config.toml`\nResolved items: `@/charter/D-20` — `dev/vision/9db27a3a-charter.md`; `@/issue/9876a23a/requirement/REQ-07`, `@/issue/ea843d26/requirement/REQ-01`, `REQ-02`, `REQ-03` — issue Markdown; `@/invariant/orthogonal-tests` — `.jit/invariants.toml`\nGate evidence: `cargo-ci` passed (exit 0, recorded on merge commit `b1017884c` containing the attributed commit); `code-review` pending\nTruncation recovery: Re-read focused `identity.rs` ranges and named direct callers after broad combined outputs truncated; unrelated `.matches` hits were excluded.\n\n1. **[blocking][issue-impact]** The new equivalence property does not cover every accepted hyphenation. Its generator emits hyphens only before generated characters at `crates/jit/src/domain/identity.rs:913`, so it never creates a trailing-hyphen prefix such as `ABCD-`. Trailing hyphens are accepted because normalization strips them, but the property does not compare their behavior against the normalized predicate for either matching or nonmatching generated candidates. Extend the generator with a trailing-hyphen component. References: `@/issue/ea843d26/requirement/REQ-03`, `@/invariant/orthogonal-tests`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The allocation-free matcher is correct on inspected callers, but its required equivalence property omits valid trailing-hyphen prefixes.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The equivalence property omits accepted trailing-hyphen prefix spellings.\",\"file\":\"crates/jit/src/domain/identity.rs\",\"line\":913,\"references\":[\"@/issue/ea843d26/requirement/REQ-03\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
