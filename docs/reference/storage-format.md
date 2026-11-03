@@ -393,7 +393,8 @@ separate from the claims state.
 
 - **`claims.jsonl`**: an append-only, newline-delimited log of claim
   operations (`Acquire`, `Renew`, `Heartbeat`, `Release`, `AutoEvict`,
-  `ForceEvict`), each entry carrying a monotonic `seq` for total ordering.
+  `ForceEvict`, and `Reclaim`, recorded when `jit recover` removes a stale
+  indefinite lease), each entry carrying a monotonic `seq` for total ordering.
 - **`claims.index.json`**: the stored leases. Claim operations read and
   atomically replace it under `locks/claims.lock` and append their records to
   `claims.jsonl` after it; `jit claim list` and `status` read it without the

@@ -130,6 +130,12 @@ pub enum ClaimOp {
         evicted_at: DateTime<Utc>,
         reason: String,
     },
+    /// Recovery reclaims an indefinite lease whose heartbeat lapsed
+    Reclaim {
+        lease_id: LeaseId,
+        reclaimed_at: DateTime<Utc>,
+        reason: String,
+    },
 }
 
 /// Claim operation with metadata
@@ -160,6 +166,15 @@ pub struct ClaimsIndex {
     /// Detected sequence gaps (for diagnostics)
     #[serde(default)]
     pub sequence_gaps: Vec<u64>,
+}
+
+/// Leases [`ClaimCoordinator::evict_lapsed`] removed, by cause.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct LapsedLeases {
+    /// Finite leases evicted past their expiry.
+    pub expired: usize,
+    /// Indefinite leases reclaimed for a stale heartbeat.
+    pub reclaimed: usize,
 }
 
 /// Policy limits applied when acquiring an indefinite claim lease.
@@ -762,34 +777,57 @@ impl ClaimCoordinator {
         Ok(())
     }
 
-    /// Evict expired leases from index
-    pub fn evict_expired(&self, index: &mut ClaimsIndex) -> Result<()> {
+    /// Remove lapsed leases from `index`: evict expired leases and reclaim
+    /// stale indefinite ones ([`Lease::is_stale`], the rule lease listings
+    /// report), appending one claims-log record per lease.
+    pub fn evict_lapsed(&self, index: &mut ClaimsIndex) -> Result<LapsedLeases> {
         let now = self.clock.now();
-        self.evict_expired_at(index, now)
-    }
-
-    fn evict_expired_at(&self, index: &mut ClaimsIndex, now: DateTime<Utc>) -> Result<()> {
-        let expired: Vec<_> = index
+        let lapsed: Vec<(LeaseId, ClaimOp)> = index
             .leases
             .iter()
-            .filter(|l| l.is_expired(now))
-            .cloned()
+            .filter_map(|lease| {
+                let lease_id = lease.lease_id.clone();
+                if lease.is_expired(now) {
+                    Some(ClaimOp::AutoEvict {
+                        lease_id: lease_id.clone(),
+                        evicted_at: now,
+                        reason: format!(
+                            "Lease expired at {}",
+                            lease
+                                .expires_at
+                                .map_or_else(String::new, |at| at.to_string())
+                        ),
+                    })
+                } else if lease.is_stale(now) {
+                    Some(ClaimOp::Reclaim {
+                        lease_id: lease_id.clone(),
+                        reclaimed_at: now,
+                        reason: format!("No heartbeat since {}", lease.last_beat),
+                    })
+                } else {
+                    None
+                }
+                .map(|op| (lease_id, op))
+            })
             .collect();
 
-        for lease in expired {
-            // Log eviction
-            let op = ClaimOp::AutoEvict {
-                lease_id: lease.lease_id.clone(),
-                evicted_at: now,
-                reason: format!("Lease expired at {}", lease.expires_at.unwrap()),
-            };
-            self.append_claim_op(&op)?;
-
-            // Remove from index
-            index.remove_lease(&lease.lease_id);
-        }
-
-        Ok(())
+        lapsed.iter().try_fold(
+            LapsedLeases::default(),
+            |counts, (lease_id, op)| -> Result<LapsedLeases> {
+                self.append_claim_op(op)?;
+                index.remove_lease(lease_id);
+                Ok(match op {
+                    ClaimOp::Reclaim { .. } => LapsedLeases {
+                        reclaimed: counts.reclaimed + 1,
+                        ..counts
+                    },
+                    _ => LapsedLeases {
+                        expired: counts.expired + 1,
+                        ..counts
+                    },
+                })
+            },
+        )
     }
 
     /// Append a claim operation to the audit log
@@ -924,7 +962,7 @@ impl ClaimCoordinator {
     /// 2. Apply operations to build active leases map:
     ///    - Acquire: add lease
     ///    - Renew: update expires_at and last_beat
-    ///    - Release/AutoEvict/ForceEvict: remove lease
+    ///    - Release/AutoEvict/ForceEvict/Reclaim: remove lease
     /// 3. Filter out expired finite leases
     /// 4. Track highest sequence number
     ///
@@ -999,7 +1037,8 @@ impl ClaimCoordinator {
                     }
                     ClaimOp::Release { lease_id, .. }
                     | ClaimOp::AutoEvict { lease_id, .. }
-                    | ClaimOp::ForceEvict { lease_id, .. } => {
+                    | ClaimOp::ForceEvict { lease_id, .. }
+                    | ClaimOp::Reclaim { lease_id, .. } => {
                         active.remove(&lease_id);
                     }
                 }
@@ -1033,7 +1072,7 @@ impl ClaimCoordinator {
     /// inconsistency (e.g. a [`StorageWarning::DuplicateLease`]). The caller's
     /// output layer decides whether and how to render the warnings.
     ///
-    /// Note: Does NOT check for expired leases - those are handled by evict_expired().
+    /// Note: Does NOT check for expired leases - those are handled by evict_lapsed().
     /// Expired leases are normal state, not corruption. Treating them as corruption
     /// would trigger unnecessary full index rebuilds.
     pub fn verify_index_consistency(&self) -> Result<(bool, Vec<StorageWarning>)> {
@@ -2003,6 +2042,68 @@ mod tests {
         clock.set(base + Duration::seconds(threshold + 1));
 
         assert!(!blocked(27), "a stale indefinite lease does not count");
+    }
+
+    #[test]
+    fn test_evict_lapsed_logs_one_record_per_lease_and_counts_each_cause_apart() {
+        use crate::storage::clock::FixedClock;
+
+        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64;
+        let temp_dir = TempDir::new().unwrap();
+        let base = Utc::now();
+        let clock = Arc::new(FixedClock::new(base));
+        let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
+        let limits = ClaimAcquireLimits::new(10, 10);
+        let (silent, ()) = acquire(&coordinator, &crate::test_utils::issue_id(41), 0, limits);
+        let (expired, ()) = acquire(&coordinator, &crate::test_utils::issue_id(42), 1, limits);
+        clock.set(base + Duration::seconds(threshold + 1));
+        let (current, ()) = acquire(&coordinator, &crate::test_utils::issue_id(43), 0, limits);
+        let logged_before = logged_operations(&temp_dir).len();
+        let mut index = coordinator.load_claims_index().unwrap();
+
+        let lapsed = coordinator.evict_lapsed(&mut index).unwrap();
+
+        assert_eq!(
+            lapsed,
+            LapsedLeases {
+                expired: 1,
+                reclaimed: 1
+            }
+        );
+        assert_eq!(index.leases, vec![current]);
+        let appended = logged_operations(&temp_dir).split_off(logged_before);
+        assert_eq!(appended.len(), 2, "one record per lapsed lease");
+        assert!(appended.iter().any(
+            |op| matches!(op, ClaimOp::Reclaim { lease_id, .. } if *lease_id == silent.lease_id)
+        ));
+        assert!(appended.iter().any(
+            |op| matches!(op, ClaimOp::AutoEvict { lease_id, .. } if *lease_id == expired.lease_id)
+        ));
+    }
+
+    #[test]
+    fn test_rebuild_index_from_log_drops_a_reclaimed_lease() {
+        use crate::storage::clock::FixedClock;
+
+        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64;
+        let temp_dir = TempDir::new().unwrap();
+        let base = Utc::now();
+        let clock = Arc::new(FixedClock::new(base));
+        let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
+        acquire(
+            &coordinator,
+            &crate::test_utils::issue_id(44),
+            0,
+            ClaimAcquireLimits::new(10, 10),
+        );
+        clock.set(base + Duration::seconds(threshold + 1));
+        let mut index = coordinator.load_claims_index().unwrap();
+        coordinator.evict_lapsed(&mut index).unwrap();
+        clock.set(base);
+
+        let rebuilt = coordinator.rebuild_index_from_log().unwrap();
+
+        assert!(rebuilt.leases.is_empty(), "{:?}", rebuilt.leases);
     }
 
     fn logged_operations(temp_dir: &TempDir) -> Vec<ClaimOp> {

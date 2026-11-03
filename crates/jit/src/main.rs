@@ -6307,8 +6307,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 Ok(report) => {
                     if json {
                         let msg = format!(
-                            "Recovery: {} locks cleaned, {} leases evicted",
-                            report.stale_locks_cleaned, report.expired_leases_evicted
+                            "Recovery: {} locks cleaned, {} leases evicted, {} leases reclaimed",
+                            report.stale_locks_cleaned,
+                            report.expired_leases_evicted,
+                            report.stale_leases_reclaimed
                         );
                         let output = JsonOutput::success(json!({
                             "success": true,
@@ -6316,6 +6318,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             "stale_locks_cleaned": report.stale_locks_cleaned,
                             "index_rebuilt": report.index_rebuilt,
                             "expired_leases_evicted": report.expired_leases_evicted,
+                            "stale_leases_reclaimed": report.stale_leases_reclaimed,
                             "temp_files_removed": report.temp_files_removed,
                             "derived_state_repaired": report.derived_state_repaired,
                             "claims_lease_recovery": report.claims_lease_recovery,
@@ -6331,6 +6334,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         println!(
                             "  • Expired leases evicted: {}",
                             report.expired_leases_evicted
+                        );
+                        println!(
+                            "  • Stale leases reclaimed: {}",
+                            report.stale_leases_reclaimed
                         );
                         println!("  • Temp files removed: {}", report.temp_files_removed);
                         println!(
