@@ -49,7 +49,8 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
                 false,
             )
             .unwrap()
-            .0;
+            .issue
+            .id;
         for dependency in dependencies {
             executor.graph().add_dependency(&id, &dependency).unwrap();
         }

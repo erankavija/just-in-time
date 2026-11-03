@@ -99,7 +99,7 @@ fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
     let executor = CommandExecutor::new(storage).with_layout(layout);
 
     // Create a task without parent labels (orphaned at a leaf level).
-    let (issue_id, _) = executor
+    let issue_id = executor
         .issues()
         .create_issue(
             "Orphaned task".to_string(),
@@ -111,7 +111,9 @@ fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     let issues = executor.storage().list_issues().unwrap();
     let warnings: Vec<_> = executor

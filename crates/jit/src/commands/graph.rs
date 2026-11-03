@@ -484,7 +484,7 @@ impl<S: IssueStore> GraphOps<'_, S> {
     ///         .issues().create_issue(title.into(), String::new(), Priority::Normal,
     ///             vec![], labels, None, None, false)
     ///         .unwrap()
-    ///         .0
+    ///         .issue.id
     /// };
     ///
     /// let epic = new("Epic", vec![format!("type:{}", taxonomy.type_at_level(2))]);

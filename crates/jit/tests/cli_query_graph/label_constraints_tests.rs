@@ -26,7 +26,7 @@ fn create_labeled(
     title: &str,
     labels: &[&str],
 ) -> IssueId {
-    let (id, _) = exec
+    let id = exec
         .issues()
         .create_issue(
             title.to_string(),
@@ -38,7 +38,9 @@ fn create_labeled(
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
     id
 }
 

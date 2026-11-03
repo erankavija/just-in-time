@@ -2060,16 +2060,17 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     // The command layer owns `--type` validation and `type:<kind>`
                     // label derivation; the CLI just forwards the typed value.
-                    let (id, warnings) = executor.issues().create_issue(
-                        title,
-                        description,
-                        prio,
-                        gate,
-                        label,
-                        content_format,
-                        issue_type,
-                        force,
-                    )?;
+                    let jit::commands::IssueCreation { issue, warnings } =
+                        executor.issues().create_issue(
+                            title,
+                            description,
+                            prio,
+                            gate,
+                            label,
+                            content_format,
+                            issue_type,
+                            force,
+                        )?;
 
                     // Print warnings to stderr
                     for warning in &warnings {
@@ -2079,7 +2080,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let output_ctx = OutputContext::new(quiet, json);
 
                     if json {
-                        let issue = storage.load_issue(&id)?;
                         let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
                         let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
                         let gate_runs = executor
@@ -2098,9 +2098,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     } else {
                         // In quiet mode, output just the ID for scripting
                         if quiet {
-                            println!("{}", id);
+                            println!("{}", issue.id);
                         } else {
-                            println!("Created issue: {}", id);
+                            println!("Created issue: {}", issue.id);
                         }
 
                         // Surface workflow type-hierarchy warnings
@@ -2114,7 +2114,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             let graph_findings =
                                 executor.validation().evaluate_graph_rules(&issues)?;
                             for gf in graph_findings.iter().filter(|gf| {
-                                gf.issue_id.as_ref() == Some(&id)
+                                gf.issue_id.as_ref() == Some(&issue.id)
                                     && !(orphan && gf.finding.rule == "orphan-leaf")
                             }) {
                                 let _ =

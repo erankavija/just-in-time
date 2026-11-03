@@ -113,7 +113,7 @@ fn test_create_force_bypasses_and_logs_event() {
         },
     );
 
-    let (id, _warnings) = executor
+    let id = executor
         .issues()
         .create_issue(
             "An epic".to_string(),
@@ -125,7 +125,9 @@ fn test_create_force_bypasses_and_logs_event() {
             None,
             true, // --force
         )
-        .expect("force must allow the create");
+        .expect("force must allow the create")
+        .issue
+        .id;
 
     // The issue exists despite the violation.
     assert_eq!(executor.storage().list_issues().unwrap().len(), 1);
@@ -162,7 +164,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
         },
     );
 
-    let (_, warnings) = executor
+    let jit::commands::IssueCreation { warnings, .. } = executor
         .issues()
         .create_issue(
             "An epic".to_string(),
@@ -678,7 +680,7 @@ fn test_create_evaluates_rules_against_post_autopromote_shape() {
     assert!(executor.storage().list_issues().unwrap().is_empty());
 
     // A satisfying issue (carrying req:) is created and promoted to Ready.
-    let (id, _) = executor
+    let id = executor
         .issues()
         .create_issue(
             "A task".to_string(),
@@ -690,7 +692,9 @@ fn test_create_evaluates_rules_against_post_autopromote_shape() {
             None,
             false,
         )
-        .expect("satisfying issue must be created");
+        .expect("satisfying issue must be created")
+        .issue
+        .id;
     assert_eq!(
         executor.storage().load_issue(&id).unwrap().state,
         State::Ready

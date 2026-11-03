@@ -132,7 +132,7 @@ fn create_epic(h: &TestHarness, title: &str) -> IssueId {
             Some(GateChecker::RepositoryValidation),
         );
     }
-    let (id, _) = h
+    let id = h
         .executor
         .issues()
         .create_issue(
@@ -145,7 +145,9 @@ fn create_epic(h: &TestHarness, title: &str) -> IssueId {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
     id
 }
 
@@ -415,7 +417,7 @@ fn test_apply_rejects_wrong_container_type_and_creates_nothing() {
     // the container's type rather than an undeclared area reached first.
     declare_document_area(&h);
     let template = plan_template();
-    let (task, _) = h
+    let task = h
         .executor
         .issues()
         .create_issue(
@@ -428,7 +430,9 @@ fn test_apply_rejects_wrong_container_type_and_creates_nothing() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     let before = h.all_issues().len();
     let err = h
@@ -513,7 +517,7 @@ fn test_apply_rejects_legacy_planning_only_bracket() {
     // Simulate a legacy P-only bracket (from the removed `jit plan`): a planning
     // node wired as the container's dependency, with NO breakdown node. Applying
     // must reject rather than create a duplicate planning node.
-    let (planning, _) = h
+    let planning = h
         .executor
         .issues()
         .create_issue(
@@ -526,7 +530,9 @@ fn test_apply_rejects_legacy_planning_only_bracket() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
     h.executor.graph().add_dependency(&epic, &planning).unwrap();
 
     let before = h.all_issues().len();
@@ -950,7 +956,8 @@ applies_to  = ["epic"]
                 false,
             )
             .unwrap()
-            .0;
+            .issue
+            .id;
 
         let before = h.all_issues().len();
         let error = h
@@ -1075,7 +1082,7 @@ applies_to  = ["epic"]
         .unwrap()
         .clone();
 
-    let (epic, _) = executor
+    let epic = executor
         .issues()
         .create_issue(
             "Broken-preset epic".to_string(),
@@ -1087,7 +1094,9 @@ applies_to  = ["epic"]
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     let before = executor.storage().list_issues().unwrap().len();
     // Under the BUGGY code this would be `Ok(_)` (silent registry-key fallback), so

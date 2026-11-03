@@ -1333,7 +1333,7 @@ mod tests {
         ));
 
         // Create test issues
-        let (_id1, _) = executor
+        let _id1 = executor
             .issues()
             .create_issue(
                 "Issue 1".to_string(),
@@ -1345,8 +1345,10 @@ mod tests {
                 None,
                 false,
             )
-            .unwrap();
-        let (_id2, _) = executor
+            .unwrap()
+            .issue
+            .id;
+        let _id2 = executor
             .issues()
             .create_issue(
                 "Issue 2".to_string(),
@@ -1358,7 +1360,9 @@ mod tests {
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1398,7 +1402,8 @@ mod tests {
                     false,
                 )
                 .unwrap()
-                .0
+                .issue
+                .id
         };
         let dependency = create("Dependency");
         let dependent = create("Dependent");
@@ -1480,7 +1485,7 @@ mod tests {
         ));
 
         // Create issues with dependencies
-        let (id1, _) = executor
+        let id1 = executor
             .issues()
             .create_issue(
                 "Issue 1".to_string(),
@@ -1492,8 +1497,10 @@ mod tests {
                 None,
                 false,
             )
-            .unwrap();
-        let (id2, _) = executor
+            .unwrap()
+            .issue
+            .id;
+        let id2 = executor
             .issues()
             .create_issue(
                 "Issue 2".to_string(),
@@ -1505,7 +1512,9 @@ mod tests {
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         executor.graph().add_dependency(&id2, &id1).unwrap();
 
@@ -1570,7 +1579,8 @@ mod tests {
                     false,
                 )
                 .unwrap()
-                .0
+                .issue
+                .id
         };
         let (id1, id2) = (new("Issue 1"), new("Issue 2"));
         new("Issue 3");
@@ -1619,7 +1629,8 @@ mod tests {
                     false,
                 )
                 .unwrap()
-                .0
+                .issue
+                .id
         };
         // The container and leaf kinds this repository declares, read from the
         // declaration its configuration was rendered from.
@@ -1717,7 +1728,7 @@ mod tests {
             },
         ));
 
-        let (_id, _) = executor
+        let _id = executor
             .issues()
             .create_issue(
                 "Issue 1".to_string(),
@@ -1729,7 +1740,9 @@ mod tests {
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -2051,7 +2064,7 @@ unique = false
     ) -> IssueId {
         use jit::domain::Priority;
 
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "Test issue".to_string(),
@@ -2063,7 +2076,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         std::fs::write(worktree.join(HTML_DOC), "<html><body>hello</body></html>").unwrap();
         // skip_scan avoids the git dependency.
         executor
@@ -2195,7 +2210,7 @@ unique = false
         let (temp, executor) =
             setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "Binary test".to_string(),
@@ -2207,7 +2222,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         // Write binary fixture with a .dat extension (catches the text/plain fallback).
         let doc_rel = "artifact.dat";
@@ -2499,7 +2516,7 @@ unique = false
         // Use a relative path so the URL stays clean (no slashes in the segment).
         let doc_rel = "broken-doc";
 
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "IO error test".to_string(),
@@ -2511,7 +2528,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         // Link the directory path as a document (skip_scan=true avoids the read
         // during registration so we can store the bad reference).
@@ -2549,7 +2568,7 @@ unique = false
         let (temp, executor) =
             setup_test_repo_with_config("[documentation]\nissue_scoped_areas = [\"notes\"]\n")
                 .unwrap();
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "Documents on every surface".to_string(),
@@ -2561,7 +2580,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         let directory = executor
             .documents()
             .resolve_issue_artifact_directory(&id, "notes")
@@ -2673,7 +2694,7 @@ unique = false
                 .unwrap();
             assert!(status.success(), "git {args:?}");
         };
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "Derived document reads".to_string(),
@@ -2685,7 +2706,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         let directory = executor
             .documents()
             .resolve_issue_artifact_directory(&id, "notes")
@@ -2747,7 +2770,7 @@ unique = false
         fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
         fs::write(&doc_path, doc_content).unwrap();
 
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "CSV content test".to_string(),
@@ -2759,7 +2782,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         executor
             .documents()
             .add_document_reference(&id, doc_rel, None, None, None, false)
@@ -2800,7 +2825,7 @@ unique = false
         fs::create_dir_all(&dir_path).unwrap();
         let doc_rel = "broken-raw-doc";
 
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "IO error raw test".to_string(),
@@ -2812,7 +2837,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         executor
             .documents()
@@ -3179,7 +3206,7 @@ unique = false
         let (temp, executor) =
             setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
 
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "base tag test".to_string(),
@@ -3191,7 +3218,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
 
         // HTML that already has its own <base> tag.
         let original =
@@ -3332,7 +3361,7 @@ unique = false
         let link_path = temp.path().join(doc_rel);
         unix_fs::symlink(outside.path(), &link_path).unwrap();
 
-        let (id, _) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "Symlink escape repro".to_string(),
@@ -3344,7 +3373,9 @@ unique = false
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         executor
             .documents()
             .add_document_reference(&id, doc_rel, None, None, None, true)
