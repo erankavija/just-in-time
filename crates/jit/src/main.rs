@@ -5761,7 +5761,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::ConfigCommands::Show => {
                 use jit::output::JsonOutput;
 
-                let snapshot = executor.effective_config_snapshot()?;
+                let snapshot = executor.config().effective_config_snapshot()?;
 
                 if json {
                     println!(
@@ -5779,7 +5779,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::output::{render_config_get_value, ErrorCode, JsonOutput};
                 use serde_json::json;
 
-                match executor.get_config(&key) {
+                match executor.config().get_config(&key) {
                     Ok(outcome) => {
                         if json {
                             println!(
@@ -5821,7 +5821,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::output::JsonOutput;
                 use serde_json::json;
 
-                let outcome = executor.set_config(&key, &value)?;
+                let outcome = executor.config().set_config(&key, &value)?;
 
                 if json {
                     println!(

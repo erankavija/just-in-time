@@ -1,11 +1,11 @@
 //! Config accessor and mutation commands (`jit config get` / `jit config set`).
 //!
-//! `jit config set` (see [`CommandExecutor::set_config`]): key parsing,
+//! `jit config set` (see [`ConfigOps::set_config`]): key parsing,
 //! per-type value dispatch, and parsing the edited document as configuration,
 //! so an edit that would not load never reaches the file. Edits publish through
 //! a repository-state mutation session.
 //!
-//! `jit config get` (see [`CommandExecutor::get_config`]): a dotted-key
+//! `jit config get` (see [`ConfigOps::get_config`]): a dotted-key
 //! accessor covering the WHOLE configuration surface (jit:043ae624), built by
 //! walking [`EffectiveConfig::full_snapshot`]'s generic JSON snapshot with
 //! [`resolve_dotted_key`] rather than hand-mapping each recognised key —
@@ -22,7 +22,7 @@ use std::path::PathBuf;
 
 /// Result of a `jit config set` write, carrying what the CLI needs to print.
 ///
-/// Returned by [`CommandExecutor::set_config`]. `file` is the config file that
+/// Returned by [`ConfigOps::set_config`]. `file` is the config file that
 /// was written.
 #[derive(Debug, Serialize)]
 pub struct ConfigSetOutcome {
@@ -36,7 +36,7 @@ pub struct ConfigSetOutcome {
 
 /// Result of a `jit config get` lookup, carrying what the CLI needs to print.
 ///
-/// Returned by [`CommandExecutor::get_config`]. `value` is the raw
+/// Returned by [`ConfigOps::get_config`]. `value` is the raw
 /// [`serde_json::Value`] resolved at `key` — a scalar for a leaf, or an
 /// object/array for an intermediate key (`jit config get documentation`
 /// returns the whole section).
@@ -52,7 +52,7 @@ pub struct ConfigGetOutcome {
 /// configuration JSON snapshot ([`resolve_dotted_key`]).
 ///
 /// Kept independent of IO and of [`anyhow::Error`] so [`resolve_dotted_key`]
-/// stays a pure, directly unit-tested function. [`CommandExecutor::get_config`]
+/// stays a pure, directly unit-tested function. [`ConfigOps::get_config`]
 /// converts either variant's message into the shared
 /// [`InvalidArgumentError`] (exit 2) — the same family every other CLI usage
 /// error in this codebase uses — rather than introducing a parallel
@@ -193,7 +193,19 @@ fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str
     Ok(())
 }
 
+/// Configuration operations of a [`CommandExecutor`].
+pub struct ConfigOps<'a, S: IssueStore> {
+    exec: &'a CommandExecutor<S>,
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The configuration family.
+    pub fn config(&self) -> ConfigOps<'_, S> {
+        ConfigOps { exec: self }
+    }
+}
+
+impl<S: IssueStore> ConfigOps<'_, S> {
     /// Set a `section.field` key in the repository `config.toml`, returning
     /// what the CLI needs to print.
     ///
@@ -206,7 +218,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let config_path = layout.resolve(&crate::repository_state::VirtualPath::CONFIG)?;
         self.set_repo_config(key, value)?;
         Ok(ConfigSetOutcome {
@@ -234,9 +246,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{
             apply_overlay, finalize_config_edit, CaptureSpec, VirtualPath,
         };
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let config_vpath = VirtualPath::CONFIG;
-        with_mutation_session(self.storage(), &layout, "config set", |session| {
+        with_mutation_session(self.exec.storage(), &layout, "config set", |session| {
             // Read the current config for a preservation-safe edit from the closed
             // image, so a concurrent edit is caught by the apply-time preimage check.
             let Some(config_image) = capture_or_retry(session.capture(CaptureSpec::new(
@@ -262,7 +274,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             let overrides =
                 std::iter::once((config_vpath.clone(), Some(edited_bytes.clone()))).collect();
             let Some(base) =
-                self.capture_proposed_base(session, &overrides, &[], Some(config_image))?
+                self.exec
+                    .capture_proposed_base(session, &overrides, &[], Some(config_image))?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -294,7 +307,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Reading `.jit/config.toml` lives behind `EffectiveConfig::load` in
     /// [`crate::config`].
     pub fn effective_config_snapshot(&self) -> Result<serde_json::Value> {
-        EffectiveConfig::load(self.repository_layout()?)?.full_snapshot()
+        EffectiveConfig::load(self.exec.repository_layout()?)?.full_snapshot()
     }
 
     /// Resolve a dotted `section[.field[.subfield...]]` key against the WHOLE
@@ -436,7 +449,7 @@ mod tests {
             "worktree",
             "coordination",
         ] {
-            let outcome = executor.get_config(section).unwrap();
+            let outcome = executor.config().get_config(section).unwrap();
             assert!(
                 outcome.value.is_object(),
                 "section {section} did not resolve to an object: {:?}",
@@ -446,6 +459,7 @@ mod tests {
 
         // A defaulted coordination leaf still resolves without any config.toml.
         let cap = executor
+            .config()
             .get_config("coordination.max_indefinite_leases_per_agent")
             .unwrap();
         assert_eq!(
@@ -495,6 +509,7 @@ schema = 1
 
         assert_eq!(
             executor
+                .config()
                 .get_config("type_hierarchy.strategic_types")
                 .unwrap()
                 .value,
@@ -502,6 +517,7 @@ schema = 1
         );
         assert_eq!(
             executor
+                .config()
                 .get_config("type_hierarchy.types.epic")
                 .unwrap()
                 .value,
@@ -509,21 +525,34 @@ schema = 1
         );
         assert_eq!(
             executor
+                .config()
                 .get_config("documentation.development_root")
                 .unwrap()
                 .value,
             serde_json::json!("dev")
         );
         assert_eq!(
-            executor.get_config("namespaces.type.unique").unwrap().value,
+            executor
+                .config()
+                .get_config("namespaces.type.unique")
+                .unwrap()
+                .value,
             serde_json::json!(true)
         );
         assert_eq!(
-            executor.get_config("validation.strictness").unwrap().value,
+            executor
+                .config()
+                .get_config("validation.strictness")
+                .unwrap()
+                .value,
             serde_json::json!("loose")
         );
         assert_eq!(
-            executor.get_config("version.schema").unwrap().value,
+            executor
+                .config()
+                .get_config("version.schema")
+                .unwrap()
+                .value,
             serde_json::json!(1)
         );
     }
@@ -549,22 +578,32 @@ schema = 1
 
         // A recognized level is accepted and persisted.
         executor
+            .config()
             .set_config("validation.strictness", "strict")
             .unwrap();
         assert_eq!(
-            executor.get_config("validation.strictness").unwrap().value,
+            executor
+                .config()
+                .get_config("validation.strictness")
+                .unwrap()
+                .value,
             serde_json::json!("strict")
         );
 
         // An unrecognized level is rejected with a message naming the bad value.
         let err = executor
+            .config()
             .set_config("validation.strictness", "banana")
             .unwrap_err();
         assert!(err.to_string().contains("banana"), "{err}");
 
         // The rejected set persisted nothing: the good value survives on disk.
         assert_eq!(
-            executor.get_config("validation.strictness").unwrap().value,
+            executor
+                .config()
+                .get_config("validation.strictness")
+                .unwrap()
+                .value,
             serde_json::json!("strict")
         );
     }
@@ -577,7 +616,7 @@ schema = 1
             crate::test_utils::repository_layout_for_data_root(dir.path()),
         );
 
-        let err = executor.get_config("bogus_section").unwrap_err();
+        let err = executor.config().get_config("bogus_section").unwrap_err();
         assert!(err.downcast_ref::<InvalidArgumentError>().is_some());
         assert!(err.to_string().contains("valid top-level sections"));
     }
