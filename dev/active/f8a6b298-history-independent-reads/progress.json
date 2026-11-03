@@ -406,15 +406,19 @@
     },
     {
       "item": "dd53527f code-review fail 3: next_claim_seq scans claims.jsonl vs per:D-19; options (a) drop label (b) claims.seq now",
-      "status": "pending with user via just-in-time-6a"
+      "status": "resolved: user D-1 accepts scan"
     },
     {
       "item": "b697a3f7 1b7f58ae criteria vs 7dd59ebf amendment (plan-review 0dc73711 blocking)",
-      "status": "pending with user via just-in-time-6a"
+      "status": "resolved: consolidated, plan-review pass"
     },
     {
       "item": "725af076 -> cf49da17 edge reversal (a4)",
-      "status": "a4 routed to 6a"
+      "status": "resolved: swapped e3f1b7628"
+    },
+    {
+      "item": "dd53527f code-review fail 4: claim list text output lacks STALE marker",
+      "status": "pending with user via just-in-time-6a"
     }
   ],
   "rework_counts": {
@@ -543,6 +547,7 @@
   "notes": [
     "Dispatch runs ready issues ahead of a held wave 1 remainder, per the user's maximum-parallelism instruction relayed by just-in-time-6a; dependencies still order all work. 2117739f is held to shorten the format freeze.",
     "just-in-time-a4 may lead 9876a23a (one validation report): coordinate R1 (validate as history reader, 5b0e3d63 landed read_history_log + record_drift bytes) and merge order with it; warn it, 88 and 6a before 2117739f.",
-    "a4 agreed: keeps DEC-09 bridge, sends field name when 6ba4f623 lands (for 53d19851 brief); warn a4 before 2117739f, its benchmark 5d774061 needs a format-4 copy and a main build after the bump."
+    "a4 agreed: keeps DEC-09 bridge, sends field name when 6ba4f623 lands (for 53d19851 brief); warn a4 before 2117739f, its benchmark 5d774061 needs a format-4 copy and a main build after the bump.",
+    "88 2e0f276b: IssueOps assign/claim/unassign/release/reject/update_issue_resolved take &IssueIdPrefix and return IssueMutation{issue,warnings}; create_issue returns IssueCreation{issue,warnings}. Put in briefs."
   ]
 }
