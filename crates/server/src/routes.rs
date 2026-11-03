@@ -1289,6 +1289,7 @@ mod tests {
             .unwrap();
         let run = harness
             .executor
+            .gates()
             .get_last_gate_run(&owner, &gate_key)
             .unwrap()
             .unwrap();
@@ -2596,7 +2597,7 @@ unique = false
             )
             .unwrap();
         executor.gates().add_gate(&id, &gate_key).unwrap();
-        executor.check_gate(&id, &gate_key).unwrap();
+        executor.gates().check_gate(&id, &gate_key).unwrap();
 
         let listed_by_doc_list =
             serde_json::to_value(executor.documents().list_document_references(&id).unwrap())
