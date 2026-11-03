@@ -16,6 +16,7 @@
       "path": "dev/active/df129d9e-rust-code-quality/evidence-083c9a91-ci-ancestry.md"
     }
   ],
+  "done_at": "2026-11-03T20:25:12.892318681Z",
   "first_ready_at": "2026-11-02T22:59:43.633205903Z",
   "gates_required": [
     "cargo-ci",
@@ -29,9 +30,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "ee657077-57ea-4ce0-944b-48811c667ac2",
-      "status": "failed",
-      "updated_at": "2026-11-03T01:15:06.516890198Z",
+      "run_id": "a03297cf-86de-4c39-8696-b9a760adcac2",
+      "status": "passed",
+      "updated_at": "2026-11-03T20:25:03.231753266Z",
       "updated_by": "auto:executor"
     }
   },
@@ -46,7 +47,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Claim and recover operations behind a claims facade",
-  "updated_at": "2026-11-03T20:23:43.276012471Z"
+  "updated_at": "2026-11-03T20:25:12.892318681Z"
 }
