@@ -529,14 +529,16 @@ fn test_read_events_rejects_unknown_tags_and_malformed_records<B: Backend>() {
 fn test_read_artifact_archive_events_keeps_only_archive_executions<B: Backend>() {
     let archive = crate::test_utils::stamped_event(
         EventBody::draft_artifact_archive_executed(
-            PlanTarget::Document {
-                path: "dev/active/plan.md".to_string(),
+            crate::domain::artifact_execution::ArchiveExecution {
+                target: PlanTarget::Document {
+                    path: "dev/active/plan.md".to_string(),
+                },
+                destination_root: "dev/archive".to_string(),
+                publications: Vec::new(),
+                reference_changes: Vec::new(),
+                planned_deletions: Vec::new(),
+                reconciling: false,
             },
-            "dev/archive".to_string(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            false,
         ),
         "archive",
         chrono::Utc::now(),

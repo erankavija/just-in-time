@@ -1301,20 +1301,7 @@ pub enum EventBody {
         released_by: Option<Assignee>,
     },
     /// A dependency-aware archive execution reached its durable commit point.
-    ArtifactArchiveExecuted {
-        /// Container or document selected for archival.
-        target: crate::domain::artifact_plan::PlanTarget,
-        /// Repository-relative mirror root used by the operation.
-        destination_root: String,
-        /// New or adopted publications made durable before this record.
-        publications: Vec<crate::domain::artifact_execution::ArchivePublication>,
-        /// Exact issue-document reference changes made durable before this record.
-        reference_changes: Vec<crate::domain::artifact_plan::ReferenceChange>,
-        /// Identity-guarded removals attempted after this record.
-        planned_deletions: Vec<crate::domain::artifact_plan::PendingDeletion>,
-        /// Whether the record reconciles durable state left by an earlier failed append.
-        reconciling: bool,
-    },
+    ArtifactArchiveExecuted(crate::domain::artifact_execution::ArchiveExecution),
     /// Issue was updated (labels, priority, assignee, etc.)
     IssueUpdated {
         /// Issue that was updated
@@ -1610,21 +1597,9 @@ impl EventBody {
 
     /// Create the durable commit record for dependency-aware archival.
     pub fn draft_artifact_archive_executed(
-        target: crate::domain::artifact_plan::PlanTarget,
-        destination_root: String,
-        publications: Vec<crate::domain::artifact_execution::ArchivePublication>,
-        reference_changes: Vec<crate::domain::artifact_plan::ReferenceChange>,
-        planned_deletions: Vec<crate::domain::artifact_plan::PendingDeletion>,
-        reconciling: bool,
+        execution: crate::domain::artifact_execution::ArchiveExecution,
     ) -> Self {
-        EventBody::ArtifactArchiveExecuted {
-            target,
-            destination_root,
-            publications,
-            reference_changes,
-            planned_deletions,
-            reconciling,
-        }
+        EventBody::ArtifactArchiveExecuted(execution)
     }
 
     /// Create a dependency reduced event
@@ -1766,7 +1741,7 @@ impl EventBody {
             EventBody::IssueDeleted { issue_id, .. } => Some(issue_id),
             EventBody::IssueReleased { issue_id, .. } => Some(issue_id),
             EventBody::IssueUpdated { issue_id, .. } => Some(issue_id),
-            EventBody::ArtifactArchiveExecuted { .. } => None,
+            EventBody::ArtifactArchiveExecuted(_) => None,
             EventBody::DependencyReduced { issue_id, .. } => Some(issue_id),
             EventBody::LocalRuleBypassed { issue_id, .. } => Some(issue_id),
             EventBody::TransitionBlocked { issue_id, .. } => Some(issue_id),
