@@ -213,21 +213,6 @@ impl ClaimsIndex {
             .collect()
     }
 
-    /// The first active lease on `issue_id` held by anyone but `current_agent`; a
-    /// writer with no identity holds none, so every active lease conflicts.
-    pub(crate) fn conflicting_lease(
-        &self,
-        issue_id: &IssueId,
-        current_agent: Option<&Assignee>,
-        now: DateTime<Utc>,
-    ) -> Option<&Lease> {
-        self.leases.iter().find(|lease| {
-            &lease.issue_id == issue_id
-                && lease.is_active(now)
-                && current_agent.is_none_or(|agent| &lease.agent_id != agent)
-        })
-    }
-
     /// Find active lease for an issue
     pub fn find_lease(&self, issue_id: &IssueId) -> Option<&Lease> {
         self.leases.iter().find(|l| &l.issue_id == issue_id)
@@ -276,6 +261,7 @@ pub fn read_active_lease(
 }
 
 /// Claim coordinator for atomic lease operations
+#[derive(Clone)]
 pub struct ClaimCoordinator {
     paths: WorktreePaths,
     locker: FileLocker,
@@ -291,18 +277,6 @@ pub struct ClaimCoordinator {
     /// [`SystemClock`] (the real system clock) in production; tests inject a
     /// deterministic clock so TTL boundaries are exercised without real delays.
     clock: Arc<dyn Clock>,
-}
-
-/// Stable read view of claims held across one repository mutation attempt.
-///
-/// The private guards enforce and retain the coordinator -> repository order;
-/// callers may inspect the snapshot but cannot mutate the control plane through
-/// this value.
-pub(crate) struct ClaimsMutationGuard {
-    index: ClaimsIndex,
-    now: DateTime<Utc>,
-    _order: crate::storage::guard_order::CoordinationOrderGuard,
-    _lock: crate::storage::lock::LockGuard,
 }
 
 /// What a [`LeaseLock::apply`] operation does to its issue's lease.
@@ -323,14 +297,14 @@ pub enum LeaseChange {
 /// [`load`](Self::load) and [`list`](Self::list) read the stored index loaded
 /// under the lock, expired and stale leases included; [`apply`](Self::apply) is
 /// the only writer. No operation reads the claims log's lease history.
-pub struct LeaseLock<'a> {
-    coordinator: &'a ClaimCoordinator,
+pub struct LeaseLock {
+    coordinator: ClaimCoordinator,
     index: ClaimsIndex,
     _lock: crate::storage::lock::LockGuard,
     _order: crate::storage::guard_order::CoordinationOrderGuard,
 }
 
-impl LeaseLock<'_> {
+impl LeaseLock {
     /// The issue's stored lease, expired or stale included.
     pub fn load(&self, issue_id: &IssueId) -> Result<Option<Lease>> {
         Ok(self.index.find_lease(issue_id).cloned())
@@ -502,21 +476,30 @@ fn lease_not_found(lease_id: &LeaseId) -> anyhow::Error {
     crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id.as_str())).into()
 }
 
+/// The lease check a repository mutation reads through a [`LeaseLock`] held
+/// across its session; it writes nothing.
+pub(crate) struct ClaimsMutationGuard {
+    lock: LeaseLock,
+    now: DateTime<Utc>,
+}
+
 impl ClaimsMutationGuard {
-    /// Return the first active lease on `issue_id` not held by `current_agent`.
+    /// Hold `lock` for the mutation, judging activity at the coordinator's now.
+    pub(crate) fn hold(lock: LeaseLock) -> Self {
+        let now = lock.coordinator.clock.now();
+        Self { lock, now }
+    }
+
+    /// The issue's active lease when held by anyone but `current_agent`; a
+    /// writer with no identity holds none, so every active lease conflicts.
     pub(crate) fn conflicting_lease(
         &self,
         issue_id: &IssueId,
         current_agent: Option<&Assignee>,
-    ) -> Option<Lease> {
-        self.index
-            .conflicting_lease(issue_id, current_agent, self.now)
-            .cloned()
-    }
-
-    /// Non-fatal diagnostics observed in the held control-plane snapshot.
-    pub(crate) fn warnings(&self) -> Vec<StorageWarning> {
-        self.index.warnings()
+    ) -> Result<Option<Lease>> {
+        Ok(self.lock.load(issue_id)?.filter(|lease| {
+            lease.is_active(self.now) && current_agent.is_none_or(|agent| &lease.agent_id != agent)
+        }))
     }
 }
 
@@ -571,25 +554,6 @@ impl ClaimCoordinator {
         Ok(())
     }
 
-    /// Lock claim evidence for one repository mutation attempt.
-    ///
-    /// The returned inspection guard holds the mandatory coordination-order
-    /// marker and the claims lock until it is dropped. It deliberately performs
-    /// no reconciliation or eviction: writers own those mutations, while this
-    /// read path only needs a stable control-plane snapshot across repository
-    /// capture and apply.
-    pub(crate) fn lock_claims_for_repository_mutation(&self) -> Result<ClaimsMutationGuard> {
-        let (order, lock) = self.enter_claims_lock()?;
-        let now = self.clock.now();
-        let index = self.rebuild_index_from_log_at(now, true)?;
-        Ok(ClaimsMutationGuard {
-            index,
-            now,
-            _order: order,
-            _lock: lock,
-        })
-    }
-
     /// Enter coordination, then take `claims.lock`.
     fn enter_claims_lock(
         &self,
@@ -614,11 +578,11 @@ impl ClaimCoordinator {
     ///
     /// Fails while a repository mutation session is held on this thread, when
     /// the lock wait expires, or when the index cannot be read.
-    pub fn lock(&self) -> Result<LeaseLock<'_>> {
+    pub fn lock(&self) -> Result<LeaseLock> {
         let (order, lock) = self.enter_claims_lock()?;
         let index = self.load_claims_index()?;
         Ok(LeaseLock {
-            coordinator: self,
+            coordinator: self.clone(),
             index,
             _lock: lock,
             _order: order,
@@ -972,16 +936,10 @@ impl ClaimCoordinator {
     ///
     /// Returns an error if the log file cannot be read or parsed
     pub fn rebuild_index_from_log(&self) -> Result<ClaimsIndex> {
-        self.rebuild_index_from_log_at(self.clock.now(), false)
-    }
-
-    fn rebuild_index_from_log_at(
-        &self,
-        now: DateTime<Utc>,
-        include_expired: bool,
-    ) -> Result<ClaimsIndex> {
         use std::collections::HashMap;
         use std::io::{BufRead, BufReader};
+
+        let now = self.clock.now();
 
         let log_path = self.paths.shared_jit.join("claims.jsonl");
         let mut active: HashMap<LeaseId, Lease> = HashMap::new();
@@ -1049,9 +1007,7 @@ impl ClaimCoordinator {
         }
 
         // Expired leases leave the rebuilt index; stale ones stay, flagged below.
-        if !include_expired {
-            active.retain(|_, lease| !lease.is_expired(now));
-        }
+        active.retain(|_, lease| !lease.is_expired(now));
 
         let leases: Vec<Lease> = active
             .into_values()
@@ -2623,38 +2579,6 @@ mod tests {
     }
 
     #[test]
-    fn test_lock_claims_for_repository_mutation_excludes_stale_indefinite_lease() {
-        use crate::storage::clock::FixedClock;
-
-        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64;
-        let temp_dir = TempDir::new().unwrap();
-        let base = Utc::now();
-        let clock = Arc::new(FixedClock::new(base));
-        let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
-        let issue_id = crate::test_utils::issue_id(46);
-        coordinator
-            .acquire_claim_synchronized(
-                &issue_id,
-                0,
-                Some("probe"),
-                ClaimAcquireLimits::new(1, 1),
-                |_| Ok(()),
-            )
-            .unwrap();
-
-        let is_enforced_after = |elapsed_secs: i64| {
-            clock.set(base + Duration::seconds(elapsed_secs));
-            coordinator
-                .lock_claims_for_repository_mutation()
-                .unwrap()
-                .conflicting_lease(&issue_id, Some(&"agent:stranger".parse().unwrap()))
-                .is_some()
-        };
-        assert!(is_enforced_after(threshold));
-        assert!(!is_enforced_after(threshold + 1));
-    }
-
-    #[test]
     fn test_indefinite_lease_per_agent_limit() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
@@ -2807,40 +2731,6 @@ mod tests {
     }
 
     #[test]
-    fn test_claims_mutation_guard_replays_log_and_holds_lock_without_repair() {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-        let issue_id = crate::test_utils::issue_id(46);
-        coordinator
-            .acquire_claim_synchronized(
-                &issue_id,
-                600,
-                Some("test lease"),
-                ClaimAcquireLimits::new(100, 100),
-                |_| Ok(()),
-            )
-            .unwrap();
-        let index_path = temp_dir.path().join(".git/jit/claims.index.json");
-        fs::remove_file(&index_path).unwrap();
-
-        let guard = coordinator.lock_claims_for_repository_mutation().unwrap();
-
-        let stranger: Assignee = "agent:stranger".parse().unwrap();
-        assert!(guard
-            .conflicting_lease(&issue_id, Some(&stranger))
-            .is_some());
-        assert!(
-            !index_path.exists(),
-            "inspection must not repair derived state"
-        );
-        let lock_path = temp_dir.path().join(".git/jit/locks/claims.lock");
-        let contender = FileLocker::new(StdDuration::from_millis(10));
-        assert!(contender.try_lock_exclusive(&lock_path).unwrap().is_none());
-        drop(guard);
-        assert!(contender.try_lock_exclusive(&lock_path).unwrap().is_some());
-    }
-
-    #[test]
     fn test_claims_mutation_guard_lease_blocks_only_its_own_issue() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
@@ -2855,11 +2745,71 @@ mod tests {
                 |_| Ok(()),
             )
             .unwrap();
-        let guard = coordinator.lock_claims_for_repository_mutation().unwrap();
+        let guard = ClaimsMutationGuard::hold(coordinator.lock().unwrap());
         let stranger: Assignee = "agent:stranger".parse().unwrap();
 
-        assert!(guard.conflicting_lease(&leased, Some(&stranger)).is_some());
-        assert!(guard.conflicting_lease(&other, Some(&stranger)).is_none());
+        assert!(guard
+            .conflicting_lease(&leased, Some(&stranger))
+            .unwrap()
+            .is_some());
+        assert!(guard
+            .conflicting_lease(&other, Some(&stranger))
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn test_claims_mutation_guard_conflicting_lease_anonymous_writer_conflicts_with_every_active_lease(
+    ) {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        let (lease, ()) = acquire(
+            &coordinator,
+            &crate::test_utils::issue_id(50),
+            600,
+            ClaimAcquireLimits::new(1, 1),
+        );
+        let guard = ClaimsMutationGuard::hold(coordinator.lock().unwrap());
+
+        assert!(guard
+            .conflicting_lease(&lease.issue_id, Some(&lease.agent_id))
+            .unwrap()
+            .is_none());
+        assert!(guard
+            .conflicting_lease(&lease.issue_id, None)
+            .unwrap()
+            .is_some());
+    }
+
+    #[test]
+    fn test_claims_mutation_guard_conflicting_lease_inactive_lease_conflicts_with_nobody() {
+        let temp_dir = TempDir::new().unwrap();
+        let (coordinator, _clock, expired, stale) = lease_lock_fixture(&temp_dir);
+
+        let guard = ClaimsMutationGuard::hold(coordinator.lock().unwrap());
+
+        let stranger: Assignee = "agent:stranger".parse().unwrap();
+        for lease in [&expired, &stale] {
+            for agent in [Some(&stranger), None] {
+                assert!(guard
+                    .conflicting_lease(&lease.issue_id, agent)
+                    .unwrap()
+                    .is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn test_claims_mutation_guard_hold_keeps_the_lease_lock_until_dropped() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        let lock_path = temp_dir.path().join(".git/jit/locks/claims.lock");
+        let contender = FileLocker::new(EXPIRING_LOCK_WAIT);
+
+        let guard = ClaimsMutationGuard::hold(coordinator.lock().unwrap());
+        assert!(contender.try_lock_exclusive(&lock_path).unwrap().is_none());
+        drop(guard);
+        assert!(contender.try_lock_exclusive(&lock_path).unwrap().is_some());
     }
 
     /// A coordinator on a fixed clock with a finite lease on issue 60 that has
