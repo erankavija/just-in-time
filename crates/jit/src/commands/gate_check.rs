@@ -455,7 +455,7 @@ fn captured_issue_rule_report(
         .collect::<Vec<_>>();
     let namespaces = crate::config_manager::namespaces_from_config(&config);
     let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-    let plan_content = super::validate::plan_content_from_image(image, &issues)?;
+    let plan_content = super::validate::plan_content_with_issues(image, &issues, &issues)?;
     findings.extend(
         crate::validation::graph::evaluate_graph(
             &graph_rules,
@@ -531,7 +531,7 @@ fn captured_scope_rule_report(
         let namespaces = crate::config_manager::namespaces_from_config(&config);
         let hierarchy =
             crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-        let plan_content = super::validate::plan_content_from_image(image, &slice)?;
+        let plan_content = super::validate::plan_content_with_issues(image, &all, &slice)?;
         findings.extend(
             crate::validation::graph::evaluate_graph_scoped(
                 &graph_rules,

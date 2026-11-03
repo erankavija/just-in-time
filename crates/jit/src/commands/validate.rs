@@ -5,7 +5,6 @@ use crate::domain::identity::GateKey;
 use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
-use crate::templates::{find_planning_node, planning_node_plan_path};
 use anyhow::Context;
 
 /// Rule name carried by every finding the built-in dangling-item-link pass emits
@@ -993,66 +992,23 @@ fn capture_record_fidelity_validation(
     }))
 }
 
-/// Each breakable container's plan-document path, from its planning node as
-/// plan-content projection resolves it.
+/// Each breakable container's linked plan-document path.
 fn plan_document_paths(
     issues: &[Issue],
     config: &JitConfig,
 ) -> Result<Vec<crate::repository_state::VirtualPath>> {
-    let templates = &config.templates;
-    let breakable: std::collections::HashSet<String> =
-        templates.breakable_types().into_iter().collect();
-    let by_id: std::collections::HashMap<&crate::domain::identity::IssueId, &Issue> =
-        issues.iter().map(|issue| (&issue.id, issue)).collect();
+    let by_id = issues.iter().map(|issue| (&issue.id, issue)).collect();
     issues
         .iter()
-        .filter_map(|issue| {
-            let template = crate::labels::type_label_value(&issue.labels)
-                .filter(|issue_type| breakable.contains(*issue_type))
-                .and_then(|issue_type| templates.template_for_container(issue_type))
-                .filter(|template| template.plan_doc_location(&templates.roles).is_some())?;
-            find_planning_node(issue, template, &templates.roles, &by_id)
-                .and_then(planning_node_plan_path)
-        })
-        .map(|path| Ok(crate::repository_state::VirtualPath::worktree(&path)?))
+        .filter_map(|issue| crate::templates::plan_document_ref(issue, &by_id, &config.templates))
+        .map(|plan| Ok(crate::repository_state::VirtualPath::worktree(&plan.path)?))
         .collect()
 }
 
-/// Project the plan-document content map from a captured validation image — the
-/// closed-read replacement for the retired ambient filesystem
-/// reads.
-///
-/// Planning-node resolution runs against the full captured issue set (so a scoped
-/// slice still finds a bracket's planning node), while content is emitted only for
-/// `emit_for`. Each breakable container whose bracket planning node records an
-/// external plan reference contributes its plan-document bytes, read from the
-/// image's captured plan-document entries (enqueued by [`plan_document_paths`])
-/// rather than the live filesystem. A not-yet-authored plan whose planning node is
-/// not `done` is omitted (a freshly-applied bracket validates cleanly before its
-/// plan exists); a missing plan whose planning node is `done` is an error.
-pub(crate) fn plan_content_from_image(
-    image: &crate::repository_state::RepositoryImage,
-    emit_for: &[Issue],
-) -> Result<std::collections::HashMap<IssueId, String>> {
-    let effective_repo_path =
-        |img: &crate::repository_state::RepositoryImage,
-         repo_rel: &str|
-         -> Result<Option<Vec<u8>>> { super::image_repo_bytes(img, repo_rel) };
-    let effective_repo_path: &EffectiveRepoPath<'_> = &effective_repo_path;
-
-    // Declaration parsing is best-effort, mirroring `capture_proposed_base`: a
-    // missing or malformed config (parsed in `plan_content_with_issues`),
-    // listing, or issue set yields an empty projection (no
-    // breakable containers, so no external plan docs), and `validate_repository`
-    // is the authority that reports the parse error. Only a genuinely missing
-    // required plan document (below) is a hard error.
-    let issue_ids = crate::repository_state::captured_issue_ids(image).unwrap_or_default();
-    let all_issues = effective_issues(image, &issue_ids, effective_repo_path).unwrap_or_default();
-    plan_content_with_issues(image, &all_issues, emit_for)
-}
-
-/// [`plan_content_from_image`] for a caller already holding the image's
-/// complete issue set as `all_issues`.
+/// Plan-document content for `emit_for` from a captured image, whose closure
+/// holds every path [`plan_document_paths`] derives; `all_issues` is the image's
+/// complete issue set. A missing or malformed configuration yields no plan
+/// documents, and `validate_repository` reports it.
 pub(crate) fn plan_content_with_issues(
     image: &crate::repository_state::RepositoryImage,
     all_issues: &[Issue],
@@ -1063,42 +1019,15 @@ pub(crate) fn plan_content_with_issues(
          path: &crate::repository_state::VirtualPath|
          -> Result<Option<Vec<u8>>> { super::image_virtual_bytes(img, path) };
     let effective_virtual_path: &EffectiveVirtualPath<'_> = &effective_virtual_path;
-    let mut config = effective_config(image, effective_virtual_path)
+    let config = effective_config(image, effective_virtual_path)
         .unwrap_or_else(|_| empty_materialization_config());
-    config.templates = effective_templates(image, &config, effective_virtual_path)?;
-
-    let templates = &config.templates;
-    let breakable: std::collections::HashSet<String> =
-        templates.breakable_types().into_iter().collect();
-    let by_id: std::collections::HashMap<&crate::domain::identity::IssueId, &Issue> =
-        all_issues.iter().map(|issue| (&issue.id, issue)).collect();
-
-    let mut out = std::collections::HashMap::new();
-    for issue in emit_for {
-        let Some(issue_type) =
-            label_utils::type_label_value(&issue.labels).filter(|t| breakable.contains(*t))
-        else {
-            continue;
-        };
-        let Some(template) = templates.template_for_container(issue_type) else {
-            continue;
-        };
-        if template.plan_doc_location(&templates.roles).is_none() {
-            continue;
-        }
-        let planning = find_planning_node(issue, template, &templates.roles, &by_id);
-        let Some(plan_path) = planning.and_then(planning_node_plan_path) else {
-            continue;
-        };
-        match super::image_repo_bytes(image, &plan_path)? {
-            Some(bytes) => {
-                out.insert(issue.id.clone(), String::from_utf8(bytes)?);
-            }
-            None if planning.is_none_or(|node| node.state != State::Done) => {}
-            None => return Err(anyhow!("required plan document '{plan_path}' is missing")),
-        }
-    }
-    Ok(out)
+    let templates = effective_templates(image, &config, effective_virtual_path)?;
+    crate::validation::repository::plan_content(
+        &|path| super::image_repo_bytes(image, path),
+        all_issues,
+        emit_for,
+        &templates,
+    )
 }
 
 /// Evaluate one configured graph rule against one issue from a closed image.
@@ -1152,7 +1081,7 @@ pub(super) fn rule_validation_outcome(
                 .cloned()
         })
         .collect::<Vec<_>>();
-    let plan_content = plan_content_from_image(image, &plan_sources)?;
+    let plan_content = plan_content_with_issues(image, &issues, &plan_sources)?;
     let namespaces = crate::config_manager::namespaces_from_config(&config);
     let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
     let context = crate::validation::graph::GraphEvaluationContext {
@@ -1599,18 +1528,9 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         ))
     }
 
-    /// Plan-document content for `emit_for`, image-projected when a captured
-    /// session is available (the closed-read replacement for the ambient
-    /// the plan-content projection).
-    ///
-    /// This captures the whole-repository validation image
-    /// ([`capture_validation_image`](CommandExecutor::capture_validation_image), whose
-    /// closure enqueues every derived plan-document path) and projects the
-    /// plan-document content map through [`plan_content_from_image`]. Planning-node
-    /// resolution runs against the full captured issue set, so a scoped slice still
-    /// resolves a bracket's planning node, and the plan bytes are read from the
-    /// closed image rather than the live filesystem.
-    ///
+    /// Plan-document content for `emit_for` from the whole-repository validation
+    /// image, resolving planning nodes over every captured issue so a scoped slice
+    /// still finds its bracket's planning node.
     pub(crate) fn image_plan_content(
         &self,
         emit_for: &[Issue],
@@ -1619,7 +1539,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         let image = self.exec.capture_validation_image()?;
-        plan_content_from_image(&image, emit_for)
+        plan_content_with_issues(&image, &super::captured_active_issues(&image)?, emit_for)
     }
 
     /// Run the declarative rule set (`.jit/rules.toml`) as a per-issue or

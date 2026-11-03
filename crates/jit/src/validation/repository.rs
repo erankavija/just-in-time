@@ -556,7 +556,7 @@ fn collect_rule_findings(
         .filter(|rule| rule.scope == crate::declarations::rules::RuleScope::Graph)
         .collect();
     let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
-    let plan_content = project_plan_content(read, issues, config)?;
+    let plan_content = plan_content(read, issues, issues, &config.templates)?;
     let graph_findings = crate::validation::graph::evaluate_graph(
         &graph_rules,
         issues,
@@ -630,41 +630,32 @@ fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFind
     }
 }
 
-fn project_plan_content(
+/// Plan content of each container in `emit_for` with a linked plan document,
+/// resolving planning nodes over `all_issues`. An absent plan is omitted until
+/// its planning node is `done`, then it is an error.
+pub(crate) fn plan_content(
     read: &ReadBytes<'_>,
-    issues: &[Issue],
-    config: &JitConfig,
+    all_issues: &[Issue],
+    emit_for: &[Issue],
+    templates: &crate::templates::TemplateRegistry,
 ) -> Result<HashMap<IssueId, String>> {
-    let templates = &config.templates;
-    let breakable: HashSet<String> = templates.breakable_types().into_iter().collect();
-    let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|issue| (&issue.id, issue)).collect();
-    let mut content = HashMap::new();
-    for issue in issues {
-        let Some(issue_type) = crate::labels::type_label_value(&issue.labels)
-            .filter(|issue_type| breakable.contains(*issue_type))
-        else {
-            continue;
-        };
-        let Some(template) = templates.template_for_container(issue_type) else {
-            continue;
-        };
-        if template.plan_doc_location(&templates.roles).is_none() {
-            continue;
-        }
-        let planning =
-            crate::templates::find_planning_node(issue, template, &templates.roles, &by_id);
-        let Some(path) = planning.and_then(crate::templates::planning_node_plan_path) else {
-            continue;
-        };
-        match read_text(read, &path)? {
-            Some(plan) => {
-                content.insert(issue.id.clone(), plan);
-            }
-            None if planning.is_none_or(|node| node.state != crate::domain::State::Done) => {}
-            None => return Err(anyhow!("required plan document '{path}' is missing")),
-        }
-    }
-    Ok(content)
+    let by_id = all_issues.iter().map(|issue| (&issue.id, issue)).collect();
+    emit_for
+        .iter()
+        .filter_map(|issue| {
+            crate::templates::plan_document_ref(issue, &by_id, templates).map(|plan| (issue, plan))
+        })
+        .map(|(issue, plan)| {
+            Ok(match read_text(read, &plan.path)? {
+                Some(text) => Some((issue.id.clone(), text)),
+                None if plan.planning_done => {
+                    return Err(anyhow!("required plan document '{}' is missing", plan.path))
+                }
+                None => None,
+            })
+        })
+        .filter_map(Result::transpose)
+        .collect()
 }
 
 fn collect_item_link_findings(

@@ -125,7 +125,7 @@ fn derive_issue_deletion(
             issue.id.clone()
         })
         .collect::<Vec<_>>();
-    let plan_content = validate::plan_content_from_image(image, &projected)?;
+    let plan_content = validate::plan_content_with_issues(image, issues, &projected)?;
     let ready_ids = crate::domain::queries::issues_becoming_ready(&projected);
 
     let mut intents = vec![MutationIntent::DeleteIssue {
