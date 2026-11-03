@@ -23093,3 +23093,4 @@
 {"id":"7a70df9a-a669-4be6-9d25-75bffb4fd06d","issue_id":"2f12d920-2bbc-4b8f-99f5-bca7d0e9ff4a","new_count":1,"old_count":2,"removed_deps":["de9a7557-2061-4b63-9c74-6c18ed840c17"],"timestamp":"2026-11-03T22:37:40.026132480Z","type":"dependency_reduced"}
 {"id":"26b8e74f-06dc-4122-a462-859beed31bd3","issue_id":"2a10917d-4e9d-4fcd-aa26-54910508e363","priority":"normal","timestamp":"2026-11-03T22:38:21.381647288Z","title":"Code-review context states commit ancestry for gate evidence","type":"issue_created"}
 {"gate_key":"code-review","id":"2fbcd1a9-6c9a-4a04-9fe1-45a25552d9ef","issue_id":"2a10917d-4e9d-4fcd-aa26-54910508e363","timestamp":"2026-11-03T22:38:25.315255581Z","type":"gate_added"}
+{"fields":["dependencies"],"id":"2aca4510-3da0-4a4f-b656-a63829eea5c2","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-11-03T22:38:53.564853896Z","type":"issue_updated","updated_by":"dependency-add"}
