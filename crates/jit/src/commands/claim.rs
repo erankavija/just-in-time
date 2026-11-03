@@ -140,10 +140,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
         // Acquire the lease AND synchronize the repository-side issue/event state
         // under one held coordinator lock, in the mandatory order coordinator ->
         // bootstrap -> repository -> events. The coordinator receives the CANONICAL
-        // full id (never the raw user spelling), and the repository transition is
-        // idempotent and convergent over both the captured issue assignment and the
-        // captured event-log tail, so a crash-interrupted prior attempt converges
-        // without emitting a duplicate claim event (@/inv/event-log).
+        // full id (never the raw user spelling).
         let worktree_root = paths.worktree_root.clone();
         let data_root = storage.root().to_path_buf();
         let (lease, ()) = coordinator.acquire_claim_synchronized(
@@ -169,15 +166,24 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
     }
 }
 
+/// The claim reads the issue record and appends at the log's end.
+fn claim_capture_spec(full_id: &IssueId) -> Result<crate::repository_state::CaptureSpec> {
+    use crate::repository_state::{CaptureSpec, VirtualPath};
+    let mut spec = CaptureSpec::new(
+        [VirtualPath::issue_record(full_id)],
+        super::issue_mutation_capture_budget(),
+    )?;
+    spec.discover_tail(VirtualPath::EVENTS)?;
+    Ok(spec)
+}
+
 /// Publish the repository-side issue assignment and claim event through one
 /// mutation session.
 ///
 /// Invoked under the held coordinator lock, so the guard order is coordinator ->
-/// bootstrap -> repository -> events. The transition is derived from the captured
-/// image and is convergent: a claim already reflected in both the issue
-/// assignment and the event-log tail is a complete no-op; an issue assigned
-/// without its claim event emits exactly the missing event; a duplicate event is
-/// never emitted, preserving `@/inv/event-log`.
+/// bootstrap -> repository -> events. The captured assignee alone decides: an
+/// issue already assigned to `agent` publishes nothing; any other publishes the
+/// assignment and its `IssueClaimed` (`@/inv/event-log`).
 fn synchronize_claim_repository_state<S>(
     storage: &S,
     worktree_root: &Path,
@@ -189,7 +195,7 @@ where
     S: IssueStore + crate::storage::RepositoryStateStore,
 {
     use super::{capture_or_retry, with_mutation_session, SessionStep};
-    use crate::repository_state::{finalize, CaptureSpec, MutationIntent, VirtualPath};
+    use crate::repository_state::{finalize, MutationIntent};
     use crate::storage::discover_repository_layout;
 
     let layout = discover_repository_layout(worktree_root, data_root)?;
@@ -197,12 +203,6 @@ where
         issue_id: full_id.clone(),
         agent: agent.clone(),
     }];
-    let build_spec = || -> Result<CaptureSpec> {
-        Ok(CaptureSpec::new(
-            [VirtualPath::issue_record(full_id), VirtualPath::EVENTS],
-            super::issue_mutation_capture_budget(),
-        )?)
-    };
     // Operation-scoped: a capture/apply retry must keep claim audit identity and
     // transition time stable while opening a fresh mutation session.
     let context = super::production_mutation_context();
@@ -211,7 +211,8 @@ where
         &layout,
         "claim repository synchronization",
         |session| {
-            let Some(image) = capture_or_retry(session.capture(build_spec()?))? else {
+            let Some(image) = capture_or_retry(session.capture(claim_capture_spec(full_id)?))?
+            else {
                 return Ok(SessionStep::Retry);
             };
             let plan = finalize(&layout, &image, &context, &intents)?;
@@ -1929,11 +1930,12 @@ mod tests {
     }
 
     #[test]
-    fn test_claim_acquire_idempotent_over_split_and_full_reflection() -> Result<()> {
-        let (temp, executor) = setup_test_repo_with_config("")?;
+    fn test_claim_acquire_appends_one_event_per_assignee_change() -> Result<()> {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n")?;
         let storage = executor.storage().clone();
         let (issue_id, _) = executor.issues().create_issue(
-            "Split Issue".to_string(),
+            "Reclaimed Issue".to_string(),
             "Test description".to_string(),
             crate::domain::Priority::Normal,
             Vec::new(),
@@ -1942,26 +1944,31 @@ mod tests {
             None,
             false,
         )?;
+        let acquire = || {
+            execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")
+        };
 
-        // First acquire publishes the assigned issue and its claim event in one
-        // redo record.
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
-        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
-        assert!(storage.load_issue(&issue_id)?.assignee.is_some());
-
-        // Simulate a crash that left the issue assigned but lost its claim event
-        // (the split state the old save-then-append path could produce).
-        std::fs::write(storage.root().join("events.jsonl"), b"")?;
-        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 0);
-
-        // The retry emits EXACTLY the missing event (the issue is already assigned).
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+        acquire()?;
+        acquire()?;
         assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
 
-        // A further acquire by the same agent/worktree is a complete no-op: the
-        // convergent transition never emits a duplicate event.
-        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
-        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
+        executor.issues().unassign_issue(&issue_id)?;
+        acquire()?;
+        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn test_claim_capture_spec_requests_only_the_issue_record_and_the_log_tail() -> Result<()> {
+        use crate::repository_state::{ReadMode, VirtualPath};
+
+        let issue_id = crate::test_utils::issue_id(0x5000_4000_8000_0000_0000_0001_abcd_ef12);
+        let record = VirtualPath::issue_record(&issue_id);
+        let spec = super::claim_capture_spec(&issue_id)?;
+
+        assert_eq!(spec.paths().count(), 2);
+        assert_eq!(spec.read_mode(&record), Some(ReadMode::Whole));
+        assert_eq!(spec.read_mode(&VirtualPath::EVENTS), Some(ReadMode::Tail));
         Ok(())
     }
 

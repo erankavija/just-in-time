@@ -5,6 +5,8 @@
 //! unit-tested at the domain layer (`Issue::mark_*`); here we verify the command
 //! paths wire those helpers in.
 
+use jit::domain::event_catalog::EventTag;
+use jit::domain::identity::IssueId;
 use jit::domain::{EventBody, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
@@ -85,6 +87,63 @@ fn test_assign_stamps_claimed_at_and_logs_event() {
         .filter(|e| matches!(e.body(), EventBody::IssueClaimed { .. }))
         .count();
     assert_eq!(claimed, 1);
+}
+
+/// The events a claim of `id` by `assignee` appends, by tag.
+fn tags_appended_by_claim(h: &TestHarness, id: &IssueId, assignee: &str) -> Vec<EventTag> {
+    let before = h.storage.read_events().unwrap().len();
+    h.executor
+        .issues()
+        .claim_issue(id, assignee.parse().unwrap())
+        .unwrap();
+    h.storage.read_events().unwrap()[before..]
+        .iter()
+        .map(|event| event.body().tag())
+        .collect()
+}
+
+#[test]
+fn test_claim_issue_of_unassigned_issue_appends_a_claim_event() {
+    let h = TestHarness::new();
+    let id = h.create_ready_issue("Unassigned");
+
+    let tags = tags_appended_by_claim(&h, &id, "agent:worker-1");
+
+    assert_eq!(
+        tags.iter()
+            .filter(|tag| **tag == EventTag::IssueClaimed)
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn test_claim_issue_promoting_same_assignee_appends_only_the_state_change() {
+    let h = TestHarness::new();
+    let id = h.create_ready_issue("Assigned");
+    h.executor
+        .issues()
+        .assign_issue(&id, "agent:worker-1".parse().unwrap())
+        .unwrap();
+
+    let tags = tags_appended_by_claim(&h, &id, "agent:worker-1");
+
+    assert_eq!(tags, [EventTag::IssueStateChanged]);
+    assert_eq!(h.get_issue(&id).state, State::InProgress);
+}
+
+/// A claim that neither reassigns nor promotes changes nothing.
+#[test]
+fn test_claim_issue_same_assignee_without_promotion_appends_nothing() {
+    let h = TestHarness::new();
+    let id = h.create_ready_issue("Finished");
+    h.executor
+        .issues()
+        .assign_issue(&id, "agent:worker-1".parse().unwrap())
+        .unwrap();
+    jit::test_utils::transition_issue(&h.executor, &id, State::Done).unwrap();
+
+    assert!(tags_appended_by_claim(&h, &id, "agent:worker-1").is_empty());
 }
 
 /// Transitioning an issue to Done stamps `done_at`.
