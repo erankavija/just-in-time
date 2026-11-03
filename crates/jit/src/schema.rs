@@ -547,26 +547,9 @@ impl CommandSchema {
                 "IssueShowResponse",
             ),
             // Lifecycle mutation confirmations echo the raw stored record, so the
-            // gate list stays under gates_required / gates_status. `claim` /
-            // `claim-next` add the advisory `warnings` array (ClaimResponse);
-            // `claim`'s `--assign-only` mode omits it, hence the `oneOf`.
-            "issue_assign" | "issue_unassign" | "issue_reject" | "issue_release" => {
-                (Some(schema_to_value::<Issue>()), "Issue")
-            }
-            "issue_claim" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<ClaimResponse>(),
-                        schema_to_value::<Issue>(),
-                    ],
-                    "description": "The claimed issue's complete stored record \
-                        (gate list under gates_required / gates_status). The \
-                        default claim adds an advisory `warnings` array; \
-                        `--assign-only` omits it."
-                });
-                (Some(union), "ClaimResponse")
-            }
-            "issue_claim-next" => (Some(schema_to_value::<ClaimResponse>()), "ClaimResponse"),
+            // gate list stays under gates_required / gates_status.
+            "issue_assign" | "issue_unassign" | "issue_reject" | "issue_release"
+            | "issue_claim" | "issue_claim-next" => (Some(schema_to_value::<Issue>()), "Issue"),
             "issue_update" => (
                 Some(schema_to_value::<IssueUpdateResponse>()),
                 "IssueUpdateResponse",

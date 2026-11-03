@@ -53,9 +53,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "run_id": "27d5ac35-ce33-4f8c-9e98-08fec3315684",
+      "run_id": "b8cfdcb9-2424-43a4-ab7d-69f908bad91f",
       "status": "passed",
-      "updated_at": "2026-10-21T17:08:40.101074416Z",
+      "updated_at": "2026-11-03T23:10:54.086549573Z",
       "updated_by": "auto:executor"
     }
   },
@@ -73,5 +73,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Compute one validation report and derive every validation view from it",
-  "updated_at": "2026-11-03T23:07:15.153208098Z"
+  "updated_at": "2026-11-03T23:10:54.086549573Z"
 }
