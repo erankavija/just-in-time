@@ -9,6 +9,7 @@
 //! If not found, search operations return a helpful error message with installation instructions.
 
 use crate::domain::identity::IssueId;
+use crate::repository_state::VirtualPath;
 use anyhow::Result;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -83,6 +84,8 @@ pub struct SearchOptions {
     pub file_pattern: Option<String>,
     /// Multiple file patterns (e.g., specific document paths)
     /// If provided, overrides file_pattern
+    ///
+    /// With neither selection given, history paths are excluded from the search.
     pub file_patterns: Vec<String>,
 }
 
@@ -134,6 +137,11 @@ pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Ve
         }
     } else if let Some(pattern) = &options.file_pattern {
         cmd.arg("--glob").arg(pattern);
+    } else {
+        // Anchored, so a same-named path nested elsewhere stays searchable.
+        VirtualPath::history_paths().iter().for_each(|path| {
+            cmd.arg("--glob").arg(format!("!/{path}"));
+        });
     }
 
     // ripgrep matches globs relative to its working directory, so run it in the search root.
@@ -480,5 +488,55 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_search_default_skips_history_files_and_explicit_glob_reaches_them() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let write = |rel: &str| {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, "needle\n").unwrap();
+        };
+        let history = VirtualPath::history_paths();
+        let [events, runs, scratch] = &history;
+        write(events);
+        write(&format!("{runs}/run1/result.json"));
+        write(&format!("{scratch}/redo.bin"));
+        write(&format!("nested/{events}"));
+        write(&format!("nested/{scratch}/x.txt"));
+        write("issues/a.json");
+
+        let found = |options: SearchOptions| -> std::collections::BTreeSet<String> {
+            search(root, "needle", options)
+                .unwrap()
+                .into_iter()
+                .map(|r| {
+                    Path::new(&r.path)
+                        .strip_prefix(root)
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect()
+        };
+
+        assert_eq!(
+            found(SearchOptions::default()),
+            [
+                "issues/a.json".to_string(),
+                format!("nested/{events}"),
+                format!("nested/{scratch}/x.txt"),
+            ]
+            .into()
+        );
+        assert_eq!(
+            found(SearchOptions {
+                file_pattern: Some(format!("{runs}/**")),
+                ..SearchOptions::default()
+            }),
+            [format!("{runs}/run1/result.json")].into()
+        );
     }
 }
