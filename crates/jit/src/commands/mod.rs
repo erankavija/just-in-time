@@ -97,6 +97,7 @@ pub use profile::{
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use query::QueryOps;
+pub use search::ContentMatch;
 pub use template::{TemplateApplyResult, TemplateOps};
 pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
