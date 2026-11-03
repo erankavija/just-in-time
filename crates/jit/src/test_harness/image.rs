@@ -90,6 +90,15 @@ impl ImageBuilder {
         self.entry(path, entry)
     }
 
+    /// Capture each repository-relative path as a regular file holding its
+    /// text, or as absent when the text is `None`.
+    pub fn files(self, files: &[(&str, Option<&str>)]) -> Self {
+        files.iter().fold(self, |builder, (path, text)| match text {
+            Some(text) => builder.file(*path, text),
+            None => builder.entry(*path, RepositoryEntry::Absent),
+        })
+    }
+
     /// Capture `path`'s complete listing.
     pub fn listing(mut self, path: impl ImagePath, listing: DirectoryListing) -> Self {
         self.listings.insert(path.resolve(&self.layout), listing);
@@ -242,6 +251,20 @@ mod tests {
                 .unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn test_image_builder_files_captures_text_as_files_and_none_as_absent() {
+        let absent = VirtualPath::worktree("docs/a.md").unwrap();
+        let image = ImageBuilder::new()
+            .files(&[(".jit/config.toml", Some("config")), ("docs/a.md", None)])
+            .build();
+
+        assert_eq!(
+            image.file_bytes(&VirtualPath::CONFIG).unwrap(),
+            Some(&b"config"[..])
+        );
+        assert_eq!(image.entry(&absent).unwrap(), &RepositoryEntry::Absent);
     }
 
     #[test]
