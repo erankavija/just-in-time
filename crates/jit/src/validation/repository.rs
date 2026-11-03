@@ -886,7 +886,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -900,7 +903,11 @@ mod tests {
         )
         .unwrap();
 
-        let failure = executor.validate_repository_report().unwrap().unwrap_err();
+        let failure = executor
+            .validation()
+            .validate_repository_report()
+            .unwrap()
+            .unwrap_err();
         let (error, _report) = failure.into_parts();
 
         assert_eq!(
@@ -936,7 +943,7 @@ mod tests {
     fn validate_live(
         executor: &crate::commands::CommandExecutor<JsonFileStorage>,
     ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
-        executor.validate_repository_report().unwrap()
+        executor.validation().validate_repository_report().unwrap()
     }
 
     /// Capture and validate the fixture overlaid with proposed final bytes/absence.
@@ -994,7 +1001,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1053,7 +1063,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_attested_gate_run(&mut executor);
 
         validate_live(&executor).unwrap();
@@ -1065,7 +1078,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         let run_id = seed_attested_gate_run(&mut executor);
         let path = VirtualPath::gate_run_record(&run_id);
         let stored = read_fixture(&executor, &path.repository_relative()).unwrap();
@@ -1092,7 +1108,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         let run_id = seed_attested_gate_run(&mut executor);
         std::fs::write(
             data_path(&executor, &VirtualPath::gate_run_record(&run_id)),
@@ -1109,7 +1128,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1149,7 +1171,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1170,7 +1195,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1199,7 +1227,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1227,7 +1258,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1265,7 +1299,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1286,7 +1323,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1314,7 +1354,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1358,7 +1401,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1387,7 +1433,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1414,7 +1463,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1461,7 +1513,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1493,7 +1548,10 @@ mod tests {
         )
         .unwrap();
 
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         let live = validate_live(&executor).unwrap();
         assert!(!live.rule_report.has_errors(), "{:?}", live.rule_report);
         let planned = validate_materialized_overlaid(
@@ -1514,7 +1572,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1530,7 +1591,10 @@ mod tests {
             config.as_bytes(),
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         let id = &executor.storage().list_issues().unwrap().remove(0).id;
         let mut issue: Issue = serde_json::from_slice(
             &read_fixture(&executor, &issue_path(id).repository_relative()).unwrap(),
@@ -1556,7 +1620,10 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor.validate_with_fix(true, false).unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",

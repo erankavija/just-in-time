@@ -80,7 +80,10 @@ fn test_add_dependency_demotes_a_ready_dependent_and_records_the_state_change() 
     let dependent = h.create_issue("Dependent");
     assert_eq!(h.get_issue(&dependent).state, State::Ready);
 
-    h.executor.add_dependency(&dependent, &upstream).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &upstream)
+        .unwrap();
 
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
     let events = h.storage.read_events().unwrap();
@@ -101,9 +104,12 @@ fn test_validate_reports_a_ready_issue_with_an_unmet_dependency_as_a_violation()
     let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &upstream).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &upstream)
+        .unwrap();
     assert!(
-        h.executor.validate_silent().is_ok(),
+        h.executor.validation().validate_silent().is_ok(),
         "the coherent repository must validate"
     );
 
@@ -115,6 +121,7 @@ fn test_validate_reports_a_ready_issue_with_an_unmet_dependency_as_a_violation()
 
     let error = h
         .executor
+        .validation()
         .validate_silent()
         .expect_err("a Ready issue with an unmet dependency must fail validation");
     let rendered = format!("{error:#}");
@@ -132,36 +139,49 @@ fn test_validate_reports_a_ready_issue_with_an_unmet_dependency_as_a_violation()
 /// the state its dependencies imply, leaving the repository valid.
 #[test]
 fn test_validate_fix_demotes_a_ready_issue_that_carries_an_unmet_dependency() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &upstream).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &upstream)
+        .unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
 
-    let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
+    let (fixes, _messages) = h
+        .executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
 
     assert_eq!(fixes, 1, "exactly the one incoherent issue is repaired");
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
     assert!(ready_but_blocked(&h.all_issues()).is_empty());
-    assert!(h.executor.validate_silent().is_ok());
+    assert!(h.executor.validation().validate_silent().is_ok());
 }
 
 /// REQ-04: the repair is auditable — the demotion `--fix` performs appends its
 /// own state-change event, like every other state change.
 #[test]
 fn test_validate_fix_records_the_repair_demotion_in_the_event_log() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &upstream).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &upstream)
+        .unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
     let events_before = h.storage.read_events().unwrap().len();
 
-    h.executor.validate_with_fix(true, false).unwrap();
+    h.executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
 
     let events = h.storage.read_events().unwrap();
     assert!(events.len() > events_before);
@@ -178,15 +198,22 @@ fn test_validate_fix_records_the_repair_demotion_in_the_event_log() {
 /// REQ-04: a dry run reports the violation without changing stored state.
 #[test]
 fn test_validate_fix_dry_run_reports_the_incoherent_issue_without_repairing_it() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &upstream).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &upstream)
+        .unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
 
-    let (fixes, messages) = h.executor.validate_with_fix(true, true).unwrap();
+    let (fixes, messages) = h
+        .executor
+        .validation()
+        .validate_with_fix(true, true)
+        .unwrap();
 
     assert_eq!(fixes, 1);
     assert!(
@@ -249,11 +276,11 @@ proptest! {
             let _ = match edit {
                 DependencyEdit::Add { from, to } => h
                     .executor
-                    .add_dependency(&ids[from], &ids[to])
+                    .graph().add_dependency(&ids[from], &ids[to])
                     .map(|_| ()),
                 DependencyEdit::Remove { from, to } => h
                     .executor
-                    .remove_dependency(&ids[from], &ids[to])
+                    .graph().remove_dependency(&ids[from], &ids[to])
                     .map(|_| ()),
             };
         }
@@ -276,12 +303,18 @@ proptest! {
 /// `Backlog` with nothing unmet. Validation reports it, and `--fix` promotes it.
 #[test]
 fn test_validate_reports_and_fix_promotes_a_backlog_dependent_whose_blockers_are_all_terminal() {
-    let mut h = TestHarness::new();
+    let h = TestHarness::new();
     let first = h.create_issue("First blocker");
     let second = h.create_issue("Second blocker");
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &first).unwrap();
-    h.executor.add_dependency(&dependent, &second).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &first)
+        .unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &second)
+        .unwrap();
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
     for blocker in [&first, &second] {
         let mut closed = h.get_issue(blocker);
@@ -292,14 +325,18 @@ fn test_validate_reports_and_fix_promotes_a_backlog_dependent_whose_blockers_are
     let rendered = format!(
         "{:#}",
         h.executor
+            .validation()
             .validate_silent()
             .expect_err("a Backlog issue nothing blocks must fail validation")
     );
     assert!(rendered.contains(&h.get_issue(&dependent).short_id()));
     assert!(rendered.contains("jit validate --fix"));
 
-    h.executor.validate_with_fix(true, false).unwrap();
+    h.executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
 
     assert_eq!(h.get_issue(&dependent).state, State::Ready);
-    assert!(h.executor.validate_silent().is_ok());
+    assert!(h.executor.validation().validate_silent().is_ok());
 }

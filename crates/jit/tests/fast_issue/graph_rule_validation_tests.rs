@@ -1,6 +1,6 @@
 //! End-to-end tests proving that `RuleScope::Graph` rules defined in
 //! `.jit/rules.toml` actually RUN inside the `jit validate` execution path
-//! (`CommandExecutor::validate_silent`) and affect its pass/fail result.
+//! (`ValidationOps::validate_silent`) and affect its pass/fail result.
 //!
 //! These are wiring tests: the pure `evaluate_graph` engine is unit-tested in
 //! `validation::graph`. Here we verify the production validate path loads the
@@ -46,7 +46,7 @@ fn test_validate_fails_on_error_severity_graph_rule_violation() {
             ..MemoryDeclarations::default()
         },
     );
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
 
     assert!(
         result.is_err(),
@@ -85,7 +85,7 @@ fn test_validate_passes_when_graph_rule_is_satisfied() {
             ..MemoryDeclarations::default()
         },
     );
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
 
     assert!(
         result.is_ok(),
@@ -122,7 +122,7 @@ assert = { dependency-shape = { target = { type = "story" }, mode = "should" } }
             ..MemoryDeclarations::default()
         },
     );
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
 
     assert!(
         result.is_ok(),
@@ -163,7 +163,7 @@ assert = { label-coverage = { } }
             ..MemoryDeclarations::default()
         },
     );
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
 
     assert!(
         result.is_err(),
@@ -205,7 +205,7 @@ assert = { label-coverage = { child-link = "bogus" } }
             ..MemoryDeclarations::default()
         },
     );
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
 
     assert!(result.is_err(), "rule load error must fail validation");
     assert!(

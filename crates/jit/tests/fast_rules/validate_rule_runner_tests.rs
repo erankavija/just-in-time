@@ -3,7 +3,7 @@
 //! exit-code threading (issue b8ba1b10).
 //!
 //! The pure local/graph engines are unit-tested in their own modules; these are
-//! wiring tests over `CommandExecutor::run_rules` / `explain_rules` proving the
+//! wiring tests over `ValidationOps::run_rules` / `explain_rules` proving the
 //! production orchestration loads the ruleset, scopes correctly, and reports
 //! findings with the right severity.
 //!
@@ -58,7 +58,7 @@ fn test_per_issue_local_rule_fails() {
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.run_rules(Some(&id)).unwrap();
+    let report = executor.validation().run_rules(Some(&id)).unwrap();
 
     assert!(report.has_errors(), "missing req:* label is an error");
     assert_eq!(report.error_count(), 1);
@@ -83,7 +83,7 @@ fn test_per_issue_local_rule_passes() {
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.run_rules(Some(&id)).unwrap();
+    let report = executor.validation().run_rules(Some(&id)).unwrap();
 
     // The user rule is satisfied: no `epic-needs-req` finding. (Default rules may
     // independently flag the scaffolded-config namespaces; out of scope here.)
@@ -107,7 +107,7 @@ fn test_whole_repo_collects_local_findings_for_all_issues() {
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.run_rules(None).unwrap();
+    let report = executor.validation().run_rules(None).unwrap();
 
     assert_eq!(report.error_count(), 2, "both epics fail: {report:?}");
     assert!(report.has_errors());
@@ -139,7 +139,7 @@ assert = { dependency-shape = { target = { type = "story" }, mode = "must" } }
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.run_rules(Some(&task_id)).unwrap();
+    let report = executor.validation().run_rules(Some(&task_id)).unwrap();
 
     assert!(report.has_errors(), "graph rule fires for the task");
     assert!(report
@@ -162,7 +162,7 @@ fn test_explain_lists_matched_rules_and_outcomes() {
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.explain_rules(&id).unwrap();
+    let report = executor.validation().explain_rules(&id).unwrap();
 
     assert_eq!(report.issue_id, id);
     // The effective set also contains always-on default rules (e.g. label-format);
@@ -195,7 +195,7 @@ fn test_explain_passing_rule_marks_pass() {
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.explain_rules(&id).unwrap();
+    let report = executor.validation().explain_rules(&id).unwrap();
 
     // The USER rule passes for a compliant epic; assert on it by name (default
     // rules derived from the scaffolded config are evaluated alongside it).
@@ -224,7 +224,7 @@ fn test_explain_non_matching_rule_is_reported_as_skipped() {
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.explain_rules(&id).unwrap();
+    let report = executor.validation().explain_rules(&id).unwrap();
 
     // The epic-selected USER rule does not match a task, but is now STILL listed
     // as a skipped outcome carrying the reason its selector excluded the issue.
@@ -272,7 +272,7 @@ assert = { require-section = { heading = "Plan" } }
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.explain_rules(&id).unwrap();
+    let report = executor.validation().explain_rules(&id).unwrap();
 
     let outcome = report
         .outcomes
@@ -315,7 +315,7 @@ assert = { require-section = { heading = "Summary" } }
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.explain_rules(&id).unwrap();
+    let report = executor.validation().explain_rules(&id).unwrap();
 
     let outcome = report
         .outcomes
@@ -362,7 +362,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
             ..MemoryDeclarations::default()
         },
     );
-    let report = executor.run_rules(Some(&id)).unwrap();
+    let report = executor.validation().run_rules(Some(&id)).unwrap();
 
     assert!(!report.has_errors(), "warn never fails validate");
     assert_eq!(report.error_count(), 0);

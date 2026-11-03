@@ -75,14 +75,16 @@ pub use batch_create::{
 pub use bootstrap::{open_repository, OpenedRepository, RecoveryFailedError, RepositoryInvocation};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use claim::ClaimOps;
-pub use config::{resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigSetOutcome};
+pub use config::{
+    resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigOps, ConfigSetOutcome,
+};
 pub use document::DocumentOps;
 pub use gate::{
     FieldEdit, GateNotRequiredError, GateOps, GatePassAllEntry, GatePassFailed, GatePassOutcome,
     GateUpdate, ManualGateAttestationRequiredError, PassAllOutcome,
 };
 pub use gate_check::VerdictSource;
-pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
+pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat, GraphOps};
 pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueLocalUpdate, IssueOps};
@@ -99,6 +101,7 @@ pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
     TemplateDelta,
 };
+pub use validate::ValidationOps;
 pub(crate) use validate::{find_planning_node, planning_node_plan_path, validate_claims_index_at};
 pub use validate::{DANGLING_LINK_RULE, ENFORCEMENT_DRIFT_RULE, REVIEW_PLACEHOLDER_RULE};
 

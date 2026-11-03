@@ -167,13 +167,13 @@ fn build_scenario(h: &TestHarness) -> Scenario {
 
     // E → {c1, c2, B}; children → B; B → P; c1 → ext (boundary); E2 → ext.
     for dep in [&c1, &c2, &b] {
-        h.executor.add_dependency(&e, dep).unwrap();
+        h.executor.graph().add_dependency(&e, dep).unwrap();
     }
-    h.executor.add_dependency(&c1, &b).unwrap();
-    h.executor.add_dependency(&c2, &b).unwrap();
-    h.executor.add_dependency(&b, &p).unwrap();
-    h.executor.add_dependency(&c1, &ext).unwrap();
-    h.executor.add_dependency(&e2, &ext).unwrap();
+    h.executor.graph().add_dependency(&c1, &b).unwrap();
+    h.executor.graph().add_dependency(&c2, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &p).unwrap();
+    h.executor.graph().add_dependency(&c1, &ext).unwrap();
+    h.executor.graph().add_dependency(&e2, &ext).unwrap();
 
     Scenario {
         e,
@@ -199,7 +199,7 @@ fn test_batch_export_scope_projects_membership_and_lifts_type() {
     let h = TestHarness::new();
     let s = build_scenario(&h);
 
-    let export = h.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
     let keys: Vec<String> = export.defs.iter().map(|d| d.key.clone()).collect();
 
     // Only the non-bracket in-scope nodes: E, c1, c2 (ext is out of scope),
@@ -232,7 +232,7 @@ fn test_batch_export_strips_identity_bound_labels_keeps_generic() {
     let h = TestHarness::new();
     let s = build_scenario(&h);
 
-    let export = h.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
     let c1_def = def_for(&export.defs, &s.c1);
 
     assert_eq!(c1_def.r#type.as_deref(), Some("task"));
@@ -246,7 +246,7 @@ fn test_batch_export_excludes_bracket_nodes_and_their_edges() {
     let h = TestHarness::new();
     let s = build_scenario(&h);
 
-    let export = h.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
     let keys: Vec<String> = export.defs.iter().map(|d| d.key.clone()).collect();
 
     assert!(!keys.contains(&short(&s.b)), "breakdown node exported");
@@ -270,7 +270,7 @@ fn test_batch_export_reports_boundary_edges() {
     let h = TestHarness::new();
     let s = build_scenario(&h);
 
-    let export = h.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
 
     assert_eq!(export.boundary_edges.len(), 1);
     let edge = &export.boundary_edges[0];
@@ -306,7 +306,7 @@ fn test_batch_export_omits_lifecycle_and_includes_all_states() {
         )
         .unwrap();
 
-    let export = h.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
     let keys: Vec<String> = export.defs.iter().map(|d| d.key.clone()).collect();
     assert!(keys.contains(&short(&s.c2)), "rejected node dropped");
 
@@ -335,7 +335,11 @@ fn test_scoped_graph_exports_carry_no_out_of_scope_edges() {
         GraphExportFormat::Dot,
         GraphExportFormat::Mermaid,
     ] {
-        let output = h.executor.export_graph(format, false, Some(&s.e)).unwrap();
+        let output = h
+            .executor
+            .graph()
+            .export_graph(format, false, Some(&s.e))
+            .unwrap();
         assert!(
             output.contains(s.c1.as_str()),
             "{format:?}: in-scope node c1 must be exported"
@@ -349,6 +353,7 @@ fn test_scoped_graph_exports_carry_no_out_of_scope_edges() {
     // The full-record JSON shape shares the same edges list.
     let full = h
         .executor
+        .graph()
         .export_graph(GraphExportFormat::Json, true, Some(&s.e))
         .unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&full).unwrap();
@@ -368,7 +373,7 @@ fn test_batch_export_whole_graph_without_scope() {
     let h = TestHarness::new();
     let s = build_scenario(&h);
 
-    let export = h.executor.export_graph_batch(None).unwrap();
+    let export = h.executor.graph().export_graph_batch(None).unwrap();
     let keys: std::collections::HashSet<String> =
         export.defs.iter().map(|d| d.key.clone()).collect();
 
@@ -392,7 +397,11 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
     // priorities, gates, in-scope edges) and passes repository validation.
     let source = TestHarness::new();
     let s = build_scenario(&source);
-    let export = source.executor.export_graph_batch(Some(&s.e)).unwrap();
+    let export = source
+        .executor
+        .graph()
+        .export_graph_batch(Some(&s.e))
+        .unwrap();
 
     let fresh = TestHarness::new();
     configure(&fresh);
@@ -442,7 +451,7 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
     assert_eq!(c1_new.dependencies.len(), 0);
 
     // The recreated repository passes whole-repo validation.
-    let report = fresh.executor.run_rules(None).unwrap();
+    let report = fresh.executor.validation().run_rules(None).unwrap();
     assert!(
         !report.has_errors(),
         "fresh repo failed validation: {:?}",

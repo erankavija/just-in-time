@@ -1698,7 +1698,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         jit::config_manager::ConfigManager::invocation_write_override()?;
     let jit::commands::OpenedRepository {
         retained_session: mut retained_mutation_session,
-        mut executor,
+        executor,
         data_root: jit_dir,
         worktree_paths,
         layout: executor_layout,
@@ -2111,7 +2111,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         // (acknowledged intentional orphan).
                         if !force && !quiet {
                             let issues = storage.list_issues()?;
-                            let graph_findings = executor.evaluate_graph_rules(&issues)?;
+                            let graph_findings =
+                                executor.validation().evaluate_graph_rules(&issues)?;
                             for gf in graph_findings.iter().filter(|gf| {
                                 gf.issue_id.as_ref() == Some(&id)
                                     && !(orphan && gf.finding.rule == "orphan-leaf")
@@ -3094,7 +3095,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     ),
                 };
                 match resolve_dependency_args(&storage, &from_id, &to_ids).and_then(|to_ids| {
-                    executor.add_dependencies_with_policy(&from_id, &to_ids, policy)
+                    executor
+                        .graph()
+                        .add_dependencies_with_policy(&from_id, &to_ids, policy)
                 }) {
                     Ok(result) => {
                         for warning in &result.warnings {
@@ -3174,7 +3177,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 };
                 match resolve_dependency_removal_args(&storage, &from_id, &to_ids).and_then(
                     |(to_ids, unmatched)| {
-                        let result = executor.remove_dependencies(&from_id, &to_ids)?;
+                        let result = executor.graph().remove_dependencies(&from_id, &to_ids)?;
                         for warning in &result.warnings {
                             output_ctx.print_warning(warning)?;
                         }
@@ -4628,7 +4631,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // For JSON output, use tree structure
                     use jit::output::{GraphDepsTreeResponse, JsonOutput};
 
-                    let tree = executor.build_dependency_tree(&id, depth)?;
+                    let tree = executor.graph().build_dependency_tree(&id, depth)?;
                     let summary = jit::commands::graph::compute_dependency_summary(&tree);
 
                     let response = GraphDepsTreeResponse::with_extras(
@@ -4644,7 +4647,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     println!("{}", output.to_json_string()?);
                 } else {
                     // For human output, use tree structure
-                    let tree = executor.build_dependency_tree(&id, depth)?;
+                    let tree = executor.graph().build_dependency_tree(&id, depth)?;
                     let depth_str = match depth {
                         0 => "all transitive".to_string(),
                         1 => "immediate".to_string(),
@@ -4673,7 +4676,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             GraphCommands::Rdeps { id, depth } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let id = resolve_issue_arg(&storage, &id)?;
-                let issues = executor.show_rdeps_with_depth(&id, depth)?;
+                let issues = executor.graph().show_rdeps_with_depth(&id, depth)?;
                 if json {
                     use jit::domain::MinimalIssue;
                     use jit::output::{GraphDownstreamResponse, JsonOutput};
@@ -4700,7 +4703,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             GraphCommands::Roots => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.show_roots()?;
+                let issues = executor.graph().show_roots()?;
                 if json {
                     use jit::domain::MinimalIssue;
                     use jit::output::{GraphRootsResponse, JsonOutput};
@@ -4725,7 +4728,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let root = root
                     .map(|root| resolve_issue_arg(&storage, &root))
                     .transpose()?;
-                let response = executor.resolve_hierarchy_tree(root.as_ref())?;
+                let response = executor.graph().resolve_hierarchy_tree(root.as_ref())?;
 
                 if json {
                     use jit::output::JsonOutput;
@@ -4801,7 +4804,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 // `batch` runs a distinct projection (issue definitions plus
                 // reported boundary edges); every other format renders the graph.
                 let graph_output = if format == GraphExportFormat::Batch {
-                    let export = executor.export_graph_batch(scope.as_ref())?;
+                    let export = executor.graph().export_graph_batch(scope.as_ref())?;
                     // Boundary edges never join the array (it must stay a clean
                     // batch-create payload); they are reported to stderr so no
                     // crossing edge is dropped silently (REQ-06).
@@ -4816,11 +4819,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                     serde_json::to_string_pretty(&export.defs)?
                 } else {
-                    executor.export_graph(format, full, scope.as_ref())?
+                    executor
+                        .graph()
+                        .export_graph(format, full, scope.as_ref())?
                 };
 
                 if let Some(path) = output {
-                    executor.publish_graph_export(
+                    executor.graph().publish_graph_export(
                         &current_dir,
                         std::path::Path::new(&path),
                         graph_output.as_bytes(),
@@ -5686,7 +5691,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                     jit::cli::QueryCommands::Divergence => {
                         let output_ctx = OutputContext::new(quiet, json);
-                        let report = executor.detect_divergences()?;
+                        let report = executor.graph().detect_divergences()?;
 
                         if json {
                             let msg = format!("{} divergence(s)", report.count());
@@ -5757,7 +5762,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             jit::cli::ConfigCommands::Show => {
                 use jit::output::JsonOutput;
 
-                let snapshot = executor.effective_config_snapshot()?;
+                let snapshot = executor.config().effective_config_snapshot()?;
 
                 if json {
                     println!(
@@ -5775,7 +5780,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::output::{render_config_get_value, ErrorCode, JsonOutput};
                 use serde_json::json;
 
-                match executor.get_config(&key) {
+                match executor.config().get_config(&key) {
                     Ok(outcome) => {
                         if json {
                             println!(
@@ -5817,7 +5822,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 use jit::output::JsonOutput;
                 use serde_json::json;
 
-                let outcome = executor.set_config(&key, &value)?;
+                let outcome = executor.config().set_config(&key, &value)?;
 
                 if json {
                     println!(
@@ -6102,7 +6107,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         }
         Commands::Status => {
             let output_ctx = OutputContext::new(quiet, json);
-            let summary = executor.get_status()?;
+            let summary = executor.validation().get_status()?;
 
             if json {
                 let msg = format!(
@@ -6201,7 +6206,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // error-severity finding, 0 when clean.
             if let Some(container) = scope.as_deref() {
                 let container = resolve_issue_arg(&storage, container)?;
-                let report = executor.validate_scope(&container)?;
+                let report = executor.validation().validate_scope(&container)?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -6238,7 +6243,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // positional issue as its sole firing subject. The command keeps the
             // same report and exit contract as per-issue validation.
             if let (Some(rule_name), Some(issue_id)) = (rule.as_deref(), id.as_ref()) {
-                let report = executor.validate_rule(issue_id, rule_name)?;
+                let report = executor.validation().validate_rule(issue_id, rule_name)?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -6278,7 +6283,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
             // --explain path: report matched selectors -> rule names -> outcomes.
             if let (true, Some(issue_id)) = (explain, id.as_ref()) {
-                let report = executor.explain_rules(issue_id)?;
+                let report = executor.validation().explain_rules(issue_id)?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -6344,7 +6349,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // (`--fix`/`--branch-drift`/`--leases` + id) were already rejected above,
             // so a present id here is always a pure per-issue rule run.
             if id.is_some() {
-                let report = executor.run_rules(id.as_ref())?;
+                let report = executor.validation().run_rules(id.as_ref())?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -6379,7 +6384,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let mut validation_results = Vec::new();
 
                 if branch_drift {
-                    match executor.validate_branch_drift() {
+                    match executor.validation().validate_branch_drift() {
                         Ok(()) => {
                             if !json {
                                 println!("Branch is up-to-date with origin/main");
@@ -6398,7 +6403,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
 
                 if leases {
-                    match executor.validate_leases() {
+                    match executor.validation().validate_leases() {
                         Ok(invalid_leases) => {
                             if invalid_leases.is_empty() {
                                 if !json {
@@ -6466,7 +6471,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             // Standard repository validation (existing code)
             if fix {
                 // Use auto-fix mode
-                let (fixes_applied, messages) = match executor.validate_with_fix(true, dry_run) {
+                let (fixes_applied, messages) = match executor
+                    .validation()
+                    .validate_with_fix(true, dry_run)
+                {
                     Ok(result) => result,
                     Err(error) if json => {
                         let json_error = validate_fix_json_error(&error);
@@ -6514,8 +6522,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 // Wrap any integrity violation in the typed ValidationFailedError
                 // (message preserved verbatim) so the top-level handler classifies
                 // it as a validation failure by downcast rather than by message text.
-                let (validation_report, divergence_report) =
-                    executor.validate_repository_report_with_divergences()?;
+                let (validation_report, divergence_report) = executor
+                    .validation()
+                    .validate_repository_report_with_divergences()?;
                 let (integrity_error, rule_report) = match validation_report {
                     Ok(report) => (None, report.rule_report),
                     Err(failure) => {
@@ -7513,7 +7522,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 )?;
 
                 if !force {
-                    executor.validate_silent()?;
+                    executor.validation().validate_silent()?;
                 }
 
                 let (result, warnings) = executor.archive().export_snapshot(

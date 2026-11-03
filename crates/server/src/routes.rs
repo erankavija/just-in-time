@@ -322,7 +322,7 @@ pub struct StatusResponse {
 async fn get_status<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<StatusResponse>, StatusCode> {
-    let summary = state.executor.get_status().map_err(|e| {
+    let summary = state.executor.validation().get_status().map_err(|e| {
         tracing::error!("Failed to get status: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -1402,7 +1402,10 @@ mod tests {
         };
         let dependency = create("Dependency");
         let dependent = create("Dependent");
-        executor.add_dependency(&dependent, &dependency).unwrap();
+        executor
+            .graph()
+            .add_dependency(&dependent, &dependency)
+            .unwrap();
         let state = AppState {
             executor,
             tracker: Arc::new(ChangeTracker::new(16)),
@@ -1504,7 +1507,7 @@ mod tests {
             )
             .unwrap();
 
-        executor.add_dependency(&id2, &id1).unwrap();
+        executor.graph().add_dependency(&id2, &id1).unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1572,7 +1575,7 @@ mod tests {
         let (id1, id2) = (new("Issue 1"), new("Issue 2"));
         new("Issue 3");
         // One edge over three nodes, so a `count` of edges could not pass.
-        executor.add_dependency(&id2, &id1).unwrap();
+        executor.graph().add_dependency(&id2, &id1).unwrap();
 
         let state = AppState {
             executor,
@@ -1625,7 +1628,7 @@ mod tests {
         let leaf_type = taxonomy.type_at_level(4);
         let container = new("Container", vec![format!("type:{container_type}")]);
         let leaf = new("Leaf", vec![format!("type:{leaf_type}")]);
-        executor.add_dependency(&container, &leaf).unwrap();
+        executor.graph().add_dependency(&container, &leaf).unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {

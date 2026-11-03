@@ -115,6 +115,7 @@ fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
 
     let issues = executor.storage().list_issues().unwrap();
     let warnings: Vec<_> = executor
+        .validation()
         .evaluate_graph_rules(&issues)
         .unwrap()
         .into_iter()

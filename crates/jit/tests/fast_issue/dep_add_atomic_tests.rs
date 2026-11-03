@@ -22,12 +22,12 @@ fn test_self_redundant_sibling_blocks_valid_edge_and_logs_nothing() {
     let d = h.create_issue("D");
 
     // A already reaches C via A -> B -> C, so a direct A -> C is self-redundant.
-    h.executor.add_dependency(&a, &b).unwrap();
-    h.executor.add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
 
     let events_before = h.storage.read_events().unwrap().len();
 
-    let result = h.executor.add_dependencies_with_policy(
+    let result = h.executor.graph().add_dependencies_with_policy(
         &a,
         &[d.clone(), c.clone()],
         jit::commands::RedundancyPolicy::Reject,
@@ -70,10 +70,10 @@ fn test_multiple_invalid_edges_are_all_named() {
     // Pre-existing B -> C: a fresh A -> C is self-redundant only once A -> B
     // is also requested, but here we pair it with an entirely different
     // failure class (an unresolvable id) to prove both get named.
-    h.executor.add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
     let absent = issue_id(1);
 
-    let result = h.executor.add_dependencies_with_policy(
+    let result = h.executor.graph().add_dependencies_with_policy(
         &a,
         &[b.clone(), c.clone(), absent.clone()],
         jit::commands::RedundancyPolicy::Reject,
@@ -112,11 +112,15 @@ fn test_mixed_batch_rejections_preserve_request_order() {
     let a = h.create_issue("A");
     let cycle_target = h.create_issue("Cycle target");
 
-    h.executor.add_dependency(&cycle_target, &a).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&cycle_target, &a)
+        .unwrap();
     let absent = issue_id(1);
 
     let error = h
         .executor
+        .graph()
         .add_dependencies_with_policy(
             &a,
             &[cycle_target.clone(), absent.clone()],
@@ -149,10 +153,10 @@ fn test_shadow_redundancy_attributed_only_to_responsible_edge_not_innocent_sibli
     let z = h.create_issue("Z");
     let w = h.create_issue("W");
 
-    h.executor.add_dependency(&x, &y).unwrap();
-    h.executor.add_dependency(&x, &z).unwrap();
+    h.executor.graph().add_dependency(&x, &y).unwrap();
+    h.executor.graph().add_dependency(&x, &z).unwrap();
 
-    let result = h.executor.add_dependencies_with_policy(
+    let result = h.executor.graph().add_dependencies_with_policy(
         &y,
         &[z.clone(), w.clone()],
         jit::commands::RedundancyPolicy::Reject,
@@ -191,11 +195,11 @@ fn test_cycle_failure_does_not_suppress_sibling_redundancy_check() {
     let c = h.create_issue("C");
     let d = h.create_issue("D");
 
-    h.executor.add_dependency(&a, &b).unwrap();
-    h.executor.add_dependency(&b, &c).unwrap();
-    h.executor.add_dependency(&d, &a).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&d, &a).unwrap();
 
-    let result = h.executor.add_dependencies_with_policy(
+    let result = h.executor.graph().add_dependencies_with_policy(
         &a,
         &[d.clone(), c.clone()],
         jit::commands::RedundancyPolicy::Reject,
@@ -238,13 +242,13 @@ fn test_cycle_only_failure_runs_redundancy_pass_without_spurious_rejection() {
     let d = h.create_issue("D");
     let e = h.create_issue("E");
 
-    h.executor.add_dependency(&a, &b).unwrap();
-    h.executor.add_dependency(&b, &c).unwrap();
-    h.executor.add_dependency(&d, &a).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&d, &a).unwrap();
 
     // D -> A would cycle (D already depends on A); E is a fresh, unrelated
     // issue with no redundancy of its own.
-    let result = h.executor.add_dependencies_with_policy(
+    let result = h.executor.graph().add_dependencies_with_policy(
         &a,
         &[d.clone(), e.clone()],
         jit::commands::RedundancyPolicy::Reject,
@@ -289,18 +293,19 @@ fn test_combination_redundancy_neither_edge_alone_would_trigger() {
 
     // Pre-existing B -> C. A has no dependencies yet, so A -> C alone would
     // NOT be redundant (A has no other route to C yet).
-    h.executor.add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
 
     // Confirm A -> C is fine in isolation against the pre-existing graph.
     let (result, _) = h
         .executor
+        .graph()
         .add_dependency_with_policy(&a, &c, jit::commands::RedundancyPolicy::Reject)
         .expect("A -> C alone is not redundant against the pre-existing graph");
     assert_eq!(result, jit::commands::DependencyAddResult::Added);
     // Undo it so the batch call below starts from a clean slate.
-    h.executor.remove_dependency(&a, &c).unwrap();
+    h.executor.graph().remove_dependency(&a, &c).unwrap();
 
-    let result = h.executor.add_dependencies_with_policy(
+    let result = h.executor.graph().add_dependencies_with_policy(
         &a,
         &[b.clone(), c.clone()],
         jit::commands::RedundancyPolicy::Reject,
@@ -333,6 +338,7 @@ fn test_all_valid_batch_applies_everything_with_one_event() {
 
     let result = h
         .executor
+        .graph()
         .add_dependencies(&a, &[b.clone(), c.clone()])
         .unwrap();
     assert_eq!(result.added.len(), 2);
@@ -377,13 +383,14 @@ fn test_reduce_policy_variadic_skips_redundant_and_adds_valid() {
     let c = h.create_issue("C");
     let d = h.create_issue("D");
 
-    h.executor.add_dependency(&a, &b).unwrap();
-    h.executor.add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
 
     // D is a fresh, non-redundant edge; C is self-redundant (A already
     // reaches C via A -> B -> C).
     let result = h
         .executor
+        .graph()
         .add_dependencies_with_policy(
             &a,
             &[d.clone(), c.clone()],
@@ -400,7 +407,7 @@ fn test_reduce_policy_variadic_skips_redundant_and_adds_valid() {
     assert!(loaded_a.dependencies.contains(&b));
     assert!(!loaded_a.dependencies.contains(&c));
 
-    assert!(h.executor.validate_silent().is_ok());
+    assert!(h.executor.validation().validate_silent().is_ok());
 }
 
 /// `--reduce` interplay: a batch shadowing a PRE-EXISTING edge on another
@@ -413,12 +420,13 @@ fn test_reduce_policy_drops_shadowed_edge_on_other_issue() {
     let y = h.create_issue("Y");
     let z = h.create_issue("Z");
 
-    h.executor.add_dependency(&x, &y).unwrap();
-    h.executor.add_dependency(&x, &z).unwrap();
+    h.executor.graph().add_dependency(&x, &y).unwrap();
+    h.executor.graph().add_dependency(&x, &z).unwrap();
 
     // Y -> Z makes the pre-existing X -> Z redundant (X reaches Z via X->Y->Z).
     let result = h
         .executor
+        .graph()
         .add_dependencies_with_policy(
             &y,
             std::slice::from_ref(&z),
@@ -438,5 +446,5 @@ fn test_reduce_policy_drops_shadowed_edge_on_other_issue() {
         "expected a dependency_reduced event on X"
     );
 
-    assert!(h.executor.validate_silent().is_ok());
+    assert!(h.executor.validation().validate_silent().is_ok());
 }

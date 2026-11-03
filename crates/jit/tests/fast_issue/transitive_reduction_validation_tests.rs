@@ -15,8 +15,8 @@ fn test_fix_transitive_reduction_logs_event() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.add_dependency(&b, &c).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
 
     // Manually inject redundant edge
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -26,8 +26,11 @@ fn test_fix_transitive_reduction_logs_event() {
     let events_before = h.storage.read_events().unwrap().len();
 
     // Apply fix
-    let mut executor = h.executor;
-    let (fixes_applied, _) = executor.validate_with_fix(true, false).unwrap();
+    let executor = h.executor;
+    let (fixes_applied, _) = executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes_applied, 1);
 
     // Verify a DependencyReduced event was logged
@@ -64,8 +67,8 @@ fn test_detect_transitive_redundancy() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.add_dependency(&b, &c).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
 
     // Manually add redundant edge (bypassing reduction logic)
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -73,7 +76,7 @@ fn test_detect_transitive_redundancy() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Validate should detect it
-    let result = h.executor.validate_silent();
+    let result = h.executor.validation().validate_silent();
     assert!(result.is_err(), "Should detect redundant dependency");
     let err_msg = result.unwrap_err().to_string();
     assert!(
@@ -92,8 +95,8 @@ fn test_fix_transitive_redundancy() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.add_dependency(&b, &c).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
 
     // Add redundant edge
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -101,8 +104,11 @@ fn test_fix_transitive_redundancy() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Fix with validate --fix
-    let mut executor = h.executor;
-    let (fixes_applied, _messages) = executor.validate_with_fix(true, false).unwrap();
+    let executor = h.executor;
+    let (fixes_applied, _messages) = executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert!(fixes_applied > 0, "Should apply at least one fix");
 
     // Verify C was removed from A's dependencies
@@ -128,9 +134,9 @@ fn test_validate_reports_all_redundancies() {
     let c = h.create_issue("C");
     let d = h.create_issue("D");
 
-    h.executor.add_dependency(&b, &c).unwrap();
-    h.executor.add_dependency(&b, &d).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&b, &d).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
 
     // Add redundant edges
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -139,12 +145,15 @@ fn test_validate_reports_all_redundancies() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Validate should detect both
-    let result = h.executor.validate_silent();
+    let result = h.executor.validation().validate_silent();
     assert!(result.is_err(), "Should detect redundant dependencies");
 
     // Fix and verify both removed
-    let mut executor = h.executor;
-    let (fixes_applied, _messages) = executor.validate_with_fix(true, false).unwrap();
+    let executor = h.executor;
+    let (fixes_applied, _messages) = executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes_applied, 2, "Should fix both redundancies");
 
     let fixed_a = h.storage.load_issue(&a).unwrap();
@@ -163,13 +172,13 @@ fn test_no_false_positives_diamond_pattern() {
     let c = h.create_issue("C");
     let d = h.create_issue("D");
 
-    h.executor.add_dependency(&b, &d).unwrap();
-    h.executor.add_dependency(&c, &d).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
-    h.executor.add_dependency(&a, &c).unwrap();
+    h.executor.graph().add_dependency(&b, &d).unwrap();
+    h.executor.graph().add_dependency(&c, &d).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&a, &c).unwrap();
 
     // Validation should pass - no redundancies
-    let result = h.executor.validate_silent();
+    let result = h.executor.validation().validate_silent();
     assert!(result.is_ok(), "Diamond pattern should be valid");
 }
 
@@ -182,11 +191,11 @@ fn test_no_false_positives_independent_deps() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.add_dependency(&a, &b).unwrap();
-    h.executor.add_dependency(&a, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&a, &c).unwrap();
 
     // Validation should pass
-    let result = h.executor.validate_silent();
+    let result = h.executor.validation().validate_silent();
     assert!(result.is_ok(), "Independent dependencies should be valid");
 }
 
@@ -199,16 +208,16 @@ fn test_dry_run_does_not_modify() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.add_dependency(&b, &c).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
 
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
     jit::test_harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Dry run
-    let mut executor = h.executor;
-    let (fixes_count, _messages) = executor.validate_with_fix(true, true).unwrap();
+    let executor = h.executor;
+    let (fixes_count, _messages) = executor.validation().validate_with_fix(true, true).unwrap();
     assert!(fixes_count > 0, "Should report fixes available");
 
     // Verify nothing was modified
@@ -230,9 +239,9 @@ fn test_complex_chain_reduction() {
     let c = h.create_issue("C");
     let d = h.create_issue("D");
 
-    h.executor.add_dependency(&c, &d).unwrap();
-    h.executor.add_dependency(&b, &c).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&c, &d).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
 
     // Add redundant edge (A can reach D via B→C→D)
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -240,8 +249,11 @@ fn test_complex_chain_reduction() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_a);
 
     // Fix
-    let mut executor = h.executor;
-    let _ = executor.validate_with_fix(true, false).unwrap();
+    let executor = h.executor;
+    let _ = executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
 
     // Verify
     let fixed_a = h.storage.load_issue(&a).unwrap();
@@ -264,10 +276,10 @@ fn test_multiple_issues_with_redundancies() {
     let f = h.create_issue("F");
 
     // Setup chains
-    h.executor.add_dependency(&b, &c).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
-    h.executor.add_dependency(&e, &f).unwrap();
-    h.executor.add_dependency(&d, &e).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&e, &f).unwrap();
+    h.executor.graph().add_dependency(&d, &e).unwrap();
 
     // Add redundant edges
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -279,8 +291,11 @@ fn test_multiple_issues_with_redundancies() {
     jit::test_harness::seed_memory_issue(&h.storage, &issue_d);
 
     // Fix both
-    let mut executor = h.executor;
-    let (fixes_applied, _messages) = executor.validate_with_fix(true, false).unwrap();
+    let executor = h.executor;
+    let (fixes_applied, _messages) = executor
+        .validation()
+        .validate_with_fix(true, false)
+        .unwrap();
     assert_eq!(fixes_applied, 2, "Should fix both issues");
 
     // Verify both fixed
@@ -315,12 +330,13 @@ fn test_dep_add_rejects_edge_that_shadows_existing_edge() {
     let c = h.create_issue("C");
 
     // A → C and A → B exist (no redundancy yet).
-    h.executor.add_dependency(&a, &c).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&a, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
 
     // Adding B → C makes A → C redundant (A reaches C via A → B → C).
     let err = h
         .executor
+        .graph()
         .add_dependency_with_policy(&b, &c, RedundancyPolicy::Reject)
         .expect_err("redundant add must be rejected");
     let msg = err.to_string();
@@ -353,12 +369,13 @@ fn test_dep_add_rejects_self_redundant_edge() {
     let c = h.create_issue("C");
 
     // B → C and A → B exist.
-    h.executor.add_dependency(&b, &c).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&b, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
 
     // A → C is itself redundant (A reaches C via A → B → C).
     let err = h
         .executor
+        .graph()
         .add_dependency_with_policy(&a, &c, RedundancyPolicy::Reject)
         .expect_err("self-redundant add must be rejected");
     let msg = err.to_string();
@@ -383,12 +400,13 @@ fn test_dep_add_reduce_drops_shadowed_edge() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.add_dependency(&a, &c).unwrap();
-    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.graph().add_dependency(&a, &c).unwrap();
+    h.executor.graph().add_dependency(&a, &b).unwrap();
 
     // Add B → C with --reduce: succeeds and drops the shadowed A → C.
     let (result, _warnings) = h
         .executor
+        .graph()
         .add_dependency_with_policy(&b, &c, RedundancyPolicy::Reduce)
         .expect("reduce add must succeed");
     assert_eq!(result, jit::commands::DependencyAddResult::Added);
@@ -410,7 +428,7 @@ fn test_dep_add_reduce_drops_shadowed_edge() {
 
     // Graph is transitively reduced.
     assert!(
-        h.executor.validate_silent().is_ok(),
+        h.executor.validation().validate_silent().is_ok(),
         "graph must be transitively reduced after --reduce add"
     );
 }
@@ -425,12 +443,13 @@ fn test_dep_add_reduce_background_scenario_leaves_validate_clean() {
     let y = h.create_issue("Y");
     let z = h.create_issue("Z");
 
-    h.executor.add_dependency(&x, &y).unwrap();
-    h.executor.add_dependency(&x, &z).unwrap();
+    h.executor.graph().add_dependency(&x, &y).unwrap();
+    h.executor.graph().add_dependency(&x, &z).unwrap();
 
     // Adding Y → Z makes the pre-existing X → Z redundant (X reaches Z via X→Y→Z).
     let (result, _warnings) = h
         .executor
+        .graph()
         .add_dependency_with_policy(&y, &z, RedundancyPolicy::Reduce)
         .expect("reduce add must succeed");
     assert_eq!(result, jit::commands::DependencyAddResult::Added);
@@ -449,7 +468,7 @@ fn test_dep_add_reduce_background_scenario_leaves_validate_clean() {
 
     // A later validate must be clean — no distant violation possible.
     assert!(
-        h.executor.validate_silent().is_ok(),
+        h.executor.validation().validate_silent().is_ok(),
         "validate must be clean after the reduce add"
     );
 }
@@ -464,11 +483,12 @@ fn test_dep_add_non_redundant_edge_still_added_and_validate_clean() {
 
     let (result, _warnings) = h
         .executor
+        .graph()
         .add_dependency_with_policy(&a, &b, RedundancyPolicy::Reject)
         .expect("non-redundant add must succeed even under Reject");
     assert_eq!(result, jit::commands::DependencyAddResult::Added);
 
     let loaded_a = h.storage.load_issue(&a).unwrap();
     assert!(loaded_a.dependencies.contains(&b));
-    assert!(h.executor.validate_silent().is_ok());
+    assert!(h.executor.validation().validate_silent().is_ok());
 }
