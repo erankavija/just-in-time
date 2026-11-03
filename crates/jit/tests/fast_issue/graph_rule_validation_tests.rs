@@ -11,6 +11,15 @@ use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations}
 use jit::domain::State;
 use jit::storage::InMemoryStorage;
 
+fn with_default_rules(custom: &str) -> String {
+    let namespaces = jit::config_manager::namespaces_from_config(&toml::from_str("").unwrap());
+    let defaults = jit::repository_state::serialize_ruleset(
+        &jit::repository_state::default_ruleset(&namespaces),
+    )
+    .unwrap();
+    defaults.rules_toml + custom
+}
+
 /// A `dependency-shape` graph rule: every `type:task` must depend on a
 /// `type:story`. Error severity.
 const SHAPE_RULES: &str = r#"
@@ -41,7 +50,7 @@ fn test_validate_fails_on_error_severity_graph_rule_violation() {
         storage,
         MemoryDeclarations {
             config: Some(""),
-            rules: Some(SHAPE_RULES),
+            rules: Some(&with_default_rules(SHAPE_RULES)),
             after_initialization: true,
             ..MemoryDeclarations::default()
         },
@@ -80,7 +89,7 @@ fn test_validate_passes_when_graph_rule_is_satisfied() {
         storage,
         MemoryDeclarations {
             config: Some(""),
-            rules: Some(SHAPE_RULES),
+            rules: Some(&with_default_rules(SHAPE_RULES)),
             after_initialization: true,
             ..MemoryDeclarations::default()
         },
@@ -117,7 +126,7 @@ assert = { dependency-shape = { target = { type = "story" }, mode = "should" } }
         storage,
         MemoryDeclarations {
             config: Some(""),
-            rules: Some(warn_rules),
+            rules: Some(&with_default_rules(warn_rules)),
             after_initialization: true,
             ..MemoryDeclarations::default()
         },
@@ -158,7 +167,7 @@ assert = { label-coverage = { } }
         storage,
         MemoryDeclarations {
             config: Some(""),
-            rules: Some(coverage_rules),
+            rules: Some(&with_default_rules(coverage_rules)),
             after_initialization: true,
             ..MemoryDeclarations::default()
         },
