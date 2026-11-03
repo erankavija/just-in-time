@@ -567,15 +567,25 @@ fn test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found<B
     let empty = Repository::<B>::empty();
 
     assert_eq!(
-        recorded.store.load_gate_run_result(&run.run_id).unwrap(),
+        recorded
+            .store
+            .load_gate_run_result(&run.issue_id, &run.run_id)
+            .unwrap(),
         run
     );
     for error in [
         recorded
             .store
-            .load_gate_run_result(&crate::test_utils::gate_run_id(2))
+            .load_gate_run_result(&crate::test_utils::issue_id(164), &run.run_id)
             .unwrap_err(),
-        empty.store.load_gate_run_result(&run.run_id).unwrap_err(),
+        recorded
+            .store
+            .load_gate_run_result(&run.issue_id, &crate::test_utils::gate_run_id(2))
+            .unwrap_err(),
+        empty
+            .store
+            .load_gate_run_result(&run.issue_id, &run.run_id)
+            .unwrap_err(),
     ] {
         assert!(
             error.downcast_ref::<GateRunNotFoundError>().is_some(),
@@ -741,7 +751,10 @@ fn test_gate_run_readers_name_a_malformed_result<B: Backend>() {
     let repository = Repository::<B>::seeded(&[(path.clone(), "{ corrupt".to_string())]);
 
     for error in [
-        repository.store.load_gate_run_result(&run_id).unwrap_err(),
+        repository
+            .store
+            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+            .unwrap_err(),
         repository
             .store
             .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
@@ -784,7 +797,7 @@ fn test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape<B: Ba
         .is_empty());
     let named = repository
         .store
-        .load_gate_run_result(&direct_file)
+        .load_gate_run_result(&crate::test_utils::issue_id(1), &direct_file)
         .unwrap_err();
     assert!(
         format!("{named:#}").contains("ordinary directory"),
@@ -799,7 +812,10 @@ fn test_gate_run_readers_refuse_a_file_as_the_gate_run_root<B: Backend>() {
     for error in [
         repository
             .store
-            .load_gate_run_result(&crate::test_utils::gate_run_id(1))
+            .load_gate_run_result(
+                &crate::test_utils::issue_id(2),
+                &crate::test_utils::gate_run_id(1),
+            )
             .unwrap_err(),
         repository
             .store
@@ -822,7 +838,10 @@ fn test_gate_run_readers_refuse_a_directory_as_a_result<B: Backend>() {
     )]);
 
     for error in [
-        repository.store.load_gate_run_result(&run_id).unwrap_err(),
+        repository
+            .store
+            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+            .unwrap_err(),
         repository
             .store
             .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
