@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "976e3b932b5312e915c8e98d922d5f3cd823d3d0",
+  "completed_at": "2026-11-03T23:54:47.699389363Z",
+  "duration_ms": 182419,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The allocation-free matcher preserves canonical prefix semantics, and the updated property covers trailing-hyphen spellings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ea843d26-492a-44cc-8c10-15f19b8c8ce3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "af6c72e8-8de6-44c8-a094-7c622e7cda6a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T23:51:45.279542512Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9e2bbc586, 8b551e02e\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-07 and @/issue/ea843d26/requirement/REQ-03 (issue descriptions); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T23:50:48Z)\nTruncation recovery: Re-read the 8b551e02e patch and cumulative stat separately after a combined command omitted them.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The allocation-free matcher preserves canonical prefix semantics, and the updated property covers trailing-hyphen spellings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

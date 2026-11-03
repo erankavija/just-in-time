@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "e9a036f6-a2d1-42b7-8124-4aaa4675c552",
+      "run_id": "c972bc1c-ebd8-4098-b9c0-849b2c2fd024",
       "status": "passed",
-      "updated_at": "2026-11-03T23:38:38.996897311Z",
+      "updated_at": "2026-11-03T23:51:44.834545785Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "6c628f29-566e-48d6-93b5-7e3825eefac8",
-      "status": "failed",
-      "updated_at": "2026-11-03T23:44:36.241929097Z",
+      "run_id": "af6c72e8-8de6-44c8-a094-7c622e7cda6a",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:54:47.995942552Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue-id prefixes match without allocating",
-  "updated_at": "2026-11-03T23:44:36.241929097Z"
+  "updated_at": "2026-11-03T23:54:47.995942552Z"
 }
