@@ -45,7 +45,10 @@ fn count<S: IssueStore>(
     label: String,
 ) -> anyhow::Result<Outcome<CountResponse>> {
     let issues = ctx.executor.storage().list_issues()?.len();
-    Ok(Outcome::Success(CountResponse { label, issues }))
+    Ok(Outcome::Success {
+        response: CountResponse { label, issues },
+        message: None,
+    })
 }
 
 fn flag<S: IssueStore>(

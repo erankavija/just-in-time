@@ -32,8 +32,8 @@ impl<T: Serialize + HumanRender> Report for T {
 
 /// Render `outcome` under `mode` and return the process exit status.
 ///
-/// Success writes the success envelope (`--json`) or the response's human
-/// rendering to `out` and returns [`ExitCode::Success`]. Findings write the
+/// Success writes the success envelope with the outcome's `message`
+/// (`--json`) or the response's human rendering to `out` and returns [`ExitCode::Success`]. Findings write the
 /// failure envelope with the report as `error.details` (`--json`), or the
 /// report's rendering to `out` and one `Error:` diagnostic to `err`, and return
 /// the code's [`ErrorCode::exit_code`]. A closed pipe yields
@@ -45,11 +45,17 @@ pub fn emit_outcome<R: Response>(
     err: &mut dyn Write,
 ) -> anyhow::Result<ExitCode> {
     let (written, status) = match outcome {
-        Outcome::Success(response) if mode.json => (
-            writeln!(out, "{}", JsonOutput::success(response).to_json_string()?),
-            ExitCode::Success,
-        ),
-        Outcome::Success(response) => (
+        Outcome::Success { response, message } if mode.json => {
+            let envelope = JsonOutput {
+                data: response,
+                message: message.clone(),
+            };
+            (
+                writeln!(out, "{}", envelope.to_json_string()?),
+                ExitCode::Success,
+            )
+        }
+        Outcome::Success { response, .. } => (
             out.write_all(response.render_human().as_bytes()),
             ExitCode::Success,
         ),
@@ -106,9 +112,44 @@ mod tests {
     }
 
     #[test]
+    fn test_emit_outcome_success_json_carries_outcome_message_beside_response() {
+        #[derive(Serialize, JsonSchema)]
+        struct Named {
+            name: &'static str,
+        }
+        impl HumanRender for Named {
+            fn render_human(&self) -> String {
+                String::new()
+            }
+        }
+        let mut out = Vec::new();
+
+        emit_outcome(
+            &Outcome::Success {
+                response: Named { name: "n" },
+                message: Some("done".to_owned()),
+            },
+            OutputMode {
+                json: true,
+                quiet: false,
+            },
+            &mut out,
+            &mut io::sink(),
+        )
+        .unwrap();
+
+        let printed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        assert_eq!(printed["message"], "done");
+        assert_eq!(printed["name"], "n");
+    }
+
+    #[test]
     fn test_emit_outcome_closed_pipe_returns_broken_pipe_status() {
         let status = emit_outcome(
-            &Outcome::Success(Unit),
+            &Outcome::Success {
+                response: Unit,
+                message: None,
+            },
             OutputMode::default(),
             &mut ClosedPipe,
             &mut io::sink(),

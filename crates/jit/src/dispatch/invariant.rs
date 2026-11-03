@@ -18,7 +18,10 @@ fn check<S: IssueStore>(
             report: Box::new(result),
         }
     } else {
-        Outcome::Success(result)
+        Outcome::Success {
+            response: result,
+            message: Some("No enforcement drift".to_owned()),
+        }
     })
 }
 

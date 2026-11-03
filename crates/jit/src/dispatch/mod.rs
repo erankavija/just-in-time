@@ -10,7 +10,9 @@
 //! migrated group one arm,
 //! `return group::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr())`;
 //! the returned [`ExitCode`](crate::output::ExitCode) becomes the process
-//! status in `main()`.
+//! status in `main()`. A leaf whose `--json` success carries a top-level
+//! `message` returns it in [`Outcome::Success`]'s `message`, and the others
+//! pass `None`.
 
 use crate::commands::CommandExecutor;
 use crate::output::{ErrorCode, OutputMode, Report};
@@ -25,7 +27,12 @@ pub struct CommandContext<'a, S: IssueStore> {
 
 /// A handler's result, rendered by [`crate::output::emit_outcome`].
 pub enum Outcome<R> {
-    Success(R),
+    /// `message`, when present, is the `--json` success envelope's top-level
+    /// `message`; the human rendering ignores it.
+    Success {
+        response: R,
+        message: Option<String>,
+    },
     /// Findings that fail the command: `code` is the envelope code and exit
     /// status, and `report` is the envelope's `error.details`.
     Findings {
