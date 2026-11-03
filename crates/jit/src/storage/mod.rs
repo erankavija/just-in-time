@@ -290,7 +290,7 @@ pub trait IssueStore: Clone {
         Ok(self
             .read_events()?
             .into_iter()
-            .filter(|event| matches!(event.body(), EventBody::ArtifactArchiveExecuted { .. }))
+            .filter(|event| matches!(event.body(), EventBody::ArtifactArchiveExecuted(_)))
             .collect())
     }
 

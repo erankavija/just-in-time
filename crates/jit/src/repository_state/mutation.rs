@@ -367,10 +367,8 @@ pub enum MutationIntent {
         /// Prevalidated intra-batch dependency index pairs.
         dependencies: Vec<(usize, usize)>,
     },
-    /// Convergently claim `issue_id` for `agent`. Idempotent over both the
-    /// captured issue assignment and the captured event-log tail: a fully
-    /// reflected claim is a complete no-op; an issue assigned without its claim
-    /// event emits exactly the missing event; a duplicate event is never emitted.
+    /// Assign `issue_id` to `agent` and append `IssueClaimed`, or do nothing when
+    /// the captured issue is already assigned to `agent`.
     ClaimIssue {
         /// Canonical full issue id (the caller resolves short ids first).
         issue_id: IssueId,
@@ -638,39 +636,6 @@ fn captured_issue(image: &RepositoryImage, id: &IssueId) -> Result<Option<Issue>
     }
 }
 
-/// Parse the captured event log into known events.
-fn captured_events(image: &RepositoryImage) -> Result<Vec<Event>, MutationError> {
-    let path = VirtualPath::EVENTS;
-    let Some(bytes) = captured_file_bytes(image, &path)? else {
-        return Ok(Vec::new());
-    };
-    crate::domain::event_log::parse_known_events(bytes).map_err(|error| {
-        MutationError::MalformedRecord {
-            path: path.clone(),
-            reason: error.to_string(),
-        }
-    })
-}
-
-/// Whether the captured event tail already reflects `agent`'s claim of `issue_id`
-/// as the current assignment: the most recent assignment-affecting event for the
-/// issue is an `IssueClaimed` by `agent` with no later release.
-fn event_tail_reflects_claim(events: &[Event], issue_id: &IssueId, agent: &Assignee) -> bool {
-    events
-        .iter()
-        .rev()
-        .find_map(|event| match event.body() {
-            EventBody::IssueClaimed {
-                issue_id: id,
-                assignee,
-                ..
-            } if id == issue_id => Some(assignee == agent),
-            EventBody::IssueReleased { issue_id: id, .. } if id == issue_id => Some(false),
-            _ => None,
-        })
-        .unwrap_or(false)
-}
-
 /// The single typed-to-byte finalizer for repository-owned records.
 ///
 /// Given the captured `image`, the reused `context`, and closed semantic
@@ -825,26 +790,19 @@ pub(super) fn finalize_delta(
     });
     context.reserve(gate_runs.len());
 
-    // Pass 2: convergent claim upserts (existing issues; no new identifiers).
+    // Pass 2: claims of existing issues; no new identifiers.
     for intent in intents {
         if let MutationIntent::ClaimIssue { issue_id, agent } = intent {
-            let events = captured_events(image)?;
-            let current = captured_issue(image, issue_id)?
+            let mut issue = captured_issue(image, issue_id)?
                 .ok_or_else(|| MutationError::MissingIssue(issue_id.clone()))?;
-            let issue_reflects = current.assignee.as_ref() == Some(agent);
-            let event_reflects = event_tail_reflects_claim(&events, issue_id, agent);
-
-            if !issue_reflects {
+            if issue.assignee.as_ref() != Some(agent) {
                 let now = context.timestamp();
-                let mut issue = current;
                 issue.assignee = Some(agent.clone());
                 if issue.claimed_at.is_none() {
                     issue.claimed_at = Some(now);
                 }
                 issue.updated_at = now;
                 actions.push(write_issue_action(image, &issue)?);
-            }
-            if !event_reflects {
                 pending_events.push(PendingEvent {
                     phase: 1,
                     tag: EventTag::IssueClaimed,
@@ -1675,18 +1633,12 @@ mod tests {
             Some(agent.clone()),
         );
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = crate::test_utils::stamped_event(
-            EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
-            "e",
-            fixed_instant(),
-        );
-        let events_bytes = compose_events(&[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
             (
                 VirtualPath::issue_record(&issue.id),
                 file_entry(&issue_bytes),
             ),
-            (VirtualPath::EVENTS, file_entry(&events_bytes)),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
         ]);
         let context = MutationContext::with_annotation(
             IdAuthority::random(),
@@ -2007,71 +1959,22 @@ mod tests {
         );
     }
 
+    /// An assignment made outside jit leaves no claim event behind, and a claim
+    /// does not repair one.
     #[test]
-    fn test_claim_noop_when_issue_and_event_reflect_claim_samples_nothing() {
-        let agent: Assignee = "agent:worker-1".parse().unwrap();
-        let issue = seeded_issue(
-            &crate::test_utils::issue_id(0x1111_4111_8111_1111_1111_1111_1111_1111),
-            Some(agent.clone()),
-        );
-        let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = crate::test_utils::stamped_event(
-            EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
-            "e",
-            fixed_instant(),
-        );
-        let events_bytes = compose_events(&[serialize_event(&event).unwrap()]);
-        let image = image_with(vec![
-            (
-                VirtualPath::issue_record(&issue.id),
-                file_entry(&issue_bytes),
-            ),
-            (VirtualPath::EVENTS, file_entry(&events_bytes)),
-        ]);
-        // The shared clock proves the no-op samples no time.
-        let context = MutationContext::new(
-            IdAuthority::from_seed([9u8; 32]),
-            Box::new(PanicMutationClock),
-        );
-        let delta = finalize(
-            &layout(),
-            &image,
-            &context,
-            &[MutationIntent::ClaimIssue {
-                issue_id: issue.id.clone(),
-                agent,
-            }],
-        )
-        .unwrap();
-        assert!(
-            delta.delta().actions().is_empty(),
-            "fully reflected claim is a no-op"
-        );
-    }
-
-    #[test]
-    fn test_noop_claim_production_authority_draws_no_id_and_no_time() {
-        // The strongest no-op guarantee: with a real production random authority
-        // and a clock that panics on use, a fully-reflected claim acquire draws
-        // neither the random source (the seed stays undrawn) nor the clock.
+    fn test_finalize_claim_of_issue_already_assigned_outside_jit_appends_nothing() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
         let issue = seeded_issue(
             &crate::test_utils::issue_id(0x4444_4444_8444_4444_4444_4444_4444_4444),
             Some(agent.clone()),
         );
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let event = crate::test_utils::stamped_event(
-            EventBody::draft_issue_claimed(issue.id.clone(), agent.clone()),
-            "e",
-            fixed_instant(),
-        );
-        let events_bytes = compose_events(&[serialize_event(&event).unwrap()]);
         let image = image_with(vec![
             (
                 VirtualPath::issue_record(&issue.id),
                 file_entry(&issue_bytes),
             ),
-            (VirtualPath::EVENTS, file_entry(&events_bytes)),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
         ]);
         let context = MutationContext::new(IdAuthority::random(), Box::new(PanicMutationClock));
         let plan = finalize(
@@ -2084,46 +1987,57 @@ mod tests {
             }],
         )
         .unwrap();
-        assert!(
-            plan.delta().actions().is_empty(),
-            "fully reflected claim emits no bytes"
-        );
+        assert!(plan.delta().actions().is_empty());
         assert!(
             context.ids.sampled_seed().is_none(),
-            "a no-op acquire must not draw the production random seed"
+            "a no-op claim draws no identifier"
         );
     }
 
+    /// The decision follows the assignee alone: a tail no parser accepts changes
+    /// neither outcome.
     #[test]
-    fn test_claim_missing_event_only_emits_event() {
+    fn test_finalize_claim_decides_from_the_assignee_over_an_unparseable_log_tail() {
         let agent: Assignee = "agent:worker-1".parse().unwrap();
-        // Issue already assigned but the event log is empty (crash after save).
-        let issue = seeded_issue(
-            &crate::test_utils::issue_id(0x2222_4222_8222_2222_2222_2222_2222_2222),
-            Some(agent.clone()),
-        );
-        let issue_bytes = serialize_issue(&issue).unwrap();
-        let image = image_with(vec![
-            (
-                VirtualPath::issue_record(&issue.id),
-                file_entry(&issue_bytes),
-            ),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-        ]);
-        let delta = finalize(
-            &layout(),
-            &image,
-            &ctx(),
-            &[MutationIntent::ClaimIssue {
-                issue_id: issue.id.clone(),
-                agent,
-            }],
-        )
-        .unwrap();
-        // Exactly one action: the missing events.jsonl append. No issue rewrite.
-        assert_eq!(delta.delta().actions().len(), 1);
-        let action = &delta.delta().actions()[0];
-        assert_eq!(action.path(), &VirtualPath::EVENTS);
+        let tail = crate::repository_state::EventLogTail::of_bytes(b"not an event\n");
+        let claim = |assignee: Option<Assignee>| {
+            let issue = seeded_issue(
+                &crate::test_utils::issue_id(0x2222_4222_8222_2222_2222_2222_2222_2222),
+                assignee,
+            );
+            let mut spec =
+                CaptureSpec::new([VirtualPath::issue_record(&issue.id)], budget()).unwrap();
+            spec.discover_tail(VirtualPath::EVENTS).unwrap();
+            let entries = BTreeMap::from([
+                (
+                    VirtualPath::issue_record(&issue.id),
+                    file_entry(&serialize_issue(&issue).unwrap()),
+                ),
+                (
+                    VirtualPath::EVENTS,
+                    RepositoryEntry::FileTail {
+                        tail: tail.clone(),
+                        mode: FileMode::Regular,
+                    },
+                ),
+            ]);
+            let image =
+                RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), BTreeMap::new())
+                    .unwrap();
+            finalize(
+                &layout(),
+                &image,
+                &ctx(),
+                &[MutationIntent::ClaimIssue {
+                    issue_id: issue.id,
+                    agent: agent.clone(),
+                }],
+            )
+            .unwrap()
+        };
+
+        assert!(claim(Some(agent.clone())).delta().actions().is_empty());
+        assert_eq!(claim(None).delta().actions().len(), 2);
     }
 
     #[test]

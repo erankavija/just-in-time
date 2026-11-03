@@ -272,6 +272,13 @@ pub fn init_git_repository(path: &Path) -> Result<()> {
     git(path, ["config", "commit.gpgsign", "false"]).map(drop)
 }
 
+/// Initialise git in `path` as [`init_git_repository`] does and record an empty
+/// commit, so `HEAD` names a branch.
+pub fn init_git_repository_with_commit(path: &Path) -> Result<()> {
+    init_git_repository(path)?;
+    git(path, ["commit", "-q", "--allow-empty", "-m", "init"]).map(drop)
+}
+
 fn git<I, S>(path: &Path, args: I) -> Result<String>
 where
     I: IntoIterator<Item = S>,

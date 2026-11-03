@@ -198,7 +198,7 @@ fn test_create_issue_in_new_namespace_then_validate_label_clean() {
         .unwrap();
 
     let reloaded = file_executor(temp.path()).unwrap();
-    let issue = reloaded.get_issue(&id).unwrap();
+    let issue = reloaded.issues().get_issue(&id).unwrap();
     let rules = reloaded.effective_rules().unwrap();
     let eval = evaluate_local(&issue, rules, ContentFormat::Markdown).unwrap();
     assert!(
