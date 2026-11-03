@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6f110c2197b07ceb61a2e322aa87275ac512f978",
+  "completed_at": "2026-11-03T02:44:14.595730540Z",
+  "duration_ms": 254875,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied by the attributable current tree and recorded cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f79d2510-bae7-41f1-95a3-b14ef10cd84c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "21d2e6ee-793f-41fa-86a3-0dc2a7b091e6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T02:39:59.720685443Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8db708f6c (`jit:f79d2510`; 12 files, +304/-172)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/f79d2510/requirement/REQ-01, REQ-02, REQ-03; @/issue/df129d9e/requirement/REQ-03; @/invariant/architecture-dependency-direction, canonical-cutover, convention-convergence, essential-code-prose, orthogonal-tests; @/gate/cargo-ci\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T02:38:28Z)\nTruncation recovery: recovered broad-query output with bounded target issue/item, configuration, registry, and design-document reads.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied by the attributable current tree and recorded cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

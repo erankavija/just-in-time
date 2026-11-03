@@ -122,6 +122,35 @@ pub fn stamped_event(
     crate::domain::Event::new(id.into(), timestamp, body)
 }
 
+/// A non-reconciling execution of `target` into `root` publishing each
+/// `(source, destination)` pair with identity of the destination's own text.
+pub fn archive_execution(
+    target: crate::domain::artifact_plan::PlanTarget,
+    root: &str,
+    published: &[(&str, &str)],
+) -> crate::domain::artifact_execution::ArchiveExecution {
+    crate::domain::artifact_execution::ArchiveExecution {
+        target,
+        destination_root: root.to_string(),
+        publications: published
+            .iter()
+            .map(
+                |(source, destination)| crate::domain::artifact_execution::ArchivePublication {
+                    source: Some((*source).to_string()),
+                    destination: (*destination).to_string(),
+                    content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
+                        destination.as_bytes(),
+                    ),
+                    adopted: false,
+                },
+            )
+            .collect(),
+        reference_changes: Vec::new(),
+        planned_deletions: Vec::new(),
+        reconciling: false,
+    }
+}
+
 #[cfg(test)]
 mod fixture_issue_tests {
     use super::fixture_issue;
@@ -348,11 +377,13 @@ fn initialize_profiled_repository_fixture(
     storage.seed_repository_tree_fixture(repository)?;
     let layout = storage.repository_layout();
     let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
-    let selection = executor.select_profiles(
+    let selection = executor.profiles().select_profiles(
         &[PathBuf::from(&selected)],
         &crate::commands::ProfileVariableOptions::default(),
     )?;
-    executor.initialize_fresh_repository(repository, Some(&selection))?;
+    executor
+        .profiles()
+        .initialize_fresh_repository(repository, Some(&selection))?;
     write_repository_entries(&storage, &layout)
 }
 
@@ -789,6 +820,7 @@ pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     let layout = discover_repository_layout(temp.path(), &jit_root)?;
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
+        .profiles()
         .initialize_fresh_repository(temp.path(), None)?;
     // Claim coordination tests use this as a synthetic Git control directory.
     fs::create_dir(temp.path().join(".git"))?;
@@ -865,7 +897,9 @@ pub fn setup_test_repo_with_config(
     fs::write(temp.path().join(".jit/config.toml"), config)?;
 
     let executor = file_executor(temp.path())?;
-    executor.initialize_fresh_repository(temp.path(), None)?;
+    executor
+        .profiles()
+        .initialize_fresh_repository(temp.path(), None)?;
     // Claim coordination tests use this as a synthetic Git control directory.
     fs::create_dir(temp.path().join(".git"))?;
 
@@ -1313,11 +1347,12 @@ pub fn apply_selected_packages<S: IssueStore + crate::storage::RepositoryStateSt
     selectors: &[PathBuf],
 ) -> Result<crate::profile::ProfileComposedApplyResult> {
     executor
+        .profiles()
         .select_profiles(
             selectors,
             &crate::commands::ProfileVariableOptions::default(),
         )
-        .and_then(|selection| executor.apply_profiles(&selection))
+        .and_then(|selection| executor.profiles().apply_profiles(&selection))
 }
 
 /// Move `id` to `state` the way `jit issue update --state` does.
@@ -1362,6 +1397,7 @@ pub fn selected_closure<S: IssueStore + crate::storage::RepositoryStateStore>(
     package: &crate::profile::ProfilePackage,
 ) -> Result<Vec<crate::profile::ProfilePackage>> {
     executor
+        .profiles()
         .select_profiles(
             &[selector_of(package)],
             &crate::commands::ProfileVariableOptions::default(),
@@ -1710,12 +1746,14 @@ mod tests {
             let executor = CommandExecutor::new(JsonFileStorage::new(&jit_root))
                 .with_layout(discover_repository_layout(&reference, &jit_root).unwrap());
             let selection = executor
+                .profiles()
                 .select_profiles(
                     &[reference.join(package_directory).join(spec.id)],
                     &crate::commands::ProfileVariableOptions::default(),
                 )
                 .unwrap();
             executor
+                .profiles()
                 .initialize_fresh_repository(&reference, Some(&selection))
                 .unwrap();
             // Machine-local state the file backend's next session creates on demand.

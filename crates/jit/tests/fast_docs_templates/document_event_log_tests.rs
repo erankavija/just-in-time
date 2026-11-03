@@ -297,6 +297,7 @@ fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
+        .profiles()
         .initialize_fresh_repository(temp.path(), None)
         .unwrap();
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
@@ -366,6 +367,7 @@ fn test_add_document_rejects_malformed_utf8_without_writes() {
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
+        .profiles()
         .initialize_fresh_repository(temp.path(), None)
         .unwrap();
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
