@@ -1,6 +1,6 @@
 //! Command-line interface definitions using clap.
 
-use clap::{ArgAction, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
 
 use crate::build_info;
 use crate::domain::event_catalog::EventTag;
@@ -43,6 +43,44 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
+/// Field filters shared by issue listings, searches, and query subsets.
+#[derive(Args, Default)]
+pub struct IssueFilterArgs {
+    /// Filter by state
+    #[arg(short = 's', long)]
+    pub state: Option<String>,
+
+    /// Filter by assignee (format: type:identifier)
+    #[arg(short = 'a', long)]
+    pub assignee: Option<String>,
+
+    /// Filter by priority
+    #[arg(short = 'p', long)]
+    pub priority: Option<String>,
+
+    /// Filter by exact namespace:value or namespace:* pattern; repeatable and AND-combined
+    #[arg(short = 'l', long = "label")]
+    pub labels: Vec<String>,
+}
+
+impl IssueFilterArgs {
+    /// Parse at dispatch time so invalid values retain JSON failure envelopes.
+    pub fn parse(&self) -> anyhow::Result<crate::domain::queries::AllFilter<'_>> {
+        let state = self.state.as_deref().map(str::parse).transpose()?;
+        let priority = self.priority.as_deref().map(str::parse).transpose()?;
+        let assignee = self.assignee.as_deref().map(str::parse).transpose()?;
+        self.labels
+            .iter()
+            .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
+        Ok(crate::domain::queries::AllFilter {
+            state,
+            priority,
+            assignee,
+            labels: &self.labels,
+        })
+    }
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize through one recoverable publication; an absent data root is
@@ -81,23 +119,8 @@ pub enum Commands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     List {
-        /// Filter by state
-        #[arg(short = 's', long)]
-        state: Option<String>,
-
-        /// Filter by assignee (format: type:identifier)
-        #[arg(short = 'a', long)]
-        assignee: Option<String>,
-
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -210,28 +233,12 @@ pub enum Commands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Query {
+        #[command(flatten)]
+        filters: IssueFilterArgs,
+
         /// Subcommand — omit to list all issues
         #[command(subcommand)]
         subcommand: Option<QueryCommands>,
-
-        /// Filter by state (used when no subcommand is given)
-        #[arg(short = 's', long)]
-        state: Option<String>,
-
-        /// Filter by assignee — format: type:identifier (used when no subcommand is given)
-        #[arg(short = 'a', long)]
-        assignee: Option<String>,
-
-        /// Filter by priority (used when no subcommand is given)
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard) — used when no subcommand is given.
-        /// Repeatable; patterns are ANDed, so an issue must match every
-        /// pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries (used when no subcommand is given)
         #[arg(long)]
@@ -718,23 +725,12 @@ pub enum IssueCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Search {
+        #[command(flatten)]
+        filters: IssueFilterArgs,
+
         /// Search query (searches title, description, and ID). Optional when any
         /// filter flag is provided.
         query: Option<String>,
-
-        #[arg(short, long)]
-        state: Option<String>,
-
-        #[arg(short, long)]
-        assignee: Option<String>,
-
-        #[arg(short, long)]
-        priority: Option<String>,
-
-        /// Filter by label: exact `namespace:value` or `namespace:*` wildcard.
-        /// Repeatable; labels are ANDed, so an issue must match every one.
-        #[arg(short = 'l', long = "label")]
-        labels: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -1075,23 +1071,8 @@ pub enum IssueCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     List {
-        /// Filter by state
-        #[arg(short = 's', long)]
-        state: Option<String>,
-
-        /// Filter by assignee (format: type:identifier)
-        #[arg(short = 'a', long)]
-        assignee: Option<String>,
-
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -2039,23 +2020,8 @@ pub enum QueryCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     All {
-        /// Filter by state
-        #[arg(short = 's', long)]
-        state: Option<String>,
-
-        /// Filter by assignee (format: type:identifier)
-        #[arg(short = 'a', long)]
-        assignee: Option<String>,
-
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -2067,15 +2033,8 @@ pub enum QueryCommands {
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     #[command(visible_alias = "ready")]
     Available {
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -2086,15 +2045,8 @@ pub enum QueryCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Blocked {
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -2105,15 +2057,8 @@ pub enum QueryCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Strategic {
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -2125,26 +2070,18 @@ pub enum QueryCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Closed {
-        /// Filter by priority
-        #[arg(short = 'p', long)]
-        priority: Option<String>,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
+        #[command(flatten)]
+        filters: IssueFilterArgs,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
         full: bool,
     },
 
-    /// Aggregate issues into counts by a dimension over a label bucket (or the
-    /// whole repo), with a done/total delivery rollup.
+    /// Aggregate filtered issues into counts by a dimension, with a done/total delivery rollup.
     ///
-    /// The bucket is every issue matching all `--label` patterns (AND-combined;
-    /// none given means the whole repository); membership is by label here, the
+    /// The bucket matches every supplied field filter (AND-combined;
+    /// none given means the whole repository), the
     /// advisory grouping counterpart to the DAG-authoritative `issue progress`
     /// over a container's children. `--by state` lists every lifecycle state,
     /// zero-count states included. The two terminal states are counted distinctly
@@ -2160,15 +2097,12 @@ pub enum QueryCommands {
     ///   jit query count --by state
     ///   jit query count --by state --label milestone:m1 --json
     Count {
+        #[command(flatten)]
+        filters: IssueFilterArgs,
+
         /// Aggregation dimension.
         #[arg(long, value_name = "DIMENSION")]
         by: CountDimension,
-
-        /// Filter by label pattern (namespace:value, exact match; or
-        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
-        /// must match every pattern given. None given aggregates the whole repo.
-        #[arg(short = 'l', long)]
-        label: Vec<String>,
     },
 
     /// Report membership labels that disagree with DAG-resolved containment
