@@ -23091,3 +23091,5 @@
 {"from":"backlog","id":"72a15cd6-3edf-4e35-9994-49d623203327","issue_id":"cf49da17-a076-480e-a96b-bc9224269ac0","timestamp":"2026-11-03T22:37:32.174770119Z","to":"ready","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"dbbbc5d3-3316-4117-9b15-7f3a522b5d14","issue_id":"725af076-76e0-40ea-91e3-a1b43f720cc6","timestamp":"2026-11-03T22:37:40.026132480Z","type":"issue_updated","updated_by":"dependency-add"}
 {"id":"7a70df9a-a669-4be6-9d25-75bffb4fd06d","issue_id":"2f12d920-2bbc-4b8f-99f5-bca7d0e9ff4a","new_count":1,"old_count":2,"removed_deps":["de9a7557-2061-4b63-9c74-6c18ed840c17"],"timestamp":"2026-11-03T22:37:40.026132480Z","type":"dependency_reduced"}
+{"id":"26b8e74f-06dc-4122-a462-859beed31bd3","issue_id":"2a10917d-4e9d-4fcd-aa26-54910508e363","priority":"normal","timestamp":"2026-11-03T22:38:21.381647288Z","title":"Code-review context states commit ancestry for gate evidence","type":"issue_created"}
+{"gate_key":"code-review","id":"2fbcd1a9-6c9a-4a04-9fe1-45a25552d9ef","issue_id":"2a10917d-4e9d-4fcd-aa26-54910508e363","timestamp":"2026-11-03T22:38:25.315255581Z","type":"gate_added"}
