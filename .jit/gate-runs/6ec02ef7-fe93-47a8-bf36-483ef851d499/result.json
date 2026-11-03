@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "968119b03f03608b0b459b71be7dd6c3950be0c2",
+  "completed_at": "2026-11-03T22:28:42.734338963Z",
+  "duration_ms": 179351,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/mod.rs",
+        "id": "F1",
+        "line": 34,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The test-only handler group is never registered, so registration and registry-backed schema lookup are untested."
+      }
+    ],
+    "summary": "The handler contract lacks the required registry-backed end-to-end test.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "abe555e9-0b95-474b-bf80-a9c23f33dbfa",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6ec02ef7-fe93-47a8-bf36-483ef851d499",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T22:25:43.383304064Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5066 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a384-acc1-7b12-ad8b-74485f611d76\n--------\nuser\n--- 5053 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 938bd0a27 `feat(jit:abe555e9): library-side command handler contract`\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-02, REQ-05, REQ-12, REQ-17 (issue Markdown); @/invariant/orthogonal-tests, essential-code-prose, architecture-dependency-direction (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-11-03T22:24:08Z)\nTruncation recovery: re-read bounded schema diff and dispatch, test-group, emitter, and plan line ranges after broad search output truncated\n\n1. [blocking, issue-impact] The required end-to-end registration test is absent. `REGISTERED_GROUPS` is empty, so the test-only group never enters the registry; its tests call its private `output_schema` directly, while schema tests inject a separate fake callback. Consequently, no test drives a handler group through actual registration and registry-backed schema lookup as required by REQ-06. Add the test-only lookup to the test registry and assert through `registered_output_schema` (and the schema resolution path). `crates/jit/src/dispatch/mod.rs:34`, `crates/jit/src/dispatch/test_group.rs:193`, `crates/jit/src/schema.rs:1677`. References: @/invariant/orthogonal-tests.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The handler contract lacks the required registry-backed end-to-end test.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The test-only handler group is never registered, so registration and registry-backed schema lookup are untested.\",\"file\":\"crates/jit/src/dispatch/mod.rs\",\"line\":34,\"references\":[\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
