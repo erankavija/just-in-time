@@ -10,6 +10,7 @@
   ],
   "description": "Factor the payload of an archive-execution event into one domain struct that the archive evidence folds take directly, so evidence can be stored outside the event log without a second shape.\n\n## Background\n\n`EventBody::ArtifactArchiveExecuted` (`crates/jit/src/domain/types.rs`) inlines its payload: target, destination root, publications, reference changes, planned deletions and the reconciling flag. `EventBody` is internally tagged. Three folds read prior executions from events: `recorded_archived_copies` (`domain/artifact_discovery.rs`), `archive_coverage` (`repository_state/archive.rs`) and `apply_recorded_residue_identities` (`commands/archive.rs`). Kept as one change for a build reason: extracting the payload changes the three folds' parameter type, and they compile only together. The variant is also cited by the event catalog (`domain/event_catalog.rs`), by the storage trait's archive reader (`storage/mod.rs`) and by the file backend's archive reader (`storage/json.rs`).\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::artifact_execution::ArchiveExecution` holds the payload, and the event variant wraps it. The serialized event bytes are unchanged, and the generated event reference is unchanged.\n- [hard] REQ-02: The three folds take `&[ArchiveExecution]`, and their tests build executions without events.\n",
   "documents": [],
+  "done_at": "2026-11-03T02:11:14.114247735Z",
   "first_ready_at": "2026-10-21T10:39:53.980326737Z",
   "gates_required": [
     "cargo-ci",
@@ -17,15 +18,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "9920339b-7418-4d0e-820c-4ffee4d31905",
+      "run_id": "5ff0e6be-ad32-4305-bb74-035690ee6abf",
       "status": "passed",
-      "updated_at": "2026-11-03T02:06:20.827003092Z",
+      "updated_at": "2026-11-03T02:10:00.209296757Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "a946bf18-285e-4e86-a9fa-52fc151a29b2",
-      "status": "failed",
-      "updated_at": "2026-11-03T02:07:31.071001605Z",
+      "run_id": "6ba7e221-7e20-4f28-ba7b-2d5ce16816ae",
+      "status": "passed",
+      "updated_at": "2026-11-03T02:11:13.690918470Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,7 +41,7 @@
     "satisfies:f8a6b298/REQ-09"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archive executions are one domain record type",
-  "updated_at": "2026-11-03T02:07:31.071001605Z"
+  "updated_at": "2026-11-03T02:11:14.114247735Z"
 }
