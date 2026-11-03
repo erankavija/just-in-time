@@ -12,7 +12,26 @@
     "code-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "741e8192-4af6-4a6b-a534-1763fa4f65fc",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:29:12.627209518Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "41717de6-1d2e-476c-a3ee-bfef545533d8",
+      "status": "failed",
+      "updated_at": "2026-11-03T23:32:50.523152016Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "f7b120f9-8bb0-4281-a1b7-04d2d5f1b4a8",
+      "status": "failed",
+      "updated_at": "2026-11-03T23:29:15.661269918Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c92f4011-1850-4998-a555-ca899ec45552",
   "labels": [
     "type:bug",
@@ -23,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Keep default rules in force when rules.toml holds only custom rules",
-  "updated_at": "2026-11-03T23:27:31.600326649Z"
+  "updated_at": "2026-11-03T23:32:50.523152016Z"
 }
