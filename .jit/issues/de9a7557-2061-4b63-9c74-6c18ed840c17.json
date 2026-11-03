@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "run_id": "9a1d90d4-5970-465f-a9b4-f873a08fa36c",
-      "status": "passed",
-      "updated_at": "2026-10-21T20:36:15.899297301Z",
+      "run_id": "9ffaf9c3-2f3a-4b93-b199-9b2e12e0a236",
+      "status": "failed",
+      "updated_at": "2026-11-03T23:19:56.688349038Z",
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "done",
   "title": "breakdown: Compute one validation report and derive every validation view from it",
-  "updated_at": "2026-11-03T23:11:06.267196366Z"
+  "updated_at": "2026-11-03T23:19:56.688349038Z"
 }
