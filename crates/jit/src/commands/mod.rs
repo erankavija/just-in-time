@@ -3195,13 +3195,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let record = update.as_mut().unwrap_or(&mut issue);
                 match &request {
                     CapturedLifecycleMutation::Claim { assignee, .. } => {
-                        record.assignee = Some(assignee.clone());
-                        events.push((
-                            4,
-                            EventBody::draft_issue_claimed(record.id.clone(), assignee.clone()),
-                        ));
-                        if update.is_none() {
-                            update = Some(issue);
+                        if record.assignee.as_ref() != Some(assignee) {
+                            record.assignee = Some(assignee.clone());
+                            events.push((
+                                4,
+                                EventBody::draft_issue_claimed(record.id.clone(), assignee.clone()),
+                            ));
+                            if update.is_none() {
+                                update = Some(issue);
+                            }
                         }
                     }
                     CapturedLifecycleMutation::Release {
