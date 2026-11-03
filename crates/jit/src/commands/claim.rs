@@ -1921,7 +1921,9 @@ mod tests {
         acquire()?;
         assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
 
-        executor.issues().unassign_issue(&issue_id)?;
+        executor
+            .issues()
+            .unassign_issue(&IssueIdPrefix::from(&issue_id))?;
         acquire()?;
         assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 2);
         Ok(())

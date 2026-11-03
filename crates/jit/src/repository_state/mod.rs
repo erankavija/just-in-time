@@ -62,7 +62,7 @@ pub use materialize::{
     ValidationCaptureClosure,
 };
 pub(crate) use mutation::MutationContextFactory;
-pub(crate) use mutation::{canonical_json, captured_gate_run_ids, created_issue};
+pub(crate) use mutation::{canonical_json, captured_gate_run_ids, created_issue, mutated_issue};
 pub use mutation::{
     finalize, fresh_index_bytes, prefix_has_torn_tail, serialize_event, serialize_gate_run,
     serialize_issue, IdAuthority, MutationClock, MutationContext, MutationContextAnnotation,
@@ -1075,23 +1075,7 @@ pub fn compare_materializations(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
-
-    fn layout() -> RepositoryLayout {
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "worktree", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap()
-    }
-
-    fn budget() -> CaptureBudget {
-        CaptureBudget {
-            max_listings: 0,
-            max_bytes: 128,
-            max_depth: 4,
-        }
-    }
+    use crate::test_harness::image::{synthetic_layout, ImageBuilder};
 
     fn plan(image: &RepositoryImage, actions: Vec<RepositoryAction>) -> MaterializationPlan {
         MaterializationPlan::new(
@@ -1102,15 +1086,7 @@ mod tests {
 
     #[test]
     fn test_compare_materializations_propagates_undiscovered_for_every_action() {
-        let layout = layout();
-        let image = RepositoryImage::close(
-            layout.clone(),
-            CaptureSpec::new(Vec::<VirtualPath>::new(), budget()).unwrap(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
+        let image = ImageBuilder::new().build();
         let target = VirtualPath::data("unrequested.json").unwrap();
         let occupant = EntryIdentity::for_bytes("occupant", b"captured").unwrap();
         let actions = [
@@ -1155,56 +1131,32 @@ mod tests {
 
     #[test]
     fn test_compare_materializations_classifies_captured_mismatches() {
-        let layout = layout();
         let create = VirtualPath::data("create").unwrap();
         let delete = VirtualPath::data("delete").unwrap();
         let set_mode = VirtualPath::data("set-mode").unwrap();
         let write = VirtualPath::data("write").unwrap();
-        let write_bytes = b"old".to_vec();
         let delete_content = CapturedBytes::new("delete", b"delete me".to_vec()).unwrap();
         let mode_content = CapturedBytes::new("mode", b"mode".to_vec()).unwrap();
         let delete_identity = delete_content.identity().clone();
         let mode_identity = mode_content.identity().clone();
-        let image = RepositoryImage::close(
-            layout.clone(),
-            CaptureSpec::new(
-                [
-                    create.clone(),
-                    delete.clone(),
-                    set_mode.clone(),
-                    write.clone(),
-                ],
-                budget(),
+        let image = ImageBuilder::new()
+            .entry(create.clone(), RepositoryEntry::Absent)
+            .entry(
+                delete.clone(),
+                RepositoryEntry::File {
+                    content: delete_content,
+                    mode: FileMode::Regular,
+                },
             )
-            .unwrap(),
-            BTreeMap::from([
-                (create.clone(), RepositoryEntry::Absent),
-                (
-                    delete.clone(),
-                    RepositoryEntry::File {
-                        content: delete_content,
-                        mode: FileMode::Regular,
-                    },
-                ),
-                (
-                    set_mode.clone(),
-                    RepositoryEntry::File {
-                        content: mode_content,
-                        mode: FileMode::Regular,
-                    },
-                ),
-                (
-                    write.clone(),
-                    RepositoryEntry::File {
-                        content: CapturedBytes::new("write", write_bytes).unwrap(),
-                        mode: FileMode::Regular,
-                    },
-                ),
-            ]),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
+            .entry(
+                set_mode.clone(),
+                RepositoryEntry::File {
+                    content: mode_content,
+                    mode: FileMode::Regular,
+                },
+            )
+            .file(write.clone(), b"old")
+            .build();
         let expected = plan(
             &image,
             vec![
@@ -1263,29 +1215,6 @@ mod tests {
         );
     }
 
-    fn empty_image() -> RepositoryImage {
-        RepositoryImage::close(
-            layout(),
-            CaptureSpec::new(Vec::<VirtualPath>::new(), budget()).unwrap(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
-    }
-
-    fn image_with(entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
-        let paths: Vec<VirtualPath> = entries.iter().map(|(path, _)| path.clone()).collect();
-        RepositoryImage::close(
-            layout(),
-            CaptureSpec::new(paths, budget()).unwrap(),
-            entries.into_iter().collect::<BTreeMap<_, _>>(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
-    }
-
     fn empty_declarations() -> (ConfigurationDeclarations, GateRegistry, RuleSet) {
         (
             crate::declarations::parse_configuration(b"").unwrap(),
@@ -1311,7 +1240,7 @@ mod tests {
 
     #[test]
     fn test_finalize_gate_registry_edit_missing_edit_intent_is_typed() {
-        let image = empty_image();
+        let image = ImageBuilder::new().build();
         let context = MutationContext::preview();
         let (configuration, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
@@ -1319,8 +1248,9 @@ mod tests {
             gates: &gates,
             rules: &rules,
         };
-        let error = finalize_gate_registry_edit(&layout(), &image, &context, &[], declarations)
-            .unwrap_err();
+        let error =
+            finalize_gate_registry_edit(&synthetic_layout(), &image, &context, &[], declarations)
+                .unwrap_err();
         assert!(matches!(
             error,
             RepositoryStateError::GateRegistryEdit(GateRegistryEditError::MissingEdit)
@@ -1329,7 +1259,7 @@ mod tests {
 
     #[test]
     fn test_finalize_gate_registry_edit_multiple_edit_intents_is_typed() {
-        let image = empty_image();
+        let image = ImageBuilder::new().build();
         let context = MutationContext::preview();
         let (configuration, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
@@ -1345,9 +1275,14 @@ mod tests {
                 registry: Box::new(GateRegistry::default()),
             },
         ];
-        let error =
-            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
-                .unwrap_err();
+        let error = finalize_gate_registry_edit(
+            &synthetic_layout(),
+            &image,
+            &context,
+            &intents,
+            declarations,
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             RepositoryStateError::GateRegistryEdit(GateRegistryEditError::MultipleEdits)
@@ -1356,7 +1291,7 @@ mod tests {
 
     #[test]
     fn test_finalize_gate_registry_edit_declaration_mismatch_is_typed() {
-        let image = empty_image();
+        let image = ImageBuilder::new().build();
         let context = MutationContext::preview();
         let (configuration, _default_gates, rules) = empty_declarations();
         let mut mismatched = GateRegistry::default();
@@ -1371,9 +1306,14 @@ mod tests {
         let intents = vec![MutationIntent::EditGateRegistry {
             registry: Box::new(GateRegistry::default()),
         }];
-        let error =
-            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
-                .unwrap_err();
+        let error = finalize_gate_registry_edit(
+            &synthetic_layout(),
+            &image,
+            &context,
+            &intents,
+            declarations,
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             RepositoryStateError::GateRegistryEdit(GateRegistryEditError::DeclarationMismatch)
@@ -1387,16 +1327,13 @@ mod tests {
         // `MutationError::MissingIssue` must surface through
         // `GateRegistryEditError::Mutation`, short-circuiting before the
         // declaration-derived producer set is ever composed.
-        let image = image_with(vec![
-            (
-                VirtualPath::data("events.jsonl").unwrap(),
-                RepositoryEntry::Absent,
-            ),
-            (
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
                 VirtualPath::issue_record(&crate::test_utils::issue_id(75)),
                 RepositoryEntry::Absent,
-            ),
-        ]);
+            )
+            .build();
         let context = MutationContext::preview();
         let (configuration, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
@@ -1413,9 +1350,14 @@ mod tests {
                 agent: "agent:tester".parse().unwrap(),
             },
         ];
-        let error =
-            finalize_gate_registry_edit(&layout(), &image, &context, &intents, declarations)
-                .unwrap_err();
+        let error = finalize_gate_registry_edit(
+            &synthetic_layout(),
+            &image,
+            &context,
+            &intents,
+            declarations,
+        )
+        .unwrap_err();
         match error {
             RepositoryStateError::GateRegistryEdit(GateRegistryEditError::Mutation(
                 MutationError::MissingIssue(id),

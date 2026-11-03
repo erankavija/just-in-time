@@ -2,6 +2,7 @@
 //!
 //! Worked `TestHarness` examples of the issue lifecycle and of gates.
 use jit::declarations::GateMode;
+use jit::domain::identity::IssueIdPrefix;
 use jit::domain::Priority;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
@@ -51,13 +52,13 @@ fn test_issue_lifecycle_works_without_coordinator() {
     // Claim issue
     h.executor
         .issues()
-        .claim_issue(&id, "agent:test".parse().unwrap())
+        .claim_issue(&IssueIdPrefix::from(&id), "agent:test".parse().unwrap())
         .unwrap();
 
     // Release issue
     h.executor
         .issues()
-        .release_issue(&id, "Test release")
+        .release_issue(&IssueIdPrefix::from(&id), "Test release")
         .unwrap();
 
     // After release, assignee is cleared (state stays in-progress though)

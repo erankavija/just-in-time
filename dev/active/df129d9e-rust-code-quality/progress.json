@@ -604,6 +604,14 @@
           "title": "Derive server HTTP statuses from the library classification",
           "classification": "implementation",
           "status": "pending"
+        },
+        {
+          "key": "test-speed-measure",
+          "id": "1eb949a5",
+          "short_id": "1eb949a5",
+          "title": "Measure per-test durations and derive the per-test limits",
+          "classification": "research",
+          "status": "pending"
         }
       ]
     },
@@ -633,6 +641,14 @@
           "title": "Query and status commands move to library handlers",
           "classification": "implementation",
           "status": "pending"
+        },
+        {
+          "key": "test-speed-refactor",
+          "id": "4a01ccba",
+          "short_id": "4a01ccba",
+          "title": "Refactor every test over the per-test limit",
+          "classification": "implementation",
+          "status": "pending"
         }
       ]
     },
@@ -644,6 +660,14 @@
           "id": "b23b1bf3-e875-44aa-b879-4dc96c0b7caf",
           "short_id": "b23b1bf3",
           "title": "Gate evaluation commands move to library handlers",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "key": "test-speed-enforce",
+          "id": "f487aeef",
+          "short_id": "f487aeef",
+          "title": "Enforce the per-test limits and retire the whole-suite budget",
           "classification": "implementation",
           "status": "pending"
         }
@@ -690,6 +714,14 @@
           "short_id": "c06daf50",
           "title": "Library-side command dispatch for crates/jit",
           "classification": "story",
+          "status": "pending"
+        },
+        {
+          "key": "test-speed-ci-lock",
+          "id": "fba8d478",
+          "short_id": "fba8d478",
+          "title": "Decide whether concurrent cargo-ci runs can drop the host lock",
+          "classification": "implementation",
           "status": "pending"
         }
       ]
@@ -766,7 +798,18 @@
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "date": "2026-11-03",
+      "ids": [
+        "1eb949a5",
+        "4a01ccba",
+        "f487aeef",
+        "fba8d478"
+      ],
+      "reason": "user direction: per-test speed limits replace the whole-suite budget (plan D-32)"
+    }
+  ],
   "escalations": [
     {
       "date": "2026-10-21",

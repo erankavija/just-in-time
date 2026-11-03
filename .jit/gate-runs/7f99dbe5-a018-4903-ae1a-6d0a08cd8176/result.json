@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "018c2e2646dcde3dc416c3bfe48ab131faa2df5c",
+  "completed_at": "2026-11-03T22:41:03.689996246Z",
+  "duration_ms": 241322,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Both hard requirements are verified; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "70ac98fc-0fa7-4d4b-b3c0-f67dbe1df2a1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7f99dbe5-a018-4903-ae1a-6d0a08cd8176",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T22:37:02.367836786Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 058434a44, 4ac62044d, 018c2e264\nPolicy sources: AGENTS.md\nResolved items: @/issue/70ac98fc/requirement/REQ-01–02 (issue description); @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0; tested merge b383182 contains 058434a44); prior code-review failed (exit 1; its ancestry finding is resolved)\nTruncation recovery: Re-read 058434a44 per file in bounded ranges and checked current builder/call sites; no relevant evidence remained truncated.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both hard requirements are verified; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

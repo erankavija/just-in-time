@@ -610,52 +610,13 @@ mod tests {
         ArtifactEdge, ArtifactPlanEntry, ArtifactVersion, EdgeKind, EdgeResolutionMode,
         PendingDeletion, PolicyStatus,
     };
-    use crate::repository_state::{
-        CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryImage,
-        RepositoryLayout, RepositoryRootEvidence,
-    };
+    use crate::repository_state::{CapturedBytes, EntryIdentity, RepositoryImage};
+    use crate::test_harness::image::ImageBuilder;
     use crate::test_utils::fixture_issue;
     use crate::test_utils::{document_reference, document_reference_at};
-    use std::collections::BTreeMap;
-
-    fn layout() -> RepositoryLayout {
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "worktree", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap()
-    }
-
-    fn budget() -> CaptureBudget {
-        CaptureBudget {
-            max_listings: 4,
-            max_bytes: 1 << 20,
-            max_depth: 8,
-        }
-    }
 
     fn context() -> MutationContext {
         MutationContext::preview()
-    }
-
-    /// Close an image over the given entries. Every finalization reads the
-    /// archive-coverage event tail first, so an absent `events.jsonl` entry is
-    /// captured by default unless the caller supplies its own.
-    fn image_with(mut entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
-        let events_path = VirtualPath::data("events.jsonl").unwrap();
-        if !entries.iter().any(|(path, _)| path == &events_path) {
-            entries.push((events_path, RepositoryEntry::Absent));
-        }
-        let spec =
-            CaptureSpec::new(entries.iter().map(|(path, _)| path.clone()), budget()).unwrap();
-        RepositoryImage::close(
-            layout(),
-            spec,
-            entries.into_iter().collect::<BTreeMap<_, _>>(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
     }
 
     fn file_entry(bytes: &[u8]) -> RepositoryEntry {
@@ -714,11 +675,8 @@ mod tests {
         .unwrap()
     }
 
-    fn captured_issue_entry(id: &IssueId, issue: &Issue) -> (VirtualPath, RepositoryEntry) {
-        (
-            VirtualPath::issue_record(id),
-            file_entry(&crate::repository_state::serialize_issue(issue).unwrap()),
-        )
+    fn captured_issue_entry(issue: &Issue) -> RepositoryEntry {
+        file_entry(&crate::repository_state::serialize_issue(issue).unwrap())
     }
 
     fn archive_execution_error(
@@ -735,10 +693,13 @@ mod tests {
     fn test_finalize_archive_execution_content_identity_changed_after_planning() {
         let planned_identity = ContentIdentity::from_bytes(b"planned content");
         let plan = move_artifact("doc.md", "archived.md", planned_identity);
-        let image = image_with(vec![(
-            VirtualPath::worktree("doc.md").unwrap(),
-            file_entry(b"different content on disk"),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::worktree("doc.md").unwrap(),
+                file_entry(b"different content on disk"),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -753,10 +714,10 @@ mod tests {
             "archived.md",
             ContentIdentity::from_bytes(b"anything"),
         );
-        let image = image_with(vec![(
-            VirtualPath::worktree("doc.md").unwrap(),
-            directory_entry(),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(VirtualPath::worktree("doc.md").unwrap(), directory_entry())
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -773,16 +734,17 @@ mod tests {
             "archived.md",
             ContentIdentity::from_bytes(content),
         );
-        let image = image_with(vec![
-            (
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
                 VirtualPath::worktree("doc.md").unwrap(),
                 file_entry(content),
-            ),
-            (
+            )
+            .entry(
                 VirtualPath::worktree("archived.md").unwrap(),
                 directory_entry(),
-            ),
-        ]);
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -809,10 +771,13 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        let image = image_with(vec![(
-            VirtualPath::worktree("archive/.jit-container").unwrap(),
-            directory_entry(),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::worktree("archive/.jit-container").unwrap(),
+                directory_entry(),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -844,10 +809,13 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        let image = image_with(vec![(
-            VirtualPath::worktree("stale.md").unwrap(),
-            directory_entry(),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::worktree("stale.md").unwrap(),
+                directory_entry(),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -868,7 +836,13 @@ mod tests {
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![captured_issue_entry(&issue.id, &issue)]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                captured_issue_entry(&issue),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -889,7 +863,13 @@ mod tests {
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![captured_issue_entry(&issue.id, &issue)]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                captured_issue_entry(&issue),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -909,7 +889,13 @@ mod tests {
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![captured_issue_entry(&issue.id, &issue)]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&issue.id),
+                captured_issue_entry(&issue),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -927,10 +913,13 @@ mod tests {
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![(
-            VirtualPath::issue_record(&crate::test_utils::issue_id(166)),
-            RepositoryEntry::Absent,
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&crate::test_utils::issue_id(166)),
+                RepositoryEntry::Absent,
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -947,10 +936,13 @@ mod tests {
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![(
-            VirtualPath::issue_record(&crate::test_utils::issue_id(167)),
-            file_entry(b"not json"),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&crate::test_utils::issue_id(167)),
+                file_entry(b"not json"),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -969,10 +961,13 @@ mod tests {
             to_path: "archived.md".into(),
         };
         let plan = relink_plan(change);
-        let image = image_with(vec![(
-            VirtualPath::issue_record(&crate::test_utils::issue_id(168)),
-            file_entry(&crate::repository_state::serialize_issue(&issue).unwrap()),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::issue_record(&crate::test_utils::issue_id(168)),
+                file_entry(&crate::repository_state::serialize_issue(&issue).unwrap()),
+            )
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -994,7 +989,9 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        let image = image_with(Vec::new());
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
@@ -1025,7 +1022,9 @@ mod tests {
             Vec::new(),
         )
         .unwrap();
-        let image = image_with(Vec::new());
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,

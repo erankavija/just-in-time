@@ -667,6 +667,71 @@ pub(crate) fn created_issue(draft: &Issue, now: DateTime<Utc>) -> Issue {
     issue
 }
 
+/// The issue a mutation persists, or its captured record for a no-op.
+pub(crate) fn mutated_issue(
+    image: &RepositoryImage,
+    id: &IssueId,
+    intents: &[MutationIntent],
+    now: DateTime<Utc>,
+) -> Result<Issue, MutationError> {
+    let preimage =
+        captured_issue(image, id)?.ok_or_else(|| MutationError::MissingIssue(id.clone()))?;
+    let Some(issue) = intents.iter().find_map(|intent| match intent {
+        MutationIntent::UpdateIssue { issue } if &issue.id == id => Some(issue.as_ref()),
+        _ => None,
+    }) else {
+        return Ok(preimage);
+    };
+    Ok(updated_issue(&preimage, issue, intents, now))
+}
+
+fn updated_issue(
+    preimage: &Issue,
+    issue: &Issue,
+    intents: &[MutationIntent],
+    now: DateTime<Utc>,
+) -> Issue {
+    let mut updated = issue.clone();
+    updated.created_at = preimage.created_at;
+    updated.first_ready_at = preimage.first_ready_at;
+    updated.claimed_at = preimage.claimed_at;
+    updated.done_at = preimage.done_at;
+    if preimage.state != State::Ready && updated.state == State::Ready {
+        updated.mark_first_ready(now);
+    }
+    if preimage.assignee.is_none() && updated.assignee.is_some() {
+        updated.mark_claimed(now);
+    }
+    if preimage.state != State::Done && updated.state == State::Done {
+        updated.mark_done(now);
+    }
+    for (key, state) in &mut updated.gates_status {
+        let records_evidence = intents.iter().any(|intent| match intent {
+            MutationIntent::RecordEvent { event, .. } => match (&**event, state.status) {
+                (
+                    EventBody::GatePassed {
+                        issue_id, gate_key, ..
+                    },
+                    GateStatus::Passed,
+                )
+                | (
+                    EventBody::GateFailed {
+                        issue_id, gate_key, ..
+                    },
+                    GateStatus::Failed,
+                ) => issue_id == &updated.id && gate_key == key,
+                _ => false,
+            },
+            _ => false,
+        });
+        if records_evidence || preimage.gates_status.get(key) != Some(state) {
+            state.updated_at = now;
+        }
+    }
+    updated.updated_at = now;
+    updated
+}
+
 pub(super) fn finalize_delta(
     layout: &RepositoryLayout,
     image: &RepositoryImage,
@@ -825,45 +890,7 @@ pub(super) fn finalize_delta(
         if let MutationIntent::UpdateIssue { issue } = intent {
             let preimage = captured_issue(image, &issue.id)?
                 .ok_or_else(|| MutationError::MissingIssue(issue.id.clone()))?;
-            let now = context.timestamp();
-            let mut updated = (**issue).clone();
-            updated.created_at = preimage.created_at;
-            updated.first_ready_at = preimage.first_ready_at;
-            updated.claimed_at = preimage.claimed_at;
-            updated.done_at = preimage.done_at;
-            if preimage.state != State::Ready && updated.state == State::Ready {
-                updated.mark_first_ready(now);
-            }
-            if preimage.assignee.is_none() && updated.assignee.is_some() {
-                updated.mark_claimed(now);
-            }
-            if preimage.state != State::Done && updated.state == State::Done {
-                updated.mark_done(now);
-            }
-            for (key, state) in &mut updated.gates_status {
-                let records_evidence = intents.iter().any(|intent| match intent {
-                    MutationIntent::RecordEvent { event, .. } => match (&**event, state.status) {
-                        (
-                            EventBody::GatePassed {
-                                issue_id, gate_key, ..
-                            },
-                            GateStatus::Passed,
-                        )
-                        | (
-                            EventBody::GateFailed {
-                                issue_id, gate_key, ..
-                            },
-                            GateStatus::Failed,
-                        ) => issue_id == &updated.id && gate_key == key,
-                        _ => false,
-                    },
-                    _ => false,
-                });
-                if records_evidence || preimage.gates_status.get(key) != Some(state) {
-                    state.updated_at = now;
-                }
-            }
-            updated.updated_at = now;
+            let updated = updated_issue(&preimage, issue, intents, context.timestamp());
             actions.push(write_issue_action(image, &updated)?);
         }
     }
@@ -1244,18 +1271,11 @@ mod tests {
     use super::*;
     use crate::domain::{GateState, GateStatus};
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, CapturedBytes, RepositoryEntry, RepositoryImage,
-        RepositoryIndex, RepositoryRootEvidence, SUPPORTED_INDEX_SCHEMA_VERSION,
+        CapturedBytes, RepositoryEntry, RepositoryImage, RepositoryIndex,
+        SUPPORTED_INDEX_SCHEMA_VERSION,
     };
-    use std::collections::{BTreeMap, HashMap};
-
-    fn layout() -> RepositoryLayout {
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "wt", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap()
-    }
+    use crate::test_harness::image::{synthetic_layout, ImageBuilder};
+    use std::collections::HashMap;
 
     /// Fails when `serde_json`'s `preserve_order` feature is enabled.
     #[test]
@@ -1305,28 +1325,6 @@ mod tests {
         fn now(&self) -> DateTime<Utc> {
             panic!("a no-op must not sample the mutation clock");
         }
-    }
-
-    fn budget() -> CaptureBudget {
-        CaptureBudget {
-            max_listings: 2,
-            max_bytes: 1 << 20,
-            max_depth: 6,
-        }
-    }
-
-    /// Build an image over a fixed set of `Data(...)` entries.
-    fn image_with(entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
-        let paths: Vec<VirtualPath> = entries.iter().map(|(path, _)| path.clone()).collect();
-        let spec = CaptureSpec::new(paths, budget()).unwrap();
-        RepositoryImage::close(
-            layout(),
-            spec,
-            entries.into_iter().collect::<BTreeMap<_, _>>(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
     }
 
     fn file_entry(bytes: &[u8]) -> RepositoryEntry {
@@ -1407,20 +1405,17 @@ mod tests {
         })
         .unwrap();
         let created_id = created_id();
-        let image = image_with(vec![
-            (
-                VirtualPath::data("issues").unwrap(),
-                RepositoryEntry::Absent,
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::ISSUES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
                 VirtualPath::issue_record(&created_id),
                 RepositoryEntry::Absent,
-            ),
-        ]);
+            )
+            .build();
         let first = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::CreateIssue {
@@ -1429,7 +1424,7 @@ mod tests {
         )
         .unwrap();
         let retry = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::CreateIssue {
@@ -1473,18 +1468,15 @@ mod tests {
         })
         .unwrap();
         let created_id = created_id();
-        image_with(vec![
-            (
-                VirtualPath::data("issues").unwrap(),
-                RepositoryEntry::Absent,
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (
+        ImageBuilder::new()
+            .entry(VirtualPath::ISSUES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
                 VirtualPath::issue_record(&created_id),
                 RepositoryEntry::Absent,
-            ),
-        ])
+            )
+            .build()
     }
 
     /// The exact bytes a delta appends to the event log.
@@ -1518,7 +1510,7 @@ mod tests {
         let intents = [MutationIntent::CreateIssue {
             draft: Box::new(map_order_draft(false)),
         }];
-        let plan = finalize(&layout(), &image, &annotated_ctx(), &intents).unwrap();
+        let plan = finalize(&synthetic_layout(), &image, &annotated_ctx(), &intents).unwrap();
 
         let created_id = created_id();
         assert!(
@@ -1599,13 +1591,13 @@ mod tests {
             draft: Box::new(map_order_draft(false)),
         }];
         let unannotated = appended_event_bytes(
-            finalize(&layout(), &image, &ctx(), &intents)
+            finalize(&synthetic_layout(), &image, &ctx(), &intents)
                 .unwrap()
                 .delta(),
         )
         .expect("an issue creation appends its own events");
         let annotated = appended_event_bytes(
-            finalize(&layout(), &image, &annotated_ctx(), &intents)
+            finalize(&synthetic_layout(), &image, &annotated_ctx(), &intents)
                 .unwrap()
                 .delta(),
         )
@@ -1634,20 +1626,20 @@ mod tests {
             Some(agent.clone()),
         );
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let image = image_with(vec![
-            (
+        let image = ImageBuilder::new()
+            .entry(
                 VirtualPath::issue_record(&issue.id),
                 file_entry(&issue_bytes),
-            ),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-        ]);
+            )
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let context = MutationContext::with_annotation(
             IdAuthority::random(),
             Box::new(PanicMutationClock),
             Some(override_annotation()),
         );
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &context,
             &[MutationIntent::ClaimIssue {
@@ -1668,14 +1660,13 @@ mod tests {
 
     /// An image holding the event log as `tail`.
     fn tail_image(tail: crate::repository_state::EventLogTail) -> RepositoryImage {
-        let mut spec = CaptureSpec::new([], budget()).unwrap();
-        spec.discover_tail(VirtualPath::EVENTS).unwrap();
         let mode = FileMode::Regular;
-        let entries = BTreeMap::from([(
-            VirtualPath::EVENTS,
-            RepositoryEntry::FileTail { tail, mode },
-        )]);
-        RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), BTreeMap::new()).unwrap()
+        ImageBuilder::new()
+            .entry(
+                VirtualPath::EVENTS,
+                RepositoryEntry::FileTail { tail, mode },
+            )
+            .build()
     }
 
     /// An audit append over a log read as its tail lands at the log's committed
@@ -1726,7 +1717,9 @@ mod tests {
     fn test_finalize_audit_append_publishes_the_dispatch_override_record_with_its_events() {
         // The second finalizer path composes its events through the same event pass,
         // so the dispatch fact reaches it without a second edit.
-        let image = image_with(vec![(VirtualPath::EVENTS, RepositoryEntry::Absent)]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let action = finalize_audit_append(
             &image,
             &annotated_ctx(),
@@ -1772,18 +1765,15 @@ mod tests {
         })
         .unwrap();
         let created_id = created_id();
-        let image = image_with(vec![
-            (
-                VirtualPath::data("issues").unwrap(),
-                RepositoryEntry::Absent,
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            (
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::ISSUES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .entry(
                 VirtualPath::issue_record(&created_id),
                 RepositoryEntry::Absent,
-            ),
-        ]);
+            )
+            .build();
 
         // Deliberately prove the finalizer owns these values rather than accepting
         // caller timestamps embedded in the draft.
@@ -1793,7 +1783,7 @@ mod tests {
                 .with_timezone(&Utc);
         }
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::CreateIssue {
@@ -1896,12 +1886,20 @@ mod tests {
             },
         );
         let bytes = serialize_issue(&preimage).unwrap();
-        let image = image_with(vec![(VirtualPath::issue_record(id), file_entry(&bytes))]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::issue_record(id), file_entry(&bytes))
+            .build();
         let intent = MutationIntent::UpdateIssue {
             issue: Box::new(updated),
         };
-        let first = finalize(&layout(), &image, &ctx(), std::slice::from_ref(&intent)).unwrap();
-        let retry = finalize(&layout(), &image, &ctx(), &[intent]).unwrap();
+        let first = finalize(
+            &synthetic_layout(),
+            &image,
+            &ctx(),
+            std::slice::from_ref(&intent),
+        )
+        .unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &ctx(), &[intent]).unwrap();
         assert_eq!(first.delta(), retry.delta());
         let written = first
             .delta()
@@ -1970,16 +1968,16 @@ mod tests {
             Some(agent.clone()),
         );
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let image = image_with(vec![
-            (
+        let image = ImageBuilder::new()
+            .entry(
                 VirtualPath::issue_record(&issue.id),
                 file_entry(&issue_bytes),
-            ),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-        ]);
+            )
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let context = MutationContext::new(IdAuthority::random(), Box::new(PanicMutationClock));
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &context,
             &[MutationIntent::ClaimIssue {
@@ -2006,27 +2004,21 @@ mod tests {
                 &crate::test_utils::issue_id(0x2222_4222_8222_2222_2222_2222_2222_2222),
                 assignee,
             );
-            let mut spec =
-                CaptureSpec::new([VirtualPath::issue_record(&issue.id)], budget()).unwrap();
-            spec.discover_tail(VirtualPath::EVENTS).unwrap();
-            let entries = BTreeMap::from([
-                (
+            let image = ImageBuilder::new()
+                .entry(
                     VirtualPath::issue_record(&issue.id),
                     file_entry(&serialize_issue(&issue).unwrap()),
-                ),
-                (
+                )
+                .entry(
                     VirtualPath::EVENTS,
                     RepositoryEntry::FileTail {
                         tail: tail.clone(),
                         mode: FileMode::Regular,
                     },
-                ),
-            ]);
-            let image =
-                RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), BTreeMap::new())
-                    .unwrap();
+                )
+                .build();
             finalize(
-                &layout(),
+                &synthetic_layout(),
                 &image,
                 &ctx(),
                 &[MutationIntent::ClaimIssue {
@@ -2049,20 +2041,26 @@ mod tests {
             None,
         );
         let issue_bytes = serialize_issue(&issue).unwrap();
-        let image = image_with(vec![
-            (
+        let image = ImageBuilder::new()
+            .entry(
                 VirtualPath::issue_record(&issue.id),
                 file_entry(&issue_bytes),
-            ),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-        ]);
+            )
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let intent = MutationIntent::ClaimIssue {
             issue_id: issue.id.clone(),
             agent: agent.clone(),
         };
         let context = ctx();
-        let first = finalize(&layout(), &image, &context, std::slice::from_ref(&intent)).unwrap();
-        let retry = finalize(&layout(), &image, &context, &[intent]).unwrap();
+        let first = finalize(
+            &synthetic_layout(),
+            &image,
+            &context,
+            std::slice::from_ref(&intent),
+        )
+        .unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &[intent]).unwrap();
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
             serde_json::to_vec(retry.delta()).unwrap(),
@@ -2102,7 +2100,13 @@ mod tests {
     #[test]
     fn test_finalize_empty_intents_samples_neither_time_nor_identity() {
         let context = MutationContext::new(IdAuthority::random(), Box::new(PanicMutationClock));
-        let plan = finalize(&layout(), &image_with(Vec::new()), &context, &[]).unwrap();
+        let plan = finalize(
+            &synthetic_layout(),
+            &ImageBuilder::new().build(),
+            &context,
+            &[],
+        )
+        .unwrap();
 
         assert!(plan.delta().actions().is_empty());
         assert!(
@@ -2113,7 +2117,9 @@ mod tests {
 
     #[test]
     fn test_finalize_record_event_reuses_identity_time_and_bytes_on_retry() {
-        let image = image_with(vec![(VirtualPath::EVENTS, RepositoryEntry::Absent)]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let intent = MutationIntent::RecordEvent {
             phase: 0,
             event: Box::new(EventBody::draft_gate_definition_created(
@@ -2121,8 +2127,14 @@ mod tests {
             )),
         };
         let context = ctx();
-        let first = finalize(&layout(), &image, &context, std::slice::from_ref(&intent)).unwrap();
-        let retry = finalize(&layout(), &image, &context, &[intent]).unwrap();
+        let first = finalize(
+            &synthetic_layout(),
+            &image,
+            &context,
+            std::slice::from_ref(&intent),
+        )
+        .unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &[intent]).unwrap();
 
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
@@ -2146,10 +2158,10 @@ mod tests {
     fn test_finalize_gate_run_reserves_its_derived_id_and_serializes_attestation() {
         let context = ctx();
         let run_id = context.gate_run_id_at(0);
-        let image = image_with(vec![
-            (VirtualPath::GATE_RUNS, RepositoryEntry::Absent),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
-        ]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::GATE_RUNS, RepositoryEntry::Absent)
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+            .build();
         let draft = GateRunResult::attestation(
             &run_id,
             &crate::test_utils::issue_id(7),
@@ -2168,8 +2180,8 @@ mod tests {
             )),
         };
         let intents = [intent, provenance];
-        let first = finalize(&layout(), &image, &context, &intents).unwrap();
-        let retry = finalize(&layout(), &image, &context, &intents).unwrap();
+        let first = finalize(&synthetic_layout(), &image, &context, &intents).unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &intents).unwrap();
 
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
@@ -2231,8 +2243,8 @@ mod tests {
         ];
         let image = creation_image();
         let context = ctx();
-        let first = finalize(&layout(), &image, &context, &intents).unwrap();
-        let retry = finalize(&layout(), &image, &context, &intents).unwrap();
+        let first = finalize(&synthetic_layout(), &image, &context, &intents).unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &intents).unwrap();
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
             serde_json::to_vec(retry.delta()).unwrap(),
@@ -2286,25 +2298,18 @@ mod tests {
             deleted_ids: Vec::new(),
         })
         .unwrap();
-        let image = image_with(
-            [
-                (
-                    VirtualPath::data("issues").unwrap(),
-                    RepositoryEntry::Absent,
-                ),
-                (VirtualPath::INDEX, file_entry(&index_bytes)),
-                (VirtualPath::EVENTS, RepositoryEntry::Absent),
-            ]
-            .into_iter()
-            .chain(
-                draft_ids
-                    .iter()
-                    .map(|id| (VirtualPath::issue_record(id), RepositoryEntry::Absent)),
+        let image = draft_ids
+            .iter()
+            .fold(
+                ImageBuilder::new()
+                    .entry(VirtualPath::ISSUES, RepositoryEntry::Absent)
+                    .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+                    .entry(VirtualPath::EVENTS, RepositoryEntry::Absent),
+                |builder, id| builder.entry(VirtualPath::issue_record(id), RepositoryEntry::Absent),
             )
-            .collect(),
-        );
+            .build();
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::CreateIssueBatch {
@@ -2363,21 +2368,18 @@ mod tests {
             issue.state = State::Ready;
             issue
         };
-        let image = image_with(vec![
-            (
-                VirtualPath::data("issues").unwrap(),
-                RepositoryEntry::Absent,
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-            (VirtualPath::EVENTS, RepositoryEntry::Absent),
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::ISSUES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
             // The draft carries its id; seed that id's absent slot.
-            (
+            .entry(
                 VirtualPath::issue_record(&created_id()),
                 RepositoryEntry::Absent,
-            ),
-        ]);
+            )
+            .build();
         let delta = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::CreateIssue {
@@ -2421,16 +2423,16 @@ mod tests {
             true,
         )
         .unwrap();
-        let image = image_with(vec![
-            (
+        let image = ImageBuilder::new()
+            .entry(
                 VirtualPath::issue_record(&issue.id),
                 file_entry(&issue_bytes),
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-        ]);
+            )
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .build();
 
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::DeleteIssue {
@@ -2468,16 +2470,16 @@ mod tests {
             "deleted_ids": [crate::test_utils::issue_id(1), crate::test_utils::issue_id(1)]
         }))
         .unwrap();
-        let image = image_with(vec![
-            (
+        let image = ImageBuilder::new()
+            .entry(
                 VirtualPath::issue_record(&issue.id),
                 file_entry(&issue_bytes),
-            ),
-            (VirtualPath::INDEX, file_entry(&index_bytes)),
-        ]);
+            )
+            .entry(VirtualPath::INDEX, file_entry(&index_bytes))
+            .build();
 
         let error = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::DeleteIssue {
@@ -2500,13 +2502,12 @@ mod tests {
         updated.created_at = DateTime::UNIX_EPOCH;
         updated.done_at = Some(DateTime::UNIX_EPOCH);
         let bytes = serialize_issue(&issue).unwrap();
-        let image = image_with(vec![(
-            VirtualPath::issue_record(&issue.id),
-            file_entry(&bytes),
-        )]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::issue_record(&issue.id), file_entry(&bytes))
+            .build();
 
         let plan = finalize(
-            &layout(),
+            &synthetic_layout(),
             &image,
             &ctx(),
             &[MutationIntent::UpdateIssue {
@@ -2539,7 +2540,7 @@ mod tests {
 
     /// The finalizer's event-log action over `image`: its offset and bytes.
     fn event_append(image: &RepositoryImage, intents: &[MutationIntent]) -> (u64, Vec<u8>) {
-        let plan = finalize(&layout(), image, &ctx(), intents).unwrap();
+        let plan = finalize(&synthetic_layout(), image, &ctx(), intents).unwrap();
         plan.delta()
             .actions()
             .iter()
@@ -2584,7 +2585,9 @@ mod tests {
             (log, image)
         };
         let whole = |log: Vec<u8>| {
-            let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&log))]);
+            let image = ImageBuilder::new()
+                .entry(VirtualPath::EVENTS, file_entry(&log))
+                .build();
             (log, image)
         };
         let record = MutationIntent::RecordEvent {
@@ -2647,7 +2650,9 @@ mod tests {
 
     #[test]
     fn test_finalize_orders_the_stamped_marker_first_over_a_torn_tail() {
-        let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&torn_log()))]);
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::EVENTS, file_entry(&torn_log()))
+            .build();
         let record = |event| MutationIntent::RecordEvent {
             phase: 0,
             event: Box::new(event),

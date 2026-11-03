@@ -6,7 +6,7 @@
 //! paths wire those helpers in.
 
 use jit::domain::event_catalog::EventTag;
-use jit::domain::identity::IssueId;
+use jit::domain::identity::{IssueId, IssueIdPrefix};
 use jit::domain::{EventBody, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
@@ -57,7 +57,7 @@ fn test_claim_stamps_claimed_at() {
 
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".parse().unwrap())
+        .claim_issue(&IssueIdPrefix::from(&id), "agent:worker-1".parse().unwrap())
         .unwrap();
 
     let issue = h.get_issue(&id);
@@ -74,7 +74,7 @@ fn test_assign_stamps_claimed_at_and_logs_event() {
 
     h.executor
         .issues()
-        .assign_issue(&id, "human:alice".parse().unwrap())
+        .assign_issue(&IssueIdPrefix::from(&id), "human:alice".parse().unwrap())
         .unwrap();
 
     assert!(h.get_issue(&id).claimed_at.is_some());
@@ -94,7 +94,7 @@ fn tags_appended_by_claim(h: &TestHarness, id: &IssueId, assignee: &str) -> Vec<
     let before = h.storage.read_events().unwrap().len();
     h.executor
         .issues()
-        .claim_issue(id, assignee.parse().unwrap())
+        .claim_issue(&IssueIdPrefix::from(id), assignee.parse().unwrap())
         .unwrap();
     h.storage.read_events().unwrap()[before..]
         .iter()
@@ -123,7 +123,7 @@ fn test_claim_issue_promoting_same_assignee_appends_only_the_state_change() {
     let id = h.create_ready_issue("Assigned");
     h.executor
         .issues()
-        .assign_issue(&id, "agent:worker-1".parse().unwrap())
+        .assign_issue(&IssueIdPrefix::from(&id), "agent:worker-1".parse().unwrap())
         .unwrap();
 
     let tags = tags_appended_by_claim(&h, &id, "agent:worker-1");
@@ -139,7 +139,7 @@ fn test_claim_issue_same_assignee_without_promotion_appends_nothing() {
     let id = h.create_ready_issue("Finished");
     h.executor
         .issues()
-        .assign_issue(&id, "agent:worker-1".parse().unwrap())
+        .assign_issue(&IssueIdPrefix::from(&id), "agent:worker-1".parse().unwrap())
         .unwrap();
     jit::test_utils::transition_issue(&h.executor, &id, State::Done).unwrap();
 
@@ -168,7 +168,7 @@ fn test_reclaim_keeps_first_claimed_at() {
     let id = h.create_ready_issue("Claimable");
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".parse().unwrap())
+        .claim_issue(&IssueIdPrefix::from(&id), "agent:worker-1".parse().unwrap())
         .unwrap();
     let first = h.get_issue(&id).claimed_at;
     assert!(first.is_some());
@@ -176,7 +176,7 @@ fn test_reclaim_keeps_first_claimed_at() {
     // Re-claiming as the same assignee promotes/no-ops but must not re-stamp.
     h.executor
         .issues()
-        .claim_issue(&id, "agent:worker-1".parse().unwrap())
+        .claim_issue(&IssueIdPrefix::from(&id), "agent:worker-1".parse().unwrap())
         .unwrap();
     assert_eq!(h.get_issue(&id).claimed_at, first);
 }

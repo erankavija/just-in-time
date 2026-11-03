@@ -3,8 +3,7 @@
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
-    "725af076-76e0-40ea-91e3-a1b43f720cc6",
-    "de9a7557-2061-4b63-9c74-6c18ed840c17"
+    "725af076-76e0-40ea-91e3-a1b43f720cc6"
   ],
   "description": "Make `CaptureSpec`'s growth methods validate only the entries they add, so growing a spec one request at a time is linear.\n\n## Background\n\n- `discover_paths`, `discover_tail` and `discover_listings` (`crates/jit/src/repository_state/image.rs:566-612`) clone the whole spec, add the request and re-run `validate` (`:660-686`) over every held path, listing and pinned request. `discover_pinned` (`:620-629`) already validates only its request.\n- Every check in `validate` is per entry (depth within `max_depth`, `ensure_semantic`, `validate_pinned_request`) or a count (`listings.len()` within `max_listings`), and every mutator goes through these methods, so every held entry is already valid.\n- `discover_paths` refuses a whole read of the event log, a per-entry check.\n- `RepositoryImage::close` validates the spec once (`:705`).\n\n## Success Criteria\n\n- [hard] REQ-01: `discover_paths`, `discover_tail` and `discover_listings` validate only the entries a call adds plus the listing count, and clone nothing; a refused call leaves the spec unchanged.\n- [hard] REQ-02: A proptest shows that, for generated specs and batches, a batch is accepted exactly when whole-spec validation of the grown spec succeeds, and that the grown spec is the same either way.\n- [hard] REQ-03: A unit test shows that a refused batch leaves the spec equal to its prior value.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
@@ -27,5 +26,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Capture specs validate only added entries",
-  "updated_at": "2026-10-21T20:31:37.199985332Z"
+  "updated_at": "2026-11-03T22:37:40.026132480Z"
 }
