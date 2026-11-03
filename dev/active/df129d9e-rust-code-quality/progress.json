@@ -192,7 +192,10 @@
           "short_id": "5962427b",
           "title": "Validation methods behind a validation facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 7f257f027; cargo-ci, code-review passed; rework 1 (authorized &mut self -> &self); claim.rs conflict and a post-merge unused mut fixed by Haiku workers)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-profiles",
@@ -200,7 +203,10 @@
           "short_id": "6f49f3b3",
           "title": "Profile and init methods behind a profiles facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged d7729e1ca; cargo-ci, code-review passed)",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         },
         {
           "key": "executor-facade-queries",
@@ -208,7 +214,10 @@
           "short_id": "7a7d0bfe",
           "title": "Query, search and event methods behind a queries facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 876eae0af; cargo-ci, code-review passed; merge-main conflict resolved by a Haiku worker)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-gates",
@@ -216,7 +225,10 @@
           "short_id": "fd2073b7",
           "title": "Gate definition and attachment methods behind a gates facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 58b9b90dc; cargo-ci, code-review passed; conflict with storage epic gate-run addressing resolved by a Haiku worker)",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         },
         {
           "key": "executor-facade-graph",
@@ -224,7 +236,10 @@
           "short_id": "93aaba24",
           "title": "Graph and dependency methods behind a graph facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 226db21cc; cargo-ci, code-review passed; first branch CI missed the suite-clock budget (30471 ms) as host load rose mid-run; rerun 16740 ms; one rustdoc conflict resolved by a Haiku worker)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-issue-batches",
@@ -232,7 +247,10 @@
           "short_id": "f79d2510",
           "title": "Label and batch issue methods onto the issues facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 6f110c219; cargo-ci, code-review passed)",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         },
         {
           "key": "executor-facade-gate-checks",
@@ -240,7 +258,10 @@
           "short_id": "a24b11aa",
           "title": "Gate check methods onto the gates facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 67df5d08a; cargo-ci, code-review passed; conflict with ValidationOps resolved by a Haiku worker)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-documents",
@@ -248,7 +269,10 @@
           "short_id": "985c2b15",
           "title": "Document methods behind a documents facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 3aa8182c5; cargo-ci, code-review passed; first land refused on another lead's uncommitted file on main)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-config",
@@ -256,7 +280,10 @@
           "short_id": "dbd05242",
           "title": "Config methods behind a config facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 8b4ca7956; cargo-ci, code-review passed; two merge-main conflicts resolved by Haiku workers)",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         },
         {
           "key": "claims-executor-family",
@@ -264,7 +291,10 @@
           "short_id": "083c9a91",
           "title": "Claim and recover operations behind a claims facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (merged 0fbd890c3; cargo-ci passed; code-review failed F1 'cargo-ci pass predates 2174da3a', though 2174da3a is an ancestor of 0fbd890c3; an unchanged rerun was stopped unrecorded at 6a's direction; awaiting user ruling)",
+          "vendor": "claude",
+          "model_tier": "sonnet",
+          "tier_reason": "recover session ordering is concurrency-sensitive (plan D-28)"
         },
         {
           "key": "executor-facade-templates",
@@ -272,7 +302,10 @@
           "short_id": "1002524a",
           "title": "Template methods behind a templates facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 55e6ce46f; cargo-ci, code-review passed)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "mechanical facade move; Claude/Codex alternation"
         },
         {
           "key": "executor-facade-archive",
@@ -280,7 +313,10 @@
           "short_id": "a015dcbb",
           "title": "Archive and snapshot methods behind an archive facade",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done (merged 18a5a57b0; cargo-ci, code-review passed)",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "mechanical: facade pattern fixed by 27f0a575"
         }
       ]
     },
@@ -742,6 +778,13 @@
       "issue": "df129d9e",
       "summary": "No disk cleanup by this lead; just-in-time-6a coordinates relocation to /mnt/nvme",
       "status": "open"
+    },
+    {
+      "date": "2026-11-03",
+      "kind": "gate-dispute",
+      "issue": "083c9a91",
+      "summary": "code-review F1 claims cargo-ci evidence predates 2174da3a; ancestry shows otherwise; raised to the user via just-in-time-6a",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -751,9 +794,16 @@
     "9fa12e75": 1,
     "d4373d07": 1,
     "a807e699": 1,
-    "5d0a9a90": 2
+    "5d0a9a90": 2,
+    "5962427b": 1
   },
-  "surfaced_pitfalls": [],
+  "surfaced_pitfalls": [
+    {
+      "source": "wave 4 workers",
+      "summary": "cargo doc -p jit --no-deps reports unresolved intra-doc links (pre-existing): cli.rs, commands/mod.rs (incl. :2303 RepositoryLayout), bulk_update.rs, document.rs, gate.rs, dependency.rs, config.rs, validate.rs, project.rs:112, profile.rs:441 PackageArchiveError, domain/artifact_discovery.rs:243 private crate::commands::archive, domain/types.rs:129,185,1220,1442",
+      "disposition": "reconcile against REQ-03-type criteria before container gates"
+    }
+  ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
   "line_target": {
@@ -768,10 +818,22 @@
       "2e7e1348": -4,
       "a807e699": -158,
       "5d0a9a90": 8,
-      "d84a7bfa": 0
+      "d84a7bfa": 0,
+      "1002524a": 1,
+      "7a7d0bfe": 10,
+      "93aaba24": 4,
+      "985c2b15": 11,
+      "a015dcbb": 0,
+      "dbd05242": 0,
+      "5962427b": 5,
+      "6f49f3b3": 13,
+      "fd2073b7": 5,
+      "f79d2510": 3,
+      "a24b11aa": 0,
+      "083c9a91": -14
     },
-    "epic_total": -293,
-    "head_lines": 9121,
-    "head_rev": "99b8ae0dd"
+    "epic_total": -255,
+    "head_lines": 9159,
+    "head_rev": "2ac3d1872"
   }
 }
