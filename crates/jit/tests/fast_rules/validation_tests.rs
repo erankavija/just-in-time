@@ -43,7 +43,10 @@ fn test_validation_detects_broken_dependency() {
         .unwrap();
 
     // Add valid dependency
-    executor.add_dependency(&issue2_id, &issue1_id).unwrap();
+    executor
+        .graph()
+        .add_dependency(&issue2_id, &issue1_id)
+        .unwrap();
 
     // Validation should pass
     assert!(executor.validation().validate_silent().is_ok());
@@ -95,7 +98,10 @@ fn test_validation_detects_cycle() {
         .unwrap();
 
     // Add A -> B
-    executor.add_dependency(&issue1_id, &issue2_id).unwrap();
+    executor
+        .graph()
+        .add_dependency(&issue1_id, &issue2_id)
+        .unwrap();
 
     // Manually create cycle by adding B -> A directly in storage
     let mut issue2_updated = storage.load_issue(&issue2_id).unwrap();
@@ -156,8 +162,14 @@ fn test_validation_passes_with_valid_graph() {
         )
         .unwrap();
 
-    executor.add_dependency(&issue_b_id, &issue_c_id).unwrap();
-    executor.add_dependency(&issue_a_id, &issue_b_id).unwrap();
+    executor
+        .graph()
+        .add_dependency(&issue_b_id, &issue_c_id)
+        .unwrap();
+    executor
+        .graph()
+        .add_dependency(&issue_a_id, &issue_b_id)
+        .unwrap();
 
     // Validation should pass
     assert!(executor.validation().validate_silent().is_ok());
@@ -267,7 +279,10 @@ fn test_validation_detects_isolated_issues() {
         )
         .unwrap();
 
-    executor.add_dependency(&issue_b_id, &issue_a_id).unwrap();
+    executor
+        .graph()
+        .add_dependency(&issue_b_id, &issue_a_id)
+        .unwrap();
 
     // Create an isolated issue (no deps, not a dep of anything)
     let (_isolated_id, _) = executor
@@ -340,8 +355,14 @@ fn test_validation_passes_with_all_connected_issues() {
         )
         .unwrap();
 
-    executor.add_dependency(&issue_b_id, &issue_a_id).unwrap();
-    executor.add_dependency(&issue_c_id, &issue_b_id).unwrap();
+    executor
+        .graph()
+        .add_dependency(&issue_b_id, &issue_a_id)
+        .unwrap();
+    executor
+        .graph()
+        .add_dependency(&issue_c_id, &issue_b_id)
+        .unwrap();
 
     // All issues are connected - validation should pass
     let result = executor.validation().validate_silent();

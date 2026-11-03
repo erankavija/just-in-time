@@ -805,7 +805,10 @@ mod sdd_lifecycle {
             },
         );
         // Wire containment: the epic depends on its child.
-        executor.add_dependency(&epic_id, &child_id).unwrap();
+        executor
+            .graph()
+            .add_dependency(&epic_id, &child_id)
+            .unwrap();
 
         // Transition to done: must succeed.
         let result = executor.issues().update_issue(

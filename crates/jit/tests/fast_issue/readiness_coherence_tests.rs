@@ -80,7 +80,10 @@ fn test_add_dependency_demotes_a_ready_dependent_and_records_the_state_change() 
     let dependent = h.create_issue("Dependent");
     assert_eq!(h.get_issue(&dependent).state, State::Ready);
 
-    h.executor.add_dependency(&dependent, &upstream).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &upstream)
+        .unwrap();
 
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
     let events = h.storage.read_events().unwrap();
@@ -101,7 +104,10 @@ fn test_validate_reports_a_ready_issue_with_an_unmet_dependency_as_a_violation()
     let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &upstream).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &upstream)
+        .unwrap();
     assert!(
         h.executor.validation().validate_silent().is_ok(),
         "the coherent repository must validate"
@@ -136,7 +142,10 @@ fn test_validate_fix_demotes_a_ready_issue_that_carries_an_unmet_dependency() {
     let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &upstream).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &upstream)
+        .unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
@@ -160,7 +169,10 @@ fn test_validate_fix_records_the_repair_demotion_in_the_event_log() {
     let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &upstream).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &upstream)
+        .unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
@@ -189,7 +201,10 @@ fn test_validate_fix_dry_run_reports_the_incoherent_issue_without_repairing_it()
     let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &upstream).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &upstream)
+        .unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
@@ -261,11 +276,11 @@ proptest! {
             let _ = match edit {
                 DependencyEdit::Add { from, to } => h
                     .executor
-                    .add_dependency(&ids[from], &ids[to])
+                    .graph().add_dependency(&ids[from], &ids[to])
                     .map(|_| ()),
                 DependencyEdit::Remove { from, to } => h
                     .executor
-                    .remove_dependency(&ids[from], &ids[to])
+                    .graph().remove_dependency(&ids[from], &ids[to])
                     .map(|_| ()),
             };
         }
@@ -292,8 +307,14 @@ fn test_validate_reports_and_fix_promotes_a_backlog_dependent_whose_blockers_are
     let first = h.create_issue("First blocker");
     let second = h.create_issue("Second blocker");
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &first).unwrap();
-    h.executor.add_dependency(&dependent, &second).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &first)
+        .unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &second)
+        .unwrap();
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
     for blocker in [&first, &second] {
         let mut closed = h.get_issue(blocker);

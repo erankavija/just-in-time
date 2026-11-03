@@ -42,7 +42,10 @@ fn test_archived_from_done_still_satisfies_dependents() {
     drive_to_done(&h, &dependency);
     archive(&h, &dependency);
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &dependency).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &dependency)
+        .unwrap();
     jit::test_utils::transition_issue(&h.executor, &dependent, State::Backlog).unwrap();
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
 
@@ -57,7 +60,10 @@ fn test_archived_from_non_terminal_does_not_satisfy_dependents() {
     let h = TestHarness::new();
     let dependent = h.create_issue("Dependent");
     let dependency = h.create_issue("Parked mid-flight");
-    h.executor.add_dependency(&dependent, &dependency).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &dependency)
+        .unwrap();
     jit::test_utils::transition_issue(&h.executor, &dependency, State::InProgress).unwrap();
     archive(&h, &dependency);
     assert_eq!(
@@ -120,7 +126,10 @@ fn test_archived_from_rejected_revives_only_to_rejected_and_stays_terminal() {
         Some(State::Rejected)
     );
     let dependent = h.create_issue("Dependent");
-    h.executor.add_dependency(&dependent, &dependency).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&dependent, &dependency)
+        .unwrap();
     jit::test_utils::transition_issue(&h.executor, &dependent, State::Backlog).unwrap();
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
 

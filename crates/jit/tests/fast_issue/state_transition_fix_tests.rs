@@ -14,7 +14,7 @@ fn test_validate_fix_transitions_backlog_to_ready() {
     // Create a story in backlog with one task dependency
     let task = h.create_issue("Task");
     let story = h.create_issue("Story");
-    h.executor.add_dependency(&story, &task).unwrap();
+    h.executor.graph().add_dependency(&story, &task).unwrap();
 
     // Verify story is in backlog (has dependencies)
     let story_issue = h.storage.load_issue(&story).unwrap();
@@ -54,8 +54,8 @@ fn test_validate_fix_ignores_unmet_dependencies() {
     let task1 = h.create_issue("Task 1");
     let task2 = h.create_issue("Task 2");
     let story = h.create_issue("Story");
-    h.executor.add_dependency(&story, &task1).unwrap();
-    h.executor.add_dependency(&story, &task2).unwrap();
+    h.executor.graph().add_dependency(&story, &task1).unwrap();
+    h.executor.graph().add_dependency(&story, &task2).unwrap();
 
     // Complete only one task
     let mut task1_issue = h.storage.load_issue(&task1).unwrap();
@@ -85,8 +85,8 @@ fn test_validate_fix_transitions_multiple_issues() {
     let story1 = h.create_issue("Story 1");
     let story2 = h.create_issue("Story 2");
 
-    h.executor.add_dependency(&story1, &task1).unwrap();
-    h.executor.add_dependency(&story2, &task2).unwrap();
+    h.executor.graph().add_dependency(&story1, &task1).unwrap();
+    h.executor.graph().add_dependency(&story2, &task2).unwrap();
 
     // Complete both tasks
     let mut task1_issue = h.storage.load_issue(&task1).unwrap();
@@ -120,7 +120,7 @@ fn test_validate_fix_dry_run_no_changes() {
     // Create a story with completed dependency
     let task = h.create_issue("Task");
     let story = h.create_issue("Story");
-    h.executor.add_dependency(&story, &task).unwrap();
+    h.executor.graph().add_dependency(&story, &task).unwrap();
 
     let mut task_issue = h.storage.load_issue(&task).unwrap();
     task_issue.state = State::Done;
@@ -151,7 +151,7 @@ fn test_validate_fix_ignores_ready_issues() {
     let issue1 = h.create_issue("Ready issue 1");
     let issue2 = h.create_issue("Ready issue 2");
     // Connected, so the repository carries no isolated-issue finding.
-    h.executor.add_dependency(&issue2, &issue1).unwrap();
+    h.executor.graph().add_dependency(&issue2, &issue1).unwrap();
 
     // Manually set to ready
     let mut issue1_loaded = h.storage.load_issue(&issue1).unwrap();
@@ -174,7 +174,7 @@ fn test_validate_fix_ignores_done_issues() {
     // Create a done issue that had dependencies
     let task = h.create_issue("Task");
     let story = h.create_issue("Story");
-    h.executor.add_dependency(&story, &task).unwrap();
+    h.executor.graph().add_dependency(&story, &task).unwrap();
 
     // Both done
     let mut task_issue = h.storage.load_issue(&task).unwrap();
@@ -206,11 +206,11 @@ fn test_validate_fix_complex_dependency_chain() {
     let story2 = h.create_issue("Story 2");
     let epic = h.create_issue("Epic");
 
-    h.executor.add_dependency(&story1, &task1).unwrap();
-    h.executor.add_dependency(&story1, &task2).unwrap();
-    h.executor.add_dependency(&story2, &task3).unwrap();
-    h.executor.add_dependency(&epic, &story1).unwrap();
-    h.executor.add_dependency(&epic, &story2).unwrap();
+    h.executor.graph().add_dependency(&story1, &task1).unwrap();
+    h.executor.graph().add_dependency(&story1, &task2).unwrap();
+    h.executor.graph().add_dependency(&story2, &task3).unwrap();
+    h.executor.graph().add_dependency(&epic, &story1).unwrap();
+    h.executor.graph().add_dependency(&epic, &story2).unwrap();
 
     // Complete all tasks
     for task_id in [&task1, &task2, &task3] {

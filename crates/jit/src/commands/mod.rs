@@ -75,14 +75,16 @@ pub use batch_create::{
 pub use bootstrap::{open_repository, OpenedRepository, RecoveryFailedError, RepositoryInvocation};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use claim::ClaimOps;
-pub use config::{resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigSetOutcome};
+pub use config::{
+    resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigOps, ConfigSetOutcome,
+};
 pub use document::DocumentOps;
 pub use gate::{
-    FieldEdit, GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, GateUpdate,
-    ManualGateAttestationRequiredError, PassAllOutcome,
+    FieldEdit, GateNotRequiredError, GateOps, GatePassAllEntry, GatePassFailed, GatePassOutcome,
+    GateUpdate, ManualGateAttestationRequiredError, PassAllOutcome,
 };
 pub use gate_check::VerdictSource;
-pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
+pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat, GraphOps};
 pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueLocalUpdate, IssueOps};
@@ -1877,7 +1879,7 @@ fn apply_captured_issue_mutation(
 ///
 /// A required gate with no recorded run counts as [`GateStatus::Pending`]. A
 /// gate key missing from `registry` (should not normally happen) defaults to
-/// [`GateMode::Manual`], matching [`CommandExecutor::pass_gate`]'s own
+/// [`GateMode::Manual`], matching [`GateOps::pass_gate`]'s own
 /// fallback: an unregistered gate never matches the `Auto` branch there
 /// either, so it is treated as requiring `--by` just the same. Shared by the
 /// transition guard and the gate-diversion path so both describe a

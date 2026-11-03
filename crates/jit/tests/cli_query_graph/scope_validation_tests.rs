@@ -51,7 +51,7 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
             .unwrap()
             .0;
         for dependency in dependencies {
-            executor.add_dependency(&id, &dependency).unwrap();
+            executor.graph().add_dependency(&id, &dependency).unwrap();
         }
         if executor.storage().load_issue(&id).unwrap().state != target_state {
             executor
@@ -1305,7 +1305,7 @@ mod file_backed_external_plan {
             vec!["type:task"]
         };
         let impl_id = seed(executor, "impl", &impl_labels, "", &[]);
-        executor.add_dependency(&c, &impl_id).unwrap();
+        executor.graph().add_dependency(&c, &impl_id).unwrap();
 
         // Write the plan under the REPO ROOT, NOT under `.jit/`.
         let plan_dir = repo_root.path().join("dev/active");

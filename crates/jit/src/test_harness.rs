@@ -172,6 +172,7 @@ impl TestHarness {
         checker: Option<crate::declarations::GateChecker>,
     ) {
         self.executor
+            .gates()
             .define_gate(
                 key,
                 title.to_string(),
