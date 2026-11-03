@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "99460e2e11d1545f945c8bc50962b12fba9f6dea",
+  "completed_at": "2026-11-03T22:42:12.527043356Z",
+  "duration_ms": 295309,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 6901,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/dd53527f/requirement/REQ-06"
+        ],
+        "severity": "high",
+        "summary": "Plain claim list returns stale unexpired leases but does not render their stale marker or remediation block."
+      }
+    ],
+    "summary": "Plain claim list does not mark stale leases despite returning them.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dd53527f-818b-4e61-a0de-c2fb1d0d2684",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ce5dc362-fee0-4e2d-897e-49b5d7d4d9c3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T22:37:17.218034402Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 17927 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a38f-42b0-7370-be8a-bc19d44efbba\n--------\nuser\n--- 17914 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 05c6f455, 2e2554b1, ad57facb, 685d8178, e3b772bb (`jit:dd53527f`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-19, @/charter/D-20, @/charter/D-22 (dev/vision/9db27a3a-charter.md); @/invariant/convention-convergence (.jit/invariants.toml); @/issue/f8a6b298/requirement/REQ-06, @/issue/dd53527f/requirement/REQ-06, @/issue/dd53527f/decision/D-1 (issue Markdown)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T21:20:53Z); prior code-review F1 reviewed against decision D-1\nTruncation recovery: Re-read bounded per-commit hunk headers, implementation, renderer, tests, documentation, and resolved-item ranges after broad reads truncated.\n\n1. F1 — blocking, issue-impact (high): Plain `claim list` returns stale unexpired leases but never renders their computed `stale` flag: its indefinite-lease branch ends after `Last beat` at `crates/jit/src/main.rs:6901`, unlike `claim status`’s `STALE` block. This fails REQ-06’s requirement that listings report a stale lease as marked stale; the added test only checks the command-layer result, not rendered CLI output. References: @/issue/dd53527f/requirement/REQ-06.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Plain claim list does not mark stale leases despite returning them.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Plain claim list returns stale unexpired leases but does not render their stale marker or remediation block.\",\"file\":\"crates/jit/src/main.rs\",\"line\":6901,\"references\":[\"@/issue/dd53527f/requirement/REQ-06\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
