@@ -2646,11 +2646,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 if rules_path.exists() {
                     let user = self.rules().map_err(|e| e.to_string())?.clone();
                     let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
-                    Ok(
-                        crate::repository_state::reconcile_default_rules_with_config(
-                            user, namespaces,
-                        ),
-                    )
+                    crate::repository_state::reconcile_default_rules_with_config(user, namespaces)
+                        .map_err(|error| error.to_string())
                 } else {
                     // File absent: build the fixed defaults IN MEMORY (no write,
                     // no warning) from the repo's namespace registry. Materialized

@@ -2914,7 +2914,7 @@ kind = \"enforced\"
 
     const ONE_RULE: &str = "\
 [[rules]]
-name = \"label-format\"
+name = \"require-success-criteria\"
 assert = { require-section = { heading = \"Success Criteria\" } }
 ";
 
@@ -2939,7 +2939,10 @@ priority = 100
         let node = issue_with_labels(
             "node",
             "",
-            &["enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"],
+            &[
+                "enforces:@/rule/require-success-criteria",
+                "enforces:@/gate/cargo-ci",
+            ],
         );
         let config = crate::test_utils::shipped_item_kind_tables(&["invariant", "rule", "gate"]);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
