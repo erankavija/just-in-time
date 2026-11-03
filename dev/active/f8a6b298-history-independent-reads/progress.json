@@ -403,6 +403,18 @@
     {
       "item": "b697a3f7 REQ-04 wording: missing-lease to foreign-lease",
       "status": "pending with user via just-in-time-6a"
+    },
+    {
+      "item": "dd53527f code-review fail 3: next_claim_seq scans claims.jsonl vs per:D-19; options (a) drop label (b) claims.seq now",
+      "status": "pending with user via just-in-time-6a"
+    },
+    {
+      "item": "b697a3f7 1b7f58ae criteria vs 7dd59ebf amendment (plan-review 0dc73711 blocking)",
+      "status": "pending with user via just-in-time-6a"
+    },
+    {
+      "item": "725af076 -> cf49da17 edge reversal (a4)",
+      "status": "a4 routed to 6a"
     }
   ],
   "rework_counts": {

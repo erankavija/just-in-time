@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-03T21:48:22.187026615Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -27,7 +28,7 @@
     "satisfies:9876a23a/REQ-06"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Planning-node lookup lives in the template module",
-  "updated_at": "2026-11-01T02:13:13.384611212Z"
+  "updated_at": "2026-11-03T21:48:22.187026615Z"
 }
