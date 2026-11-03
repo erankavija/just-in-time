@@ -283,21 +283,15 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             })
     }
 
-    /// [`find_issue_document`](Self::find_issue_document) for the CLI, which
-    /// reports an absent document as a
-    /// [`NotFoundError`](crate::errors::NotFoundError).
+    /// [`find_issue_document`](Self::find_issue_document) with the typed
+    /// [`PathReadError`](crate::storage::PathReadError) kept as the CLI error,
+    /// so an absent document classifies by variant.
     fn require_issue_document(
         &self,
         issue: crate::domain::Issue,
         path: &str,
     ) -> Result<crate::domain::DocumentReference> {
-        self.find_issue_document(issue, path)
-            .map_err(|error| match error {
-                crate::storage::PathReadError::NotFound(message) => {
-                    crate::errors::NotFoundError::new(message).into()
-                }
-                other => other.into(),
-            })
+        Ok(self.find_issue_document(issue, path)?)
     }
 
     /// List `issue_id`'s documents: its explicit links, then the files it owns
@@ -601,9 +595,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
                         .storage
                         .read_path_text(&doc.path, None)
                         .map(|(text, _)| text)
-                        .map_err(|e| {
-                            anyhow!("Failed to read {} from filesystem: {}", doc.path, e)
-                        })?
+                        .with_context(|| format!("Failed to read {} from filesystem", doc.path))?
                 }
             }
         };

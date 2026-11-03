@@ -476,3 +476,59 @@ fn test_doc_dir_rejects_an_unknown_issue_identifier() {
     // lookup instead of an unparseable line.
     assert_json_rejection_agrees(&cli, &args, &[unknown], "an identifier naming no issue");
 }
+
+fn failure_of(output: &std::process::Output) -> serde_json::Value {
+    serde_json::from_slice(&output.stdout).expect("failure envelope on stdout")
+}
+
+#[test]
+fn test_doc_show_missing_document_reports_document_not_found() {
+    let cli = JitCli::initialised().unwrap();
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+
+    let output = cli
+        .command([
+            "doc",
+            "show",
+            issue_id.as_str(),
+            "docs/missing.md",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    let code = jit::output::ErrorCode::DocumentNotFound;
+    assert_eq!(failure_of(&output)["error"]["code"], code.as_str());
+    assert_eq!(output.status.code(), Some(code.exit_code() as i32));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_doc_show_document_outside_repository_reports_invalid_argument() {
+    let cli = JitCli::initialised().unwrap();
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    fs::write(outside.path().join("secret.md"), "# outside").unwrap();
+    let link = cli.root().join("escape");
+    fs::create_dir(&link).unwrap();
+    fs::write(link.join("secret.md"), "# inside").unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "escape/secret.md"])
+        .unwrap();
+    fs::remove_dir_all(&link).unwrap();
+    std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+
+    let output = cli
+        .command([
+            "doc",
+            "show",
+            issue_id.as_str(),
+            "escape/secret.md",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    let code = jit::output::ErrorCode::InvalidArgument;
+    assert_eq!(failure_of(&output)["error"]["code"], code.as_str());
+    assert_eq!(output.status.code(), Some(code.exit_code() as i32));
+}
