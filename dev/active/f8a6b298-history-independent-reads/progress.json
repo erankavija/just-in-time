@@ -475,6 +475,19 @@
       "vendor": "claude",
       "model": "sonnet",
       "reason": "Astra at capacity; finishes the partial rework"
+    },
+    {
+      "id": "c3e3e2ff",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "well-specified lease read API"
+    },
+    {
+      "id": "5b0e3d63",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "capture read modes across both session backends"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
