@@ -390,214 +390,6 @@ impl ClaimCoordinator {
         })
     }
 
-    /// Acquire a claim on an issue (atomic operation)
-    ///
-    /// # Arguments
-    ///
-    /// * `issue_id` - Issue to claim
-    /// * `ttl_secs` - Time-to-live in seconds (0 = indefinite)
-    ///
-    /// # Returns
-    ///
-    /// The acquired lease on success
-    ///
-    /// # Errors
-    ///
-    /// - Issue already claimed by another agent
-    /// - Lock timeout
-    /// - I/O errors
-    pub fn acquire_claim(&self, issue_id: &IssueId, ttl_secs: u64) -> Result<Lease> {
-        // 1. Acquire exclusive lock with metadata for diagnostics
-        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
-        fs::create_dir_all(lock_path.parent().unwrap())?;
-        let _guard = self
-            .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
-
-        // 2. Load index and evict expired leases
-        let mut index = self.load_claims_index()?;
-        self.evict_expired(&mut index)?;
-
-        // 3. Check availability
-        if let Some(existing) = index.find_lease(issue_id) {
-            let expires_info = if existing.ttl_secs == 0 {
-                format!("(indefinite lease, last beat: {})", existing.last_beat)
-            } else {
-                format!("until {}", existing.expires_at.unwrap())
-            };
-
-            bail!(
-                "{}",
-                errors::already_claimed(issue_id, &existing.agent_id.to_string(), &expires_info)
-            );
-        }
-
-        // 4. Create new lease
-        let now = self.clock.now();
-        let lease = Lease {
-            lease_id: LeaseId::try_from(Uuid::new_v4().to_string())?,
-            issue_id: issue_id.clone(),
-            agent_id: self.agent_id.clone(),
-            worktree_id: self.worktree_id.clone(),
-            branch: self.get_current_branch().ok(),
-            ttl_secs,
-            acquired_at: now,
-            expires_at: if ttl_secs > 0 {
-                Some(now + Duration::seconds(ttl_secs as i64))
-            } else {
-                None
-            },
-            last_beat: now,
-            stale: false,
-        };
-
-        // 5. Append to audit log
-        let op = ClaimOp::Acquire {
-            lease: lease.clone(),
-        };
-        self.append_claim_op(&op)?;
-
-        // 6. Update index atomically
-        index.add_lease(lease.clone());
-        self.write_index_atomic(&index)?;
-
-        // 7. Lock released via RAII
-        Ok(lease)
-    }
-
-    /// Acquire a claim with reason validation for indefinite leases.
-    ///
-    /// This is the preferred entry point for acquiring claims when indefinite
-    /// leases (TTL=0) are possible, as it enforces policy requirements.
-    ///
-    /// # Arguments
-    ///
-    /// * `issue_id` - Issue to claim
-    /// * `ttl_secs` - Time-to-live in seconds (0 = indefinite)
-    /// * `reason` - Reason for the claim (required for TTL=0)
-    /// * `max_indefinite_per_agent` - Maximum indefinite leases per agent
-    /// * `max_indefinite_per_repo` - Maximum indefinite leases per repository
-    ///
-    /// # Policy Enforcement
-    ///
-    /// - TTL=0 requires a non-empty reason
-    /// - Per-agent limit enforced from config
-    /// - Per-repo limit enforced from config
-    pub fn acquire_claim_with_reason(
-        &self,
-        issue_id: &IssueId,
-        ttl_secs: u64,
-        reason: Option<&str>,
-        max_indefinite_per_agent: u32,
-        max_indefinite_per_repo: u32,
-    ) -> Result<Lease> {
-        // Policy: TTL=0 requires a reason
-        if ttl_secs == 0 {
-            match reason {
-                None | Some("") => {
-                    bail!(
-                        "Indefinite leases (TTL=0) require --reason flag.\n\
-                         Example: jit claim acquire {} --ttl 0 --reason \"Manual oversight\"",
-                        issue_id
-                    );
-                }
-                Some(_) => {}
-            }
-        }
-
-        // 1. Acquire exclusive lock with metadata for diagnostics
-        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
-        fs::create_dir_all(lock_path.parent().unwrap())?;
-        let _guard = self
-            .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
-
-        // 2. Load index and evict expired leases
-        let mut index = self.load_claims_index()?;
-        self.evict_expired(&mut index)?;
-
-        // 3. Check availability
-        if let Some(existing) = index.find_lease(issue_id) {
-            let expires_info = if existing.ttl_secs == 0 {
-                format!("(indefinite lease, last beat: {})", existing.last_beat)
-            } else {
-                format!("until {}", existing.expires_at.unwrap())
-            };
-
-            bail!(
-                "{}",
-                errors::already_claimed(issue_id, &existing.agent_id.to_string(), &expires_info)
-            );
-        }
-
-        // 4. Policy: Check indefinite lease limits for TTL=0
-        if ttl_secs == 0 {
-            // Per-agent limit
-            let agent_indefinite_count = index
-                .leases
-                .iter()
-                .filter(|l| l.agent_id == self.agent_id && l.ttl_secs == 0)
-                .count() as u32;
-
-            if agent_indefinite_count >= max_indefinite_per_agent {
-                bail!(
-                    "Exceeded per-agent limit for indefinite leases.\n\
-                     Agent {} already has {} indefinite lease(s) (max: {}).\n\
-                     Release an existing indefinite lease or use a finite TTL.",
-                    self.agent_id,
-                    agent_indefinite_count,
-                    max_indefinite_per_agent
-                );
-            }
-
-            // Per-repo limit
-            let repo_indefinite_count =
-                index.leases.iter().filter(|l| l.ttl_secs == 0).count() as u32;
-
-            if repo_indefinite_count >= max_indefinite_per_repo {
-                bail!(
-                    "Exceeded per-repository limit for indefinite leases.\n\
-                     Repository has {} indefinite lease(s) (max: {}).\n\
-                     Wait for leases to be released or use a finite TTL.",
-                    repo_indefinite_count,
-                    max_indefinite_per_repo
-                );
-            }
-        }
-
-        // 5. Create new lease
-        let now = self.clock.now();
-        let lease = Lease {
-            lease_id: LeaseId::try_from(Uuid::new_v4().to_string())?,
-            issue_id: issue_id.clone(),
-            agent_id: self.agent_id.clone(),
-            worktree_id: self.worktree_id.clone(),
-            branch: self.get_current_branch().ok(),
-            ttl_secs,
-            acquired_at: now,
-            expires_at: if ttl_secs > 0 {
-                Some(now + Duration::seconds(ttl_secs as i64))
-            } else {
-                None
-            },
-            last_beat: now,
-            stale: false,
-        };
-
-        // 6. Append to audit log
-        let op = ClaimOp::Acquire {
-            lease: lease.clone(),
-        };
-        self.append_claim_op(&op)?;
-
-        // 7. Update index atomically
-        index.add_lease(lease.clone());
-        self.write_index_atomic(&index)?;
-
-        // 8. Lock released via RAII
-        Ok(lease)
-    }
-
     /// Acquire a claim and run the repository-side synchronization under the held
     /// coordinator lock, in the mandatory order coordinator → (repository
     /// session: bootstrap → repository → events).
@@ -1001,61 +793,6 @@ impl ClaimCoordinator {
         Ok(updated_lease)
     }
 
-    /// Release a lease explicitly
-    ///
-    /// # Arguments
-    ///
-    /// * `lease_id` - Lease to release
-    ///
-    /// # Errors
-    ///
-    /// - Lease not found
-    /// - Lease not owned by current agent
-    pub fn release_lease(&self, lease_id: &LeaseId) -> Result<()> {
-        // 1. Acquire exclusive lock with metadata
-        let lock_path = self.paths.shared_jit.join("locks/claims.lock");
-        let _guard = self
-            .locker
-            .lock_exclusive_with_metadata(&lock_path, &self.agent_id.to_string())?;
-
-        // 2. Load index
-        let mut index = self.load_claims_index()?;
-
-        // 3. Find the lease
-        let lease = index
-            .leases
-            .iter()
-            .find(|l| &l.lease_id == lease_id)
-            .ok_or_else(|| {
-                crate::errors::LeaseNotFoundError::new(&errors::lease_not_found(lease_id.as_str()))
-            })?;
-
-        // 4. Verify ownership
-        if lease.agent_id != self.agent_id {
-            bail!(
-                "{}",
-                errors::not_owner(
-                    &format!("lease {}", lease_id),
-                    &lease.agent_id.to_string(),
-                    &self.agent_id.to_string()
-                )
-            );
-        }
-
-        // 5. Log release
-        let op = ClaimOp::Release {
-            lease_id: lease_id.clone(),
-            released_at: self.clock.now(),
-        };
-        self.append_claim_op(&op)?;
-
-        // 6. Remove from index
-        index.remove_lease(lease_id);
-        self.write_index_atomic(&index)?;
-
-        Ok(())
-    }
-
     /// Force evict a lease (admin operation)
     ///
     /// # Arguments
@@ -1370,7 +1107,16 @@ fn acquire_claim_when_reached(
     let mut watch = super::contention_probe::ProgressWatch::new();
     let mut answered = claimants.answered_count();
     loop {
-        match coordinator.acquire_claim(issue_id, ttl_secs) {
+        match coordinator
+            .acquire_claim_synchronized(
+                issue_id,
+                ttl_secs,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .map(|(lease, ())| lease)
+        {
             Err(error) if super::lock::is_lock_timeout(&error) => {
                 claimants.contention.record_refusal();
                 let now_answered = claimants.answered_count();
@@ -1508,8 +1254,14 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(9), 600)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(9),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         assert_eq!(lease.issue_id, crate::test_utils::issue_id(9));
@@ -1524,7 +1276,13 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(10), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(10),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         // Simulate a crash where the durable log advanced but the derived index was
         // never published.
@@ -1555,12 +1313,24 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(11), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(11),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         let stale_index =
             std::fs::read(temp_dir.path().join(".git/jit/claims.index.json")).unwrap();
-        let durable = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(12), 600)
+        let (durable, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(12),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         std::fs::write(
             temp_dir.path().join(".git/jit/claims.index.json"),
@@ -1589,7 +1359,14 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let owner = setup_coordinator(&temp_dir);
         owner
-            .acquire_claim(&crate::test_utils::issue_id(13), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(13),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .map(|(lease, ())| lease)
             .unwrap();
         // A different agent cannot acquire the same issue.
         let locker = FileLocker::new(StdDuration::from_secs(
@@ -1621,7 +1398,13 @@ mod tests {
         let clock = Arc::new(FixedClock::new(base));
         let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(14), 1)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(14),
+                1,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         clock.set(base + Duration::seconds(2));
         let repository_sync_ran = Cell::new(false);
@@ -1647,12 +1430,65 @@ mod tests {
     }
 
     #[test]
+    fn test_acquire_claim_synchronized_persists_eviction_when_another_owner_blocks_acquisition() {
+        use crate::storage::clock::FixedClock;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = Utc::now();
+        let clock = Arc::new(FixedClock::new(base));
+        let mut coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
+        let expired = crate::test_utils::issue_id(14);
+        let occupied = crate::test_utils::issue_id(15);
+        coordinator
+            .acquire_claim_synchronized(
+                &expired,
+                1,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
+        coordinator
+            .acquire_claim_synchronized(
+                &occupied,
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
+        clock.set(base + Duration::seconds(2));
+        coordinator.agent_id = "agent:other".parse().unwrap();
+
+        let error = coordinator
+            .acquire_claim_synchronized(
+                &occupied,
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap_err();
+
+        assert!(error.to_string().contains("already claimed"));
+        let index = coordinator.load_claims_index().unwrap();
+        assert!(index.find_lease(&expired).is_none());
+        assert!(index.find_lease(&occupied).is_some());
+    }
+
+    #[test]
     fn test_acquire_claim_writes_log_under_shared_jit_not_local_jit() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(16), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(16),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         // The append-only claim log lives in the shared control plane
@@ -1668,29 +1504,19 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(17), 0)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(17),
+                0,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         assert_eq!(lease.ttl_secs, 0);
         assert!(lease.expires_at.is_none());
         assert_eq!(lease.last_beat, lease.acquired_at);
-    }
-
-    #[test]
-    fn test_acquire_claim_already_claimed() {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        // First claim succeeds
-        coordinator
-            .acquire_claim(&crate::test_utils::issue_id(18), 600)
-            .unwrap();
-
-        // Second claim fails
-        let result = coordinator.acquire_claim(&crate::test_utils::issue_id(18), 600);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("already claimed"));
     }
 
     #[test]
@@ -1762,7 +1588,14 @@ mod tests {
         let held = hold_claims_lock(&temp_dir);
 
         let while_held = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(20), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(20),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .map(|(lease, ())| lease)
             .expect_err("the lock is held, so this caller cannot reach the coordinator");
 
         assert!(
@@ -1773,7 +1606,14 @@ mod tests {
         drop(held);
         assert!(
             coordinator
-                .acquire_claim(&crate::test_utils::issue_id(20), 600)
+                .acquire_claim_synchronized(
+                    &crate::test_utils::issue_id(20),
+                    600,
+                    Some("test lease"),
+                    ClaimAcquireLimits::new(100, 100),
+                    |_| Ok(())
+                )
+                .map(|(lease, ())| lease)
                 .is_ok(),
             "the same call is granted once the lock is free, so the expired wait \
              said nothing about the issue"
@@ -1831,14 +1671,20 @@ mod tests {
     #[test]
     fn test_acquire_claim_grants_exactly_one_claimant_when_every_lock_wait_expires() {
         let temp_dir = TempDir::new().unwrap();
-        let coordinator = Arc::new(coordinator_with_lock_wait(&temp_dir, EXPIRING_LOCK_WAIT));
+        let paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
+        setup_coordinator(&temp_dir);
         let claimant_count = 8;
         let claimants = Claimants::new();
         let held = hold_claims_lock(&temp_dir);
 
         let contenders = (0..claimant_count)
-            .map(|_| {
-                let coordinator = Arc::clone(&coordinator);
+            .map(|i| {
+                let coordinator = ClaimCoordinator::new(
+                    paths.clone(),
+                    FileLocker::new(EXPIRING_LOCK_WAIT),
+                    format!("wt:claimant{i}").parse().unwrap(),
+                    format!("agent:claimant{i}").parse().unwrap(),
+                );
                 let claimants = Arc::clone(&claimants);
                 thread::spawn(move || {
                     acquire_claim_when_reached(
@@ -1880,7 +1726,15 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         let issue_id = crate::test_utils::issue_id(16);
-        coordinator.acquire_claim(&issue_id, 600).unwrap();
+        coordinator
+            .acquire_claim_synchronized(
+                &issue_id,
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
 
         let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
         assert!(log_path.exists());
@@ -1984,7 +1838,13 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(22), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(22),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         let index_path = temp_dir.path().join(".git/jit/claims.index.json");
@@ -2018,8 +1878,14 @@ mod tests {
         coordinator.write_index_atomic(&index).unwrap();
 
         // Now try to claim - should evict expired and succeed
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(23), 600)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(23),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         assert_eq!(lease.agent_id.to_string(), "agent:test");
     }
@@ -2044,8 +1910,14 @@ mod tests {
         let base = Utc::now();
         let clock = Arc::new(FixedClock::new(base));
         let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
-        let expired = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(24), 1)
+        let (expired, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(24),
+                1,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         clock.set(base + Duration::seconds(2));
 
@@ -2073,7 +1945,13 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(25), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(25),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         let before = logged_operations(&temp_dir).len();
 
@@ -2089,8 +1967,14 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Acquire a finite lease
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(26), 600)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(26),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         let original_expiry = lease.expires_at.unwrap();
 
@@ -2112,8 +1996,14 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Acquire an indefinite lease
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(27), 0)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(27),
+                0,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         let original_heartbeat = lease.last_beat;
 
@@ -2148,8 +2038,14 @@ mod tests {
         let coordinator1 = setup_coordinator(&temp_dir);
 
         // Agent 1 acquires lease
-        let lease = coordinator1
-            .acquire_claim(&crate::test_utils::issue_id(28), 600)
+        let (lease, ()) = coordinator1
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(28),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         // Create coordinator for different agent
@@ -2170,73 +2066,19 @@ mod tests {
     }
 
     #[test]
-    fn test_release_lease() {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        // Acquire and release
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(29), 600)
-            .unwrap();
-        coordinator.release_lease(&lease.lease_id).unwrap();
-
-        // Verify lease is gone from index
-        let index = coordinator.load_claims_index().unwrap();
-        assert!(index.find_lease(&crate::test_utils::issue_id(29)).is_none());
-
-        // Should be able to claim again
-        let new_lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(29), 600)
-            .unwrap();
-        assert_ne!(new_lease.lease_id, lease.lease_id); // Different lease
-    }
-
-    #[test]
-    fn test_release_nonexistent_lease() {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        let result =
-            coordinator.release_lease(&"00000000-0000-4000-8000-000000000007".parse().unwrap());
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not found"));
-    }
-
-    #[test]
-    fn test_release_lease_not_owned() {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator1 = setup_coordinator(&temp_dir);
-
-        // Agent 1 acquires lease
-        let lease = coordinator1
-            .acquire_claim(&crate::test_utils::issue_id(30), 600)
-            .unwrap();
-
-        // Create coordinator for different agent
-        let paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
-        let coordinator2 = ClaimCoordinator::new(
-            paths,
-            FileLocker::new(StdDuration::from_secs(
-                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-            )),
-            "wt:other".parse().unwrap(),
-            "agent:other".parse().unwrap(),
-        );
-
-        // Agent 2 tries to release - should fail
-        let result = coordinator2.release_lease(&lease.lease_id);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("owned by"));
-    }
-
-    #[test]
     fn test_force_evict_lease() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator1 = setup_coordinator(&temp_dir);
 
         // Agent 1 acquires lease
-        let lease = coordinator1
-            .acquire_claim(&crate::test_utils::issue_id(31), 600)
+        let (lease, ()) = coordinator1
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(31),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         // Create admin coordinator
@@ -2261,7 +2103,13 @@ mod tests {
 
         // Should be able to claim again
         coordinator1
-            .acquire_claim(&crate::test_utils::issue_id(31), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(31),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
     }
 
@@ -2284,11 +2132,19 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Perform various operations
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(32), 600)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(32),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         coordinator.renew_lease(&lease.lease_id, 600).unwrap();
-        coordinator.release_lease(&lease.lease_id).unwrap();
+        coordinator
+            .force_evict_lease(&lease.lease_id, "test release")
+            .unwrap();
 
         // Check audit log
         let log_path = temp_dir.path().join(".git/jit/claims.jsonl");
@@ -2296,9 +2152,8 @@ mod tests {
 
         assert!(content.contains("acquire"));
         assert!(content.contains("renew"));
-        assert!(content.contains("release"));
+        assert!(content.contains("force-evict"));
 
-        // Verify sequence ordering
         let lines: Vec<_> = content.lines().collect();
         assert!(lines.len() >= 3);
     }
@@ -2322,10 +2177,22 @@ mod tests {
 
         // Create some leases
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(33), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(33),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(34), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(34),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         // Rebuild from log
@@ -2344,15 +2211,23 @@ mod tests {
     }
 
     #[test]
-    fn test_rebuild_index_with_release_operation() {
+    fn test_rebuild_index_with_force_eviction() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
         // Acquire and release
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(35), 600)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(35),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
-        coordinator.release_lease(&lease.lease_id).unwrap();
+        coordinator
+            .force_evict_lease(&lease.lease_id, "test release")
+            .unwrap();
 
         // Rebuild should show no active leases
         let rebuilt = coordinator.rebuild_index_from_log().unwrap();
@@ -2366,7 +2241,13 @@ mod tests {
 
         // Create lease that expires immediately
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(36), 1)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(36),
+                1,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         // Wait for expiry
@@ -2382,8 +2263,14 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(37), 600)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(37),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         let original_expiry = lease.expires_at.unwrap();
 
@@ -2403,8 +2290,14 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(38), 600)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(38),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         // Force evict
@@ -2423,8 +2316,14 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Create indefinite lease
-        let lease = coordinator
-            .acquire_claim(&crate::test_utils::issue_id(39), 0)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(39),
+                0,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         // Rebuild
@@ -2444,13 +2343,31 @@ mod tests {
 
         // Multiple operations
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(40), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(40),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(41), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(41),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(42), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(42),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
 
         let rebuilt = coordinator.rebuild_index_from_log().unwrap();
@@ -2629,7 +2546,13 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
         let issue_id = crate::test_utils::issue_id(46);
         coordinator
-            .acquire_claim_with_reason(&issue_id, 0, Some("probe"), 1, 1)
+            .acquire_claim_synchronized(
+                &issue_id,
+                0,
+                Some("probe"),
+                ClaimAcquireLimits::new(1, 1),
+                |_| Ok(()),
+            )
             .unwrap();
 
         let is_enforced_after = |elapsed_secs: i64| {
@@ -2652,32 +2575,34 @@ mod tests {
         // Default limit is 2 indefinite leases per agent
         // First two should succeed
         coordinator
-            .acquire_claim_with_reason(
+            .acquire_claim_synchronized(
                 &crate::test_utils::issue_id(7),
                 0,
                 Some("Manual task 1"),
-                2,
-                10,
+                ClaimAcquireLimits::new(2, 10),
+                |_| Ok(()),
             )
             .unwrap();
         coordinator
-            .acquire_claim_with_reason(
+            .acquire_claim_synchronized(
                 &crate::test_utils::issue_id(43),
                 0,
                 Some("Manual task 2"),
-                2,
-                10,
+                ClaimAcquireLimits::new(2, 10),
+                |_| Ok(()),
             )
             .unwrap();
 
         // Third should fail - exceeds per-agent limit
-        let result = coordinator.acquire_claim_with_reason(
-            &crate::test_utils::issue_id(44),
-            0,
-            Some("Manual task 3"),
-            2,
-            10,
-        );
+        let result = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(44),
+                0,
+                Some("Manual task 3"),
+                ClaimAcquireLimits::new(2, 10),
+                |_| Ok(()),
+            )
+            .map(|(lease, ())| lease);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
@@ -2688,7 +2613,13 @@ mod tests {
 
         // But finite TTL should still work
         coordinator
-            .acquire_claim(&crate::test_utils::issue_id(47), 600)
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(47),
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
             .unwrap();
     }
 
@@ -2698,8 +2629,15 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // TTL=0 without reason should fail
-        let result =
-            coordinator.acquire_claim_with_reason(&crate::test_utils::issue_id(7), 0, None, 2, 10);
+        let result = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(7),
+                0,
+                None,
+                ClaimAcquireLimits::new(2, 10),
+                |_| Ok(()),
+            )
+            .map(|(lease, ())| lease);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(
@@ -2710,12 +2648,12 @@ mod tests {
 
         // TTL=0 with reason should succeed
         coordinator
-            .acquire_claim_with_reason(
+            .acquire_claim_synchronized(
                 &crate::test_utils::issue_id(7),
                 0,
                 Some("Manual oversight"),
-                2,
-                10,
+                ClaimAcquireLimits::new(2, 10),
+                |_| Ok(()),
             )
             .unwrap();
     }
@@ -2726,8 +2664,14 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
 
         // Acquire indefinite lease
-        let lease = coordinator
-            .acquire_claim_with_reason(&crate::test_utils::issue_id(7), 0, Some("Long task"), 2, 10)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(7),
+                0,
+                Some("Long task"),
+                ClaimAcquireLimits::new(2, 10),
+                |_| Ok(()),
+            )
             .unwrap();
         let original_beat = lease.last_beat;
 
@@ -2754,8 +2698,14 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
 
-        let lease = coordinator
-            .acquire_claim_with_reason(&crate::test_utils::issue_id(7), 0, Some("Manual"), 2, 10)
+        let (lease, ()) = coordinator
+            .acquire_claim_synchronized(
+                &crate::test_utils::issue_id(7),
+                0,
+                Some("Manual"),
+                ClaimAcquireLimits::new(2, 10),
+                |_| Ok(()),
+            )
             .unwrap();
 
         coordinator.heartbeat(&lease.lease_id).unwrap();
@@ -2774,7 +2724,15 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
         let issue_id = crate::test_utils::issue_id(46);
-        coordinator.acquire_claim(&issue_id, 600).unwrap();
+        coordinator
+            .acquire_claim_synchronized(
+                &issue_id,
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
         let index_path = temp_dir.path().join(".git/jit/claims.index.json");
         fs::remove_file(&index_path).unwrap();
 
@@ -2801,7 +2759,15 @@ mod tests {
         let coordinator = setup_coordinator(&temp_dir);
         let leased = crate::test_utils::issue_id(48);
         let other = crate::test_utils::issue_id(49);
-        coordinator.acquire_claim(&leased, 600).unwrap();
+        coordinator
+            .acquire_claim_synchronized(
+                &leased,
+                600,
+                Some("test lease"),
+                ClaimAcquireLimits::new(100, 100),
+                |_| Ok(()),
+            )
+            .unwrap();
         let guard = coordinator.lock_claims_for_repository_mutation().unwrap();
         let stranger: Assignee = "agent:stranger".parse().unwrap();
 

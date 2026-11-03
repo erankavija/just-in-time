@@ -455,8 +455,7 @@ pub(crate) fn captured_archive_events(
         .file_bytes(&path)
         .map_err(ProducerError::from)?
         .unwrap_or_default();
-    let text = String::from_utf8(bytes.to_vec()).map_err(ProducerError::from)?;
-    crate::domain::event_log::parse_known_events(&text).map_err(ArchiveExecutionError::EventLog)
+    crate::domain::event_log::parse_known_events(bytes).map_err(ArchiveExecutionError::EventLog)
 }
 
 /// A typed failure raised while finalizing one archive execution.

@@ -8,7 +8,7 @@
 //! is computable, testable, and checkable (see [`validate_delta_acyclic`])
 //! before the first mutation.
 //!
-//! The executor ([`apply_template_with`](crate::commands::CommandExecutor::apply_template_with))
+//! The executor ([`apply_template_with`](crate::commands::TemplateOps::apply_template_with))
 //! is the only layer that touches storage: it validates the delta, then commits
 //! it under one repository lock.
 //!
