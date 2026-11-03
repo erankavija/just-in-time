@@ -2,8 +2,8 @@
 //! backend or mutation session.
 
 use crate::repository_state::{
-    CaptureBudget, CaptureSpec, DirectoryListing, PinnedDocumentEvidence, RepositoryEntry,
-    RepositoryImage, RepositoryLayout, RepositoryRootEvidence, VirtualPath,
+    CaptureBudget, CaptureSpec, CapturedBytes, DirectoryListing, FileMode, PinnedDocumentEvidence,
+    RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryRootEvidence, VirtualPath,
 };
 use std::collections::BTreeMap;
 
@@ -79,6 +79,17 @@ impl ImageBuilder {
         self
     }
 
+    /// Capture a regular file with `bytes`.
+    pub fn file(self, path: impl ImagePath, bytes: impl AsRef<[u8]>) -> Self {
+        let path = path.resolve(&self.layout);
+        let entry = RepositoryEntry::File {
+            content: CapturedBytes::new(path.repository_relative(), bytes.as_ref().to_vec())
+                .unwrap(),
+            mode: FileMode::Regular,
+        };
+        self.entry(path, entry)
+    }
+
     /// Capture `path`'s complete listing.
     pub fn listing(mut self, path: impl ImagePath, listing: DirectoryListing) -> Self {
         self.listings.insert(path.resolve(&self.layout), listing);
@@ -146,15 +157,21 @@ fn derived_spec(
 mod tests {
     use super::*;
     use crate::repository_state::{
-        CaptureError, CapturedBytes, EntryIdentity, EventLogTail, FileMode, PinnedSourceClass,
-        ReadMode, RepositoryTargetKind,
+        CaptureError, EntryIdentity, EventLogTail, PinnedSourceClass, ReadMode,
+        RepositoryTargetKind,
     };
 
-    fn file(bytes: &[u8]) -> RepositoryEntry {
-        RepositoryEntry::File {
-            content: CapturedBytes::new("file", bytes.to_vec()).unwrap(),
-            mode: FileMode::Regular,
-        }
+    #[test]
+    fn test_image_builder_captures_file_bytes_with_regular_mode() {
+        let image = ImageBuilder::new()
+            .file(VirtualPath::CONFIG, b"config")
+            .build();
+
+        assert!(matches!(
+            image.entry(&VirtualPath::CONFIG).unwrap(),
+            RepositoryEntry::File { content, mode: FileMode::Regular }
+                if content.bytes() == b"config"
+        ));
     }
 
     #[test]
@@ -172,7 +189,13 @@ mod tests {
             mode: FileMode::Regular,
         };
         let declared = [
-            (VirtualPath::worktree("docs/a.md").unwrap(), file(b"bytes")),
+            (
+                VirtualPath::worktree("docs/a.md").unwrap(),
+                RepositoryEntry::File {
+                    content: CapturedBytes::new("file", b"bytes".to_vec()).unwrap(),
+                    mode: FileMode::Regular,
+                },
+            ),
             (
                 VirtualPath::data("absent.json").unwrap(),
                 RepositoryEntry::Absent,
@@ -205,7 +228,7 @@ mod tests {
     #[test]
     fn test_image_builder_classifies_repository_relative_paths_against_its_layout() {
         let image = ImageBuilder::new()
-            .entry(".jit/config.toml", file(b"config"))
+            .file(".jit/config.toml", b"config")
             .entry("docs/a.md", RepositoryEntry::Absent)
             .build();
 
@@ -290,9 +313,7 @@ mod tests {
     #[test]
     fn test_image_builder_refuses_a_path_outside_the_declared_set_as_uncaptured() {
         let undeclared = VirtualPath::worktree("other.md").unwrap();
-        let image = ImageBuilder::new()
-            .entry("docs/a.md", file(b"bytes"))
-            .build();
+        let image = ImageBuilder::new().file("docs/a.md", b"bytes").build();
 
         assert!(matches!(
             image.entry(&undeclared),

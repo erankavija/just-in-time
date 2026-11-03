@@ -1858,78 +1858,10 @@ fn existing_file_mode(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository_state::{
-        CaptureBudget, CaptureSpec, CapturedBytes, RepositoryLayout, RepositoryRootEvidence,
-    };
+    use crate::repository_state::RepositoryLayout;
+    use crate::test_harness::image::{synthetic_layout, ImageBuilder};
     use proptest::prelude::*;
     use std::collections::BTreeMap;
-
-    /// A captured image whose configuration registry holds `config` and whose
-    /// named targets hold their bytes, every other registry absent.
-    ///
-    /// Every repository shape a composition decides against is stated through
-    /// this one builder (`@/inv/shared-test-contracts`).
-    fn image_holding(
-        config: &[u8],
-        targets: &[(VirtualPath, &[u8])],
-    ) -> (RepositoryImage, RepositoryLayout) {
-        let layout = RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "worktree", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap();
-        let registries = [
-            VirtualPath::CONFIG,
-            VirtualPath::GATES,
-            VirtualPath::INVARIANTS,
-            VirtualPath::RULES,
-            VirtualPath::TEMPLATES,
-        ];
-        let mut spec = CaptureSpec::new(
-            registries
-                .iter()
-                .cloned()
-                .chain(targets.iter().map(|(target, _)| target.clone())),
-            CaptureBudget {
-                max_listings: 0,
-                max_bytes: 65536,
-                max_depth: 8,
-            },
-        )
-        .unwrap();
-        spec.discover_paths([]).unwrap();
-        let mut entries = registries
-            .into_iter()
-            .map(|path| (path, RepositoryEntry::Absent))
-            .collect::<BTreeMap<_, _>>();
-        entries.insert(
-            VirtualPath::CONFIG,
-            RepositoryEntry::File {
-                content: CapturedBytes::new("config", config.to_vec()).unwrap(),
-                mode: FileMode::Regular,
-            },
-        );
-        entries.extend(targets.iter().map(|(target, bytes)| {
-            (
-                target.clone(),
-                RepositoryEntry::File {
-                    content: CapturedBytes::new("target", bytes.to_vec()).unwrap(),
-                    mode: FileMode::Regular,
-                },
-            )
-        }));
-        (
-            RepositoryImage::close(
-                layout.clone(),
-                spec,
-                entries,
-                BTreeMap::new(),
-                BTreeMap::new(),
-            )
-            .unwrap(),
-            layout,
-        )
-    }
 
     fn parsed_registry(
         identity: &ContributionIdentity,
@@ -2211,7 +2143,7 @@ mod tests {
 
     /// One package's claims defining the namespace `shared` as `description`.
     fn claims_defining_shared(package: &str, description: &str) -> ProfileClaims {
-        let (_, layout) = image_holding(b"", &[]);
+        let layout = synthetic_layout();
         ProfileClaims {
             contributions: vec![contribution_claim(
                 package,
@@ -2319,7 +2251,7 @@ mod tests {
     fn test_drop_overridden_claims_composes_the_dependents_asset_and_region() {
         let asset = VirtualPath::worktree("docs/shared.txt").unwrap();
         let region_target = VirtualPath::worktree("docs/guide.md").unwrap();
-        let (_, layout) = image_holding(b"", &[]);
+        let layout = synthetic_layout();
         let claims = |package: &str, bytes: &[u8]| ProfileClaims {
             regions: vec![region_claim(&layout, &region_target, bytes)],
             ..asset_claims(&layout, package, std::slice::from_ref(&asset), bytes)
@@ -2343,7 +2275,7 @@ mod tests {
     #[test]
     fn test_contested_file_targets_names_every_package_declaring_a_region_differently() {
         let target = VirtualPath::worktree("docs/guide.md").unwrap();
-        let (_, layout) = image_holding(b"", &[]);
+        let layout = synthetic_layout();
         let claims = |package: &str, content: &[u8]| ProfileClaims {
             regions: vec![region_claim(&layout, &target, content)],
             ..asset_claims(&layout, package, &[], b"")
@@ -2453,14 +2385,20 @@ mod tests {
     /// the identity differently is updated to the package's value.
     #[test]
     fn test_compose_profile_targets_never_contests_a_differing_registry_declaration() {
-        let (image, layout) = image_holding(
-            b"[namespaces.shared]\ndescription = \"Repository definition.\"\nunique = false\n",
-            &[],
-        );
+        let image = ImageBuilder::new()
+            .file(
+                VirtualPath::CONFIG,
+                b"[namespaces.shared]\ndescription = \"Repository definition.\"\nunique = false\n",
+            )
+            .entry(VirtualPath::GATES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INVARIANTS, RepositoryEntry::Absent)
+            .entry(VirtualPath::RULES, RepositoryEntry::Absent)
+            .entry(VirtualPath::TEMPLATES, RepositoryEntry::Absent)
+            .build();
         let contribution = namespace_contribution("shared", "Package definition.");
         let claims = ProfileClaims {
             contributions: vec![contribution_claim("workflow", contribution.clone())],
-            ..asset_claims(&layout, "workflow", &[], b"")
+            ..asset_claims(image.layout(), "workflow", &[], b"")
         };
 
         let context = claims.contributions.clone();
@@ -2488,9 +2426,16 @@ mod tests {
     #[test]
     fn test_compose_profile_targets_updates_an_asset_over_differing_repository_content() {
         let target = VirtualPath::worktree("docs/custom.txt").unwrap();
-        let (image, layout) = image_holding(b"", &[(target.clone(), b"repository bytes")]);
+        let image = ImageBuilder::new()
+            .file(VirtualPath::CONFIG, b"")
+            .entry(VirtualPath::GATES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INVARIANTS, RepositoryEntry::Absent)
+            .entry(VirtualPath::RULES, RepositoryEntry::Absent)
+            .entry(VirtualPath::TEMPLATES, RepositoryEntry::Absent)
+            .file(target.clone(), b"repository bytes")
+            .build();
         let claims = asset_claims(
-            &layout,
+            image.layout(),
             "workflow",
             std::slice::from_ref(&target),
             b"package bytes",
@@ -2514,7 +2459,7 @@ mod tests {
     fn test_contested_file_targets_names_every_package_declaring_a_target_differently() {
         let contested = VirtualPath::worktree("docs/contested.txt").unwrap();
         let restated = VirtualPath::worktree("docs/restated.txt").unwrap();
-        let (_, layout) = image_holding(b"", &[]);
+        let layout = synthetic_layout();
         let base = ProfileClaims {
             assets: asset_claims(
                 &layout,
@@ -2558,9 +2503,15 @@ mod tests {
         let targets = ["first.txt", "second.txt", "third.txt"]
             .map(|name| VirtualPath::worktree(name).unwrap())
             .to_vec();
-        let (image, layout) = image_holding(b"", &[]);
-        let workflow = asset_claims(&layout, "workflow", &targets, b"workflow bytes");
-        let base = asset_claims(&layout, "base", &targets, b"base bytes");
+        let image = ImageBuilder::new()
+            .file(VirtualPath::CONFIG, b"")
+            .entry(VirtualPath::GATES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INVARIANTS, RepositoryEntry::Absent)
+            .entry(VirtualPath::RULES, RepositoryEntry::Absent)
+            .entry(VirtualPath::TEMPLATES, RepositoryEntry::Absent)
+            .build();
+        let workflow = asset_claims(image.layout(), "workflow", &targets, b"workflow bytes");
+        let base = asset_claims(image.layout(), "base", &targets, b"base bytes");
         let contested = contested_file_targets([&workflow, &base]);
 
         let composition =
@@ -2944,10 +2895,12 @@ mod tests {
 
     #[test]
     fn test_contribution_disposition_compares_the_package_value_with_the_held_entry() {
-        let (image, _) = image_holding(
-            b"[namespaces.shared]\ndescription = \"Held.\"\nunique = false\n",
-            &[],
-        );
+        let image = ImageBuilder::new()
+            .file(
+                VirtualPath::CONFIG,
+                b"[namespaces.shared]\ndescription = \"Held.\"\nunique = false\n",
+            )
+            .build();
         let disposition = |identity: &str, description: &str| {
             contribution_disposition(
                 &mut RegistryDocuments::new(&image),
@@ -2972,36 +2925,9 @@ mod tests {
     #[test]
     fn test_empty_contributions_leave_authored_configuration_without_an_overlay() {
         let authored = b"[documentation]\ndevelopment_root = \"notes\"\n";
-        let path = VirtualPath::data("config.toml").unwrap();
-        let layout = super::super::RepositoryLayout::new(
-            super::super::RepositoryRootEvidence::new("/repo", "worktree", true),
-            super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap();
-        let mut spec = CaptureSpec::new(
-            [path.clone()],
-            CaptureBudget {
-                max_listings: 0,
-                max_bytes: 1024,
-                max_depth: 4,
-            },
-        )
-        .unwrap();
-        spec.discover_paths([]).unwrap();
-        let image = RepositoryImage::close(
-            layout,
-            spec,
-            BTreeMap::from([(
-                path,
-                RepositoryEntry::File {
-                    content: CapturedBytes::new(".jit/config.toml", authored.to_vec()).unwrap(),
-                    mode: FileMode::Regular,
-                },
-            )]),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
+        let image = ImageBuilder::new()
+            .file(VirtualPath::CONFIG, authored)
+            .build();
 
         assert!(
             render_composed_contributions(&mut RegistryDocuments::new(&image), &[])
@@ -3012,7 +2938,13 @@ mod tests {
 
     #[test]
     fn test_render_composed_contributions_writes_each_registry_at_its_data_root_constant() {
-        let (image, _) = image_holding(b"", &[]);
+        let image = ImageBuilder::new()
+            .file(VirtualPath::CONFIG, b"")
+            .entry(VirtualPath::GATES, RepositoryEntry::Absent)
+            .entry(VirtualPath::INVARIANTS, RepositoryEntry::Absent)
+            .entry(VirtualPath::RULES, RepositoryEntry::Absent)
+            .entry(VirtualPath::TEMPLATES, RepositoryEntry::Absent)
+            .build();
         let keyed = |target, field: &str| Contribution::KeyedArray {
             target,
             identity: "shared".to_string(),
@@ -3065,13 +2997,16 @@ mod tests {
     /// Replacing and appending in one parse leaves each entry at its own identity.
     #[test]
     fn test_render_composed_contributions_lands_every_contribution_over_one_parse() {
-        let (image, _) = image_holding(
-            b"[type_hierarchy]\nstrategic_types = [\"epic\"]\n",
-            &[(
+        let image = ImageBuilder::new()
+            .file(
+                VirtualPath::CONFIG,
+                b"[type_hierarchy]\nstrategic_types = [\"epic\"]\n",
+            )
+            .file(
                 VirtualPath::GATES,
                 b"[[gates]]\nkey = \"sibling\"\n\n[[gates]]\nkey = \"held\"\n",
-            )],
-        );
+            )
+            .build();
         let definitions = [
             gate_contribution("appended", "Appended."),
             gate_contribution("held", "Replaced."),
@@ -3102,7 +3037,13 @@ mod tests {
 
     #[test]
     fn test_compose_profile_contributions_parses_each_registry_once_however_many_it_renders() {
-        let (image, _) = image_holding(b"[namespaces.held]\ndescription = \"Held.\"\n", &[]);
+        let image = ImageBuilder::new()
+            .file(
+                VirtualPath::CONFIG,
+                b"[namespaces.held]\ndescription = \"Held.\"\n",
+            )
+            .entry(VirtualPath::GATES, RepositoryEntry::Absent)
+            .build();
         let claims = ["held", "second", "third"]
             .map(|name| namespace_contribution(name, "Package."))
             .into_iter()
