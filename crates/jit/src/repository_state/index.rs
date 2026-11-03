@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// The one on-disk repository-format version this binary accepts.
-pub(crate) const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 3;
+pub(crate) const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 4;
 
 /// Typed representation of `.jit/index.json`.
 ///

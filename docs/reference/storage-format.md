@@ -439,7 +439,7 @@ The repository's on-disk **format version** is the `schema_version` field in
 `index.json`:
 
 ```json
-{ "schema_version": 3, "deleted_ids": [] }
+{ "schema_version": 4, "deleted_ids": [] }
 ```
 
 Issue membership is the `.json` files under `issues/`. `deleted_ids` holds
@@ -456,7 +456,7 @@ an older binary and a newer one each refuse the other's repository. `jit`
 performs no migration; moving a repository between formats is an explicit
 rewrite made alongside installing the matching binary.
 
-An index carrying any other field, such as a format 3 index with `all_ids`,
+An index carrying any other field, such as `all_ids`,
 fails validation.
 
 `config.toml` separately records a `[version] schema` describing the

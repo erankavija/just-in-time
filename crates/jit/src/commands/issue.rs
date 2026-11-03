@@ -340,10 +340,10 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// documents every reader reports ([`DocumentOps::issue_documents`]).
     pub fn show_response(&self, issue: Issue) -> Result<crate::output::IssueShowResponse> {
         let enriched_deps = self.get_dependencies_enriched(&issue);
-        let gate_runs = self
+        let (gate_runs, _) = self
             .exec
             .gates()
-            .list_gate_runs(&issue.id, None)
+            .get_last_gate_runs_for_issue(&issue.id)
             .with_context(|| format!("Failed to load gate runs for issue {}", issue.id))?;
         let documents = self.exec.documents().issue_documents(&issue)?;
         Ok(crate::output::IssueShowResponse {
@@ -366,7 +366,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         issue: Issue,
     ) -> Result<crate::output::IssueStatusResponse> {
         let enriched_deps = self.get_dependencies_enriched(&issue);
-        let gate_runs = self.exec.gates().list_gate_runs(&issue.id, None)?;
+        let (gate_runs, _) = self.exec.gates().get_last_gate_runs_for_issue(&issue.id)?;
         let show = crate::output::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs);
         Ok(crate::output::IssueStatusResponse::from_show(&show))
     }

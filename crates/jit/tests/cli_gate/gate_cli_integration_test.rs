@@ -69,9 +69,17 @@ fn test_issue_show_errors_on_corrupt_gate_run() {
     let temp = JitCli::initialised().unwrap();
     let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 0");
 
-    // Plant a corrupt gate-run record on disk.
+    temp.run(["gate", "evaluate", &issue_id, "test-gate"])
+        .unwrap();
+    let issue: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.root().join(format!(".jit/issues/{issue_id}.json"))).unwrap(),
+    )
+    .unwrap();
+    let run_id =
+        serde_json::from_value(issue["gates_status"]["test-gate"]["run_id"].clone()).unwrap();
+
     let result_path = temp.root().join(".jit").join(
-        jit::repository_state::VirtualPath::gate_run_record(&jit::test_utils::gate_run_id(1))
+        jit::repository_state::VirtualPath::gate_run_record(&run_id)
             .relative()
             .as_path(),
     );
@@ -1102,4 +1110,29 @@ fn test_gate_fail_gate_not_required_is_invalid_argument() {
     );
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+}
+
+#[test]
+fn test_issue_responses_do_not_open_unreferenced_gate_runs() {
+    let cli = JitCli::initialised().unwrap();
+    let child = add_auto_gate_issue(&cli, "test-gate", "exit 0");
+    cli.run(["gate", "evaluate", &child, "test-gate"]).unwrap();
+    let parent = cli.create_issue(["--title", "Parent"]).unwrap();
+    cli.run(["dep", "add", &parent, &child]).unwrap();
+    let path = cli.root().join(".jit").join(
+        jit::repository_state::VirtualPath::gate_run_record(&jit::test_utils::gate_run_id(1))
+            .relative()
+            .as_path(),
+    );
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, "{ corrupt unreferenced run").unwrap();
+
+    for args in [
+        vec!["issue", "show", &child],
+        vec!["issue", "status", &child],
+        vec!["issue", "children", &parent],
+        vec!["issue", "create", "--title", "New"],
+    ] {
+        cli.run_json(args).unwrap();
+    }
 }

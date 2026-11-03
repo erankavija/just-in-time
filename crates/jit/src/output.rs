@@ -1716,19 +1716,15 @@ pub struct GateView {
 impl GateView {
     /// Build the per-gate view for a single required gate.
     ///
-    /// `state` is the issue's recorded [`GateState`] for this gate (if any) and
-    /// `runs` are all recorded runs for the issue; the run `state` was projected
-    /// from, the gate's latest published run, supplies `last_run_at`/`exit_code`.
+    /// `latest` is the run named by `state`, loaded by the latest-run accessor.
     fn build(
         key: &GateKey,
         state: Option<&crate::domain::GateState>,
-        runs: &[GateRunResult],
+        latest: Option<&GateRunResult>,
     ) -> Self {
         let status = state
             .map(|s| s.status)
             .unwrap_or(crate::domain::GateStatus::Pending);
-
-        let latest = state.and_then(|state| state.projected_run(key, runs));
 
         GateView {
             key: key.clone(),
@@ -1824,9 +1820,9 @@ pub struct IssueShowResponse {
 impl IssueShowResponse {
     /// Create from Issue with enriched dependencies and the issue's gate runs.
     ///
-    /// `gate_runs` are all recorded [`GateRunResult`]s for the issue; the
-    /// latest run per required gate enriches that gate's `last_run_at` and
-    /// `exit_code`. Pass an empty slice when no runs exist.
+    /// `gate_runs` contains one latest run per gate, supplied by
+    /// [`GateOps::get_last_gate_runs_for_issue`](crate::commands::GateOps::get_last_gate_runs_for_issue).
+    /// Pass an empty slice when no gate state names a run.
     ///
     /// `enriched_deps` normally holds one [`MinimalIssue`] per entry in
     /// `issue.dependencies`, but an id that no longer resolves to a stored
@@ -1841,10 +1837,18 @@ impl IssueShowResponse {
         enriched_deps: Vec<MinimalIssue>,
         gate_runs: &[GateRunResult],
     ) -> Self {
+        let latest_runs: std::collections::HashMap<_, _> =
+            gate_runs.iter().map(|run| (&run.gate_key, run)).collect();
         let gates = issue
             .gates_required
             .iter()
-            .map(|key| GateView::build(key, issue.gates_status.get(key), gate_runs))
+            .map(|key| {
+                GateView::build(
+                    key,
+                    issue.gates_status.get(key),
+                    latest_runs.get(key).copied(),
+                )
+            })
             .collect();
 
         // See the doc comment above: recover ids `enriched_deps` couldn't
