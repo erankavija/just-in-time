@@ -229,6 +229,24 @@ pub trait RepositoryMutationSession {
         &mut self,
         plan: &MaterializationPlan,
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError>;
+    /// The event log's whole bytes, read without following a link, or `None`
+    /// when absent. Outside any [`CaptureSpec`], so no image holds the whole
+    /// log; whole-repository record fidelity is its one reader.
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError>;
+}
+
+/// The whole log from its entry: a link or any non-file is unsafe, not absent.
+fn history_log_bytes(
+    entry: Option<&RepositoryEntry>,
+) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+    match entry {
+        Some(RepositoryEntry::File { content, .. }) => Ok(Some(content.bytes().to_vec())),
+        None | Some(RepositoryEntry::Absent) => Ok(None),
+        _ => Err(RepositoryStateStoreError::UnsafeTarget(format!(
+            "{:?}",
+            VirtualPath::EVENTS
+        ))),
+    }
 }
 
 /// Storage backend capable of one capture/apply mutation boundary.
@@ -599,6 +617,16 @@ impl RepositoryMutationSession for JsonMutationSession {
         self.captured = None;
         Ok(outcome)
     }
+
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+        revalidate_layout_capabilities(&self.layout, &self.roots)?;
+        history_log_bytes(Some(&inspect_capability_entry(
+            &self.layout,
+            &self.roots,
+            &VirtualPath::EVENTS,
+            ReadMode::Whole,
+        )?))
+    }
 }
 
 impl JsonMutationSession {
@@ -749,6 +777,15 @@ impl RepositoryMutationSession for MemoryMutationSession {
         }
         self.captured = None;
         Ok(outcome)
+    }
+
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+        history_log_bytes(
+            self.storage
+                .repository_state()
+                .entries
+                .get(&VirtualPath::EVENTS),
+        )
     }
 }
 

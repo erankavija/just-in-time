@@ -29,7 +29,7 @@
     "satisfies:9876a23a/REQ-10"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "One loader parses the index and issue records",
-  "updated_at": "2026-11-02T23:41:01.192993633Z"
+  "updated_at": "2026-11-03T20:38:40.821819558Z"
 }

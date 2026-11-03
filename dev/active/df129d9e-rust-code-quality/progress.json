@@ -1,7 +1,7 @@
 {
   "epic_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "epic_short_id": "df129d9e",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -291,7 +291,7 @@
           "short_id": "083c9a91",
           "title": "Claim and recover operations behind a claims facade",
           "classification": "implementation",
-          "status": "in_progress (merged 0fbd890c3; cargo-ci passed; code-review failed F1 'cargo-ci pass predates 2174da3a', though 2174da3a is an ancestor of 0fbd890c3; an unchanged rerun was stopped unrecorded at 6a's direction; awaiting user ruling)",
+          "status": "done (merged 0fbd890c3; cargo-ci passed; code-review R1 failed F1 'cargo-ci pass predates 2174da3a'; user ruled one rerun with factual ancestry evidence linked to the issue (44f5177fc); R2 passed, 0 findings; closed fd902dc8a)",
           "vendor": "claude",
           "model_tier": "sonnet",
           "tier_reason": "recover session ordering is concurrency-sensitive (plan D-28)"
@@ -329,7 +329,10 @@
           "short_id": "1539da29",
           "title": "Derive failure details and suggestions from the error type",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (dispatched at base 467fcab19)",
+          "vendor": "claude",
+          "model_tier": "sonnet",
+          "tier_reason": "typed errors across many call sites; moderate design"
         },
         {
           "key": "issue-filter-args",
@@ -337,7 +340,10 @@
           "short_id": "a3a99cf8",
           "title": "Shared IssueFilterArgs group for issue filters",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (dispatched at base 467fcab19)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "CLI contract change over ~14 sites; alternation"
         },
         {
           "key": "create-returns-issue",
@@ -345,7 +351,10 @@
           "short_id": "8b7f2973",
           "title": "Issue creation returns the created issue",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (dispatched at base 467fcab19)",
+          "vendor": "claude",
+          "model_tier": "sonnet",
+          "tier_reason": "compiler-driven rewrite of ~900 call sites; needs stamina"
         },
         {
           "key": "apply-returns-created-issues",
@@ -353,7 +362,10 @@
           "short_id": "334c12e7",
           "title": "Template application returns the created issues",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (dispatched at base 467fcab19)",
+          "vendor": "codex",
+          "model_tier": "gpt-6-astra",
+          "tier_reason": "narrow return-shape change; alternation"
         },
         {
           "key": "search-through-executor",
@@ -361,7 +373,10 @@
           "short_id": "d05b5639",
           "title": "CLI search runs through the executor",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (dispatched at base 467fcab19)",
+          "vendor": "claude",
+          "model_tier": "haiku",
+          "tier_reason": "one executor entry point and one arm"
         }
       ]
     },
@@ -784,7 +799,7 @@
       "kind": "gate-dispute",
       "issue": "083c9a91",
       "summary": "code-review F1 claims cargo-ci evidence predates 2174da3a; ancestry shows otherwise; raised to the user via just-in-time-6a",
-      "status": "open"
+      "status": "resolved: user ruled option A (one rerun with evidence); R2 passed"
     }
   ],
   "rework_counts": {

@@ -145,33 +145,23 @@ fn gate_pass_json_error(e: &anyhow::Error, requested: &str) -> jit::output::Json
 /// In `--json` mode emits the structured
 /// [`TemplateApplyResult`](jit::commands::TemplateApplyResult) (template name,
 /// resolved anchor bindings, created/refreshed node ids by role, and the
-/// pre-apply anchor dependency snapshots) plus the freshly-loaded created
+/// pre-apply anchor dependency snapshots) plus the returned created
 /// issues, keyed by role. In quiet mode prints just the created node ids (one per
 /// line, role-ordered) for scripting; otherwise a short human summary.
 fn print_apply_result(
-    storage: &JsonFileStorage,
     result: &jit::commands::TemplateApplyResult,
     container: &IssueId,
     quiet: bool,
     json: bool,
 ) -> Result<()> {
     if json {
-        // Load each created node so the JSON consumer gets the full stored
-        // records (gate list under the storage names) alongside the role→id map.
-        // Routed through the typed response so the schema derives from the same
-        // `Issue` the emission serializes (jit:f40f1b0a).
-        let created_issues: std::collections::BTreeMap<String, jit::domain::Issue> = result
-            .created_node_ids_by_role
-            .iter()
-            .map(|(role, id)| Ok((role.clone(), storage.load_issue(id)?)))
-            .collect::<Result<_>>()?;
         let response = jit::output::TemplateApplyResponse {
             template: result.template.clone(),
             container: container.clone(),
             anchor_bindings: result.anchor_bindings.clone(),
             created_node_ids_by_role: result.created_node_ids_by_role.clone(),
             anchor_dependency_snapshots: result.anchor_dependency_snapshots.clone(),
-            created_issues,
+            created_issues: result.created_issues.clone(),
         };
         let msg = format!("Applied template '{}' to {}", result.template, container);
         let output = JsonOutput::success(response).with_message(msg);
@@ -2861,7 +2851,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             for warning in &warnings {
                 eprintln!("Warning: {}", warning);
             }
-            print_apply_result(&storage, &result, &container, quiet, json)?;
+            print_apply_result(&result, &container, quiet, json)?;
         }
         Commands::Dep(dep_cmd) => match dep_cmd {
             DepCommands::Add {
