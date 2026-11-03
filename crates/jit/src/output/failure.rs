@@ -566,9 +566,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     if let Some(path_error) = error.downcast_ref::<crate::storage::PathReadError>() {
         return match path_error {
             crate::storage::PathReadError::NotFound(_)
-            | crate::storage::PathReadError::CommitNotFound(_) => ErrorCode::RepositoryNotFound,
-            crate::storage::PathReadError::InvalidPath(_) => ErrorCode::InvalidArgument,
-            crate::storage::PathReadError::OutsideRepoRoot(_) => ErrorCode::GenericError,
+            | crate::storage::PathReadError::CommitNotFound(_) => ErrorCode::DocumentNotFound,
+            crate::storage::PathReadError::InvalidPath(_)
+            | crate::storage::PathReadError::OutsideRepoRoot(_) => ErrorCode::InvalidArgument,
             crate::storage::PathReadError::Other(inner) => classify_code(inner),
         };
     }
@@ -1883,5 +1883,62 @@ mod derived_guidance_tests {
         assert_eq!(json.error.code, ErrorCode::ItemNotFound);
         assert!(json.error.details.is_none());
         assert!(json.error.suggestions.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod path_read_classification_tests {
+    //! Each [`PathReadError`] variant classifies by what it describes: absent
+    //! content is a not-found, an unusable path is an invalid argument, and a
+    //! wrapped cause classifies as itself.
+
+    use super::classify;
+    use crate::output::{ErrorCode, ExitCode};
+    use crate::storage::PathReadError;
+
+    fn code_of(error: PathReadError) -> ErrorCode {
+        classify(&error.into()).error.code
+    }
+
+    #[test]
+    fn test_classify_path_read_not_found_is_document_not_found_in_not_found_class() {
+        let code = code_of(PathReadError::NotFound("docs/a.md".into()));
+        assert_eq!(code, ErrorCode::DocumentNotFound);
+        assert_eq!(code.exit_code(), ExitCode::NotFound);
+    }
+
+    #[test]
+    fn test_classify_path_read_commit_not_found_is_document_not_found_in_not_found_class() {
+        let code = code_of(PathReadError::CommitNotFound("deadbeef".into()));
+        assert_eq!(code, ErrorCode::DocumentNotFound);
+        assert_eq!(code.exit_code(), ExitCode::NotFound);
+    }
+
+    #[test]
+    fn test_classify_path_read_invalid_path_is_invalid_argument() {
+        assert_eq!(
+            code_of(PathReadError::InvalidPath("../x".into())),
+            ErrorCode::InvalidArgument
+        );
+    }
+
+    #[test]
+    fn test_classify_path_read_outside_repo_root_is_invalid_argument() {
+        assert_eq!(
+            code_of(PathReadError::OutsideRepoRoot("link".into())),
+            ErrorCode::InvalidArgument
+        );
+    }
+
+    #[test]
+    fn test_classify_path_read_other_classifies_by_inner_error() {
+        let inner = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let expected = classify(&anyhow::Error::from(std::io::Error::from(
+            std::io::ErrorKind::PermissionDenied,
+        )))
+        .error
+        .code;
+        assert_eq!(code_of(PathReadError::Other(inner.into())), expected);
+        assert_eq!(expected, ErrorCode::PermissionDenied);
     }
 }
