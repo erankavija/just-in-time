@@ -1578,7 +1578,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         let namespaces = self.exec.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
         let hierarchy =
             crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
 
         // Resolve any external plan documents from the captured validation image
         // so a container whose criteria live in an external file is validated
@@ -1677,7 +1677,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
                 return Ok(RuleReport { findings });
             }
         };
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
         let issues = self.exec.storage.list_issues()?;
 
         let mut findings: Vec<ReportedFinding> = Vec::new();
@@ -1841,7 +1841,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
         let ruleset = self.exec.effective_rules()?;
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
         let all = self.exec.storage.list_issues()?;
 
         // The breakdown boundary type is template-driven: resolve the container's
@@ -1998,7 +1998,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         use crate::validation::report::{ExplainReport, RuleOutcome};
 
         let ruleset = self.exec.effective_rules()?;
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
         let issue = self.exec.storage.load_issue(id)?;
         let issues = self.exec.storage.list_issues()?;
 
