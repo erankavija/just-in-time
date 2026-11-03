@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-03T21:48:22.821077282Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f52c86bc-ceee-48df-82e9-3772d6e0515f",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:08:29.941772286Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6100b960-193f-40e2-9e62-970815412930",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Shared test fixture for repository images",
-  "updated_at": "2026-11-03T21:48:22.821077282Z"
+  "updated_at": "2026-11-03T22:08:29.941772286Z"
 }
