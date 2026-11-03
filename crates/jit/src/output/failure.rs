@@ -1475,13 +1475,19 @@ mod derived_guidance_tests {
             .expect("the failure carries details")
     }
 
-    fn suggestions_mention(json: &JsonError, needles: &[&str]) -> bool {
-        !json.error.suggestions.is_empty()
-            && json
-                .error
-                .suggestions
-                .iter()
-                .all(|suggestion| needles.iter().all(|needle| suggestion.contains(needle)))
+    /// Assert the envelope carries exactly one suggestion per marker group, in
+    /// order, each naming every marker of its group (its action and subject).
+    fn assert_suggestions(json: &JsonError, expected: &[&[&str]]) {
+        let actual = &json.error.suggestions;
+        assert_eq!(actual.len(), expected.len(), "{actual:?}");
+        for (suggestion, markers) in actual.iter().zip(expected) {
+            for marker in *markers {
+                assert!(
+                    suggestion.contains(marker),
+                    "suggestion lacks `{marker}`: {suggestion}"
+                );
+            }
+        }
     }
 
     #[test]
@@ -1497,13 +1503,21 @@ mod derived_guidance_tests {
             assert_eq!(details["verdict"], verdict);
             assert_eq!(details["issue_id"], issue_id(85).to_string());
             assert_eq!(details["key"], "tests");
-            assert!(details.get("checker_result").is_some());
-            assert!(details.get("warnings").is_some());
             let issue = issue_id(85).to_string();
-            assert!(
-                suggestions_mention(&json, &[issue.as_str(), "tests"]),
-                "{:?}",
-                json.error.suggestions
+            let checker = &details["checker_result"];
+            assert_eq!(checker["key"], "tests");
+            assert_eq!(checker["status"], status.as_str());
+            assert_eq!(checker["exit_code"], 1);
+            assert_eq!(checker["command"], "false");
+            assert_eq!(details["status"], "failed");
+            assert_eq!(details["warnings"], serde_json::json!([]));
+            assert_suggestions(
+                &json,
+                &[
+                    &["Inspect", "gate status", &issue, "tests"],
+                    &["history", "gate status", "--all", &issue, "tests"],
+                    &["rerun", "gate evaluate", &issue, "tests"],
+                ],
             );
         }
     }
@@ -1523,7 +1537,8 @@ mod derived_guidance_tests {
         assert_eq!(details["issue_id"], issue_id(1).to_string());
         assert_eq!(details["key"], "tests");
         assert!(details.get("verdict").is_none(), "no checker ran");
-        assert!(suggestions_mention(&json, &["gate add", "tests"]));
+        let issue = issue_id(1).to_string();
+        assert_suggestions(&json, &[&["gate add", &issue, "tests"]]);
     }
 
     #[test]
@@ -1539,10 +1554,11 @@ mod derived_guidance_tests {
         assert_eq!(json.error.code, ErrorCode::InvalidArgument);
         assert_eq!(details_of(&json)["key"], "tests");
         assert!(details_of(&json).get("verdict").is_none());
-        assert!(suggestions_mention(
+        let issue = issue_id(1).to_string();
+        assert_suggestions(
             &json,
-            &["gate evaluate", "--by", "tests"]
-        ));
+            &[&["gate evaluate", "--by", issue.as_str(), "tests"]],
+        );
     }
 
     #[test]
@@ -1560,9 +1576,11 @@ mod derived_guidance_tests {
         assert_eq!(details["transposed"], true);
         assert_eq!(details["issue_id"], "abc12345");
         assert_eq!(details["key"], "tests");
-        let [suggestion] = json.error.suggestions.as_slice() else {
-            panic!("one suggestion expected: {:?}", json.error.suggestions);
-        };
+        assert_suggestions(
+            &json,
+            &[&["Did you mean", "gate status", "abc12345", "tests"]],
+        );
+        let suggestion = &json.error.suggestions[0];
         assert!(
             suggestion.find("abc12345") < suggestion.find("tests"),
             "the issue comes before the gate: {suggestion}"
@@ -1578,7 +1596,7 @@ mod derived_guidance_tests {
 
         assert_eq!(json.error.code, ErrorCode::IssueNotFound);
         assert_eq!(details_of(&json)["issue_id"], issue_id(7).to_string());
-        assert!(!json.error.suggestions.is_empty());
+        assert_suggestions(&json, &[&["query all"], &["Check", "issue ID"]]);
         assert_eq!(json.error.message, error.to_string());
     }
 
@@ -1602,6 +1620,15 @@ mod derived_guidance_tests {
         assert_eq!(details["issue_id"], issue_id(1).to_string());
         assert_eq!(details["blockers"].as_array().map(Vec::len), Some(1));
         assert_eq!(json.error.suggestions, remediation);
+        let (issue, missing) = (issue_id(1).to_string(), issue_id(2).to_string());
+        assert_suggestions(
+            &json,
+            &[
+                &["graph deps", &issue],
+                &["validate", "missing dependency", &missing],
+                &["issue assign", &issue],
+            ],
+        );
     }
 
     #[test]
@@ -1621,7 +1648,15 @@ mod derived_guidance_tests {
         let json = classify(&error);
 
         assert_eq!(json.error.code, ErrorCode::ValidationFailed);
-        assert!(!json.error.suggestions.is_empty());
+        let issue = issue_id(1).to_string();
+        assert_suggestions(
+            &json,
+            &[
+                &["gate status-all", &issue],
+                &["gate evaluate", "--by", &issue, "tests"],
+                &["gate status", "--all", &issue, "tests"],
+            ],
+        );
     }
 
     #[test]
@@ -1631,10 +1666,7 @@ mod derived_guidance_tests {
         let json = classify(&error);
 
         assert_eq!(json.error.code, ErrorCode::InvalidLabelPattern);
-        assert!(suggestions_mention(
-            &json,
-            &["namespace:value", "namespace:*"]
-        ));
+        assert_suggestions(&json, &[&["namespace:value", "namespace:*"]]);
     }
 
     #[test]
@@ -1652,9 +1684,15 @@ mod derived_guidance_tests {
         let details = details_of(&json);
         assert_eq!(details["checkout"], "/work/linked");
         assert_eq!(details["stance"], serde_json::to_value(stance).unwrap());
-        assert_eq!(
-            json.error.suggestions,
-            LinkedCheckoutWriteRefusedError::permit_guidance().to_vec()
+        assert_suggestions(
+            &json,
+            &[
+                &["write_policy", "allow", ".jit/config.toml"],
+                &[
+                    crate::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV,
+                    "allow",
+                ],
+            ],
         );
     }
 
@@ -1669,7 +1707,11 @@ mod derived_guidance_tests {
         assert_eq!(json.error.code, ErrorCode::AmbiguousId);
         let details = details_of(&json);
         assert_eq!(details["prefix"], "aaaa");
-        assert_eq!(details["matches"].as_array().map(Vec::len), Some(2));
+        assert_eq!(
+            details["matches"],
+            serde_json::json!(["aaaa1111", "aaaa2222"])
+        );
+        assert!(json.error.suggestions.is_empty());
     }
 
     #[test]
@@ -1717,7 +1759,7 @@ mod derived_guidance_tests {
             details["issue_id"], "ghost",
             "the dominant edge's own details survive"
         );
-        assert!(!json.error.suggestions.is_empty());
+        assert_suggestions(&json, &[&["query all"], &["Check", "issue ID"]]);
     }
 
     #[test]
@@ -1736,6 +1778,9 @@ mod derived_guidance_tests {
         assert_eq!(classified.exit_code(), dedicated.exit_code());
         assert_eq!(classified.error.details, dedicated.error.details);
         assert_eq!(classified.error.suggestions, dedicated.error.suggestions);
+        assert_suggestions(&classified, &[&["Remove", "cycle"], &["graph show"]]);
+        assert_eq!(details_of(&classified)["from"], issue_id(1).to_string());
+        assert_eq!(details_of(&classified)["to"], "loop");
     }
 
     #[test]
@@ -1750,9 +1795,11 @@ mod derived_guidance_tests {
         assert_eq!(json.error.code, ErrorCode::ProfileUncommittedTargets);
         let details = details_of(&json);
         assert_eq!(details["paths"][0], "docs/a.md");
-        assert!(details["resolution"]
-            .as_str()
-            .is_some_and(|r| !r.is_empty()));
+        assert_eq!(
+            details["resolution"],
+            crate::commands::UNCOMMITTED_TARGETS_RESOLUTION
+        );
+        assert!(json.error.suggestions.is_empty());
     }
 
     #[test]
@@ -1779,6 +1826,10 @@ mod derived_guidance_tests {
             details_of(&json)["conflicts"].as_array().map(Vec::len),
             Some(1)
         );
+        let conflict = &details_of(&json)["conflicts"][0];
+        assert_eq!(conflict["owner"], "candidate");
+        assert_eq!(conflict["subject"]["path"], ".jit/issues/a.json");
+        assert_eq!(conflict["conflict"]["kind"], "contested");
         assert!(json.error.suggestions.is_empty());
     }
 
@@ -1806,7 +1857,7 @@ mod derived_guidance_tests {
             let json = classify(&error);
 
             assert_eq!(json.error.code, ErrorCode::ProfileError, "{error}");
-            assert_eq!(json.error.suggestions.len(), 1, "{error}");
+            assert_suggestions(&json, &[&["Place", "package", "beside"]]);
         }
     }
 
@@ -1818,7 +1869,7 @@ mod derived_guidance_tests {
         let failed = classify(&SearchError::Failed("boom".to_owned()).into());
 
         assert_eq!(missing.error.code, ErrorCode::RipgrepNotFound);
-        assert!(suggestions_mention(&missing, &["ripgrep"]));
+        assert_suggestions(&missing, &[&["Install", "ripgrep"]]);
         assert_eq!(failed.error.code, ErrorCode::SearchFailed);
         assert!(failed.error.suggestions.is_empty());
     }
