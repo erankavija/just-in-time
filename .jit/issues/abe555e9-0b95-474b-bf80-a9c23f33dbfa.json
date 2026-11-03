@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "0dfa7da9-159c-40a3-a52d-2871e41442b8",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:25:42.940747988Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "abe555e9-0b95-474b-bf80-a9c23f33dbfa",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Library-side command handler contract",
-  "updated_at": "2026-11-03T21:28:43.085149993Z"
+  "updated_at": "2026-11-03T22:25:42.940747988Z"
 }
