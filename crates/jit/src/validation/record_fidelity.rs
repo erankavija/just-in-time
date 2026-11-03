@@ -4,7 +4,7 @@
 
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::GateRunId;
-use crate::domain::{GateRunResult, Issue};
+use crate::domain::{Event, GateRunResult, Issue};
 use crate::repository_state::{
     canonical_json, captured_gate_run_ids, captured_issue_ids, serialize_event, serialize_gate_run,
     serialize_issue, RepositoryImage, RepositoryIndex, VirtualPath,
@@ -102,31 +102,29 @@ fn gate_run_drift(id: &GateRunId, bytes: &[u8]) -> Result<Option<String>> {
     })
 }
 
-/// Every line reproduces its bytes and every event id names one line. A line alone
-/// that fails to parse is the log's certified torn tail, since the whole log parsed.
+/// Every committed line reproduces its bytes and every event id names one line.
 fn event_log_drift(bytes: &[u8]) -> Vec<String> {
-    let Some(log) = std::str::from_utf8(bytes)
-        .ok()
-        .filter(|log| parse_known_events(log).is_ok())
-    else {
+    let Ok(events) = parse_known_events(bytes) else {
         return Vec::new();
     };
-    let ids = log
-        .lines()
-        .filter_map(|line| {
-            serde_json::from_str::<Value>(line).ok()?["id"]
-                .as_str()
-                .map(str::to_owned)
-        })
-        .fold(BTreeMap::<String, usize>::new(), |mut ids, id| {
+    let ids = events
+        .iter()
+        .map(Event::id)
+        .fold(BTreeMap::<&str, usize>::new(), |mut ids, id| {
             *ids.entry(id).or_default() += 1;
             ids
         });
-    log.lines()
+    bytes
+        .split_inclusive(|byte| *byte == b'\n')
         .filter_map(|line| {
             let event = parse_known_events(line).ok()?.into_iter().next()?;
-            (serialize_event(&event).ok()?.as_slice() != line.as_bytes())
-                .then(|| format!("line does not reproduce: {line}"))
+            let record = line.strip_suffix(b"\n")?;
+            (serialize_event(&event).ok()?.as_slice() != record).then(|| {
+                format!(
+                    "line does not reproduce: {}",
+                    String::from_utf8_lossy(record)
+                )
+            })
         })
         .chain(
             ids.into_iter()
@@ -252,6 +250,14 @@ mod tests {
 
         assert_eq!(drift.len(), 1, "{drift:?}");
         assert!(drift[0].contains(id.as_str().unwrap()), "{drift:?}");
+    }
+
+    #[test]
+    fn test_event_log_drift_ignores_an_unterminated_final_line() {
+        let line = event_line(EventTag::ALL[0]);
+        let log = format!("{line}\n{}", line.replacen(':', ": ", 1));
+
+        assert_eq!(event_log_drift(log.as_bytes()), Vec::<String>::new());
     }
 
     #[test]

@@ -241,7 +241,7 @@ fn load_profile_variable_inputs(
 }
 
 /// One profile selection, built once per invocation by
-/// [`CommandExecutor::select_profiles`].
+/// [`ProfileOps::select_profiles`].
 ///
 /// Building it reads the packages the selectors name, resolves their
 /// dependency graph through [`ResolvedProfileGraph::resolve`], validates the
@@ -296,7 +296,19 @@ impl SelectedProfile {
     }
 }
 
-impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
+/// Profile-package and repository-initialization operations of a [`CommandExecutor`].
+pub struct ProfileOps<'a, S: IssueStore> {
+    pub(super) exec: &'a CommandExecutor<S>,
+}
+
+impl<S: IssueStore> CommandExecutor<S> {
+    /// The profile-package and repository-initialization family.
+    pub fn profiles(&self) -> ProfileOps<'_, S> {
+        ProfileOps { exec: self }
+    }
+}
+
+impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
     /// Resolve every selector in occurrence order before any package is applied.
     ///
     /// A repeated selector reads its package once.
@@ -305,7 +317,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         crate::profile::selection_probe::record(
             crate::profile::selection_probe::SelectionStage::SelectorResolution,
         );
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let mut read = BTreeMap::<PathBuf, ProfilePackage>::new();
         selectors
             .iter()
@@ -373,7 +385,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         output: &Path,
         publish: bool,
     ) -> Result<(ProfilePackResult, Vec<String>)> {
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let source = worktree_directory(&layout, invocation_dir, package_source)?;
         let package = capture_package_tree(&source, &layout).map_err(|source_error| {
             ProfileResolutionError::UncapturableLocation {
@@ -456,7 +468,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         destination: &Path,
         publish: bool,
     ) -> Result<ProfileAddResult> {
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let destination = worktree_directory(&layout, invocation_dir, destination)?;
         let tree = read_package_archive(&read_archive_bytes(invocation_dir, archive)?)?;
         let targets = self.publish_package_tree(&layout, &destination, &tree, publish)?;
@@ -507,41 +519,46 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         )?;
         let budget = package_tree_capture_budget(destination);
 
-        with_mutation_session(self.storage(), layout, "profile package tree", |session| {
-            let Some(image) =
-                super::capture_or_retry(session.capture(capture.capture_spec(budget)?))?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            if !matches!(image.entry(destination)?, RepositoryEntry::Absent) {
-                return Err(ProfileApplyError::PackageDestinationOccupied {
-                    path: destination.repository_relative(),
-                }
-                .into());
-            }
-
-            let plan = finalize_package_tree_capture(&image, &capture)?;
-            let targets = plan
-                .delta()
-                .file_writes()
-                .filter_map(|action| match action {
-                    RepositoryAction::WriteFile { path, mode, .. } => {
-                        Some(ProfileTargetChange::new(
-                            path.repository_relative(),
-                            ProfileTargetAction::Create,
-                            *mode,
-                            None,
-                        ))
+        with_mutation_session(
+            self.exec.storage(),
+            layout,
+            "profile package tree",
+            |session| {
+                let Some(image) =
+                    super::capture_or_retry(session.capture(capture.capture_spec(budget)?))?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                if !matches!(image.entry(destination)?, RepositoryEntry::Absent) {
+                    return Err(ProfileApplyError::PackageDestinationOccupied {
+                        path: destination.repository_relative(),
                     }
-                    _ => None,
-                })
-                .collect();
-            if publish {
-                Ok(SessionStep::Apply(plan, targets))
-            } else {
-                Ok(SessionStep::Done(targets))
-            }
-        })
+                    .into());
+                }
+
+                let plan = finalize_package_tree_capture(&image, &capture)?;
+                let targets = plan
+                    .delta()
+                    .file_writes()
+                    .filter_map(|action| match action {
+                        RepositoryAction::WriteFile { path, mode, .. } => {
+                            Some(ProfileTargetChange::new(
+                                path.repository_relative(),
+                                ProfileTargetAction::Create,
+                                *mode,
+                                None,
+                            ))
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                if publish {
+                    Ok(SessionStep::Apply(plan, targets))
+                } else {
+                    Ok(SessionStep::Done(targets))
+                }
+            },
+        )
     }
 
     /// Publish one built archive at the output path the caller named.
@@ -579,9 +596,9 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                     max_depth: 128,
                 };
                 let result = if publish {
-                    self.publish_repository_export(layout, &intent, budget)
+                    self.exec.publish_repository_export(layout, &intent, budget)
                 } else {
-                    self.plan_repository_export(layout, &intent, budget)
+                    self.exec.plan_repository_export(layout, &intent, budget)
                 };
                 super::map_occupied_export_error(result, output)?;
                 Ok(Vec::new())
@@ -612,7 +629,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
 
     /// Inspect every selected profile package in selector occurrence order.
     pub fn show_profiles(&self, selectors: &[PathBuf]) -> Result<ProfileShowResult> {
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let profiles = self
             .resolve_profile_selectors(selectors)?
             .iter()
@@ -656,7 +673,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let graph = self.resolve_profile_graph(&roots)?;
         let closure = graph.selected_packages();
         let variable_inputs = load_profile_variable_inputs(&closure, options)?;
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let members = closure
             .into_iter()
             .map(|package| {
@@ -760,7 +777,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         if selection.members.is_empty() {
             return Ok(ProfileComposedApplyResult::new(Vec::new()));
         }
-        let layout = self.require_layout()?;
+        let layout = self.exec.require_layout()?;
         let context = match mode {
             ProfileRunMode::Publish => super::production_mutation_context(),
             ProfileRunMode::Rehearse | ProfileRunMode::Report => MutationContext::preview(),
@@ -769,7 +786,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             ProfileRunMode::Publish => "profile application",
             ProfileRunMode::Rehearse | ProfileRunMode::Report => "profile planning",
         };
-        let closure = with_mutation_session(self.storage(), &layout, label, |session| {
+        let closure = with_mutation_session(self.exec.storage(), &layout, label, |session| {
             let Some(plan) = self.prepare_profile_selection(session, selection, &context, mode)?
             else {
                 return Ok(SessionStep::Retry);
@@ -892,7 +909,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         else {
             return Err(not_found());
         };
-        match supplied_package(&location, &self.require_layout()?) {
+        match supplied_package(&location, &self.exec.require_layout()?) {
             Ok(package) if package.model().id == *dependency => Ok(package),
             Ok(_) => Err(not_found()),
             Err(error) if is_unreadable_location(&error) => Err(not_found()),
@@ -937,11 +954,15 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         ));
         content_paths.push(events_path.clone());
 
-        let base =
-            match self.capture_proposed_base(session, &BTreeMap::new(), &content_paths, None)? {
-                None => return Ok(None),
-                Some(base) => base,
-            };
+        let base = match self.exec.capture_proposed_base(
+            session,
+            &BTreeMap::new(),
+            &content_paths,
+            None,
+        )? {
+            None => return Ok(None),
+            Some(base) => base,
+        };
 
         let contribution_base = apply_overlay(
             &base,
@@ -964,8 +985,12 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         {
             expanded_paths.push(VirtualPath::SCHEMAS);
         }
-        let Some(base) =
-            self.capture_proposed_base(session, &BTreeMap::new(), &expanded_paths, Some(base))?
+        let Some(base) = self.exec.capture_proposed_base(
+            session,
+            &BTreeMap::new(),
+            &expanded_paths,
+            Some(base),
+        )?
         else {
             return Ok(None);
         };
@@ -987,7 +1012,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         );
         let overrides = super::validation_overlay(preview.image(), preview.delta())?;
         let Some(probe) =
-            self.capture_proposed_base(session, &overrides, &extra_paths, Some(base))?
+            self.exec
+                .capture_proposed_base(session, &overrides, &extra_paths, Some(base))?
         else {
             return Ok(None);
         };
@@ -1026,8 +1052,8 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                 .map_err(RepositoryStateError::from)?;
             ensure_committed_write_targets(
                 &plan,
-                &self.require_layout()?,
-                self.require_worktree_paths()?,
+                &self.exec.require_layout()?,
+                self.exec.require_worktree_paths()?,
             )?;
             if let Some(refusal) = final_validation_refusal(&plan)? {
                 return Err(refusal.into());
@@ -1551,8 +1577,9 @@ mod tests {
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
         executor
+            .profiles()
             .select_profiles(selectors, options)
-            .and_then(|selection| executor.apply_profiles(&selection))
+            .and_then(|selection| executor.profiles().apply_profiles(&selection))
     }
 
     /// Resolve `selector` to the one package it names.
@@ -1561,6 +1588,7 @@ mod tests {
         selector: &PathBuf,
     ) -> Result<ProfilePackage> {
         executor
+            .profiles()
             .resolve_profile_selectors(std::slice::from_ref(selector))
             .map(|mut packages| packages.remove(0))
     }
@@ -1574,12 +1602,14 @@ mod tests {
         context: &MutationContext,
     ) -> (MaterializationPlan, Vec<ProfileTargetChange>) {
         let selection = executor
+            .profiles()
             .select_profiles(
                 &[package_selector(package)],
                 &ProfileVariableOptions::default(),
             )
             .unwrap();
         let plan = executor
+            .profiles()
             .prepare_profile_selection(session, &selection, context, ProfileRunMode::Rehearse)
             .unwrap()
             .unwrap();
@@ -1601,8 +1631,9 @@ mod tests {
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
         executor
+            .profiles()
             .select_profiles(selectors, options)
-            .and_then(|selection| executor.plan_profiles(&selection))
+            .and_then(|selection| executor.profiles().plan_profiles(&selection))
     }
 
     /// Report `selectors` the way `jit profile diff` does.
@@ -1612,8 +1643,9 @@ mod tests {
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
         executor
+            .profiles()
             .select_profiles(selectors, options)
-            .and_then(|selection| executor.diff_profiles(&selection))
+            .and_then(|selection| executor.profiles().diff_profiles(&selection))
     }
 
     /// Select a package through the worktree location it was read from.
@@ -2067,6 +2099,7 @@ mod tests {
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(&outside, storage.root()).unwrap());
         executor
+            .profiles()
             .initialize_fresh_repository(&outside, None)
             .unwrap();
         repository.commit("track the store");
@@ -2909,31 +2942,36 @@ template = true
     }
 
     #[test]
-    fn test_profile_application_preserves_and_certifies_torn_event_tail_end_to_end() {
-        let (temp, _) = setup_test_repo().unwrap();
-        let executor = file_executor(temp.path()).unwrap();
-        let storage = executor.storage().clone();
-        let package = package_read_from(&temp, FIXTURE_LOCATION);
-        let torn = b"{\"torn\":";
-        fs::write(temp.path().join(".jit/events.jsonl"), torn).unwrap();
+    fn test_profile_application_overwrites_an_unterminated_event_tail_end_to_end() {
+        let complete_record = serde_json::to_vec(&crate::test_utils::stamped_event(
+            EventBody::draft_gate_definition_created("prior".parse().unwrap()),
+            String::new(),
+            chrono::DateTime::UNIX_EPOCH,
+        ))
+        .unwrap();
+        for tail in [b"{\"torn\":".as_slice(), &complete_record] {
+            let (temp, _) = setup_test_repo().unwrap();
+            let executor = file_executor(temp.path()).unwrap();
+            let package = package_read_from(&temp, FIXTURE_LOCATION);
+            let log = temp.path().join(".jit/events.jsonl");
+            fs::write(&log, tail).unwrap();
 
-        apply_package(&executor, &package).unwrap();
+            apply_package(&executor, &package).unwrap();
 
-        let image = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
-        assert!(image.starts_with(b"{\"torn\":\n"));
-        assert_eq!(&image[..torn.len()], torn);
-        let events = storage.read_events().unwrap();
-        assert!(matches!(
-            events
-                .iter()
-                .map(Event::body)
-                .collect::<Vec<_>>()
-                .as_slice(),
-            [EventBody::ProfileLifecycle {
-                isolated_torn_tail: true,
-                ..
-            }]
-        ));
+            assert!(fs::read(&log).unwrap().ends_with(b"\n"));
+            let events = executor.storage().read_events().unwrap();
+            assert!(
+                matches!(
+                    events
+                        .iter()
+                        .map(Event::body)
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                    [EventBody::ProfileLifecycle { .. }]
+                ),
+                "{events:?}"
+            );
+        }
     }
 
     #[test]
@@ -2985,6 +3023,7 @@ template = true
         let bootstrap = JsonFileStorage::new(temp.path().join(".jit"));
         CommandExecutor::new(bootstrap.clone())
             .with_layout(discover_repository_layout(temp.path(), bootstrap.root()).unwrap())
+            .profiles()
             .initialize_fresh_repository(temp.path(), None)
             .unwrap();
         let left = package_declaring(&temp, "vendor/left", "left", &[]);
@@ -3069,6 +3108,7 @@ template = true
         let bootstrap = JsonFileStorage::new(temp.path().join(".jit"));
         CommandExecutor::new(bootstrap.clone())
             .with_layout(discover_repository_layout(temp.path(), bootstrap.root()).unwrap())
+            .profiles()
             .initialize_fresh_repository(temp.path(), None)
             .unwrap();
         let left = package_declaring(&temp, "vendor/left", "left", &[]);
@@ -3679,44 +3719,6 @@ template = true
         );
     }
 
-    #[test]
-    fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
-        let (temp, _) = setup_test_repo().unwrap();
-        let executor = file_executor(temp.path()).unwrap();
-        let storage = executor.storage().clone();
-        let package = package_read_from(&temp, FIXTURE_LOCATION);
-        let prior_event = crate::test_utils::stamped_event(
-            EventBody::draft_profile_lifecycle(
-                ProfileLifecycleOperation::Apply,
-                vec![crate::domain::ProfileLifecycleProfile {
-                    id: "prior".try_into().unwrap(),
-                    version: semver::Version::new(1, 0, 0),
-                    status: ProfileLifecycleStatus::Installed,
-                    variables: Default::default(),
-                }],
-            ),
-            String::new(),
-            chrono::DateTime::UNIX_EPOCH,
-        );
-        fs::write(
-            temp.path().join(".jit/events.jsonl"),
-            serde_json::to_vec(&prior_event).unwrap(),
-        )
-        .unwrap();
-
-        apply_package(&executor, &package).unwrap();
-
-        let events = storage.read_events().unwrap();
-        assert_eq!(events.len(), 2);
-        assert!(matches!(
-            events.last().unwrap().body(),
-            EventBody::ProfileLifecycle {
-                isolated_torn_tail: false,
-                ..
-            }
-        ));
-    }
-
     /// Assert a rehearsal's per-target decisions against what the real run did.
     ///
     /// A rehearsal is only worth running if its decisions are the ones the
@@ -4316,7 +4318,9 @@ template = true
         for spelling in ["vendor/../vendor/workflow", "vendor/workflow/../workflow"] {
             for location in [PathBuf::from(spelling), temp.path().join(spelling)] {
                 let (result, stages) = selection_probe::observe(|| {
-                    executor.select_profiles(&[location], &ProfileVariableOptions::default())
+                    executor
+                        .profiles()
+                        .select_profiles(&[location], &ProfileVariableOptions::default())
                 });
 
                 let error = result.err().expect("parent traversal must remain rejected");
@@ -4338,7 +4342,7 @@ template = true
         let (selector, _) = dependent_selection(&temp, &executor);
         std::os::unix::fs::symlink("workflow", temp.path().join("vendor/alias")).unwrap();
 
-        let result = executor.select_profiles(
+        let result = executor.profiles().select_profiles(
             &[selector, PathBuf::from("vendor/alias")],
             &ProfileVariableOptions::default(),
         );
@@ -4364,7 +4368,7 @@ template = true
         package_declaring(&outside, "vendor/workflow", "workflow", &[]);
         std::os::unix::fs::symlink(outside.path(), temp.path().join("outside")).unwrap();
 
-        let result = executor.select_profiles(
+        let result = executor.profiles().select_profiles(
             &[PathBuf::from("outside/vendor/workflow")],
             &ProfileVariableOptions::default(),
         );

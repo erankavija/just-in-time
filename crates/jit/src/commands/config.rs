@@ -543,6 +543,7 @@ schema = 1
                 .unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
         executor
+            .profiles()
             .initialize_fresh_repository(dir.path().parent().unwrap(), None)
             .unwrap();
 

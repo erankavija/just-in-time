@@ -3,10 +3,11 @@
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
-    "2f563673-82ee-4579-913a-e9d55c9881f1"
+    "944edb32-2fe3-481e-9086-4cffaef7cfc8"
   ],
   "description": "Rewrite this checkout's active leases once from `claims.index.json` into per-issue lease records and remove the index, so no lease held at cutover is lost.\n\n## Background\n\nThis checkout's `.git/jit/` holds `claims.index.json` with the active leases, `claims.jsonl` with about 1,800 history lines, and an empty leftover `heartbeat/` directory. The released binary reads leases only from `.git/jit/leases/<issue-id>.json`, takes sequence numbers from `.git/jit/claims.seq`, and never reads the index. The data is machine-local and not committed.\n\n## Success Criteria\n\n- [hard] REQ-01: A script under `dev/active/f8a6b298-history-independent-reads/` writes each unexpired lease of the index to `.git/jit/leases/<issue-id>.json` in the lease record shape, seeds `claims.seq` from the log's highest sequence number, and removes `claims.index.json` and the empty `heartbeat/` directory. It leaves `claims.jsonl` byte-for-byte unchanged.\n- [hard] REQ-02: The script is idempotent: a second run changes nothing.\n- [hard] REQ-03: `jit claim list --json` reports the same leases after the rewrite as before it, and repository validation passes.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
+  "first_ready_at": "2026-11-02T23:40:40.648167329Z",
   "gates_required": [
     "repo-validate"
   ],
@@ -19,10 +20,11 @@
     "story:per-key-leases",
     "component:storage",
     "enforces:@/invariant/canonical-cutover",
-    "satisfies:f8a6b298/REQ-05"
+    "satisfies:f8a6b298/REQ-05",
+    "resolution:merged-into-944edb32"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "This checkout's leases are rewritten into lease records",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-02T23:41:54.339300848Z"
 }

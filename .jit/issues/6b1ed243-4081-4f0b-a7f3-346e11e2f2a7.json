@@ -7,6 +7,7 @@
   ],
   "description": "Make `jit issue claim` append `IssueClaimed` only when the assignee changes, the same rule `claim acquire` and `issue assign` follow.\n\n## Background\n\n`jit issue claim` (lifecycle `Claim`, `crates/jit/src/commands/mod.rs:3158-3168`) pushes `IssueClaimed` unconditionally, including when a Ready issue already assigned to the claimant is promoted and the assignment does not change. `issue assign` emits it only when the assignee changes (`commands/mod.rs:1600-1611`).\n\n## Success Criteria\n\n- [hard] REQ-01: `issue claim` appends `IssueClaimed` exactly when the assignee changes; a same-assignee promotion appends only the state change, and a test pins it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "documents": [],
+  "first_ready_at": "2026-11-02T23:40:38.511388871Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,10 +23,11 @@
     "per:@/charter/D-19",
     "per:@/charter/D-20",
     "enforces:@/invariant/event-log",
-    "satisfies:f8a6b298/REQ-08"
+    "satisfies:f8a6b298/REQ-08",
+    "resolution:merged-into-63de0883"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Issue claim emits its event exactly when the assignee changes",
-  "updated_at": "2026-10-21T10:39:53.980326737Z"
+  "updated_at": "2026-11-02T23:41:51.048784855Z"
 }

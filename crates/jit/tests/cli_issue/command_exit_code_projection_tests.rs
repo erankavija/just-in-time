@@ -17,7 +17,9 @@
 
 use jit::commands::serve::foreground_exit_code;
 use jit::schema::CommandSchema;
+use jit::storage::worktree_paths::WorktreePaths;
 use jit::test_cli::{jit_binary, JitCli};
+use jit::test_lease_store::{corrupt_lease, LeaseCorruption};
 use std::fs;
 use std::io::Read;
 use std::process::{Output, Stdio};
@@ -460,9 +462,13 @@ fn invoke_validate_branch_drift(json: bool) -> Vec<Output> {
 /// cannot produce a clean result.
 fn invoke_validate_leases(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
-    let shared = cli.root().join(".git/jit");
-    fs::create_dir_all(&shared).unwrap();
-    fs::write(shared.join("claims.index.json"), "not json").unwrap();
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    corrupt_lease(
+        &paths.shared_jit,
+        &jit::test_utils::issue_id(1),
+        LeaseCorruption::MalformedJson,
+    )
+    .unwrap();
     vec![output_in_form(&cli, &["validate", "--leases"], json)]
 }
 
