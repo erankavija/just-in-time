@@ -4,6 +4,7 @@
 //! The wrappers handle storage access and delegate to pure domain functions.
 
 use super::*;
+use crate::domain::queries::{query_all, AllFilter};
 
 /// Query, search, and event-log operations of a [`CommandExecutor`].
 pub struct QueryOps<'a, S: IssueStore> {
@@ -121,84 +122,54 @@ impl<S: IssueStore> QueryOps<'_, S> {
         ))
     }
 
-    /// Query available issues with optional filters (unassigned + state=ready + unblocked)
-    ///
-    /// `label_filters` is repeatable and AND-combined; see [`Self::query_all`].
-    pub fn query_available(
-        &self,
-        priority_filter: Option<Priority>,
-        label_filters: &[String],
-    ) -> Result<Vec<Issue>> {
-        label_filters
+    /// Query available work, narrowed by every supplied field filter.
+    pub fn query_available(&self, filter: AllFilter<'_>) -> Result<Vec<Issue>> {
+        filter
+            .labels
             .iter()
             .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
         let issues = self.exec.storage.list_issues()?;
-        Ok(crate::domain::queries::query_available(
+        let available = crate::domain::queries::query_available(
             &issues,
-            crate::domain::queries::AvailableFilter {
-                priority: priority_filter,
-                labels: label_filters,
-            },
-        ))
+            crate::domain::queries::AvailableFilter::default(),
+        );
+        Ok(query_all(&available, filter))
     }
 
-    /// Query blocked issues with optional filters
-    ///
-    /// `label_filters` is repeatable and AND-combined; see [`Self::query_all`].
+    /// Query blocked issues, narrowed by every supplied field filter.
     pub fn query_blocked_filtered(
         &self,
-        priority_filter: Option<Priority>,
-        label_filters: &[String],
+        filter: AllFilter<'_>,
     ) -> Result<Vec<(Issue, Vec<crate::domain::queries::BlockingReason>)>> {
-        let mut blocked = self.query_blocked()?;
-
-        // Apply additional filters
-        if let Some(priority) = priority_filter {
-            blocked.retain(|(i, _)| i.priority == priority);
-        }
-        if !label_filters.is_empty() {
-            let label_matches = self.query_by_labels(label_filters)?;
-            let label_ids: std::collections::HashSet<_> =
-                label_matches.iter().map(|i| &i.id).collect();
-            blocked.retain(|(i, _)| label_ids.contains(&i.id));
-        }
-
-        Ok(blocked)
+        let matches = self.query_all(
+            filter.state,
+            filter.assignee,
+            filter.priority,
+            filter.labels,
+        )?;
+        let ids: std::collections::HashSet<_> = matches.iter().map(|issue| &issue.id).collect();
+        Ok(self
+            .query_blocked()?
+            .into_iter()
+            .filter(|(issue, _)| ids.contains(&issue.id))
+            .collect())
     }
 
-    /// Query strategic issues with optional filters
-    ///
-    /// `label_filters` is repeatable and AND-combined; see [`Self::query_all`].
-    pub fn query_strategic_filtered(
-        &self,
-        priority_filter: Option<Priority>,
-        label_filters: &[String],
-    ) -> Result<Vec<Issue>> {
-        let mut issues = self.query_strategic()?;
-
-        // Apply additional filters
-        if let Some(priority) = priority_filter {
-            issues.retain(|i| i.priority == priority);
-        }
-        if !label_filters.is_empty() {
-            let label_matches = self.query_by_labels(label_filters)?;
-            let label_ids: std::collections::HashSet<_> =
-                label_matches.iter().map(|i| &i.id).collect();
-            issues.retain(|i| label_ids.contains(&i.id));
-        }
-
-        Ok(issues)
+    /// Query strategic issues, narrowed by every supplied field filter.
+    pub fn query_strategic_filtered(&self, filter: AllFilter<'_>) -> Result<Vec<Issue>> {
+        filter
+            .labels
+            .iter()
+            .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
+        Ok(query_all(&self.query_strategic()?, filter))
     }
 
-    /// Aggregate a label bucket into the counts-by-state
+    /// Aggregate filtered issues into the counts-by-state
     /// [`StateRollup`](crate::output::StateRollup) behind `jit query count --by
     /// state`.
     ///
-    /// The bucket is every issue matching all `label_filters` (AND-combined; an
-    /// empty slice aggregates the whole repository), the advisory-grouping
-    /// counterpart to the DAG-authoritative
-    /// [`issue_progress`](crate::commands::IssueOps::issue_progress). Patterns are validated with the
-    /// same rules as [`Self::query_by_labels`].
+    /// Every supplied field filter narrows the bucket. Label patterns use the
+    /// same validation as [`Self::query_by_labels`].
     ///
     /// # Examples
     ///
@@ -224,8 +195,8 @@ impl<S: IssueStore> QueryOps<'_, S> {
     ///         vec![], vec![], None, None, false)
     ///     .unwrap();
     ///
-    /// // No label filter aggregates the whole repository.
-    /// let rollup = executor.queries().query_count_by_state(&[]).unwrap();
+    /// // No filters aggregates the whole repository.
+    /// let rollup = executor.queries().query_count_by_state(Default::default()).unwrap();
     /// assert_eq!(rollup.extras.total, 2);
     /// assert_eq!(rollup.extras.done, 1);
     /// assert_eq!(rollup.extras.percent, 50);
@@ -234,34 +205,24 @@ impl<S: IssueStore> QueryOps<'_, S> {
     /// ```
     pub fn query_count_by_state(
         &self,
-        label_filters: &[String],
+        filter: AllFilter<'_>,
     ) -> Result<crate::output::StateRollup> {
-        let issues = self.query_by_labels(label_filters)?;
+        let issues = self.query_all(
+            filter.state,
+            filter.assignee,
+            filter.priority,
+            filter.labels,
+        )?;
         Ok(crate::output::StateRollup::from_issues(&issues))
     }
 
-    /// Query closed issues with optional filters
-    ///
-    /// `label_filters` is repeatable and AND-combined; see [`Self::query_all`].
-    pub fn query_closed_filtered(
-        &self,
-        priority_filter: Option<Priority>,
-        label_filters: &[String],
-    ) -> Result<Vec<Issue>> {
-        let mut issues = self.query_closed()?;
-
-        // Apply additional filters
-        if let Some(priority) = priority_filter {
-            issues.retain(|i| i.priority == priority);
-        }
-        if !label_filters.is_empty() {
-            let label_matches = self.query_by_labels(label_filters)?;
-            let label_ids: std::collections::HashSet<_> =
-                label_matches.iter().map(|i| &i.id).collect();
-            issues.retain(|i| label_ids.contains(&i.id));
-        }
-
-        Ok(issues)
+    /// Query closed issues, narrowed by every supplied field filter.
+    pub fn query_closed_filtered(&self, filter: AllFilter<'_>) -> Result<Vec<Issue>> {
+        filter
+            .labels
+            .iter()
+            .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
+        Ok(query_all(&self.query_closed()?, filter))
     }
 }
 
@@ -281,22 +242,38 @@ mod tests {
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         let result = executor
             .queries()
-            .query_available(Some(Priority::High), &["component:api".to_string()])
+            .query_available(AllFilter {
+                priority: Some(Priority::High),
+                labels: &["component:api".to_string()],
+                ..AllFilter::default()
+            })
             .unwrap();
         assert_eq!(result.iter().map(|i| &i.id).collect::<Vec<_>>(), [&id]);
         assert!(executor
             .queries()
-            .query_available(Some(Priority::Low), &["component:api".to_string()])
+            .query_available(AllFilter {
+                priority: Some(Priority::Low),
+                labels: &["component:api".to_string()],
+                ..AllFilter::default()
+            })
             .unwrap()
             .is_empty());
         assert!(executor
             .queries()
-            .query_available(None, &["component:web".to_string()])
+            .query_available(AllFilter {
+                priority: None,
+                labels: &["component:web".to_string()],
+                ..AllFilter::default()
+            })
             .unwrap()
             .is_empty());
         assert!(executor
             .queries()
-            .query_available(None, &["invalid".to_string()])
+            .query_available(AllFilter {
+                priority: None,
+                labels: &["invalid".to_string()],
+                ..AllFilter::default()
+            })
             .is_err());
     }
 }
