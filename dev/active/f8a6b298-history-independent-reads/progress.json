@@ -12,7 +12,7 @@
           "title": "Gate state names the run that produced it",
           "classification": "implementation",
           "type": "task",
-          "status": "pending"
+          "status": "done"
         },
         {
           "short_id": "803b107c",
@@ -20,7 +20,7 @@
           "title": "Gate-run records load by issue and run id",
           "classification": "implementation",
           "type": "task",
-          "status": "pending"
+          "status": "done"
         },
         {
           "short_id": "becea20a",
@@ -44,7 +44,7 @@
           "title": "CLI tests reach lease storage through one test helper",
           "classification": "implementation",
           "type": "task",
-          "status": "pending"
+          "status": "done"
         },
         {
           "short_id": "63de0883",
@@ -60,7 +60,7 @@
           "title": "Event-log readers ignore an unterminated final line that the next append overwrites",
           "classification": "implementation",
           "type": "task",
-          "status": "pending"
+          "status": "done"
         },
         {
           "short_id": "f9bf70a5",
@@ -76,7 +76,7 @@
           "title": "Default search reads no history file",
           "classification": "implementation",
           "type": "task",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -398,8 +398,60 @@
     }
   ],
   "rework_counts": {},
-  "surfaced_pitfalls": [],
-  "dispatch_log": [],
+  "surfaced_pitfalls": [
+    {
+      "from": "84e1e27a",
+      "note": "97f5f2b7 body lists UncertifiedTornTail and append prose already removed; worker should treat as met"
+    },
+    {
+      "from": "gate reviewer b06cee74",
+      "note": "gate-and-search-command-docs membership label; format-rewrite-tooling borderline large"
+    }
+  ],
+  "dispatch_log": [
+    {
+      "id": "84e1e27a",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "sets the shared event-log rule"
+    },
+    {
+      "id": "7a8773ca",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "narrow, fully specified"
+    },
+    {
+      "id": "77f3db10",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "tests only"
+    },
+    {
+      "id": "803b107c",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "mechanical signature change across backends"
+    },
+    {
+      "id": "cc6ef886",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "test fixture consolidation"
+    },
+    {
+      "id": "b32a720e",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "narrow refusal plus branch deletion"
+    }
+  ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
-  "freeze": "format-4-window: installed jit stays at last format 3 build from the 2117739f landing to the window"
+  "freeze": "format-4-window: installed jit stays at last format 3 build from the 2117739f landing to the window",
+  "notes": [
+    "Dispatch runs ready issues ahead of a held wave 1 remainder, per the user's maximum-parallelism instruction relayed by just-in-time-6a; dependencies still order all work. 2117739f is held to shorten the format freeze."
+  ]
 }
