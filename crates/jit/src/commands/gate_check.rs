@@ -3809,7 +3809,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .run_id
             .clone()
             .expect("a manual status write names its run");
-        let run = executor.get_gate_run_result(&named).unwrap();
+        let run = executor.get_gate_run_result(&issue_id, &named).unwrap();
         assert_eq!(run.origin, crate::domain::GateVerdictOrigin::Attested);
     }
 
