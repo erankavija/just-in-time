@@ -13,9 +13,8 @@ use crate::domain::identity::GateKey;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::template_expand::{
-    declared_container_label, expand_template, located_document_area_error, node_description,
-    node_document_path, validate_delta_acyclic, DeltaEndpoint, InterpolationContext, PlannedNode,
-    TemplateDelta,
+    expand_template, located_document_area_error, node_description, node_document_path,
+    validate_delta_acyclic, DeltaEndpoint, PlannedNode, TemplateDelta,
 };
 use super::*;
 use crate::repository_state::{
@@ -23,7 +22,9 @@ use crate::repository_state::{
     MutationContext, MutationIntent, RepositoryEntry, RepositoryImage, VirtualPath,
 };
 use crate::storage::IssueNotFoundError;
-use crate::templates::{GraphTemplate, RoleBindings};
+use crate::templates::{
+    declared_container_label, GraphTemplate, InterpolationContext, RoleBindings,
+};
 use serde::Serialize;
 
 /// Actor recorded on the events the apply engine appends directly.
