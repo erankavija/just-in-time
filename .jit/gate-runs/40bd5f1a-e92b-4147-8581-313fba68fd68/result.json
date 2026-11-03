@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7f255bf7a1c772c0c2e0347c8319334c9b70834f",
+  "completed_at": "2026-11-03T23:45:50.367088765Z",
+  "duration_ms": 204607,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable change satisfies the configuration-accessor criteria and has no issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "977d01d8-2757-48c2-ad73-25f42c4b2105",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "40bd5f1a-e92b-4147-8581-313fba68fd68",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T23:42:25.759662411Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 67f9e6b132f4c223c998af089146f1847c3a7873 (`jit:977d01d8`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-12 (parent issue criteria); @/invariant/semantic-types, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T23:36:48Z)\nTruncation recovery: narrow reads of AGENTS.md, the config accessors/tests, all six individual patches, and targeted Rust symbol searches; historical dev artifacts were outside the attributable cone.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable change satisfies the configuration-accessor criteria and has no issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
