@@ -127,9 +127,7 @@ pub fn execute_gate_checker_with_context(
             env,
             ..
         } => execute_command(command, *timeout_seconds, env, &base_env, working_dir)?,
-        _ => anyhow::bail!(
-            "built-in gate checkers must be executed through CommandExecutor::check_gate"
-        ),
+        _ => anyhow::bail!("built-in gate checkers must be executed through GateOps::check_gate"),
     };
 
     let duration = start_time.elapsed();

@@ -2182,6 +2182,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use std::process::Command;
 
         let layout = self
+            .gates()
             .real_repo_layout()
             .context("Branch drift needs a repository on disk")?;
         let repository = layout.data_root();
