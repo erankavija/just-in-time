@@ -28,7 +28,7 @@
           "title": "Test-only lease APIs are gone",
           "classification": "implementation",
           "type": "task",
-          "status": "pending"
+          "status": "done"
         },
         {
           "short_id": "c3e3e2ff",
@@ -68,7 +68,7 @@
           "title": "Archive executions are one domain record type",
           "classification": "implementation",
           "type": "task",
-          "status": "pending"
+          "status": "done"
         },
         {
           "short_id": "7a8773ca",
