@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T21:48:22.403667371Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -14,7 +15,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f0f4e65e-8fa3-4d1c-af50-f4fe0822d4cd",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:07:11.756545269Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7eb443b2-3788-45ee-b65e-4d88b5c3c8de",
   "labels": [
     "type:task",
@@ -26,7 +34,7 @@
     "satisfies:9876a23a/REQ-02"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Graph findings record their firing subject",
-  "updated_at": "2026-11-01T02:13:12.950383589Z"
+  "updated_at": "2026-11-03T22:07:11.756545269Z"
 }
