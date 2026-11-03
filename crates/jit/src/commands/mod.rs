@@ -87,8 +87,9 @@ pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueLocalUpdate, IssueOps};
 pub use item::{ItemListResult, ItemOps, ItemShowResult};
 pub use profile::{
-    parse_profile_selector, ProfileApplyError, ProfileResolutionError, ProfileSelection,
-    ProfileSelectorError, ProfileVariableOptions, SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
+    parse_profile_selector, ProfileApplyError, ProfileOps, ProfileResolutionError,
+    ProfileSelection, ProfileSelectorError, ProfileVariableOptions, SelectedProfile,
+    UNCOMMITTED_TARGETS_RESOLUTION,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use template::{TemplateApplyResult, TemplateOps};
@@ -3315,49 +3316,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(())
-    }
-
-    /// Create or refresh machine-local worktree identity after repository
-    /// scaffold publication.
-    ///
-    /// Called after the scaffold is published, so optional Git host state
-    /// remains outside repository publication.
-    pub fn initialize_worktree_identity(
-        &self,
-        paths: &crate::storage::worktree_paths::WorktreePaths,
-    ) -> Result<(
-        Option<WorktreeIdentity>,
-        Vec<crate::storage::StorageWarning>,
-    )> {
-        use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
-
-        if !paths.is_git_repository() {
-            return Ok((None, Vec::new()));
-        }
-
-        // Get git branch name
-        let branch = std::process::Command::new("git")
-            .arg("-C")
-            .arg(&paths.worktree_root)
-            .args(["branch", "--show-current"])
-            .output()
-            .ok()
-            .and_then(|output| {
-                if output.status.success() {
-                    String::from_utf8(output.stdout).ok()
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_else(|| "main".to_string())
-            .trim()
-            .to_string();
-
-        // Create or update worktree identity
-        // This handles copied files in git worktrees automatically
-        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
-
-        Ok((Some(identity), warnings))
     }
 
     /// Refuse a write to any of `targets` another agent holds an active lease on
