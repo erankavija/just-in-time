@@ -72,6 +72,7 @@ impl ScopeFixtureStore for jit::storage::JsonFileStorage {
         }
         for document in documents {
             executor
+                .documents()
                 .add_document_reference(
                     &id,
                     &document.path,

@@ -4874,7 +4874,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let id = resolve_issue_arg(&storage, &id)?;
-                let (result, warnings) = executor.add_document_reference(
+                let (result, warnings) = executor.documents().add_document_reference(
                     &id,
                     &path,
                     commit.as_deref(),
@@ -4917,7 +4917,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                 let output_ctx = OutputContext::new(quiet, json);
                 let id = resolve_issue_arg(&storage, &id)?;
-                let result = executor.list_document_references(&id)?;
+                let result = executor.documents().list_document_references(&id)?;
 
                 if json {
                     let msg = format!("{} document(s) attached", result.count());
@@ -4953,7 +4953,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             DocCommands::Remove { id, path } => {
                 let id = resolve_issue_arg(&storage, &id)?;
-                let (result, warnings) = executor.remove_document_reference(&id, &path)?;
+                let (result, warnings) =
+                    executor.documents().remove_document_reference(&id, &path)?;
                 let output_ctx = OutputContext::new(quiet, json);
                 for warning in warnings {
                     output_ctx.print_warning(&warning)?;
@@ -4976,7 +4977,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             DocCommands::Show { id, path, at } => {
                 let id = resolve_issue_arg(&storage, &id)?;
-                let result = executor.show_document_content(&id, &path, at.as_deref())?;
+                let result =
+                    executor
+                        .documents()
+                        .show_document_content(&id, &path, at.as_deref())?;
 
                 if json {
                     use jit::output::JsonOutput;
@@ -4999,9 +5003,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             DocCommands::Dir { id, area } => {
                 let output_ctx = OutputContext::new(quiet, json);
 
-                match resolve_issue_arg(&storage, &id)
-                    .and_then(|full_id| executor.resolve_issue_artifact_directory(&full_id, &area))
-                {
+                match resolve_issue_arg(&storage, &id).and_then(|full_id| {
+                    executor
+                        .documents()
+                        .resolve_issue_artifact_directory(&full_id, &area)
+                }) {
                     Ok(response) => {
                         if json {
                             use jit::output::JsonOutput;
@@ -5056,7 +5062,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 // the sibling `doc dir` arm also returns to the top-level
                 // handler rather than relabelling under a code whose exit class
                 // would disagree with it.
-                let report = executor.report_artifact_conformance()?;
+                let report = executor.documents().report_artifact_conformance()?;
 
                 if json {
                     use jit::output::JsonOutput;
@@ -5109,7 +5115,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                 let output_ctx = OutputContext::new(quiet, json);
                 let id = resolve_issue_arg(&storage, &id)?;
-                let result = executor.document_history(&id, &path)?;
+                let result = executor.documents().document_history(&id, &path)?;
 
                 if json {
                     let msg = format!("{} commits in history", result.commits.len());
@@ -5129,7 +5135,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             DocCommands::Diff { id, path, from, to } => {
                 let id = resolve_issue_arg(&storage, &id)?;
-                let result = executor.document_diff(&id, &path, &from, to.as_deref())?;
+                let result =
+                    executor
+                        .documents()
+                        .document_diff(&id, &path, &from, to.as_deref())?;
 
                 if json {
                     use jit::output::JsonOutput;
@@ -5147,7 +5156,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     let output_ctx = OutputContext::new(quiet, json);
                     let id = resolve_issue_arg(&storage, &id)?;
-                    let result = executor.list_document_assets(&id, &path, rescan)?;
+                    let result = executor
+                        .documents()
+                        .list_document_assets(&id, &path, rescan)?;
 
                     // Print warnings first if any
                     for warning in &result.extras.warnings {
@@ -5281,7 +5292,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                 let output_ctx = OutputContext::new(quiet, json);
                 let scope = DocumentScope::parse(&scope, |id| resolve_issue_arg(&storage, id))?;
-                let result = executor.check_document_links(&scope)?;
+                let result = executor.documents().check_document_links(&scope)?;
 
                 if json {
                     let msg = if result.summary.errors == 0 && result.summary.warnings == 0 {

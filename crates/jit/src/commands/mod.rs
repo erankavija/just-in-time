@@ -76,6 +76,7 @@ pub use bootstrap::{open_repository, OpenedRepository, RecoveryFailedError, Repo
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use claim::ClaimOps;
 pub use config::{resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigSetOutcome};
+pub use document::DocumentOps;
 pub use gate::{
     FieldEdit, GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, GateUpdate,
     ManualGateAttestationRequiredError, PassAllOutcome,
