@@ -5326,7 +5326,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         },
         Commands::Archive(archive_cmd) => match archive_cmd {
             ArchiveCommands::Candidates => {
-                let report = executor.archive_candidates()?;
+                let report = executor.archive().archive_candidates()?;
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report)?);
                 } else {
@@ -5335,14 +5335,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             ArchiveCommands::Document { path, execute } => {
                 if execute {
-                    let result = executor.execute_archive_document(&path)?;
+                    let result = executor.archive().execute_archive_document(&path)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
                         print!("{}", jit::output::render_archive_execution(&result));
                     }
                 } else {
-                    let plan = executor.preview_archive_document(&path)?;
+                    let plan = executor.archive().preview_archive_document(&path)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&plan)?);
                     } else {
@@ -5353,14 +5353,14 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             ArchiveCommands::Container { id, execute } => {
                 let id = resolve_issue_arg(&storage, &id)?;
                 if execute {
-                    let result = executor.execute_archive_container(&id)?;
+                    let result = executor.archive().execute_archive_container(&id)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&result)?);
                     } else {
                         print!("{}", jit::output::render_archive_execution(&result));
                     }
                 } else {
-                    let plan = executor.preview_archive_container(&id)?;
+                    let plan = executor.archive().preview_archive_container(&id)?;
                     if json {
                         println!("{}", serde_json::to_string_pretty(&plan)?);
                     } else {
@@ -7464,7 +7464,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     .with_context(|| format!("Invalid format: {}", format))?;
 
                 // Determine source mode
-                let source_mode = executor.determine_snapshot_source_mode(
+                let source_mode = executor.archive().determine_snapshot_source_mode(
                     at.as_deref(),
                     working_tree,
                     committed_only,
@@ -7474,7 +7474,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     executor.validate_silent()?;
                 }
 
-                let (result, warnings) = executor.export_snapshot(
+                let (result, warnings) = executor.archive().export_snapshot(
                     &current_dir,
                     &snapshot_scope,
                     &source_mode,
