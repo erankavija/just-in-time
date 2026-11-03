@@ -15,7 +15,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f0f4e65e-8fa3-4d1c-af50-f4fe0822d4cd",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:07:11.756545269Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7eb443b2-3788-45ee-b65e-4d88b5c3c8de",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Graph findings record their firing subject",
-  "updated_at": "2026-11-03T22:05:26.648951904Z"
+  "updated_at": "2026-11-03T22:07:11.756545269Z"
 }
