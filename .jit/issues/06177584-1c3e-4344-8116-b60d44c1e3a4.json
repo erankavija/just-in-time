@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-03T23:39:07.666304377Z",
+  "dependencies": [],
+  "description": "The dependency tree repeats every shared subtree in full at each path that reaches it, so its size grows with the number of paths through the DAG rather than with its issues and edges. An unlimited-depth tree over a large container becomes unusable.\n\n## Background\n\n`DependencyGraph::build_dependency_tree` (`crates/jit/src/commands/graph.rs`) unfolds the DAG from one issue into a forest of occurrences and folds each occurrence into a `DependencyTreeNode`. An issue reached along several paths is marked `shared`, but every occurrence still carries its complete `children` subtree, so each diamond doubles the output below it.\n\nMeasured on 2026-11-04 on this repository (1,849 issues), installed release build, for container `df129d9e` with 187 distinct transitive dependencies:\n\n- Unlimited depth: 1,048,641,001 bytes of JSON, 4.1 s wall, almost all of it user CPU.\n- Depth 3: 54,801 bytes. Depth 4: 179,321 bytes.\n\n## Success Criteria\n\n- [hard] REQ-01: In the dependency tree, each issue's dependency subtree appears in full at exactly one occurrence. Every other occurrence of that issue is a reference that identifies the issue, carries the `shared` marker and has no children.\n- [hard] REQ-02: The tree's node count is bounded by the number of distinct issues plus the number of dependency edges within the requested depth, for any DAG, verified by a property-based test over generated DAGs.\n- [hard] REQ-03: The JSON and human output of the tree present the same structure, and a reader can tell a reference occurrence from a full one.\n- [hard] REQ-04: For container `df129d9e` at unlimited depth on this repository, the JSON output is below 1 MB.\n\n## Notes\n\nBreaking the JSON shape is acceptable; update the CLI schema and any consumer (MCP bridge, web UI) in the same change.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-03T23:39:07.666304377Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "06177584-1c3e-4344-8116-b60d44c1e3a4",
+  "labels": [
+    "epic:graph-engine",
+    "milestone:v1.0",
+    "component:core",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Dependency tree repeats shared subtrees at every path",
+  "updated_at": "2026-11-03T23:39:07.666304377Z"
+}

@@ -389,7 +389,11 @@
   ],
   "created_during_execution": [
     "944edb32",
-    "655273d9"
+    "655273d9",
+    {
+      "id": "5b37a806",
+      "note": "external issue driven by this lead per user ruling (via 6a)"
+    }
   ],
   "escalations": [
     {
@@ -552,15 +556,31 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "concurrency-critical mutation lease guard"
+    },
+    {
+      "id": "2117739f",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "latest-run accessor and format-4 bump; warned 6a, 88, a4"
+    },
+    {
+      "id": "5b37a806",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "external v1-release bug assigned to this lead by user ruling; unblocks a7314585"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
-  "freeze": "format-4-window: installed jit stays at last format 3 build from the 2117739f landing to the window",
+  "freeze": {
+    "format4_bump": "2117739f dispatched; installed jit stays last format-3 build until cutover window"
+  },
   "notes": [
     "Dispatch runs ready issues ahead of a held wave 1 remainder, per the user's maximum-parallelism instruction relayed by just-in-time-6a; dependencies still order all work. 2117739f is held to shorten the format freeze.",
     "just-in-time-a4 may lead 9876a23a (one validation report): coordinate R1 (validate as history reader, 5b0e3d63 landed read_history_log + record_drift bytes) and merge order with it; warn it, 88 and 6a before 2117739f.",
     "a4 agreed: keeps DEC-09 bridge, sends field name when 6ba4f623 lands (for 53d19851 brief); warn a4 before 2117739f, its benchmark 5d774061 needs a format-4 copy and a main build after the bump.",
     "88 2e0f276b: IssueOps assign/claim/unassign/release/reject/update_issue_resolved take &IssueIdPrefix and return IssueMutation{issue,warnings}; create_issue returns IssueCreation{issue,warnings}. Put in briefs.",
-    "User principle (via 6a): refactors and spec changes must make things more consistent and simpler on their own merit, never to pre-empt a reviewer; a wrong review finding goes to 6a."
+    "User principle (via 6a): refactors and spec changes must make things more consistent and simpler on their own merit, never to pre-empt a reviewer; a wrong review finding goes to 6a.",
+    "Host schedule: from 03:30 EET dispatch nothing new; let running work finish; hold until 6a says gf2 benchmark is done. Warn 6a the moment 2117739f lands."
   ]
 }

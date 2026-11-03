@@ -272,11 +272,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Some(_) => vec![issue_id.clone()],
             None => Vec::new(),
         };
-        let effective =
-            |image: &crate::repository_state::RepositoryImage,
-             repo_rel: &str|
-             -> Result<Option<Vec<u8>>> { super::image_repo_bytes(image, repo_rel) };
-        let issues = effective_issues(&image, &candidates, &effective)?;
+        let issues = crate::repository_state::parse_issue_records(&candidates, |path| {
+            image.file_bytes(path)
+        })?;
         let target_id = super::require_issue_in_capture(&issues, issue_id)?;
         let target = issues
             .into_iter()
@@ -384,16 +382,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             }
             Ok(())
         };
-        // Effective bytes at a repo-relative path: the override (create/replace or
-        // proposed absence) when present, otherwise the captured base bytes.
-        let effective_repo_path =
-            |image: &RepositoryImage, repo_rel: &str| -> Result<Option<Vec<u8>>> {
-                let vpath = image.layout().classify_repository_relative(repo_rel)?;
-                match overrides.get(&vpath) {
-                    Some(value) => Ok(value.clone()),
-                    None => super::image_repo_bytes(image, repo_rel),
-                }
-            };
         let effective_virtual_path =
             |image: &RepositoryImage, path: &VirtualPath| -> Result<Option<Vec<u8>>> {
                 match overrides.get(path) {
@@ -451,7 +439,15 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 let parsed = if mutation {
                     super::captured_active_issues(image)?
                 } else {
-                    effective_issues(image, &issue_ids, &effective_repo_path)?
+                    // Effective bytes: the override (create/replace or proposed
+                    // absence) when present, otherwise the captured base bytes.
+                    crate::repository_state::parse_issue_records(
+                        &issue_ids,
+                        |path| match overrides.get(path) {
+                            Some(value) => Ok(value.as_deref()),
+                            None => image.file_bytes(path),
+                        },
+                    )?
                 };
                 if matches!(
                     purpose,
@@ -746,8 +742,6 @@ fn captured_divergences(
 }
 
 /// Effective-bytes byte source over a captured image and a proposed overlay.
-type EffectiveRepoPath<'a> =
-    dyn Fn(&crate::repository_state::RepositoryImage, &str) -> Result<Option<Vec<u8>>> + 'a;
 type EffectiveVirtualPath<'a> = dyn Fn(
         &crate::repository_state::RepositoryImage,
         &crate::repository_state::VirtualPath,
@@ -778,23 +772,6 @@ fn empty_materialization_config() -> JitConfig {
     crate::declarations::parse_configuration(b"")
         .expect("empty configuration parses")
         .materialization_config(crate::declarations::invariants::InvariantRegistry::empty())
-}
-
-/// Parse every named issue record (possibly overlaid).
-fn effective_issues(
-    image: &crate::repository_state::RepositoryImage,
-    issue_ids: &[IssueId],
-    effective: &EffectiveRepoPath<'_>,
-) -> Result<Vec<Issue>> {
-    issue_ids
-        .iter()
-        .map(|id| {
-            let path = crate::repository_state::VirtualPath::issue_record(id);
-            let bytes = effective(image, &path.repository_relative())?
-                .ok_or_else(|| anyhow!("captured image has no issue file for '{id}'"))?;
-            Ok(crate::repository_state::decode_issue_record(&path, &bytes)?)
-        })
-        .collect()
 }
 
 /// Parse the (possibly overlaid) template registry, needed to derive plan-document
@@ -1507,7 +1484,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         let namespaces = self.exec.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
         let hierarchy =
             crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
 
         // Resolve any external plan documents from the captured validation image
         // so a container whose criteria live in an external file is validated
@@ -1600,7 +1577,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
                 return Ok(RuleReport { findings });
             }
         };
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
         let issues = self.exec.storage.list_issues()?;
 
         let mut findings: Vec<ReportedFinding> = Vec::new();
@@ -1764,7 +1741,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
         let ruleset = self.exec.effective_rules()?;
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
         let all = self.exec.storage.list_issues()?;
 
         // The breakdown boundary type is template-driven: resolve the container's
@@ -1921,7 +1898,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         use crate::validation::report::{ExplainReport, RuleOutcome};
 
         let ruleset = self.exec.effective_rules()?;
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
         let issue = self.exec.storage.load_issue(id)?;
         let issues = self.exec.storage.list_issues()?;
 
