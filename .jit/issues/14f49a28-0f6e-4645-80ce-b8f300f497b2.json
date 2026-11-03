@@ -18,9 +18,10 @@
       "updated_by": null
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-11-03T23:41:06.902790650Z",
-      "updated_by": null
+      "run_id": "00ad1278-235a-433e-b59f-26fcbfacdfd2",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:42:06.029202683Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "14f49a28-0f6e-4645-80ce-b8f300f497b2",
@@ -32,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Package-content docs check assembles its packages outside the repository",
-  "updated_at": "2026-11-03T23:41:06.902790650Z"
+  "updated_at": "2026-11-03T23:42:06.029202683Z"
 }
