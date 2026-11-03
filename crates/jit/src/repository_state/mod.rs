@@ -52,7 +52,9 @@ pub use initialize::{
     render_repo_config, structural_minimum_config, GitattributesClaim, GitattributesStatus,
     InitializationError, InitializationScaffold, FRESH_CONFIG_SCHEMA_VERSION,
 };
-pub use issue_record::{decode_issue_record, MalformedIssueRecordError};
+pub use issue_record::{
+    decode_issue_record, parse_issue_records, IssueRecordsError, MalformedIssueRecordError,
+};
 pub(crate) use managed_document::compose_managed_documents;
 pub use managed_document::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,

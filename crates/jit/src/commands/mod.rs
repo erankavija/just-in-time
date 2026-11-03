@@ -2167,31 +2167,17 @@ pub(crate) fn validation_overlay(
     )?)
 }
 
-/// Parse the active issue set from the captured listing and issue records, in id order.
+/// Parse the issues the captured listing names, in listing order, reporting a
+/// missing record as issue-not-found.
 fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> Result<Vec<Issue>> {
-    use crate::repository_state::{RepositoryEntry, VirtualPath};
+    use crate::repository_state::{captured_issue_ids, parse_issue_records, IssueRecordsError};
 
-    crate::repository_state::captured_issue_ids(image)?
-        .iter()
-        .map(|id| {
-            let path = VirtualPath::issue_record(id);
-            let bytes = match image.entry(&path)? {
-                RepositoryEntry::File { content, .. } => content.bytes(),
-                RepositoryEntry::Absent => {
-                    return Err(crate::storage::IssueNotFoundError::new(id.clone()).into())
-                }
-                _ => return Err(anyhow!("issue {id} is not an ordinary file")),
-            };
-            let issue = crate::repository_state::decode_issue_record(&path, bytes)?;
-            if issue.id != *id {
-                return Err(anyhow!(
-                    "issue {id} contains mismatched embedded id {}",
-                    issue.id
-                ));
-            }
-            Ok(issue)
-        })
-        .collect()
+    parse_issue_records(&captured_issue_ids(image)?, |path| image.file_bytes(path)).map_err(
+        |error| match error {
+            IssueRecordsError::Missing(id) => crate::storage::IssueNotFoundError::new(id).into(),
+            error => error.into(),
+        },
+    )
 }
 
 /// Add the gate-run root and its complete listing to `spec`, then each run
@@ -2697,11 +2683,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 ))
                 .into()
             })
-    }
-
-    /// Resolve the repository's configured default content format.
-    fn repo_content_format(&self) -> Result<crate::domain::ContentFormat> {
-        Ok(self.cached_config()?.content_format())
     }
 
     fn publish_captured_field_update(
