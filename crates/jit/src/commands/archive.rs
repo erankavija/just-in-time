@@ -14,7 +14,9 @@ use crate::domain::artifact_discovery::{
     recorded_archived_copies, ArtifactClosure, ArtifactClosureState, ArtifactEvidence,
     ArtifactEvidenceMap, ArtifactListingScope,
 };
-use crate::domain::artifact_execution::ArchiveExecutionResult;
+use crate::domain::artifact_execution::{
+    archive_executions, ArchiveExecution, ArchiveExecutionResult,
+};
 use crate::domain::artifact_inventory::{
     inventory_explicit_roots, member_derived_documents, member_document_directories,
     pinned_root_requests, ExplicitRootTarget, PinnedRootEvidence, PinnedRootEvidenceMap,
@@ -26,7 +28,7 @@ use crate::domain::artifact_plan::{
 use crate::domain::artifact_plan::{ArtifactAction, WarningCode};
 use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
-use crate::domain::{Event, EventBody, Issue};
+use crate::domain::Issue;
 use crate::storage::artifact_planning::inspect_artifact_evidence;
 use crate::storage::{
     collect_artifact_classification_facts, discover_archive_artifacts,
@@ -122,20 +124,14 @@ fn apply_recorded_residue_identities(
     locations: &mut BTreeMap<String, ArtifactLocationFacts>,
     target: &PlanTarget,
     destination_root: &str,
-    events: &[Event],
+    executions: &[ArchiveExecution],
 ) {
-    let covered = events
+    let covered = executions
         .iter()
-        .filter_map(|event| match event.body() {
-            EventBody::ArtifactArchiveExecuted {
-                target: event_target,
-                destination_root: event_root,
-                publications,
-                ..
-            } if event_target == target && event_root == destination_root => Some(publications),
-            _ => None,
+        .filter(|execution| {
+            &execution.target == target && execution.destination_root == destination_root
         })
-        .flatten()
+        .flat_map(|execution| &execution.publications)
         .filter_map(|publication| {
             publication.source.as_ref().map(|source| {
                 (
@@ -154,7 +150,7 @@ fn apply_recorded_residue_identities(
             // Only a prior archive record turns differing source bytes into an
             // edited residue; an unrelated occupied destination still blocks.
             // Source is the stable publication identity across destination-layout
-            // cutovers, while target and destination root scope the event set.
+            // cutovers, while target and destination root scope the execution set.
             if differs
                 && covered
                     .get(&normalize_artifact_path(source_path))
@@ -291,13 +287,14 @@ impl<S: IssueStore> ArchiveOps<'_, S> {
             }
             None => inventory,
         };
-        let archive_events = self.exec.storage.read_artifact_archive_events()?;
+        let archive_executions =
+            archive_executions(&self.exec.storage.read_artifact_archive_events()?);
         let (discovered, embedded_owners) = discover_archive_artifacts(
             &self.exec.storage,
             inventory,
             &issues,
             &policy,
-            recorded_archived_copies(&archive_events, &target_for_layout),
+            recorded_archived_copies(&archive_executions, &target_for_layout),
         )?;
         let plan_target = discovered.target;
         let artifacts = discovered.artifacts;
@@ -337,7 +334,7 @@ impl<S: IssueStore> ArchiveOps<'_, S> {
             &mut facts.locations,
             &plan_target,
             &destination_root,
-            &archive_events,
+            &archive_executions,
         );
         classify_artifacts(
             ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
@@ -785,9 +782,10 @@ impl ArchiveOps<'_, JsonFileStorage> {
             )
             .collect::<BTreeSet<_>>();
         let mut evidence = ArtifactEvidenceMap::new();
-        let archive_events = crate::repository_state::captured_archive_events(&image)?;
+        let archive_executions =
+            archive_executions(&crate::repository_state::captured_archive_events(&image)?);
         let mut state = ArtifactClosureState::new(roots)
-            .with_archived_copies(recorded_archived_copies(&archive_events, &plan_target));
+            .with_archived_copies(recorded_archived_copies(&archive_executions, &plan_target));
         let parsed = loop {
             match expand_artifact_closure(state, &evidence) {
                 ArtifactClosure::Complete(parsed) => break parsed,
@@ -890,7 +888,7 @@ impl ArchiveOps<'_, JsonFileStorage> {
             &mut facts.locations,
             &plan_target,
             &destination,
-            &archive_events,
+            &archive_executions,
         );
         let plan = classify_artifacts(
             ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
@@ -952,12 +950,41 @@ impl ArchiveOps<'_, JsonFileStorage> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_apply_recorded_residue_identities_scopes_coverage_to_target_and_root() {
+        let target = PlanTarget::Document {
+            path: "a.md".into(),
+        };
+        let executions = [
+            archive_execution(target.clone(), "arc", &[("src/x.md", "arc/x.md")]),
+            archive_execution(target.clone(), "elsewhere", &[("src/y.md", "other/y.md")]),
+        ];
+        let bytes = |text: &[u8]| {
+            ArtifactLocation::Regular(crate::domain::artifact_plan::ContentIdentity::from_bytes(
+                text,
+            ))
+        };
+        let facts = |source: &[u8], destination: &[u8]| ArtifactLocationFacts {
+            source: bytes(source),
+            destination: bytes(destination),
+        };
+        let mut locations = BTreeMap::from([
+            ("src/x.md".to_string(), facts(b"edited", b"arc/x.md")),
+            ("src/y.md".to_string(), facts(b"edited", b"other/y.md")),
+        ]);
+        let before = locations.clone();
+        apply_recorded_residue_identities(&mut locations, &target, "arc", &executions);
+        assert_ne!(locations["src/x.md"], before["src/x.md"]);
+        assert_eq!(locations["src/y.md"], before["src/y.md"]);
+    }
+
     use super::*;
     use crate::domain::artifact_plan::EvidenceCode;
     use crate::domain::identity::IssueId;
-    use crate::domain::State;
+    use crate::domain::{EventBody, State};
     use crate::storage::JsonFileStorage;
     use crate::test_taxonomy::test_taxonomy;
+    use crate::test_utils::archive_execution;
     use crate::test_utils::{document_reference, document_reference_at};
     use std::collections::HashMap;
     use std::fs;
@@ -1614,16 +1641,16 @@ mod tests {
             .is_empty());
 
         let valid = crate::test_utils::stamped_event(
-            EventBody::draft_artifact_archive_executed(
-                PlanTarget::Document {
+            EventBody::draft_artifact_archive_executed(ArchiveExecution {
+                target: PlanTarget::Document {
                     path: "fixtures/root.md".into(),
                 },
-                "archive".into(),
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                true,
-            ),
+                destination_root: "archive".into(),
+                publications: Vec::new(),
+                reference_changes: Vec::new(),
+                planned_deletions: Vec::new(),
+                reconciling: true,
+            }),
             "valid-archive",
             chrono::DateTime::UNIX_EPOCH,
         );
@@ -2540,12 +2567,12 @@ mod tests {
         fs::write(repo.path().join(source), b"# Edited residue\n").unwrap();
 
         let historical_event = crate::test_utils::stamped_event(
-            EventBody::draft_artifact_archive_executed(
-                PlanTarget::Document {
+            EventBody::draft_artifact_archive_executed(ArchiveExecution {
+                target: PlanTarget::Document {
                     path: source.into(),
                 },
-                "workspace/archive".into(),
-                vec![crate::domain::artifact_execution::ArchivePublication {
+                destination_root: "workspace/archive".into(),
+                publications: vec![crate::domain::artifact_execution::ArchivePublication {
                     source: Some(source.into()),
                     destination: historical_destination.into(),
                     content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
@@ -2553,10 +2580,10 @@ mod tests {
                     ),
                     adopted: false,
                 }],
-                Vec::new(),
-                Vec::new(),
-                false,
-            ),
+                reference_changes: Vec::new(),
+                planned_deletions: Vec::new(),
+                reconciling: false,
+            }),
             "historical-archive",
             chrono::DateTime::UNIX_EPOCH,
         );
