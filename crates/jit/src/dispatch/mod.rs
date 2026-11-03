@@ -30,8 +30,12 @@ pub enum Outcome<R> {
 }
 
 /// The `output_schema` lookup of every migrated group, consulted by
-/// [`crate::CommandSchema::generate`] before its legacy table.
-pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[];
+/// [`crate::CommandSchema::generate`] before its legacy table. Test builds
+/// also register the test-only group, whose leaf paths no real command uses.
+pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
+    #[cfg(test)]
+    test_group::output_schema,
+];
 
 /// The registered success schema of the leaf at `cmd_path`, if any group
 /// registers it.
