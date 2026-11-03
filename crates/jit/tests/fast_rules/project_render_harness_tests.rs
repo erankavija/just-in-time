@@ -34,8 +34,8 @@ kind = "advisory"
 
 const RULES_TOML: &str = r#"
 [[rules]]
-name = "label-format"
-description = "Every label is namespace:value."
+name = "require-type-label"
+description = "Every issue has a type label."
 severity = "error"
 enforce = true
 assert = { require-label = { label = "type:*" } }
@@ -256,13 +256,17 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
         .unwrap()
         .expect("separate-file target written");
 
-    // Parity oracle: the typed rule+gate full render over the same captured
-    // authored registries the command used.
-    let effective = RuleSet::parse(RULES_TOML, None, std::iter::empty()).unwrap();
+    // Parity oracle: the typed render over the same effective registries.
+    let namespaces = jit::config_manager::namespaces_from_config(&toml::from_str(&config).unwrap());
+    let effective = jit::repository_state::reconcile_default_rules_with_config(
+        RuleSet::parse(RULES_TOML, None, std::iter::empty()).unwrap(),
+        &namespaces,
+    )
+    .unwrap();
     let expected =
         render_rules_and_gates_markdown(&effective, &registry, jit::config::ProjectionStyle::Full);
     assert_eq!(written, expected);
-    assert!(written.contains("@/rule/label-format"));
+    assert!(written.contains("@/rule/require-type-label"));
     assert!(written.contains("@/gate/cargo-ci"));
 
     let _ = std::fs::remove_dir_all(storage.root());

@@ -593,7 +593,7 @@ fn template_declarations_from_image(
                 .collect::<Result<Vec<_>>>()?;
             let parsed =
                 crate::declarations::rules::RuleSet::parse(content, Some(config), schemas)?;
-            crate::repository_state::reconcile_default_rules_with_config(parsed, &namespaces)
+            crate::repository_state::reconcile_default_rules_with_config(parsed, &namespaces)?
         }
         None => crate::repository_state::default_ruleset(&namespaces),
     };
