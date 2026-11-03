@@ -60,17 +60,32 @@
           "short_id": "70ac98fc",
           "title": "Export, initialization and profile test images use the shared builder",
           "classification": "implementation",
-          "status": "gated: code-review F1 disputed as factually wrong (merge b38318255 contains 058434a44); escalated to just-in-time-6a",
+          "status": "done (code-review passed on the user-authorised rerun with evidence note)",
           "worker": "codex gpt-6-astra xhigh",
           "merge": "b38318255"
+        },
+        {
+          "id": "cf49da17-a076-480e-a96b-bc9224269ac0",
+          "short_id": "cf49da17",
+          "title": "Repository-state and document test images use the shared builder",
+          "classification": "implementation",
+          "status": "done",
+          "worker": "claude opus",
+          "merge": "2a55def17"
+        },
+        {
+          "id": "c92f4011-1850-4998-a555-ca899ec45552",
+          "short_id": "c92f4011",
+          "title": "Keep default rules in force when rules.toml holds only custom rules",
+          "classification": "implementation",
+          "status": "dispatched",
+          "worker": "codex gpt-6-astra xhigh"
         }
       ]
     }
   ],
   "held": {
-    "c92f4011": "awaiting user decision 6 (default-row semantics)",
-    "core": "awaiting user decisions 1-5 in audit.md before amending via jit-planning-lead",
-    "wave2_candidates": "ready now: 70ac98fc, 977d01d8 (decision 2), b3a768b3 (decision 2), ea843d26 (decision 3), f968dfe1 (decision 3); c92f4011 (decision 6)"
+    "wave3": "waits for plan-review (2df01664) and breakdown-review (de9a7557) reruns after the amendment 9a886c0e5"
   },
   "line_target": {
     "goal": "net production-line reduction",
@@ -88,37 +103,59 @@
           "bd2534bd": 0,
           "d40d6f74": -5
         }
+      },
+      {
+        "wave": 2,
+        "partial": true,
+        "default": 15,
+        "test_support_as_test": 0,
+        "by_issue": {
+          "70ac98fc": "+9 (builder file())",
+          "cf49da17": "+6 (builder files())"
+        }
       }
     ]
   },
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "short_id": "2a10917d",
+      "note": "standalone, user-approved: code-review context states commit ancestry; under milestone 9db27a3a; not part of this epic"
+    }
+  ],
   "escalations": [
     {
       "to": "just-in-time-6a",
       "at": "2026-11-03",
       "subject": "audit decisions 1-5 (audit.md)",
-      "status": "open"
+      "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
     },
     {
       "to": "just-in-time-6a",
       "at": "2026-11-03",
       "subject": "cf49da17/725af076 edge swap (3e agrees)",
-      "status": "open"
+      "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
     },
     {
       "to": "just-in-time-6a",
       "at": "2026-11-03",
       "subject": "c92f4011 default-row semantics",
-      "status": "open"
+      "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
     },
     {
       "to": "just-in-time-6a",
       "at": "2026-11-04",
       "subject": "70ac98fc code-review F1 ancestry misread",
-      "status": "open"
+      "status": "resolved 2026-11-04: user approved decisions 1-6 (c92f4011: A2), 70ac98fc rerun authorised"
     }
   ],
   "rework_counts": {},
-  "surfaced_pitfalls": [],
-  "started_at": "2026-11-03T23:40:00+02:00"
+  "surfaced_pitfalls": [
+    "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
+    "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566"
+  ],
+  "started_at": "2026-11-03T23:40:00+02:00",
+  "rejected": [
+    "145b4d57 (superseded, merged into 977d01d8)",
+    "e16493fc (superseded, REQ-02 folded into 2f12d920)"
+  ]
 }
