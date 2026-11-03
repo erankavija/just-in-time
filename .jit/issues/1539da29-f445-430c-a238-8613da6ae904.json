@@ -16,7 +16,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "196aedad-4643-4669-829a-90e090b2973c",
+      "status": "passed",
+      "updated_at": "2026-11-03T21:05:39.108116931Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c99b4198-b156-4698-a18d-3cf190ac76e5",
+      "status": "failed",
+      "updated_at": "2026-11-03T21:10:00.416422297Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1539da29-f445-430c-a238-8613da6ae904",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Derive failure details and suggestions from the error type",
-  "updated_at": "2026-11-03T20:26:36.438378942Z"
+  "updated_at": "2026-11-03T21:10:00.416422297Z"
 }
