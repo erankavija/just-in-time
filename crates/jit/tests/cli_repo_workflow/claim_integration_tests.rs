@@ -8,7 +8,7 @@ use jit::domain::identity::IssueId;
 use jit::output::ErrorCode;
 use jit::storage::worktree_paths::WorktreePaths;
 use jit::test_cli::JitCli;
-use jit::test_lease_store::{lease_path, read_lease};
+use jit::test_lease_store::{history_path, lease_path, read_lease};
 use predicates::prelude::*;
 use serde_json::Value;
 use std::fs;
@@ -236,9 +236,18 @@ fn test_claim_renew_permission_denied_is_identical_in_plain_and_json_forms() {
     let agent = "agent:permission-probe";
     let lease_id = acquire_lease(&cli, &issue_id, agent);
     let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
-    let index_path = lease_path(&paths.shared_jit, &issue_id);
-    let original_mode = fs::metadata(&index_path).unwrap().permissions().mode();
-    fs::set_permissions(&index_path, fs::Permissions::from_mode(0o0)).unwrap();
+    // Renew reads the lease under the lock from whichever path stores it.
+    let stored = [
+        lease_path(&paths.shared_jit, &issue_id),
+        history_path(&paths.shared_jit),
+    ];
+    let original_modes = stored
+        .iter()
+        .map(|path| fs::metadata(path).unwrap().permissions().mode())
+        .collect::<Vec<_>>();
+    for path in &stored {
+        fs::set_permissions(path, fs::Permissions::from_mode(0o0)).unwrap();
+    }
 
     let invoke = |json: bool| {
         let mut command = cli.command_with_env(
@@ -253,7 +262,9 @@ fn test_claim_renew_permission_denied_is_identical_in_plain_and_json_forms() {
     let plain = invoke(false);
     let json = invoke(true);
 
-    fs::set_permissions(&index_path, fs::Permissions::from_mode(original_mode)).unwrap();
+    for (path, mode) in stored.iter().zip(original_modes) {
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    }
     assert_claim_failure_parity(&plain, &json, ErrorCode::PermissionDenied);
 }
 
