@@ -302,55 +302,22 @@ fn normalize_absolute(path: PathBuf) -> Result<PathBuf, RepositoryLayoutError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository_state::{
-        CapturedBytes, DirectoryListing, EntryIdentity, RepositoryRootEvidence,
-    };
+    use crate::repository_state::{CapturedBytes, DirectoryListing, EntryIdentity};
+    use crate::test_harness::image::{synthetic_layout, ImageBuilder};
 
-    fn layout() -> RepositoryLayout {
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new("/repo", "worktree", true),
-            RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .unwrap()
-    }
+    const CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
+        max_listings: 1,
+        max_bytes: 1024,
+        max_depth: 8,
+    };
 
     fn identity(name: &str, bytes: &[u8]) -> EntryIdentity {
         EntryIdentity::for_bytes(name, bytes).unwrap()
     }
 
-    fn image(target: VirtualPath, target_entry: RepositoryEntry) -> RepositoryImage {
-        let layout = layout();
-        let intent = RepositoryExportIntent::new(target.clone(), b"new".to_vec());
-        let spec = intent
-            .capture_spec(CaptureBudget {
-                max_listings: 1,
-                max_bytes: 1024,
-                max_depth: 8,
-            })
-            .unwrap();
-        let parent = immediate_parent(&target).unwrap();
-        RepositoryImage::close(
-            layout,
-            spec,
-            BTreeMap::from([
-                (target, target_entry),
-                (
-                    parent.clone(),
-                    RepositoryEntry::Directory {
-                        identity: identity("parent", b"directory"),
-                        mode: FileMode::Regular,
-                    },
-                ),
-            ]),
-            BTreeMap::from([(parent, DirectoryListing::default())]),
-            BTreeMap::new(),
-        )
-        .unwrap()
-    }
-
     #[test]
     fn test_classify_repository_export_prefers_data_then_worktree_then_external() {
-        let layout = layout();
+        let layout = synthetic_layout();
         assert!(matches!(
             classify_repository_export(&layout, Path::new("/repo"), Path::new(".jit/out.json"))
                 .unwrap(),
@@ -374,17 +341,27 @@ mod tests {
     fn test_finalize_repository_export_preserves_existing_mode_and_preimage() {
         let target = VirtualPath::worktree("out.json").unwrap();
         let old = b"old";
-        let plan = finalize_repository_export(
-            &image(
+        let intent = RepositoryExportIntent::new(target.clone(), b"new".to_vec());
+        let parent = immediate_parent(&target).unwrap();
+        let image = ImageBuilder::new()
+            .with_spec(intent.capture_spec(CAPTURE_BUDGET).unwrap())
+            .entry(
                 target.clone(),
                 RepositoryEntry::File {
                     content: CapturedBytes::new("target", old.to_vec()).unwrap(),
                     mode: FileMode::Executable,
                 },
-            ),
-            &RepositoryExportIntent::new(target, b"new".to_vec()),
-        )
-        .unwrap();
+            )
+            .entry(
+                parent.clone(),
+                RepositoryEntry::Directory {
+                    identity: identity("parent", b"directory"),
+                    mode: FileMode::Regular,
+                },
+            )
+            .listing(parent, DirectoryListing::default())
+            .build();
+        let plan = finalize_repository_export(&image, &intent).unwrap();
         assert!(matches!(
             &plan.delta().actions()[0],
             RepositoryAction::WriteFile {
@@ -400,16 +377,27 @@ mod tests {
     #[test]
     fn test_finalize_repository_export_rejects_wrong_kind_target() {
         let target = VirtualPath::worktree("out.json").unwrap();
-        let result = finalize_repository_export(
-            &image(
+        let intent = RepositoryExportIntent::new(target.clone(), b"new".to_vec());
+        let parent = immediate_parent(&target).unwrap();
+        let image = ImageBuilder::new()
+            .with_spec(intent.capture_spec(CAPTURE_BUDGET).unwrap())
+            .entry(
                 target.clone(),
                 RepositoryEntry::Symlink {
                     target: CapturedBytes::new("target", b"elsewhere".to_vec()).unwrap(),
                     mode: FileMode::Regular,
                 },
-            ),
-            &RepositoryExportIntent::new(target.clone(), b"new".to_vec()),
-        );
+            )
+            .entry(
+                parent.clone(),
+                RepositoryEntry::Directory {
+                    identity: identity("parent", b"directory"),
+                    mode: FileMode::Regular,
+                },
+            )
+            .listing(parent, DirectoryListing::default())
+            .build();
+        let result = finalize_repository_export(&image, &intent);
         assert!(matches!(
             result,
             Err(RepositoryExportError::UnsafeTarget(path)) if path == target
@@ -432,13 +420,7 @@ mod tests {
                 b"content".to_vec(),
             )]),
         );
-        let spec = intent
-            .capture_spec(CaptureBudget {
-                max_listings: 1,
-                max_bytes: 1024,
-                max_depth: 8,
-            })
-            .unwrap();
+        let spec = intent.capture_spec(CAPTURE_BUDGET).unwrap();
         let captured = spec.paths().cloned().collect::<BTreeSet<_>>();
         assert_eq!(
             captured,
@@ -452,9 +434,9 @@ mod tests {
         );
         assert_eq!(spec.listings(), &BTreeSet::from([parent.clone()]));
 
-        let entries = captured
+        let image = captured
             .into_iter()
-            .map(|path| {
+            .fold(ImageBuilder::new().with_spec(spec), |builder, path| {
                 let entry = if path == parent {
                     RepositoryEntry::Directory {
                         identity: identity("parent", b"directory"),
@@ -463,17 +445,10 @@ mod tests {
                 } else {
                     RepositoryEntry::Absent
                 };
-                (path, entry)
+                builder.entry(path, entry)
             })
-            .collect();
-        let image = RepositoryImage::close(
-            layout(),
-            spec,
-            entries,
-            BTreeMap::from([(parent, DirectoryListing::default())]),
-            BTreeMap::new(),
-        )
-        .unwrap();
+            .listing(parent, DirectoryListing::default())
+            .build();
         let plan = finalize_repository_export(&image, &intent).unwrap();
         assert_eq!(plan.delta().actions().len(), 4);
         assert!(matches!(
@@ -491,16 +466,21 @@ mod tests {
     #[test]
     fn test_snapshot_file_requires_an_absent_target() {
         let target = VirtualPath::worktree("snapshot.tar").unwrap();
-        let result = finalize_repository_export(
-            &image(
-                target.clone(),
-                RepositoryEntry::File {
-                    content: CapturedBytes::new("target", b"old".to_vec()).unwrap(),
+        let intent = RepositoryExportIntent::new_absent_file(target.clone(), b"new".to_vec());
+        let parent = immediate_parent(&target).unwrap();
+        let image = ImageBuilder::new()
+            .with_spec(intent.capture_spec(CAPTURE_BUDGET).unwrap())
+            .file(target.clone(), b"old")
+            .entry(
+                parent.clone(),
+                RepositoryEntry::Directory {
+                    identity: identity("parent", b"directory"),
                     mode: FileMode::Regular,
                 },
-            ),
-            &RepositoryExportIntent::new_absent_file(target.clone(), b"new".to_vec()),
-        );
+            )
+            .listing(parent, DirectoryListing::default())
+            .build();
+        let result = finalize_repository_export(&image, &intent);
         assert!(matches!(
             result,
             Err(RepositoryExportError::OccupiedTarget(path)) if path == target

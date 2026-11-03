@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "73595f9cacabb9464b4b7d25afef775370979a72",
+  "completed_at": "2026-11-03T22:16:23.820706431Z",
+  "duration_ms": 183115,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed refactor moves the planning-node and interpolation helpers into templates, updates callers, and preserves focused coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d40d6f74-8486-409a-9a43-8dfd2ad6016b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "29cd6f7b-fe6e-465c-88c4-08c097d3c21f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T22:13:20.705377080Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a223086a23ae129b1da2e883779ef67810061878 (`jit:d40d6f74`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 and @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-06 (issue description); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T22:11:37Z); code-review pending\nTruncation recovery: recovered the initially truncated aggregate patch through bounded per-file reads for all six changed Rust files\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed refactor moves the planning-node and interpolation helpers into templates, updates callers, and preserves focused coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
