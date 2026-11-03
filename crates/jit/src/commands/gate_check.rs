@@ -4981,7 +4981,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 false,
             )
             .unwrap();
-        executor.add_dependency(&issue_id, &dependency_id).unwrap();
+        executor
+            .graph()
+            .add_dependency(&issue_id, &dependency_id)
+            .unwrap();
         let dependency_path = VirtualPath::issue_record(&dependency_id).repository_relative();
         add_exec_gate(
             &executor,

@@ -3094,7 +3094,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     ),
                 };
                 match resolve_dependency_args(&storage, &from_id, &to_ids).and_then(|to_ids| {
-                    executor.add_dependencies_with_policy(&from_id, &to_ids, policy)
+                    executor
+                        .graph()
+                        .add_dependencies_with_policy(&from_id, &to_ids, policy)
                 }) {
                     Ok(result) => {
                         for warning in &result.warnings {
@@ -3174,7 +3176,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 };
                 match resolve_dependency_removal_args(&storage, &from_id, &to_ids).and_then(
                     |(to_ids, unmatched)| {
-                        let result = executor.remove_dependencies(&from_id, &to_ids)?;
+                        let result = executor.graph().remove_dependencies(&from_id, &to_ids)?;
                         for warning in &result.warnings {
                             output_ctx.print_warning(warning)?;
                         }
@@ -4628,7 +4630,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     // For JSON output, use tree structure
                     use jit::output::{GraphDepsTreeResponse, JsonOutput};
 
-                    let tree = executor.build_dependency_tree(&id, depth)?;
+                    let tree = executor.graph().build_dependency_tree(&id, depth)?;
                     let summary = jit::commands::graph::compute_dependency_summary(&tree);
 
                     let response = GraphDepsTreeResponse::with_extras(
@@ -4644,7 +4646,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     println!("{}", output.to_json_string()?);
                 } else {
                     // For human output, use tree structure
-                    let tree = executor.build_dependency_tree(&id, depth)?;
+                    let tree = executor.graph().build_dependency_tree(&id, depth)?;
                     let depth_str = match depth {
                         0 => "all transitive".to_string(),
                         1 => "immediate".to_string(),
@@ -4673,7 +4675,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             GraphCommands::Rdeps { id, depth } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let id = resolve_issue_arg(&storage, &id)?;
-                let issues = executor.show_rdeps_with_depth(&id, depth)?;
+                let issues = executor.graph().show_rdeps_with_depth(&id, depth)?;
                 if json {
                     use jit::domain::MinimalIssue;
                     use jit::output::{GraphDownstreamResponse, JsonOutput};
@@ -4700,7 +4702,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             }
             GraphCommands::Roots => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.show_roots()?;
+                let issues = executor.graph().show_roots()?;
                 if json {
                     use jit::domain::MinimalIssue;
                     use jit::output::{GraphRootsResponse, JsonOutput};
@@ -4725,7 +4727,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let root = root
                     .map(|root| resolve_issue_arg(&storage, &root))
                     .transpose()?;
-                let response = executor.resolve_hierarchy_tree(root.as_ref())?;
+                let response = executor.graph().resolve_hierarchy_tree(root.as_ref())?;
 
                 if json {
                     use jit::output::JsonOutput;
@@ -4801,7 +4803,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 // `batch` runs a distinct projection (issue definitions plus
                 // reported boundary edges); every other format renders the graph.
                 let graph_output = if format == GraphExportFormat::Batch {
-                    let export = executor.export_graph_batch(scope.as_ref())?;
+                    let export = executor.graph().export_graph_batch(scope.as_ref())?;
                     // Boundary edges never join the array (it must stay a clean
                     // batch-create payload); they are reported to stderr so no
                     // crossing edge is dropped silently (REQ-06).
@@ -4816,11 +4818,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                     serde_json::to_string_pretty(&export.defs)?
                 } else {
-                    executor.export_graph(format, full, scope.as_ref())?
+                    executor
+                        .graph()
+                        .export_graph(format, full, scope.as_ref())?
                 };
 
                 if let Some(path) = output {
-                    executor.publish_graph_export(
+                    executor.graph().publish_graph_export(
                         &current_dir,
                         std::path::Path::new(&path),
                         graph_output.as_bytes(),
@@ -5686,7 +5690,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     }
                     jit::cli::QueryCommands::Divergence => {
                         let output_ctx = OutputContext::new(quiet, json);
-                        let report = executor.detect_divergences()?;
+                        let report = executor.graph().detect_divergences()?;
 
                         if json {
                             let msg = format!("{} divergence(s)", report.count());

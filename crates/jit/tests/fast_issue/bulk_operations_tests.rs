@@ -258,6 +258,7 @@ fn test_add_multiple_dependencies() {
 
     let result = h
         .executor
+        .graph()
         .add_dependencies(&from, &[to1.clone(), to2.clone(), to3.clone()])
         .unwrap();
 
@@ -278,11 +279,12 @@ fn test_add_dependencies_some_already_exist() {
     let to2 = h.create_issue("Dep 2");
 
     // Add one dependency first
-    h.executor.add_dependency(&from, &to1).unwrap();
+    h.executor.graph().add_dependency(&from, &to1).unwrap();
 
     // Try to add to1 again plus to2
     let result = h
         .executor
+        .graph()
         .add_dependencies(&from, &[to1.clone(), to2.clone()])
         .unwrap();
 
@@ -302,6 +304,7 @@ fn test_add_dependencies_atomic_failure_nonexistent() {
 
     let result = h
         .executor
+        .graph()
         .add_dependencies(&from, &[to1.clone(), absent.clone()]);
 
     let err = result.expect_err("an unresolvable target must fail the whole batch");
@@ -325,6 +328,7 @@ fn test_add_single_dependency_still_works() {
     let to = h.create_issue("Dep");
 
     h.executor
+        .graph()
         .add_dependencies(&from, std::slice::from_ref(&to))
         .unwrap();
 
@@ -343,11 +347,13 @@ fn test_remove_multiple_dependencies() {
 
     // Add three dependencies
     h.executor
+        .graph()
         .add_dependencies(&from, &[to1.clone(), to2.clone(), to3.clone()])
         .unwrap();
 
     // Remove two
     h.executor
+        .graph()
         .remove_dependencies(&from, &[to1.clone(), to2.clone()])
         .unwrap();
 
@@ -364,11 +370,13 @@ fn test_remove_dependencies_some_not_present() {
     let to2 = h.create_issue("Dep 2");
 
     h.executor
+        .graph()
         .add_dependencies(&from, std::slice::from_ref(&to1))
         .unwrap();
 
     let result = h
         .executor
+        .graph()
         .remove_dependencies(&from, &[to1.clone(), to2.clone()])
         .unwrap();
 
@@ -395,7 +403,7 @@ fn test_add_dependencies_empty_list_error() {
     let h = TestHarness::new();
     let issue_id = h.create_issue("Test Issue");
 
-    let result = h.executor.add_dependencies(&issue_id, &[]);
+    let result = h.executor.graph().add_dependencies(&issue_id, &[]);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("at least one"));
 }

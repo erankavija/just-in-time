@@ -389,7 +389,7 @@ fn test_apply_snapshots_container_dependencies_before_mutation() {
     let upstream = h.create_issue("Upstream");
     let epic = create_epic(&h, "Snapshot epic");
     // Give the container a pre-existing upstream dependency.
-    h.executor.add_dependency(&epic, &upstream).unwrap();
+    h.executor.graph().add_dependency(&epic, &upstream).unwrap();
     let upstream_full = h.get_issue(&upstream).id;
 
     let (result, _w) = h
@@ -527,7 +527,7 @@ fn test_apply_rejects_legacy_planning_only_bracket() {
             false,
         )
         .unwrap();
-    h.executor.add_dependency(&epic, &planning).unwrap();
+    h.executor.graph().add_dependency(&epic, &planning).unwrap();
 
     let before = h.all_issues().len();
     let err = h
@@ -625,8 +625,11 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
     // Simulate the breakdown splice: a child depends on B, and C depends on the
     // child. Transitive reduction then DROPS the direct C → B edge.
     let child = h.create_issue("impl child");
-    h.executor.add_dependency(&child, &breakdown_id).unwrap();
-    h.executor.add_dependency(&epic, &child).unwrap();
+    h.executor
+        .graph()
+        .add_dependency(&child, &breakdown_id)
+        .unwrap();
+    h.executor.graph().add_dependency(&epic, &child).unwrap();
     assert!(
         !h.get_issue(&epic).dependencies.contains(&breakdown_id),
         "reduction must drop the now-redundant direct C → B edge"
@@ -1205,6 +1208,7 @@ fn test_force_errors_when_planning_node_unreachable() {
     // unreachable through the breakdown node's depends_on: a broken bracket the
     // --force refresh must reject rather than silently refresh only B.
     h.executor
+        .graph()
         .remove_dependency(&breakdown_id, &planning_id)
         .unwrap();
 
@@ -1231,8 +1235,8 @@ fn test_apply_wires_spine_and_moves_upstream_onto_planning() {
     let up1 = h.create_issue("Upstream 1");
     let up2 = h.create_issue("Upstream 2");
     let epic = create_epic(&h, "Spine epic");
-    h.executor.add_dependency(&epic, &up1).unwrap();
-    h.executor.add_dependency(&epic, &up2).unwrap();
+    h.executor.graph().add_dependency(&epic, &up1).unwrap();
+    h.executor.graph().add_dependency(&epic, &up2).unwrap();
     let up1_full = h.get_issue(&up1).id;
     let up2_full = h.get_issue(&up2).id;
 
@@ -1363,7 +1367,7 @@ applies_to  = ["epic"]
     let upstream = h.create_issue("Upstream U");
     let epic = create_epic(&h, "Cyclic epic");
     // C → U pre-existing.
-    h.executor.add_dependency(&epic, &upstream).unwrap();
+    h.executor.graph().add_dependency(&epic, &upstream).unwrap();
 
     let bindings = BTreeMap::from([
         ("container".to_string(), epic.clone()),
@@ -1510,7 +1514,7 @@ fn test_apply_result_serializes_to_expected_json_shape() {
     let template = plan_template();
     let upstream = h.create_issue("Upstream");
     let epic = create_epic(&h, "JSON epic");
-    h.executor.add_dependency(&epic, &upstream).unwrap();
+    h.executor.graph().add_dependency(&epic, &upstream).unwrap();
     let upstream_full = h.get_issue(&upstream).id;
     let epic_full = h.get_issue(&epic).id;
 
@@ -1596,7 +1600,7 @@ fn harness_with_upstreams(
     let upstreams: Vec<IssueId> = (0..upstream_count)
         .map(|i| {
             let up = h.create_issue(&format!("Upstream {i}"));
-            h.executor.add_dependency(&epic, &up).unwrap();
+            h.executor.graph().add_dependency(&epic, &up).unwrap();
             h.get_issue(&up).id
         })
         .collect();
