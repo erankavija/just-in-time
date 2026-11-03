@@ -324,12 +324,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// One capture round of the base, from `start` when the caller has read
     /// part of it already.
     ///
-    /// The round reads the registries, the event log (as its length and tail
-    /// for a `mutation`, which also parses issues strictly) and the caller's
-    /// paths; then the
-    /// closure those registries plan. Validation and mutation passes also read
-    /// linked plan documents; a mutation's precheck target adds prompt files and
-    /// gate-run results. Repair and archive omit these rule-evaluation inputs.
+    /// The round reads the registries, the event log (whole for an archive,
+    /// otherwise as its length and tail; a `mutation` also parses issues
+    /// strictly) and the caller's paths; then the closure those registries
+    /// plan. Validation and mutation passes also read linked plan documents; a
+    /// mutation's precheck target adds prompt files and gate-run results.
+    /// Repair and archive omit these rule-evaluation inputs.
     fn capture_proposed_base_inner(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -376,11 +376,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 .chain(extra_paths.iter().cloned()),
             )?;
             spec.discover_listings([VirtualPath::ISSUES])?;
-            // A mutation appends at the log's committed length, so it reads the
-            // log's length and tail; validation parses it, so it reads it whole.
-            match mutation {
-                true => spec.discover_tail(VirtualPath::EVENTS)?,
-                false => spec.discover_paths([VirtualPath::EVENTS])?,
+            // Archive planning parses the log; every other base reads only its
+            // length and tail, which an append needs.
+            match purpose {
+                BaseCapturePurpose::Archive => spec.discover_paths([VirtualPath::EVENTS])?,
+                _ => spec.discover_tail(VirtualPath::EVENTS)?,
             }
             Ok(())
         };
@@ -827,8 +827,7 @@ fn effective_templates(
 }
 
 /// Add what the captured `issues` name to `spec`: the plan documents, and a
-/// precheck target's prompt files, with the log whole when one of its gates
-/// validates the whole repository.
+/// precheck target's prompt files.
 ///
 /// Returns whether a precheck gate consumes the gate-run history, which the
 /// round then reads as well.
@@ -865,9 +864,6 @@ fn discover_issue_closure(
         }
         None => Vec::new(),
     };
-    if precheck.iter().any(super::is_broad_builtin_precheck) {
-        spec.discover_paths([crate::repository_state::VirtualPath::EVENTS])?;
-    }
     spec.discover_paths(plan_document_paths(issues, &full_config)?)?;
     let automated = || {
         precheck
@@ -966,8 +962,9 @@ fn capture_document_reference_validation(
     Ok(Some(Ok(())))
 }
 
-/// Capture every gate-run record and judge the stored records against `image`.
-/// Whole-repository validation pays this read; no mutation's preflight does.
+/// Capture every gate-run record, read the whole event log, and judge the
+/// stored records against `image`. Whole-repository validation pays these
+/// reads; no other capture does.
 fn capture_record_fidelity_validation(
     session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
     image: &crate::repository_state::RepositoryImage,
@@ -979,7 +976,9 @@ fn capture_record_fidelity_validation(
     else {
         return Ok(None);
     };
-    let drift = crate::validation::record_fidelity::record_drift(image, &gate_runs)?;
+    let events = session.read_history_log()?;
+    let drift =
+        crate::validation::record_fidelity::record_drift(image, &gate_runs, events.as_deref())?;
     Ok(Some(match drift.is_empty() {
         true => Ok(()),
         false => Err(
@@ -3415,7 +3414,7 @@ priority = 100
     #[test]
     fn test_capture_proposed_base_scopes_document_references_to_the_consuming_pass() {
         use crate::commands::test_helpers::{seed_issue, setup};
-        use crate::repository_state::{ReadMode, VirtualPath};
+        use crate::repository_state::VirtualPath;
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
@@ -3470,11 +3469,69 @@ priority = 100
             .contains(&("HEAD".into(), "dev/pinned.md".into())));
         assert!(!mutation.capture_spec().contains_path(&document));
         assert!(mutation.capture_spec().pinned().is_empty());
-        let events = |image: &crate::repository_state::RepositoryImage| {
-            image.capture_spec().read_mode(&VirtualPath::EVENTS)
-        };
-        assert_eq!(events(&mutation), Some(ReadMode::Tail));
-        assert_ne!(events(&validation), Some(ReadMode::Tail));
+    }
+
+    /// Only an archive base reads the event log whole; every other base reads
+    /// its length and tail, a whole-repository precheck target's included.
+    #[test]
+    fn test_capture_proposed_base_inner_reads_the_event_log_whole_only_for_archive() {
+        use crate::commands::test_helpers::{seed_gate_registry, seed_issue, setup};
+        use crate::declarations::{GateChecker, GateDefinition, GateMode, GateRegistry, GateStage};
+        use crate::repository_state::{ReadMode, VirtualPath};
+        use crate::storage::RepositoryStateStore;
+
+        let executor = setup();
+        let key: crate::domain::identity::GateKey = "whole-repository".parse().unwrap();
+        let mut registry = GateRegistry::default();
+        registry.gates.insert(
+            key.clone(),
+            GateDefinition {
+                version: 1,
+                key: key.clone(),
+                title: "Whole repository".to_string(),
+                description: String::new(),
+                stage: GateStage::Precheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::RepositoryValidation),
+                priority: 100,
+                reserved: std::collections::HashMap::new(),
+                inputs: None,
+            },
+        );
+        seed_gate_registry(executor.storage(), &registry);
+        let mut issue = crate::test_utils::fixture_issue("Target".to_string(), String::new());
+        issue.gates_required = vec![key];
+        let target = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        let layout = executor.require_layout().unwrap();
+        let mut session = executor.storage().open_mutation_session(layout).unwrap();
+
+        for (purpose, expected) in [
+            (BaseCapturePurpose::Validation, ReadMode::Tail),
+            (
+                BaseCapturePurpose::Mutation {
+                    precheck_target: Some(&target),
+                },
+                ReadMode::Tail,
+            ),
+            (BaseCapturePurpose::Repair, ReadMode::Tail),
+            (BaseCapturePurpose::Archive, ReadMode::Whole),
+        ] {
+            let (image, _) = executor
+                .capture_proposed_base_inner(
+                    session.as_mut(),
+                    None,
+                    &std::collections::BTreeMap::new(),
+                    &[],
+                    purpose,
+                )
+                .unwrap()
+                .expect("a settled capture");
+            assert_eq!(
+                image.capture_spec().read_mode(&VirtualPath::EVENTS),
+                Some(expected)
+            );
+        }
     }
 
     const CUSTOM_PLAN_TEMPLATE: &str = r#"
@@ -3663,6 +3720,10 @@ depends_on = ["planning"]
                 plan: &MaterializationPlan,
             ) -> Result<RepositoryApplyOutcome, Error> {
                 self.0.apply(plan)
+            }
+
+            fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, Error> {
+                self.0.read_history_log()
             }
         }
     }

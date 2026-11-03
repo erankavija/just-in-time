@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fbbaa2ba4312512685cfb065e9e5a143d5b53aeb",
+  "completed_at": "2026-11-03T20:38:39.768109219Z",
+  "duration_ms": 171267,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed validation refactor meets all four hard requirements without identified issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9967d23a-c312-4794-b00a-ed22e4d52500",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-03T20:35:48.500959489Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `e356ba1a0`, `7fa257fe3` (`jit:5b0e3d63`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/5b0e3d63/requirement/REQ-01`–`REQ-04`, `@/issue/f8a6b298/requirement/REQ-13` (issue descriptions); `@/charter/D-18`, `@/charter/D-19` (dev/vision/9db27a3a-charter.md); applicable invariants (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-03T20:32:02.914519379Z)\nTruncation recovery: recovered the truncated combined patch through bounded per-file and line-range reads; excluded a broad interleaved-history listing from attribution.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed validation refactor meets all four hard requirements without identified issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
