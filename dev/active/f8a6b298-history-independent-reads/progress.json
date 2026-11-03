@@ -399,7 +399,8 @@
   ],
   "rework_counts": {
     "becea20a": 1,
-    "f9bf70a5": 1
+    "f9bf70a5": 1,
+    "dd53527f": 1
   },
   "surfaced_pitfalls": [
     {
@@ -409,6 +410,14 @@
     {
       "from": "gate reviewer b06cee74",
       "note": "gate-and-search-command-docs membership label; format-rewrite-tooling borderline large"
+    },
+    {
+      "source": "lead",
+      "text": "An sccache server started inside a flock-held land job inherits the lock fd and holds it indefinitely; queue jobs must use flock -o (queue2.lock)."
+    },
+    {
+      "source": "dd53527f code-review",
+      "text": "LeaseLock replayed claims.jsonl on every operation (regression vs REQ-05 for heartbeat/renew/evict); list/status loaded worktree identity through the locking, writing path."
     }
   ],
   "dispatch_log": [
@@ -494,6 +503,12 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "concurrency-critical lease lock; implements R2 as approved"
+    },
+    {
+      "id": "dd53527f-r1",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "code-review F1 identity write in list/status, F2 log replay in lock()"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",

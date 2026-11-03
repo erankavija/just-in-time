@@ -60,9 +60,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "run_id": "ab012429-ff27-4388-9764-0378517c1434",
+      "run_id": "7b4b058c-f031-42ab-b653-8423ea898d52",
       "status": "passed",
-      "updated_at": "2026-11-02T23:43:36.622770619Z",
+      "updated_at": "2026-11-03T21:05:58.082935583Z",
       "updated_by": "auto:executor"
     }
   },
@@ -82,5 +82,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Restructure storage so reads never scale with project history",
-  "updated_at": "2026-11-02T23:43:36.622770619Z"
+  "updated_at": "2026-11-03T21:05:58.082935583Z"
 }
