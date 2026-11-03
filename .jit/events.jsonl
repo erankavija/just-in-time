@@ -23022,3 +23022,12 @@
 {"from":"ready","id":"59f6c99a-e412-4927-b219-b4207fa044fc","issue_id":"2e0f276b-ca9a-4f1b-88ae-1e14602d6f14","timestamp":"2026-11-03T21:28:43.313549795Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:df129d9e-lead","id":"4f3cdcf8-4b15-44b9-bf67-385421279eb9","issue_id":"22189592-0133-4465-b850-3f6ffff129b7","timestamp":"2026-11-03T21:28:43.428979093Z","type":"issue_claimed"}
 {"from":"ready","id":"828deec7-a0fd-4702-b277-edda77f0c490","issue_id":"22189592-0133-4465-b850-3f6ffff129b7","timestamp":"2026-11-03T21:28:43.543657247Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"code-review","id":"430b4ad3-528a-4167-a94c-35d01290870d","issue_id":"dd53527f-818b-4e61-a0de-c2fb1d0d2684","timestamp":"2026-11-03T21:29:59.413160604Z","type":"gate_failed","updated_by":"auto:executor"}
+{"from":"ready","id":"45f2e804-5338-4e34-8999-b3f1b1bb6fb4","issue_id":"5582e39e-10d5-4079-b81f-47f23a81e45a","timestamp":"2026-11-03T21:30:36.439425664Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"90ab759a-5269-4706-987b-abb5ec89ddd4","issue_id":"5582e39e-10d5-4079-b81f-47f23a81e45a","timestamp":"2026-11-03T21:30:36.439425664Z","type":"issue_claimed"}
+{"fields":["description"],"id":"c6fd6c41-8eee-4c29-b4d1-3e7fb087d45b","issue_id":"2e0f276b-ca9a-4f1b-88ae-1e14602d6f14","timestamp":"2026-11-03T21:31:24.693336541Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["description","labels"],"id":"79fcb710-a36a-4518-b5c4-eb8dc775f7c8","issue_id":"dd53527f-818b-4e61-a0de-c2fb1d0d2684","timestamp":"2026-11-03T21:32:04.751301593Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["description"],"id":"95dc2e24-4be2-4c70-8e7c-931c1cf96a35","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-11-03T21:32:05.013155914Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"plan-review","id":"05b1e4f2-b718-437e-8aa3-23c872bde22d","issue_id":"5e615dc2-5ca4-4a8c-b94a-dd8689894069","timestamp":"2026-11-03T21:35:16.478445274Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"coverage-preview","id":"75443c10-012c-4223-8932-c2f41ce0e1a8","issue_id":"b06cee74-7635-49c0-bc13-448bcfa28324","timestamp":"2026-11-03T21:35:17.343969761Z","type":"gate_passed","updated_by":"auto:executor"}
+{"assignee":"agent:9876a23a-lead","id":"10c917e5-49d8-4ebe-a8c8-3428f9c635db","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-03T21:35:39.312620612Z","type":"issue_claimed"}

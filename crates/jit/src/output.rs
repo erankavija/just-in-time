@@ -927,6 +927,8 @@ wire_vocabulary! {
         InvalidIdPrefix = "INVALID_ID_PREFIX",
         /// No `.jit` repository exists at the resolved data directory.
         RepositoryNotFound = "REPOSITORY_NOT_FOUND",
+        /// A document or file addressed by path or commit does not exist.
+        DocumentNotFound = "DOCUMENT_NOT_FOUND",
         /// The repository format is not the one this binary supports.
         RepositoryFormatUnsupported = "REPOSITORY_FORMAT_UNSUPPORTED",
         /// Issue deletion was refused because operator confirmation was absent.
@@ -1002,6 +1004,7 @@ impl ErrorCode {
             ErrorCode::IssueNotFound
             | ErrorCode::GateNotFound
             | ErrorCode::RepositoryNotFound
+            | ErrorCode::DocumentNotFound
             | ErrorCode::DependencyError
             | ErrorCode::GateCheckError
             | ErrorCode::PresetError
@@ -1074,6 +1077,7 @@ impl ErrorCode {
             ErrorCode::AmbiguousId => "The ID prefix matches more than one candidate.",
             ErrorCode::InvalidIdPrefix => "The ID prefix is shorter than the accepted minimum.",
             ErrorCode::RepositoryNotFound => "No JIT repository exists at the resolved path.",
+            ErrorCode::DocumentNotFound => "The requested document or commit does not exist.",
             ErrorCode::RepositoryFormatUnsupported => {
                 "The repository format is not the one this binary supports."
             }
@@ -3577,6 +3581,7 @@ mod tests {
             (ErrorCode::AmbiguousId, ExitCode::InvalidArgument),
             (ErrorCode::InvalidIdPrefix, ExitCode::InvalidArgument),
             (ErrorCode::RepositoryNotFound, ExitCode::NotFound),
+            (ErrorCode::DocumentNotFound, ExitCode::NotFound),
             (
                 ErrorCode::RepositoryFormatUnsupported,
                 ExitCode::ExternalError,
