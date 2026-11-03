@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "e32fefb2-f12a-4af7-b5de-22db99cfb8a0",
+      "run_id": "3be7936c-4ee6-477e-b59e-45f276524475",
       "status": "passed",
-      "updated_at": "2026-11-03T21:23:26.315745397Z",
+      "updated_at": "2026-11-03T23:05:34.005094699Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -44,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Lease operations run through the lease lock",
-  "updated_at": "2026-11-03T22:42:12.816967787Z"
+  "updated_at": "2026-11-03T23:05:34.005094699Z"
 }
