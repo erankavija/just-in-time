@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-03T20:28:37.578709885Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -23,7 +24,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "CLI search runs through the executor",
-  "updated_at": "2026-11-03T02:55:04.888505736Z"
+  "updated_at": "2026-11-03T20:28:37.578709885Z"
 }
