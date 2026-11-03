@@ -149,7 +149,7 @@ impl<S: IssueStore> ItemOps<'_, S> {
             .into_iter()
             .filter(|k| filter.is_none_or(|f| k.name() == f))
             .collect();
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
         let mut issues = self.exec.storage.list_issues()?;
         // Deterministic output: order by short id, then the index's own order.
         issues.sort_by_key(|a| a.short_id());
@@ -304,7 +304,7 @@ impl<S: IssueStore> ItemOps<'_, S> {
             }
         }
 
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
         // Project-scope source files use the repo's content format (Markdown by
         // default); reuse the same parser selection as issue descriptions.
         let parser = crate::document::content_parser_for(None, repo_format)
@@ -386,7 +386,7 @@ impl<S: IssueStore> ItemOps<'_, S> {
                 let issue = self.exec.storage.load_issue(&full_id)?;
 
                 let kinds = self.issue_item_kinds()?;
-                let repo_format = self.exec.repo_content_format()?;
+                let repo_format = self.exec.cached_config()?.content_format();
                 let parser = crate::document::content_parser_for(issue.content_format, repo_format)
                     .map_err(|err| {
                         anyhow!(

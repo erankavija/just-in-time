@@ -605,7 +605,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         // The captured mutation coordinator owns dependency and gate guards.
 
         let projected = Self::projected_after_update(issue, operations);
-        let repo_format = self.exec.repo_content_format()?;
+        let repo_format = self.exec.cached_config()?.content_format();
         let strictness = self.exec.cached_config()?.strictness();
         let evaluation = crate::validation::evaluate_local(
             &projected,

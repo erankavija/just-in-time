@@ -2702,11 +2702,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             })
     }
 
-    /// Resolve the repository's configured default content format.
-    fn repo_content_format(&self) -> Result<crate::domain::ContentFormat> {
-        Ok(self.cached_config()?.content_format())
-    }
-
     fn publish_captured_field_update(
         &self,
         request: CapturedFieldUpdate,
