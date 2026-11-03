@@ -587,6 +587,7 @@ mod tests {
         assert!(repo.path().join(".jit/issues").is_dir());
         file_executor(repo.path())
             .unwrap()
+            .validation()
             .validate_repository_report()
             .unwrap()
             .unwrap();
@@ -666,6 +667,7 @@ mod tests {
             .is_empty());
         file_executor(repo.path())
             .unwrap()
+            .validation()
             .validate_repository_report()
             .unwrap()
             .unwrap();
@@ -709,6 +711,7 @@ mod tests {
         assert!(resolved.issue_full_id.is_none());
         file_executor(repo.path())
             .unwrap()
+            .validation()
             .validate_repository_report()
             .unwrap()
             .unwrap();
@@ -939,6 +942,7 @@ mod tests {
         );
         file_executor(repo.path())
             .unwrap()
+            .validation()
             .validate_repository_report()
             .unwrap()
             .unwrap();
@@ -1016,6 +1020,7 @@ mod tests {
         );
         file_executor(repo.path())
             .unwrap()
+            .validation()
             .validate_repository_report()
             .unwrap()
             .unwrap();
@@ -1092,6 +1097,7 @@ mod tests {
         .contains("planning"));
         file_executor(repo.path())
             .unwrap()
+            .validation()
             .validate_repository_report()
             .unwrap()
             .unwrap();
@@ -1358,6 +1364,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
         file_executor(repo.path())
             .unwrap()
+            .validation()
             .validate_repository_report()
             .unwrap()
             .unwrap();

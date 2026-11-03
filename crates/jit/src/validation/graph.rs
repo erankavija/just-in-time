@@ -71,7 +71,7 @@ use crate::validation::engine::Finding;
 ///    look at the rest of the value, so the widened value grammar cannot
 ///    change their behavior: `labels::parse_label`, `labels::type_value_of`,
 ///    [`crate::commands::ItemOps::resolve_link_label`],
-///    [`crate::commands::CommandExecutor::dangling_link_findings`],
+///    [`crate::commands::ValidationOps::dangling_link_findings`],
 ///    `validation::desugar::desugar_require_label`,
 ///    [`crate::commands::QueryOps::query_by_label`],
 ///    `snapshot::SnapshotScope::parse`, plus unrelated-namespace assignee

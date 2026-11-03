@@ -407,7 +407,7 @@ fn test_reduce_policy_variadic_skips_redundant_and_adds_valid() {
     assert!(loaded_a.dependencies.contains(&b));
     assert!(!loaded_a.dependencies.contains(&c));
 
-    assert!(h.executor.validate_silent().is_ok());
+    assert!(h.executor.validation().validate_silent().is_ok());
 }
 
 /// `--reduce` interplay: a batch shadowing a PRE-EXISTING edge on another
@@ -446,5 +446,5 @@ fn test_reduce_policy_drops_shadowed_edge_on_other_issue() {
         "expected a dependency_reduced event on X"
     );
 
-    assert!(h.executor.validate_silent().is_ok());
+    assert!(h.executor.validation().validate_silent().is_ok());
 }

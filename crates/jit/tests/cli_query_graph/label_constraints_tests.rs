@@ -63,7 +63,7 @@ unique = false
     // An unregistered namespace is caught by the `namespace-registry` rule
     // (origin = "default"). It fails `jit validate` but does NOT block the
     // write (enforce=false).
-    let err = exec.validate_silent().unwrap_err().to_string();
+    let err = exec.validation().validate_silent().unwrap_err().to_string();
     assert!(err.contains("namespace-registry"), "{}", err);
     assert!(err.contains("typo:foo"), "{}", err);
 }
@@ -77,7 +77,9 @@ unique = true
 "#;
     let (_tmp, exec) = setup_test_repo_with_config(cfg).unwrap();
     create_labeled(&exec, "ok", &["type:task"]);
-    exec.validate_silent().expect("validate should pass");
+    exec.validation()
+        .validate_silent()
+        .expect("validate should pass");
 }
 
 // ------------------------------------------------------------------

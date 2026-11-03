@@ -49,7 +49,7 @@ fn test_validation_detects_broken_dependency() {
         .unwrap();
 
     // Validation should pass
-    assert!(executor.validate_silent().is_ok());
+    assert!(executor.validation().validate_silent().is_ok());
 
     // Add a well-formed dependency id whose target is absent.
     let mut issue2 = storage.load_issue(&issue2_id).unwrap();
@@ -57,7 +57,7 @@ fn test_validation_detects_broken_dependency() {
     jit::test_harness::seed_memory_issue(&storage, &issue2);
 
     // Validation should fail
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("Invalid dependency") || err_msg.contains("not found"));
@@ -109,7 +109,7 @@ fn test_validation_detects_cycle() {
     jit::test_harness::seed_memory_issue(&storage, &issue2_updated);
 
     // Validation should detect the cycle
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("cycle") || err_msg.contains("Cycle"));
@@ -172,7 +172,7 @@ fn test_validation_passes_with_valid_graph() {
         .unwrap();
 
     // Validation should pass
-    assert!(executor.validate_silent().is_ok());
+    assert!(executor.validation().validate_silent().is_ok());
 }
 
 #[test]
@@ -200,7 +200,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
     jit::test_harness::seed_memory_issue(&storage, &issue);
 
     // Validation should fail
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("Invalid dependency") || err_msg.contains("not found"));
@@ -212,7 +212,7 @@ fn test_validation_empty_repository() {
     let executor = memory_executor(storage);
 
     // Empty repository should validate successfully
-    assert!(executor.validate_silent().is_ok());
+    assert!(executor.validation().validate_silent().is_ok());
 }
 
 #[test]
@@ -236,7 +236,7 @@ fn test_validation_detects_invalid_gate_reference() {
         .unwrap();
 
     // Validation should fail because gate doesn't exist in registry
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(
@@ -300,7 +300,7 @@ fn test_validation_detects_isolated_issues() {
         .unwrap();
 
     // Validation should fail due to isolated issue
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("isolated") || err_msg.contains("Isolated"));
@@ -365,7 +365,7 @@ fn test_validation_passes_with_all_connected_issues() {
         .unwrap();
 
     // All issues are connected - validation should pass
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
     assert!(result.is_ok());
 }
 
@@ -390,6 +390,6 @@ fn test_validation_passes_with_single_issue() {
         .unwrap();
 
     // Single issue should not be considered isolated - validation should pass
-    let result = executor.validate_silent();
+    let result = executor.validation().validate_silent();
     assert!(result.is_ok());
 }

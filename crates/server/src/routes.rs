@@ -322,7 +322,7 @@ pub struct StatusResponse {
 async fn get_status<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<StatusResponse>, StatusCode> {
-    let summary = state.executor.get_status().map_err(|e| {
+    let summary = state.executor.validation().get_status().map_err(|e| {
         tracing::error!("Failed to get status: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
