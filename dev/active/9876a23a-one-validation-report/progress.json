@@ -51,6 +51,20 @@
         "d40d6f74": "73595f9ca"
       },
       "gates": "cargo-ci and code-review passed first round on all four"
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "70ac98fc-0fa7-4d4b-b3c0-f67dbe1df2a1",
+          "short_id": "70ac98fc",
+          "title": "Export, initialization and profile test images use the shared builder",
+          "classification": "implementation",
+          "status": "gated: code-review F1 disputed as factually wrong (merge b38318255 contains 058434a44); escalated to just-in-time-6a",
+          "worker": "codex gpt-6-astra xhigh",
+          "merge": "b38318255"
+        }
+      ]
     }
   ],
   "held": {
@@ -95,6 +109,12 @@
       "to": "just-in-time-6a",
       "at": "2026-11-03",
       "subject": "c92f4011 default-row semantics",
+      "status": "open"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-04",
+      "subject": "70ac98fc code-review F1 ancestry misread",
       "status": "open"
     }
   ],

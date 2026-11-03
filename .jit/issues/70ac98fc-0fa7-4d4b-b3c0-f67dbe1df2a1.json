@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-03T22:18:25.097270194Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "fca270bd-e48e-486f-83c7-ec5ba54d2919",
+      "status": "passed",
+      "updated_at": "2026-11-03T22:28:14.219826912Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "bb4fa0cd-010d-4ee4-9cfa-b1771245aa7b",
+      "status": "failed",
+      "updated_at": "2026-11-03T22:31:45.291817692Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "70ac98fc-0fa7-4d4b-b3c0-f67dbe1df2a1",
   "labels": [
     "type:task",
@@ -27,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Export, initialization and profile test images use the shared builder",
-  "updated_at": "2026-11-03T22:18:25.097270194Z"
+  "updated_at": "2026-11-03T22:31:45.291817692Z"
 }

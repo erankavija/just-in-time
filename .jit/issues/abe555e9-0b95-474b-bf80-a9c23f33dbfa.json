@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-11-03T22:25:42.940747988Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6ec02ef7-fe93-47a8-bf36-483ef851d499",
+      "status": "failed",
+      "updated_at": "2026-11-03T22:28:43.018839504Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "abe555e9-0b95-474b-bf80-a9c23f33dbfa",
@@ -37,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Library-side command handler contract",
-  "updated_at": "2026-11-03T22:25:42.940747988Z"
+  "updated_at": "2026-11-03T22:28:43.018839504Z"
 }
