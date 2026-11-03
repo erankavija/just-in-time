@@ -106,7 +106,7 @@ mod recovery_startup_tests {
 
         let (temp, _storage) = jit::test_utils::setup_test_repo().unwrap();
         let repo = temp.path().canonicalize().unwrap();
-        let (id, _) = jit::test_utils::file_executor(&repo)
+        let id = jit::test_utils::file_executor(&repo)
             .unwrap()
             .issues()
             .create_issue(
@@ -119,7 +119,9 @@ mod recovery_startup_tests {
                 None,
                 false,
             )
-            .expect("an issue to serve");
+            .expect("an issue to serve")
+            .issue
+            .id;
 
         let sibling = repo.join("sibling");
         std::fs::create_dir(&sibling).unwrap();

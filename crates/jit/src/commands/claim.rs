@@ -887,16 +887,20 @@ mod tests {
     fn test_release_by_issue_succeeds_for_different_actor() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Agent A acquires the lease.
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:owner")?;
@@ -920,16 +924,20 @@ mod tests {
     fn test_release_by_issue_records_actor_in_audit_trail() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:owner")?;
         execute_claim_release_by_issue_test(&temp, &storage, &issue_id, "agent:auditor")?;
@@ -951,16 +959,20 @@ mod tests {
     fn test_release_by_issue_errors_when_no_active_lease() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Unclaimed Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Unclaimed Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         let result = execute_claim_release_by_issue_test(&temp, &storage, &issue_id, "agent:actor");
 
@@ -1026,16 +1038,20 @@ mod tests {
     fn test_claim_acquire_returns_valid_lease_id() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         let result = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test");
 
@@ -1053,16 +1069,20 @@ mod tests {
 
         let ttls = [60, 600, 3600, 0];
         for (i, ttl) in ttls.iter().enumerate() {
-            let (issue_id, _) = executor.issues().create_issue(
-                format!("Issue {}", i),
-                "Test description".to_string(),
-                crate::domain::Priority::Normal,
-                Vec::new(),
-                Vec::new(),
-                None,
-                None,
-                false,
-            )?;
+            let issue_id = executor
+                .issues()
+                .create_issue(
+                    format!("Issue {}", i),
+                    "Test description".to_string(),
+                    crate::domain::Priority::Normal,
+                    Vec::new(),
+                    Vec::new(),
+                    None,
+                    None,
+                    false,
+                )?
+                .issue
+                .id;
             let result = execute_claim_acquire_test(
                 &temp,
                 &storage,
@@ -1079,16 +1099,20 @@ mod tests {
     fn test_claim_acquire_fails_when_already_claimed() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // First claim succeeds
         let first = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first");
@@ -1106,16 +1130,20 @@ mod tests {
     fn test_claim_acquire_creates_control_plane_structure() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
@@ -1128,16 +1156,20 @@ mod tests {
     fn test_claim_acquire_creates_claims_log() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
@@ -1154,16 +1186,20 @@ mod tests {
     fn test_claim_acquire_creates_worktree_identity() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
@@ -1202,16 +1238,20 @@ mod tests {
     fn test_claim_renew_extends_ttl() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire a claim
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
@@ -1265,16 +1305,20 @@ mod tests {
     fn test_claim_renew_fails_for_wrong_agent() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire with agent1
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
@@ -1292,16 +1336,20 @@ mod tests {
     fn test_claim_renew_indefinite_lease() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire indefinite lease (TTL=0)
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:test")?;
@@ -1324,16 +1372,20 @@ mod tests {
     fn test_claim_release_allows_re_acquisition_after_release() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire claim
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
@@ -1365,16 +1417,20 @@ mod tests {
     fn test_status_with_active_leases() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire a lease
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
@@ -1393,26 +1449,34 @@ mod tests {
     fn test_status_filter_by_issue() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue1, _) = executor.issues().create_issue(
-            "Issue 1".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
-        let (issue2, _) = executor.issues().create_issue(
-            "Issue 2".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue1 = executor
+            .issues()
+            .create_issue(
+                "Issue 1".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
+        let issue2 = executor
+            .issues()
+            .create_issue(
+                "Issue 2".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire leases on both issues
         execute_claim_acquire_test(&temp, &storage, &issue1, 600, "agent:test")?;
@@ -1431,16 +1495,20 @@ mod tests {
     fn test_status_filter_by_agent() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire lease with specific agent
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:other-agent")?;
@@ -1476,36 +1544,48 @@ mod tests {
     fn test_list_shows_all_leases() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue1, _) = executor.issues().create_issue(
-            "Issue 1".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
-        let (issue2, _) = executor.issues().create_issue(
-            "Issue 2".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
-        let (issue3, _) = executor.issues().create_issue(
-            "Issue 3".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue1 = executor
+            .issues()
+            .create_issue(
+                "Issue 1".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
+        let issue2 = executor
+            .issues()
+            .create_issue(
+                "Issue 2".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
+        let issue3 = executor
+            .issues()
+            .create_issue(
+                "Issue 3".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire leases with different agents
         execute_claim_acquire_test(&temp, &storage, &issue1, 600, "agent:alice")?;
@@ -1531,26 +1611,34 @@ mod tests {
     fn test_list_excludes_expired_leases() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue1, _) = executor.issues().create_issue(
-            "Issue 1".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
-        let (issue2, _) = executor.issues().create_issue(
-            "Issue 2".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue1 = executor
+            .issues()
+            .create_issue(
+                "Issue 1".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
+        let issue2 = executor
+            .issues()
+            .create_issue(
+                "Issue 2".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire one lease with very short TTL (will expire)
         execute_claim_acquire_test(&temp, &storage, &issue1, 0, "agent:expired")?;
@@ -1648,16 +1736,20 @@ mod tests {
     fn test_force_evict_removes_lease() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Acquire a lease
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
@@ -1706,16 +1798,20 @@ mod tests {
     fn test_force_evict_allows_re_acquisition() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Test Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Test Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         // Agent 1 acquires
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
@@ -1789,16 +1885,20 @@ mod tests {
     fn test_claim_acquire_synchronized_publishes_issue_and_event() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Sync Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Sync Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
         assert!(!lease_id.as_str().is_empty());
@@ -1820,16 +1920,20 @@ mod tests {
         let (temp, executor) =
             setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Reclaimed Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Reclaimed Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
         let acquire =
             || execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:worker");
 
@@ -1866,16 +1970,20 @@ mod tests {
     ) -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Long History Issue".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Long History Issue".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
         grow_event_log_beyond(&storage, 16 * 1024 * 1024)?;
 
         execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
@@ -1923,16 +2031,20 @@ mod tests {
 
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Reverse Order".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Reverse Order".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
         let full_id = issue_id.clone();
 
         ensure_git_checkout(&temp)?;
@@ -1961,16 +2073,20 @@ mod tests {
     fn test_release_renew_heartbeat_never_touch_repository_state() -> Result<()> {
         let (temp, executor) = setup_test_repo_with_config("")?;
         let storage = executor.storage().clone();
-        let (issue_id, _) = executor.issues().create_issue(
-            "Coordinator Only".to_string(),
-            "Test description".to_string(),
-            crate::domain::Priority::Normal,
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            false,
-        )?;
+        let issue_id = executor
+            .issues()
+            .create_issue(
+                "Coordinator Only".to_string(),
+                "Test description".to_string(),
+                crate::domain::Priority::Normal,
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )?
+            .issue
+            .id;
 
         let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:worker")?;
 

@@ -178,6 +178,13 @@ fn derive_issue_deletion(
     })
 }
 
+/// The issue as persisted by creation, with the write-validation warnings.
+#[derive(Debug, Clone)]
+pub struct IssueCreation {
+    pub issue: Issue,
+    pub warnings: Vec<String>,
+}
+
 /// Issue lifecycle operations of a [`CommandExecutor`].
 pub struct IssueOps<'a, S: IssueStore> {
     pub(super) exec: &'a CommandExecutor<S>,
@@ -202,7 +209,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         content_format: Option<crate::domain::ContentFormat>,
         issue_type: Option<String>,
         force: bool,
-    ) -> Result<(IssueId, Vec<String>)>
+    ) -> Result<IssueCreation>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -249,11 +256,14 @@ impl<S: IssueStore> IssueOps<'_, S> {
         // (`type-hierarchy-known`), which only warns on the normal path.
         // Scoped to the explicit-type path so non-`--type` writes keep warn-only
         // behavior; runs before the write so a bad type changes nothing.
-        let (issue_id, validation) =
+        let (issue, validation) =
             self.exec
                 .publish_issue_creation(&context, issue, explicit_type, force)?;
 
-        Ok((issue_id, validation.warnings))
+        Ok(IssueCreation {
+            issue,
+            warnings: validation.warnings,
+        })
     }
 
     pub fn list_issues(
@@ -406,7 +416,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     ///         .issues().create_issue(title.into(), String::new(), Priority::Normal,
     ///             vec![], vec![], None, None, false)
     ///         .unwrap()
-    ///         .0
+    ///         .issue.id
     /// };
     ///
     /// let epic = new("Epic");
@@ -461,7 +471,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     ///         .issues().create_issue(title.into(), String::new(), Priority::Normal,
     ///             vec![], vec![], None, None, false)
     ///         .unwrap()
-    ///         .0
+    ///         .issue.id
     /// };
     ///
     /// let epic = new("Epic");
@@ -2651,7 +2661,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                     false,
                 )
                 .unwrap()
-                .0
+                .issue
+                .id
         };
         let a_id = create("A");
         let b_id = create("B");
@@ -2706,7 +2717,8 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                     false,
                 )
                 .unwrap()
-                .0
+                .issue
+                .id
         };
         let a_id = create("A");
         let b_id = create("B");
@@ -2914,7 +2926,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             },
         );
 
-        let (a_id, _) = executor
+        let a_id = executor
             .issues()
             .create_issue(
                 "A".to_string(),
@@ -2926,8 +2938,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 None,
                 false,
             )
-            .unwrap();
-        let (b_id, _) = executor
+            .unwrap()
+            .issue
+            .id;
+        let b_id = executor
             .issues()
             .create_issue(
                 "B".to_string(),
@@ -2939,7 +2953,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         executor.graph().add_dependency(&a_id, &b_id).unwrap();
         assert!(
             executor.validation().validate_silent().is_ok(),
@@ -3055,7 +3071,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let declared = crate::test_taxonomy::test_taxonomy()
             .type_at_level(4)
             .to_string();
-        let (id, _warnings) = executor
+        let id = executor
             .issues()
             .create_issue(
                 "Declared type".to_string(),
@@ -3067,7 +3083,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 Some(declared.clone()),
                 false,
             )
-            .expect("a declared --type kind must be accepted");
+            .expect("a declared --type kind must be accepted")
+            .issue
+            .id;
         let issue = executor.storage.load_issue(&id).unwrap();
         assert!(
             issue
@@ -3733,6 +3751,31 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 .filter(|label| label.as_str() == "resolution:done")
                 .count(),
             2
+        );
+    }
+
+    #[test]
+    fn test_create_issue_returns_the_issue_storage_holds() {
+        let executor =
+            memory_executor_declaring(InMemoryStorage::new(), MemoryDeclarations::default());
+
+        let created = executor
+            .issues()
+            .create_issue(
+                "Created".to_string(),
+                "Body".to_string(),
+                crate::domain::Priority::High,
+                vec![],
+                vec!["type:task".to_string()],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+
+        assert_eq!(
+            created.issue,
+            executor.storage.load_issue(&created.issue.id).unwrap()
         );
     }
 }

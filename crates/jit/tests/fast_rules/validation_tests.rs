@@ -14,7 +14,7 @@ fn test_validation_detects_broken_dependency() {
     let executor = memory_executor(storage.clone());
 
     // Create two issues
-    let (issue1_id, _) = executor
+    let issue1_id = executor
         .issues()
         .create_issue(
             "Task A".to_string(),
@@ -26,9 +26,11 @@ fn test_validation_detects_broken_dependency() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
-    let (issue2_id, _) = executor
+    let issue2_id = executor
         .issues()
         .create_issue(
             "Task B".to_string(),
@@ -40,7 +42,9 @@ fn test_validation_detects_broken_dependency() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     // Add valid dependency
     executor
@@ -70,7 +74,7 @@ fn test_validation_detects_cycle() {
     let executor = memory_executor(storage.clone());
 
     // Create two issues
-    let (issue1_id, _) = executor
+    let issue1_id = executor
         .issues()
         .create_issue(
             "A".to_string(),
@@ -82,8 +86,10 @@ fn test_validation_detects_cycle() {
             None,
             false,
         )
-        .unwrap();
-    let (issue2_id, _) = executor
+        .unwrap()
+        .issue
+        .id;
+    let issue2_id = executor
         .issues()
         .create_issue(
             "B".to_string(),
@@ -95,7 +101,9 @@ fn test_validation_detects_cycle() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     // Add A -> B
     executor
@@ -122,7 +130,7 @@ fn test_validation_passes_with_valid_graph() {
     let executor = memory_executor(storage.clone());
 
     // Create a valid dependency graph: A -> B -> C
-    let (issue_c_id, _) = executor
+    let issue_c_id = executor
         .issues()
         .create_issue(
             "C".to_string(),
@@ -134,8 +142,10 @@ fn test_validation_passes_with_valid_graph() {
             None,
             false,
         )
-        .unwrap();
-    let (issue_b_id, _) = executor
+        .unwrap()
+        .issue
+        .id;
+    let issue_b_id = executor
         .issues()
         .create_issue(
             "B".to_string(),
@@ -147,8 +157,10 @@ fn test_validation_passes_with_valid_graph() {
             None,
             false,
         )
-        .unwrap();
-    let (issue_a_id, _) = executor
+        .unwrap()
+        .issue
+        .id;
+    let issue_a_id = executor
         .issues()
         .create_issue(
             "A".to_string(),
@@ -160,7 +172,9 @@ fn test_validation_passes_with_valid_graph() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     executor
         .graph()
@@ -180,7 +194,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
     let storage = InMemoryStorage::new();
     let executor = memory_executor(storage.clone());
 
-    let (issue1_id, _) = executor
+    let issue1_id = executor
         .issues()
         .create_issue(
             "Task".to_string(),
@@ -192,7 +206,9 @@ fn test_validation_detects_multiple_broken_dependencies() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     // Manually add missing targets using canonical issue ids.
     let mut issue = storage.load_issue(&issue1_id).unwrap();
@@ -221,7 +237,7 @@ fn test_validation_detects_invalid_gate_reference() {
     let executor = memory_executor(storage.clone());
 
     // Create issue with gate requirement
-    let (_issue, _) = executor
+    let _issue = executor
         .issues()
         .create_issue(
             "Task".to_string(),
@@ -233,7 +249,9 @@ fn test_validation_detects_invalid_gate_reference() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     // Validation should fail because gate doesn't exist in registry
     let result = executor.validation().validate_silent();
@@ -251,7 +269,7 @@ fn test_validation_detects_isolated_issues() {
     let executor = memory_executor(storage.clone());
 
     // Create connected issues: A -> B
-    let (issue_a_id, _) = executor
+    let issue_a_id = executor
         .issues()
         .create_issue(
             "Connected A".to_string(),
@@ -263,9 +281,11 @@ fn test_validation_detects_isolated_issues() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
-    let (issue_b_id, _) = executor
+    let issue_b_id = executor
         .issues()
         .create_issue(
             "Connected B".to_string(),
@@ -277,7 +297,9 @@ fn test_validation_detects_isolated_issues() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     executor
         .graph()
@@ -285,7 +307,7 @@ fn test_validation_detects_isolated_issues() {
         .unwrap();
 
     // Create an isolated issue (no deps, not a dep of anything)
-    let (_isolated_id, _) = executor
+    let _isolated_id = executor
         .issues()
         .create_issue(
             "Isolated Issue".to_string(),
@@ -297,7 +319,9 @@ fn test_validation_detects_isolated_issues() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     // Validation should fail due to isolated issue
     let result = executor.validation().validate_silent();
@@ -313,7 +337,7 @@ fn test_validation_passes_with_all_connected_issues() {
     let executor = memory_executor(storage.clone());
 
     // Create a connected graph: A -> B -> C
-    let (issue_a_id, _) = executor
+    let issue_a_id = executor
         .issues()
         .create_issue(
             "Issue A".to_string(),
@@ -325,9 +349,11 @@ fn test_validation_passes_with_all_connected_issues() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
-    let (issue_b_id, _) = executor
+    let issue_b_id = executor
         .issues()
         .create_issue(
             "Issue B".to_string(),
@@ -339,9 +365,11 @@ fn test_validation_passes_with_all_connected_issues() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
-    let (issue_c_id, _) = executor
+    let issue_c_id = executor
         .issues()
         .create_issue(
             "Issue C".to_string(),
@@ -353,7 +381,9 @@ fn test_validation_passes_with_all_connected_issues() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     executor
         .graph()
@@ -375,7 +405,7 @@ fn test_validation_passes_with_single_issue() {
     let executor = memory_executor(storage.clone());
 
     // Create a single issue (edge case - should not be considered isolated)
-    let (_issue_id, _) = executor
+    let _issue_id = executor
         .issues()
         .create_issue(
             "Single Issue".to_string(),
@@ -387,7 +417,9 @@ fn test_validation_passes_with_single_issue() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     // Single issue should not be considered isolated - validation should pass
     let result = executor.validation().validate_silent();

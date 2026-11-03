@@ -2118,7 +2118,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         issue_title: &str,
         issue_description: &str,
     ) -> IssueId {
-        let (issue_id, _) = executor
+        let issue_id = executor
             .issues()
             .create_issue(
                 issue_title.to_string(),
@@ -2130,7 +2130,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         executor.gates().add_gate(&issue_id, gate_key).unwrap();
         issue_id
     }
@@ -5044,7 +5046,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        let (dependency_id, _) = executor
+        let dependency_id = executor
             .issues()
             .create_issue(
                 "Dependency".into(),
@@ -5056,7 +5058,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 None,
                 false,
             )
-            .unwrap();
+            .unwrap()
+            .issue
+            .id;
         executor
             .graph()
             .add_dependency(&issue_id, &dependency_id)

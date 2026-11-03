@@ -140,7 +140,8 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
             false,
         )
         .unwrap()
-        .0;
+        .issue
+        .id;
     let report = exec.validation().run_rules(Some(&id)).unwrap();
     assert!(
         !report.has_errors(),
@@ -183,7 +184,7 @@ fn test_create_issue_in_new_namespace_then_validate_label_clean() {
     declare_enforces_namespace(&jit_dir);
 
     let exec = file_executor(temp.path()).unwrap();
-    let (id, _warnings) = exec
+    let id = exec
         .issues()
         .create_issue(
             "enforcer".to_string(),
@@ -195,7 +196,9 @@ fn test_create_issue_in_new_namespace_then_validate_label_clean() {
             None,
             false,
         )
-        .unwrap();
+        .unwrap()
+        .issue
+        .id;
 
     let reloaded = file_executor(temp.path()).unwrap();
     let issue = reloaded.issues().get_issue(&id).unwrap();

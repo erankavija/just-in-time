@@ -37,7 +37,8 @@ fn create_labeled(
             false,
         )
         .unwrap()
-        .0
+        .issue
+        .id
 }
 
 #[test]

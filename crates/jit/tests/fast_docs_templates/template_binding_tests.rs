@@ -116,7 +116,8 @@ fn create_container(executor: &CommandExecutor<InMemoryStorage>, title: &str) ->
             false,
         )
         .unwrap()
-        .0
+        .issue
+        .id
 }
 
 /// The issue's `type:` label value, if any.

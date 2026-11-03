@@ -332,33 +332,23 @@ fn gate_pass_json_error(e: &anyhow::Error, requested: &str) -> jit::output::Json
 /// In `--json` mode emits the structured
 /// [`TemplateApplyResult`](jit::commands::TemplateApplyResult) (template name,
 /// resolved anchor bindings, created/refreshed node ids by role, and the
-/// pre-apply anchor dependency snapshots) plus the freshly-loaded created
+/// pre-apply anchor dependency snapshots) plus the returned created
 /// issues, keyed by role. In quiet mode prints just the created node ids (one per
 /// line, role-ordered) for scripting; otherwise a short human summary.
 fn print_apply_result(
-    storage: &JsonFileStorage,
     result: &jit::commands::TemplateApplyResult,
     container: &IssueId,
     quiet: bool,
     json: bool,
 ) -> Result<()> {
     if json {
-        // Load each created node so the JSON consumer gets the full stored
-        // records (gate list under the storage names) alongside the role→id map.
-        // Routed through the typed response so the schema derives from the same
-        // `Issue` the emission serializes (jit:f40f1b0a).
-        let created_issues: std::collections::BTreeMap<String, jit::domain::Issue> = result
-            .created_node_ids_by_role
-            .iter()
-            .map(|(role, id)| Ok((role.clone(), storage.load_issue(id)?)))
-            .collect::<Result<_>>()?;
         let response = jit::output::TemplateApplyResponse {
             template: result.template.clone(),
             container: container.clone(),
             anchor_bindings: result.anchor_bindings.clone(),
             created_node_ids_by_role: result.created_node_ids_by_role.clone(),
             anchor_dependency_snapshots: result.anchor_dependency_snapshots.clone(),
-            created_issues,
+            created_issues: result.created_issues.clone(),
         };
         let msg = format!("Applied template '{}' to {}", result.template, container);
         let output = JsonOutput::success(response).with_message(msg);
@@ -1353,26 +1343,21 @@ fn run_project_inner<S: IssueStore + jit::storage::RepositoryStateStore>(
 ///
 /// Both commands take identical filters/flags and must produce identical output,
 /// so they delegate to this single implementation.
-#[allow(clippy::too_many_arguments)]
 fn run_query_all<S: IssueStore>(
     executor: &CommandExecutor<S>,
     quiet: bool,
-    state: Option<String>,
-    assignee: Option<Assignee>,
-    priority: Option<String>,
-    label: Vec<String>,
+    filters: jit::cli::IssueFilterArgs,
     full: bool,
     json: bool,
 ) -> Result<()> {
     let output_ctx = OutputContext::new(quiet, json);
-    let state_filter = state.as_ref().map(|s| State::from_str(s)).transpose()?;
-    let priority_filter = priority
-        .as_ref()
-        .map(|p| Priority::from_str(p))
-        .transpose()?;
-    let issues = executor
-        .queries()
-        .query_all(state_filter, assignee, priority_filter, &label)?;
+    let filters = filters.parse()?;
+    let issues = executor.queries().query_all(
+        filters.state,
+        filters.assignee,
+        filters.priority,
+        filters.labels,
+    )?;
 
     if json {
         use jit::domain::MinimalIssue;
@@ -1819,19 +1804,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
     // `jit issue list` and reuse those handlers verbatim.
     let command = match command {
         Commands::Rdeps { id, depth } => Commands::Graph(GraphCommands::Rdeps { id, depth }),
-        Commands::List {
-            state,
-            assignee,
-            priority,
-            label,
-            full,
-        } => Commands::Issue(IssueCommands::List {
-            state,
-            assignee,
-            priority,
-            label,
-            full,
-        }),
+        Commands::List { filters, full } => Commands::Issue(IssueCommands::List { filters, full }),
         other => other,
     };
 
@@ -2060,16 +2033,17 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     // The command layer owns `--type` validation and `type:<kind>`
                     // label derivation; the CLI just forwards the typed value.
-                    let (id, warnings) = executor.issues().create_issue(
-                        title,
-                        description,
-                        prio,
-                        gate,
-                        label,
-                        content_format,
-                        issue_type,
-                        force,
-                    )?;
+                    let jit::commands::IssueCreation { issue, warnings } =
+                        executor.issues().create_issue(
+                            title,
+                            description,
+                            prio,
+                            gate,
+                            label,
+                            content_format,
+                            issue_type,
+                            force,
+                        )?;
 
                     // Print warnings to stderr
                     for warning in &warnings {
@@ -2079,7 +2053,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     let output_ctx = OutputContext::new(quiet, json);
 
                     if json {
-                        let issue = storage.load_issue(&id)?;
                         let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
                         let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
                         let gate_runs = executor
@@ -2098,9 +2071,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     } else {
                         // In quiet mode, output just the ID for scripting
                         if quiet {
-                            println!("{}", id);
+                            println!("{}", issue.id);
                         } else {
-                            println!("Created issue: {}", id);
+                            println!("Created issue: {}", issue.id);
                         }
 
                         // Surface workflow type-hierarchy warnings
@@ -2114,7 +2087,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             let graph_findings =
                                 executor.validation().evaluate_graph_rules(&issues)?;
                             for gf in graph_findings.iter().filter(|gf| {
-                                gf.issue_id.as_ref() == Some(&id)
+                                gf.issue_id.as_ref() == Some(&issue.id)
                                     && !(orphan && gf.finding.rule == "orphan-leaf")
                             }) {
                                 let _ =
@@ -2174,21 +2147,20 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 }
                 IssueCommands::Search {
                     query,
-                    state,
-                    assignee,
-                    priority,
-                    labels,
+                    filters,
                     full,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
 
+                    let filters = filters.parse()?;
+
                     // The positional query is optional only when at least one
                     // filter narrows the search; otherwise the command would
                     // dump every issue, which is almost never intended.
-                    let has_filter = state.is_some()
-                        || assignee.is_some()
-                        || priority.is_some()
-                        || !labels.is_empty();
+                    let has_filter = filters.state.is_some()
+                        || filters.assignee.is_some()
+                        || filters.priority.is_some()
+                        || !filters.labels.is_empty();
                     if query.is_none() && !has_filter {
                         return Err(jit::errors::InvalidArgumentError::new(
                             "invalid arguments: provide a search query or at least one filter (--label/--state/--assignee/--priority)",
@@ -2196,17 +2168,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         .into());
                     }
 
-                    let state_filter = state.map(|s| State::from_str(&s)).transpose()?;
-                    let priority_filter = priority.map(|p| Priority::from_str(&p)).transpose()?;
-                    let assignee = assignee
-                        .map(|value| Assignee::from_str(&value))
-                        .transpose()?;
                     let issues = executor.queries().search_issues_with_filters(
                         query.as_deref().unwrap_or(""),
-                        priority_filter,
-                        state_filter,
-                        assignee,
-                        &labels,
+                        filters.priority,
+                        filters.state,
+                        filters.assignee,
+                        filters.labels,
                     )?;
 
                     if json {
@@ -3024,19 +2991,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         }
                     }
                 }
-                IssueCommands::List {
-                    state,
-                    assignee,
-                    priority,
-                    label,
-                    full,
-                } => {
-                    let assignee = assignee
-                        .map(|value| Assignee::from_str(&value))
-                        .transpose()?;
-                    run_query_all(
-                        &executor, quiet, state, assignee, priority, label, full, json,
-                    )?;
+                IssueCommands::List { filters, full } => {
+                    run_query_all(&executor, quiet, filters, full, json)?;
                 }
             }
         }
@@ -3071,7 +3027,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             for warning in &warnings {
                 eprintln!("Warning: {}", warning);
             }
-            print_apply_result(&storage, &result, &container, quiet, json)?;
+            print_apply_result(&result, &container, quiet, json)?;
         }
         Commands::Dep(dep_cmd) => match dep_cmd {
             DepCommands::Add {
@@ -5410,24 +5366,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         },
         Commands::Query {
             subcommand,
-            state: bare_state,
-            assignee: bare_assignee,
-            priority: bare_priority,
-            label: bare_label,
+            filters: bare_filters,
             full: bare_full,
         } => match subcommand {
-            None => run_query_all(
-                &executor,
-                quiet,
-                bare_state,
-                bare_assignee
-                    .map(|value| Assignee::from_str(&value))
-                    .transpose()?,
-                bare_priority,
-                bare_label,
-                bare_full,
-                json,
-            )?,
+            None => run_query_all(&executor, quiet, bare_filters, bare_full, json)?,
             Some(query_cmd) => {
                 // Parent-level filters only apply to the bare `jit query` form.
                 // When a subcommand is present they would be silently ignored
@@ -5435,41 +5377,21 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 // them with an actionable message instead.
                 reject_parent_query_filters(
                     &query_cmd,
-                    bare_state.as_deref(),
-                    bare_assignee.as_deref(),
-                    bare_priority.as_deref(),
-                    &bare_label,
+                    bare_filters.state.as_deref(),
+                    bare_filters.assignee.as_deref(),
+                    bare_filters.priority.as_deref(),
+                    &bare_filters.labels,
                     bare_full,
                     json,
                 )?;
                 match query_cmd {
-                    jit::cli::QueryCommands::All {
-                        state,
-                        assignee,
-                        priority,
-                        label,
-                        full,
-                    } => {
-                        let assignee = assignee
-                            .map(|value| Assignee::from_str(&value))
-                            .transpose()?;
-                        run_query_all(
-                            &executor, quiet, state, assignee, priority, label, full, json,
-                        )?;
+                    jit::cli::QueryCommands::All { filters, full } => {
+                        run_query_all(&executor, quiet, filters, full, json)?;
                     }
-                    jit::cli::QueryCommands::Available {
-                        priority,
-                        label,
-                        full,
-                    } => {
+                    jit::cli::QueryCommands::Available { filters, full } => {
                         let output_ctx = OutputContext::new(quiet, json);
-                        let priority_filter = priority
-                            .as_ref()
-                            .map(|p| Priority::from_str(p))
-                            .transpose()?;
-                        let issues = executor
-                            .queries()
-                            .query_available(priority_filter, &label)?;
+                        let filters = filters.parse()?;
+                        let issues = executor.queries().query_available(filters)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5498,19 +5420,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             )?;
                         }
                     }
-                    jit::cli::QueryCommands::Blocked {
-                        priority,
-                        label,
-                        full,
-                    } => {
+                    jit::cli::QueryCommands::Blocked { filters, full } => {
                         let output_ctx = OutputContext::new(quiet, json);
-                        let priority_filter = priority
-                            .as_ref()
-                            .map(|p| Priority::from_str(p))
-                            .transpose()?;
-                        let blocked = executor
-                            .queries()
-                            .query_blocked_filtered(priority_filter, &label)?;
+                        let filters = filters.parse()?;
+                        let blocked = executor.queries().query_blocked_filtered(filters)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5583,19 +5496,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             )?;
                         }
                     }
-                    jit::cli::QueryCommands::Strategic {
-                        priority,
-                        label,
-                        full,
-                    } => {
+                    jit::cli::QueryCommands::Strategic { filters, full } => {
                         let output_ctx = OutputContext::new(quiet, json);
-                        let priority_filter = priority
-                            .as_ref()
-                            .map(|p| Priority::from_str(p))
-                            .transpose()?;
-                        let issues = executor
-                            .queries()
-                            .query_strategic_filtered(priority_filter, &label)?;
+                        let filters = filters.parse()?;
+                        let issues = executor.queries().query_strategic_filtered(filters)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5624,19 +5528,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             )?;
                         }
                     }
-                    jit::cli::QueryCommands::Closed {
-                        priority,
-                        label,
-                        full,
-                    } => {
+                    jit::cli::QueryCommands::Closed { filters, full } => {
                         let output_ctx = OutputContext::new(quiet, json);
-                        let priority_filter = priority
-                            .as_ref()
-                            .map(|p| Priority::from_str(p))
-                            .transpose()?;
-                        let issues = executor
-                            .queries()
-                            .query_closed_filtered(priority_filter, &label)?;
+                        let filters = filters.parse()?;
+                        let issues = executor.queries().query_closed_filtered(filters)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -5665,13 +5560,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             )?;
                         }
                     }
-                    jit::cli::QueryCommands::Count { by, label } => {
-                        // Aggregation lives in the executor; this arm dispatches
-                        // by dimension and renders. The bucket is every issue
-                        // matching all --label patterns (ANDed; none = whole repo).
+                    jit::cli::QueryCommands::Count { by, filters } => {
+                        let filters = filters.parse()?;
                         let rollup = match by {
                             jit::cli::CountDimension::State => {
-                                executor.queries().query_count_by_state(&label)?
+                                executor.queries().query_count_by_state(filters)?
                             }
                         };
 
@@ -6012,7 +5905,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             glob,
         } => {
             let output_ctx = OutputContext::new(quiet, json);
-            use jit::search::{search, SearchOptions};
+            use jit::search::SearchOptions;
 
             let options = SearchOptions {
                 case_sensitive,
@@ -6023,42 +5916,41 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 file_patterns: Vec::new(),
             };
 
-            match search(&jit_dir, &query, options) {
-                Ok(results) => {
+            match executor.queries().search_content(&query, options) {
+                Ok(matches) => {
                     if json {
                         use jit::output::{JsonOutput, SearchResponse};
 
-                        let msg = format!("Found {} result(s)", results.len());
+                        let msg = format!("Found {} result(s)", matches.len());
+                        let results = matches.into_iter().map(|m| m.result).collect();
                         let response = SearchResponse::with_extras(
                             results,
                             jit::output::SearchQuery { query },
                         );
                         let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
-                    } else if results.is_empty() {
+                    } else if matches.is_empty() {
                         let _ =
                             output_ctx.print_info(format!("No matches found for \"{}\"", query));
                     } else {
                         let _ = output_ctx.print_info(format!(
                             "Search results for \"{}\" ({} matches):\n",
                             query,
-                            results.len()
+                            matches.len()
                         ));
 
                         let mut current_file = String::new();
-                        for result in &results {
+                        for m in &matches {
+                            let result = &m.result;
                             if result.path != current_file {
                                 current_file = result.path.clone();
 
-                                if let Some(issue_id) = &result.issue_id {
-                                    // Try to load issue for title
-                                    if let Ok(issue) = storage.load_issue(issue_id) {
-                                        println!("Issue {} | {}", issue_id, issue.title);
-                                    } else {
-                                        println!("Issue {}", issue_id);
+                                match (&result.issue_id, &m.issue_title) {
+                                    (Some(issue_id), Some(title)) => {
+                                        println!("Issue {} | {}", issue_id, title)
                                     }
-                                } else {
-                                    println!("Document {}", result.path);
+                                    (Some(issue_id), None) => println!("Issue {}", issue_id),
+                                    (None, _) => println!("Document {}", result.path),
                                 }
                             }
 
