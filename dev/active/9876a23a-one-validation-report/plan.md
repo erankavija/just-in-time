@@ -284,3 +284,12 @@ flowchart LR
 ## Investigation sources
 
 - [Investigation](investigation.md): pipeline map, claim classification, primitive verification, consumer sweeps and option analyses for the report and its views, and for capture, creation, `--fix` and link checking.
+
+## Background corrections at a860614ac (execution lead)
+
+Factual line corrections with criteria unchanged, given to workers at dispatch. The full audit is in [audit.md](audit.md).
+
+- d40d6f74: `find_planning_node` `commands/validate.rs:2352`, `PLAN_DOC_LABEL` `:2391`, `planning_node_plan_path` `:2400`, re-export `commands/mod.rs:107`; `declared_container_label` `commands/template_expand.rs:613`, `InterpolationContext` `:517`; callers `validate.rs:1013,1088`, `validation/repository.rs:655-656`, `commands/template.rs:883`; test `validate.rs:2599`.
+- 7eb443b2: `GraphFinding` `validation/graph.rs:199-245`; `for_issue` `:214`, `unattributed` `:226`, `issue_finding` `:661`, `config_error` `:670`; `evaluate_one` `:522`, `evaluate_label_uniqueness` `:612`, `evaluate_label_coverage` `:733`, `resolve_container` call `:776`.
+- bd2534bd: `arbitrary_dag` `graph/hierarchy.rs:1084`; proptest `crates/jit/Cargo.toml:113`; `lib.rs:39-40`.
+- 6100b960: `RepositoryImage::close` `image.rs:780`; private builders at `repository_state/mod.rs:1080,1277`, `mutation.rs:1319`, `archive.rs:621-655`, `document/reference.rs:266-351`; `initialize.rs` no longer closes an image.
