@@ -31,7 +31,11 @@
 //! task (W2). The reference-integrity checks above are all resolvable from the
 //! template file plus the type hierarchy alone.
 
-use crate::domain::identity::GateKey;
+use crate::config::DocumentationConfig;
+use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
+use crate::domain::identity::{GateKey, IssueId};
+use crate::domain::type_taxonomy::HierarchyConfig;
+use crate::domain::Issue;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -649,10 +653,262 @@ impl GraphTemplate {
     }
 }
 
+/// Find the planning dependency of a breakdown node carrying the template-declared
+/// container label. `by_id` must cover the whole repository, even for scoped validation.
+pub(crate) fn find_planning_node<'a>(
+    container: &Issue,
+    template: &GraphTemplate,
+    roles: &RoleBindings,
+    by_id: &std::collections::HashMap<&IssueId, &'a Issue>,
+) -> Option<&'a Issue> {
+    let planning_type = template.planning_type(roles)?;
+    let bracket_label = declared_container_label(template, roles, container).ok()?;
+    let planning_type_label = crate::labels::type_label(planning_type);
+
+    by_id
+        .values()
+        .filter(|b| b.labels.contains(&bracket_label))
+        .find_map(|b| {
+            b.dependencies.iter().find_map(|dep_id| {
+                by_id
+                    .get(dep_id)
+                    .copied()
+                    .filter(|p| p.labels.contains(&planning_type_label))
+            })
+        })
+}
+
+/// Linked plan documents remain authoritative when moved or archived.
+const PLAN_DOC_LABEL: &str = "plan";
+
+/// The repository-relative path of the planning node's linked plan, if present.
+pub(crate) fn planning_node_plan_path(planning: &Issue) -> Option<String> {
+    planning
+        .documents
+        .iter()
+        .find(|d| d.label.as_deref() == Some(PLAN_DOC_LABEL))
+        .map(|d| d.path.clone())
+}
+
+/// Fixed template-token substitution shared by container lookup and node expansion.
+#[derive(Debug, Clone)]
+pub(crate) struct InterpolationContext {
+    id: IssueId,
+    pub(crate) title: String,
+    hard_criteria: String,
+    directory: Option<String>,
+    pub(crate) doc: Option<String>,
+}
+
+impl InterpolationContext {
+    /// Resolve container tokens, the node's artifact directory, and its own `{doc}`.
+    /// Returns an error when the node's area is not configured as issue-scoped.
+    pub(crate) fn for_node(
+        container: &Issue,
+        node: &TemplateNode,
+        documentation: &DocumentationConfig,
+        hierarchy: &HierarchyConfig,
+    ) -> std::result::Result<Self, ArtifactDirectoryError> {
+        let directory = node
+            .doc_area
+            .as_deref()
+            .map(|area| resolve_artifact_directory(container, area, documentation, hierarchy))
+            .transpose()?;
+        Ok(Self::for_container(container).with_doc(node, directory))
+    }
+
+    /// Build the container-derived context (the `{container.dir}` and `{doc}`
+    /// tokens are unset until a node is selected via [`with_doc`](Self::with_doc)).
+    fn for_container(container: &Issue) -> Self {
+        Self {
+            id: container.id.clone(),
+            title: container.title.clone(),
+            hard_criteria: extract_hard_criteria(&container.description),
+            directory: None,
+            doc: None,
+        }
+    }
+
+    /// Resolve the node's document with its directory in scope and `{doc}` still unset.
+    fn with_doc(&self, node: &TemplateNode, directory: Option<String>) -> Self {
+        let scoped = Self {
+            directory,
+            ..self.clone()
+        };
+        let doc = node
+            .doc
+            .as_deref()
+            .map(|template| scoped.interpolate(template))
+            .unwrap_or_default();
+        Self {
+            doc: Some(doc),
+            ..scoped
+        }
+    }
+
+    /// Substitute every supported `{token}` in `template` with its context value.
+    ///
+    /// A token this context does not carry — `{container.dir}` for a node that
+    /// declares no area, `{doc}` before a node is selected — is left verbatim,
+    /// like any unknown `{...}` text.
+    pub(crate) fn interpolate(&self, template: &str) -> String {
+        let mut out = template
+            .replace("{container.id}", self.id.as_str())
+            .replace("{container.short_id}", self.id.short_id())
+            .replace("{container.title}", &self.title)
+            .replace("{container.hard_criteria}", &self.hard_criteria);
+        if let Some(directory) = &self.directory {
+            out = out.replace("{container.dir}", directory);
+        }
+        if let Some(doc) = &self.doc {
+            out = out.replace("{doc}", doc);
+        }
+        out
+    }
+}
+
+/// Resolve the breakdown node's first label containing a container identifier token.
+pub(crate) fn declared_container_label(
+    template: &GraphTemplate,
+    roles: &RoleBindings,
+    container: &Issue,
+) -> anyhow::Result<String> {
+    let node = template.breakdown_node(roles).ok_or_else(|| {
+        anyhow::anyhow!(
+            "template '{}' declares no '{}' node; bracket lookup needs a breakdown node label",
+            template.name,
+            roles.breakdown_role()
+        )
+    })?;
+    let context = InterpolationContext::for_container(container);
+    node.labels
+        .iter()
+        .find(|label| {
+            label.contains("{container.short_id}") || label.contains("{container.id}")
+        })
+        .map(|label| context.interpolate(label))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "template '{}' breakdown node '{}' declares no container label; bracket lookup cannot resolve the applied node",
+                template.name,
+                node.role
+            )
+        })
+}
+
+/// Collect `[hard]` list items in order for the `{container.hard_criteria}` token.
+fn extract_hard_criteria(description: &str) -> String {
+    description
+        .lines()
+        .map(str::trim)
+        .map(|line| line.trim_start_matches(['-', '*', '+']).trim())
+        .filter(|line| line.starts_with("[hard]"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_find_planning_node_resolves_template_declared_container_label() {
+        let template_toml = r#"
+[[template]]
+name = "custom-plan"
+applies_to = ["epic"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+[[template.nodes]]
+role = "breakdown"
+type = "breakdown"
+labels = ["scaffold:{container.short_id}"]
+depends_on = ["planning"]
+"#;
+        let registry = TemplateRegistry::from_toml_str(template_toml, &[] as &[&str]).unwrap();
+        let template = registry.get("custom-plan").unwrap();
+
+        let mut container =
+            crate::test_utils::fixture_issue("container".to_string(), String::new());
+        container.id = crate::test_utils::issue_id(0xcd81_56d8_b74a_832a_9736_5c98_69cf_16b3);
+
+        let mut planning = crate::test_utils::fixture_issue("planning".to_string(), String::new());
+        planning.id = crate::test_utils::issue_id(0xb4cb_51e2_ab13_a142_2f78_4c62_d893_6a00);
+        planning.labels = vec!["type:planning".to_string()];
+
+        let mut breakdown =
+            crate::test_utils::fixture_issue("breakdown".to_string(), String::new());
+        breakdown.id = crate::test_utils::issue_id(0x3573_5a7e_98c3_97b9_ba56_46af_e8f2_0edc);
+        breakdown.labels = vec![
+            "type:breakdown".to_string(),
+            format!("scaffold:{}", container.short_id()),
+        ];
+        breakdown.dependencies = vec![planning.id.clone()];
+
+        let by_id = std::collections::HashMap::from([
+            (&planning.id, &planning),
+            (&breakdown.id, &breakdown),
+        ]);
+        let resolved = find_planning_node(&container, template, &registry.roles, &by_id).unwrap();
+
+        assert_eq!(resolved.id, planning.id);
+    }
+
+    #[test]
+    fn test_extract_hard_criteria_pulls_only_hard_items() {
+        let desc = "## Success Criteria\n\n- [hard] REQ-01: a\n- [soft] nice\n- [hard] REQ-02: b\n";
+        assert_eq!(
+            extract_hard_criteria(desc),
+            "[hard] REQ-01: a\n[hard] REQ-02: b"
+        );
+    }
+
+    #[test]
+    fn test_extract_hard_criteria_empty_when_none() {
+        assert_eq!(extract_hard_criteria("no criteria here"), "");
+    }
+
+    #[test]
+    fn test_interpolation_resolves_container_and_doc_tokens() {
+        let mut issue = crate::test_utils::fixture_issue(
+            "Auth epic".to_string(),
+            "- [hard] REQ-01: x".to_string(),
+        );
+        issue.id = crate::test_utils::issue_id(0xf456_0000_0000_0000_0000_0000_abc1_23de);
+        let node = TemplateNode {
+            role: "planning".to_string(),
+            type_name: "planning".to_string(),
+            gates: vec![],
+            doc: Some("dev/active/{container.id}-plan.md".to_string()),
+            doc_area: None,
+            description: Some(
+                "Plan {container.title} ({container.short_id}). Doc: {doc}. Cover: {container.hard_criteria}."
+                    .to_string(),
+            ),
+            labels: vec![],
+            depends_on: vec![],
+        };
+        let ctx = InterpolationContext::for_container(&issue).with_doc(&node, None);
+        let rendered = ctx.interpolate(node.description.as_deref().unwrap());
+        assert!(rendered.contains("Auth epic"));
+        assert!(rendered.contains(&issue.short_id()));
+        assert!(rendered.contains(&format!("dev/active/{}-plan.md", issue.id)));
+        assert!(rendered.contains("[hard] REQ-01: x"));
+    }
+
+    #[test]
+    fn test_interpolate_leaves_unknown_token_verbatim() {
+        // The interpolation context is a fixed `{token}` substitution, not a
+        // templating language: an unsupported `{token}` is left untouched while the
+        // known container tokens around it still resolve.
+        let mut issue = crate::test_utils::fixture_issue("Auth epic".to_string(), String::new());
+        issue.id = crate::test_utils::issue_id(0xf456_0000_0000_0000_0000_0000_abc1_23de);
+        let ctx = InterpolationContext::for_container(&issue);
+        let rendered = ctx.interpolate("{container.title} then {totally.unknown} end");
+        assert_eq!(rendered, "Auth epic then {totally.unknown} end");
+    }
 
     /// A complete, valid `plan`-shaped template fixture for round-trip and
     /// happy-path tests. Mirrors the plan doc's schema section.

@@ -61,9 +61,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "run_id": "1e608178-4beb-49a0-99a7-4bea845aeb14",
+      "run_id": "704618ec-457a-4809-a930-7b9246ce136b",
       "status": "failed",
-      "updated_at": "2026-11-03T21:16:35.673673847Z",
+      "updated_at": "2026-11-03T21:46:31.298512293Z",
       "updated_by": "auto:executor"
     }
   },
@@ -81,5 +81,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-11-03T21:16:35.673673847Z"
+  "updated_at": "2026-11-03T21:46:31.298512293Z"
 }

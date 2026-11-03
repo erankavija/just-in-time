@@ -1,0 +1,104 @@
+{
+  "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
+  "epic_short_id": "9876a23a",
+  "current_wave": 2,
+  "waves": [
+    {
+      "wave_number": 1,
+      "base": "a860614ac",
+      "issues": [
+        {
+          "id": "d40d6f74-8486-409a-9a43-8dfd2ad6016b",
+          "short_id": "d40d6f74",
+          "title": "Planning-node lookup lives in the template module",
+          "classification": "implementation",
+          "status": "done",
+          "worker": "codex gpt-6-astra xhigh",
+          "worker_reason": "pure move, exact criteria"
+        },
+        {
+          "id": "7eb443b2-3788-45ee-b65e-4d88b5c3c8de",
+          "short_id": "7eb443b2",
+          "title": "Graph findings record their firing subject",
+          "classification": "implementation",
+          "status": "done",
+          "worker": "claude opus",
+          "worker_reason": "contract field consumed by selection"
+        },
+        {
+          "id": "bd2534bd-d638-439b-a677-a08218893ea7",
+          "short_id": "bd2534bd",
+          "title": "The acyclic-graph proptest strategy lives in the test harness",
+          "classification": "implementation",
+          "status": "done",
+          "worker": "codex gpt-6-astra xhigh",
+          "worker_reason": "small move"
+        },
+        {
+          "id": "6100b960-193f-40e2-9e62-970815412930",
+          "short_id": "6100b960",
+          "title": "Shared test fixture for repository images",
+          "classification": "implementation",
+          "status": "done",
+          "worker": "claude opus",
+          "worker_reason": "shared fixture design"
+        }
+      ],
+      "merges": {
+        "7eb443b2": "06c42b2ee",
+        "6100b960": "9b74a37cb",
+        "bd2534bd": "8f0ca65e5",
+        "d40d6f74": "73595f9ca"
+      },
+      "gates": "cargo-ci and code-review passed first round on all four"
+    }
+  ],
+  "held": {
+    "c92f4011": "awaiting user decision 6 (default-row semantics)",
+    "core": "awaiting user decisions 1-5 in audit.md before amending via jit-planning-lead",
+    "wave2_candidates": "ready now: 70ac98fc, 977d01d8 (decision 2), b3a768b3 (decision 2), ea843d26 (decision 3), f968dfe1 (decision 3); c92f4011 (decision 6)"
+  },
+  "line_target": {
+    "goal": "net production-line reduction",
+    "baseline_rev": "120402067",
+    "baseline_default": 73858,
+    "counter": "scripts/production-lines.py",
+    "wave_merge_deltas": [
+      {
+        "wave": 1,
+        "default": 113,
+        "test_support_as_test": 3,
+        "by_issue": {
+          "7eb443b2": 8,
+          "6100b960": "110 (test-support; 0 flagged)",
+          "bd2534bd": 0,
+          "d40d6f74": -5
+        }
+      }
+    ]
+  },
+  "created_during_execution": [],
+  "escalations": [
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-03",
+      "subject": "audit decisions 1-5 (audit.md)",
+      "status": "open"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-03",
+      "subject": "cf49da17/725af076 edge swap (3e agrees)",
+      "status": "open"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-03",
+      "subject": "c92f4011 default-row semantics",
+      "status": "open"
+    }
+  ],
+  "rework_counts": {},
+  "surfaced_pitfalls": [],
+  "started_at": "2026-11-03T23:40:00+02:00"
+}

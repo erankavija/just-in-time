@@ -5,6 +5,7 @@ use crate::domain::identity::GateKey;
 use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
+use crate::templates::{find_planning_node, planning_node_plan_path};
 use anyhow::Context;
 
 /// Rule name carried by every finding the built-in dangling-item-link pass emits
@@ -1010,8 +1011,8 @@ fn plan_document_paths(
                 .filter(|issue_type| breakable.contains(*issue_type))
                 .and_then(|issue_type| templates.template_for_container(issue_type))
                 .filter(|template| template.plan_doc_location(&templates.roles).is_some())?;
-            crate::commands::find_planning_node(issue, template, &templates.roles, &by_id)
-                .and_then(crate::commands::planning_node_plan_path)
+            find_planning_node(issue, template, &templates.roles, &by_id)
+                .and_then(planning_node_plan_path)
         })
         .map(|path| Ok(crate::repository_state::VirtualPath::worktree(&path)?))
         .collect()
@@ -2335,76 +2336,6 @@ impl<S: IssueStore> ValidationOps<'_, S> {
     }
 }
 
-/// Find `container`'s bracket planning node `P`, if one has been applied.
-///
-/// A breakable container is bracketed by a breakdown node `B` carrying the
-/// container-specific label declared by the template's breakdown node and
-/// depending on a planning node `P` of the template's planning type. This
-/// walks that relationship — the declared container label on `B`, then `B`'s
-/// planning-typed dependency — and returns `P`, or `None` when no bracket has
-/// been applied (no matching `B`, or its planning dependency is absent). The
-/// lookup is over the WHOLE store (`by_id`) so it stays consistent when the
-/// caller's slice bounds out the bracket infrastructure.
-///
-/// Domain-agnostic: the planning type and container label are read from the
-/// container's template (selected by the repository's role bindings), not
-/// hardcoded.
-pub(crate) fn find_planning_node<'a>(
-    container: &Issue,
-    template: &crate::templates::GraphTemplate,
-    roles: &crate::templates::RoleBindings,
-    by_id: &std::collections::HashMap<&IssueId, &'a Issue>,
-) -> Option<&'a Issue> {
-    let planning_type = template.planning_type(roles)?;
-    let bracket_label =
-        crate::commands::template_expand::declared_container_label(template, roles, container)
-            .ok()?;
-    let planning_type_label = label_utils::type_label(planning_type);
-
-    // The breakdown node carries the template-declared container label and
-    // depends on the planning node; find it, then return that dependency.
-    by_id
-        .values()
-        .filter(|b| b.labels.contains(&bracket_label))
-        .find_map(|b| {
-            b.dependencies.iter().find_map(|dep_id| {
-                by_id
-                    .get(dep_id)
-                    .copied()
-                    .filter(|p| p.labels.contains(&planning_type_label))
-            })
-        })
-}
-
-/// The document-reference label that marks a planning node's plan document.
-///
-/// A planning node records WHERE its container's plan lives as a
-/// [`DocumentReference`](crate::domain::DocumentReference) carrying this label.
-/// That reference is the validation-time source of truth for the plan-doc
-/// location: `jit validate` reads the plan from this reference's `path`, so a
-/// plan that is moved/archived and re-linked keeps validating from its new
-/// location. The graph template's
-/// [`plan_doc_location`](crate::templates::GraphTemplate::plan_doc_location)
-/// resolves into the planning node's description as an instruction naming where
-/// to author the plan; applying a template attaches no document reference, and
-/// this one is created when the plan is authored and linked.
-const PLAN_DOC_LABEL: &str = "plan";
-
-/// The repo-root-relative path of `planning`'s recorded plan document, if it has
-/// one.
-///
-/// Reads the planning node's [`PLAN_DOC_LABEL`]-labeled
-/// [`DocumentReference`](crate::domain::DocumentReference) — the validation-time
-/// source of truth for the plan-doc location. Returns `None` when the node
-/// records no such reference (the plan is inline, in the container's body).
-pub(crate) fn planning_node_plan_path(planning: &Issue) -> Option<String> {
-    planning
-        .documents
-        .iter()
-        .find(|d| d.label.as_deref() == Some(PLAN_DOC_LABEL))
-        .map(|d| d.path.clone())
-}
-
 /// Group `(rule_name, message)` pairs into a map of rule name to its messages,
 /// preserving first-seen order within each rule.
 fn group_messages(
@@ -2593,52 +2524,6 @@ mod tests {
         );
         let repaired = stale.replacen(STALE_LABEL_ASSERTION, DEFAULT_LABEL_ASSERTION, 1);
         (stale, repaired)
-    }
-
-    #[test]
-    fn test_find_planning_node_resolves_template_declared_container_label() {
-        let template_toml = r#"
-[[template]]
-name = "custom-plan"
-applies_to = ["epic"]
-[[template.nodes]]
-role = "planning"
-type = "planning"
-[[template.nodes]]
-role = "breakdown"
-type = "breakdown"
-labels = ["scaffold:{container.short_id}"]
-depends_on = ["planning"]
-"#;
-        let registry =
-            crate::templates::TemplateRegistry::from_toml_str(template_toml, &[] as &[&str])
-                .unwrap();
-        let template = registry.get("custom-plan").unwrap();
-
-        let mut container =
-            crate::test_utils::fixture_issue("container".to_string(), String::new());
-        container.id = crate::test_utils::issue_id(0xcd81_56d8_b74a_832a_9736_5c98_69cf_16b3);
-
-        let mut planning = crate::test_utils::fixture_issue("planning".to_string(), String::new());
-        planning.id = crate::test_utils::issue_id(0xb4cb_51e2_ab13_a142_2f78_4c62_d893_6a00);
-        planning.labels = vec!["type:planning".to_string()];
-
-        let mut breakdown =
-            crate::test_utils::fixture_issue("breakdown".to_string(), String::new());
-        breakdown.id = crate::test_utils::issue_id(0x3573_5a7e_98c3_97b9_ba56_46af_e8f2_0edc);
-        breakdown.labels = vec![
-            "type:breakdown".to_string(),
-            format!("scaffold:{}", container.short_id()),
-        ];
-        breakdown.dependencies = vec![planning.id.clone()];
-
-        let by_id = std::collections::HashMap::from([
-            (&planning.id, &planning),
-            (&breakdown.id, &breakdown),
-        ]);
-        let resolved = find_planning_node(&container, template, &registry.roles, &by_id).unwrap();
-
-        assert_eq!(resolved.id, planning.id);
     }
 
     #[test]

@@ -195,11 +195,17 @@ const CONFIG_ERROR_PREFIX: &str = "config error: ";
 /// - `issue_id` is `None` for a `config-error` finding: unusable runtime context
 ///   pertains to the rule itself, not a single issue, and must never be silently
 ///   dropped from a per-issue view.
+/// - `subject` is the issue whose rule application fired the finding. It
+///   differs from `issue_id` when `container-from-label` attributes a finding to
+///   the resolved container, and when a config error is raised for one firing
+///   issue; it is `None` for repo-wide findings such as `label-uniqueness`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GraphFinding {
     /// Full id of the issue this finding concerns, or `None` for a config-error
     /// (which pertains to the rule, not a single issue).
     pub issue_id: Option<IssueId>,
+    /// Full id of the issue whose rule application fired this finding.
+    pub subject: Option<IssueId>,
     /// The underlying engine finding (rule name, severity, message).
     pub finding: Finding,
     /// Whether this finding represents unusable runtime context. Set only
@@ -210,9 +216,10 @@ pub struct GraphFinding {
 }
 
 impl GraphFinding {
-    /// A finding attributed to a specific issue id.
+    /// A finding attributed to, and fired by, a specific issue id.
     pub fn for_issue(issue_id: IssueId, finding: Finding) -> Self {
         Self {
+            subject: Some(issue_id.clone()),
             issue_id: Some(issue_id),
             finding,
             is_config_error: false,
@@ -226,6 +233,7 @@ impl GraphFinding {
     pub fn unattributed(finding: Finding) -> Self {
         Self {
             issue_id: None,
+            subject: None,
             finding,
             is_config_error: false,
         }
@@ -662,14 +670,16 @@ fn issue_finding(rule: &Rule, issue_id: &IssueId, message: String) -> GraphFindi
     GraphFinding::for_issue(issue_id.clone(), finding(rule, message))
 }
 
-/// Attribute unusable runtime context to the rule rather than a single issue.
+/// Attribute unusable runtime context, raised while applying the rule to
+/// `subject`, to the rule rather than a single issue.
 ///
 /// This is the only constructor that sets `is_config_error: true` on the result;
 /// guards read that typed field rather than scanning `finding.message` for a
 /// prefix.
-fn config_error(rule: &Rule, message: impl Into<String>) -> GraphFinding {
+fn config_error(rule: &Rule, subject: &IssueId, message: impl Into<String>) -> GraphFinding {
     GraphFinding {
         issue_id: None,
+        subject: Some(subject.clone()),
         finding: finding(rule, format!("{CONFIG_ERROR_PREFIX}{}", message.into())),
         is_config_error: true,
     }
@@ -788,6 +798,7 @@ fn evaluate_label_coverage(
                         ContainerMatch::Ambiguous => {
                             return vec![config_error(
                                 rule,
+                                &source.id,
                                 format!(
                                     "issue {} matched the rule but its '{ns}:{value}' container \
                                      pointer is ambiguous (matches multiple issue ids by prefix)",
@@ -798,6 +809,7 @@ fn evaluate_label_coverage(
                         ContainerMatch::None => {
                             return vec![config_error(
                                 rule,
+                                &source.id,
                                 format!(
                                     "issue {} matched the rule but its '{ns}:{value}' container \
                                      pointer names no known issue",
@@ -809,6 +821,7 @@ fn evaluate_label_coverage(
                     None => {
                         return vec![config_error(
                             rule,
+                            &source.id,
                             format!(
                                 "issue {} matched the rule but its '{ns}:<id>' container \
                                  pointer is missing",
@@ -831,7 +844,7 @@ fn evaluate_label_coverage(
                 plan_content,
             ) {
                 Ok(ids) => ids,
-                Err(err) => return vec![config_error(rule, err.to_string())],
+                Err(err) => return vec![config_error(rule, &source.id, err.to_string())],
             };
             let candidates: Vec<&Issue> =
                 children_of(container, graph_context, child_link, &exclude_types);
@@ -842,8 +855,9 @@ fn evaluate_label_coverage(
                         .iter()
                         .any(|child| satisfied_id(child, id, &container.id))
                 })
-                .map(move |id| {
-                    issue_finding(
+                .map(move |id| GraphFinding {
+                    subject: Some(source.id.clone()),
+                    ..issue_finding(
                         rule,
                         &container.id,
                         format!(
@@ -1320,7 +1334,7 @@ fn evaluate_criteria_to_check(
                 plan_content,
             ) {
                 Ok(ids) => ids,
-                Err(err) => return vec![config_error(rule, err.to_string())],
+                Err(err) => return vec![config_error(rule, &issue.id, err.to_string())],
             };
             ids.into_iter()
                 .filter(|id| !criterion_is_checked(issue, id, check_namespace))
@@ -1444,7 +1458,7 @@ fn evaluate_criteria_label_match(
                 plan_content,
             ) {
                 Ok(ids) => ids.into_iter().collect(),
-                Err(err) => return vec![config_error(rule, err.to_string())],
+                Err(err) => return vec![config_error(rule, &issue.id, err.to_string())],
             };
 
             values_in_namespace(issue, namespace)
@@ -2324,6 +2338,59 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
         assert!(findings[0].finding.message.contains("brackets"));
+    }
+
+    #[test]
+    fn test_container_indirection_finding_is_attributed_to_container_with_breakdown_subject() {
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
+        );
+        let container = initiative_with_criteria(&["REQ-01"]);
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        breakdown
+            .labels
+            .push(format!("brackets:{}", container.short_id()));
+        let (container_id, breakdown_id) = (container.id.clone(), breakdown.id.clone());
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[container, breakdown],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert_eq!(findings.len(), 1, "uncovered criterion: {findings:?}");
+        assert_eq!(findings[0].issue_id, Some(container_id));
+        assert_eq!(findings[0].subject, Some(breakdown_id));
+    }
+
+    #[test]
+    fn test_container_indirection_dangling_pointer_config_error_has_firing_subject() {
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             container-from-label = \"brackets\" } }\n",
+        );
+        let breakdown = issue("B", &["type:breakdown", "brackets:missing"]);
+        let breakdown_id = breakdown.id.clone();
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph(
+            &rules,
+            &[breakdown],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert_eq!(findings.len(), 1, "dangling pointer: {findings:?}");
+        assert!(findings[0].is_config_error());
+        assert_eq!(findings[0].issue_id, None);
+        assert_eq!(findings[0].subject, Some(breakdown_id));
     }
 
     // --- label-coverage: scoped resolution index (ef0065ad) ----------------
@@ -3551,6 +3618,24 @@ assert = {{ label-coverage = {{ satisfies-namespace = "off-ns" }} }}
         // Config errors never have issue_id; uniqueness findings have no specific
         // attributed issue either (they are cross-issue).
         assert!(!findings[0].is_config_error());
+    }
+
+    #[test]
+    fn test_label_uniqueness_finding_has_no_subject() {
+        let rule = uniqueness_rule("req");
+        let findings = evaluate_graph(
+            &[&rule],
+            &[
+                typed_issue("initiative-a", 2, &["req:REQ-01"]),
+                typed_issue("initiative-b", 2, &["req:REQ-01"]),
+            ],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert_eq!(findings.len(), 1, "one collision: {findings:?}");
+        assert_eq!(findings[0].subject, None);
     }
 
     #[test]

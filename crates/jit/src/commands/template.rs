@@ -13,9 +13,8 @@ use crate::domain::identity::GateKey;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::template_expand::{
-    declared_container_label, expand_template, located_document_area_error, node_description,
-    node_document_path, validate_delta_acyclic, DeltaEndpoint, InterpolationContext, PlannedNode,
-    TemplateDelta,
+    expand_template, located_document_area_error, node_description, node_document_path,
+    validate_delta_acyclic, DeltaEndpoint, PlannedNode, TemplateDelta,
 };
 use super::*;
 use crate::repository_state::{
@@ -23,7 +22,9 @@ use crate::repository_state::{
     MutationContext, MutationIntent, RepositoryEntry, RepositoryImage, VirtualPath,
 };
 use crate::storage::IssueNotFoundError;
-use crate::templates::{GraphTemplate, RoleBindings};
+use crate::templates::{
+    declared_container_label, GraphTemplate, InterpolationContext, RoleBindings,
+};
 use serde::Serialize;
 
 /// Actor recorded on the events the apply engine appends directly.
@@ -376,7 +377,6 @@ fn template_fixed_paths() -> Vec<VirtualPath> {
     vec![
         VirtualPath::CONFIG,
         VirtualPath::INDEX,
-        VirtualPath::EVENTS,
         VirtualPath::GATES,
         VirtualPath::TEMPLATES,
         VirtualPath::RULES,
@@ -394,6 +394,7 @@ fn capture_template_image(
 ) -> Result<Option<RepositoryImage>> {
     let presets_dir = VirtualPath::GATE_PRESETS;
     let mut spec = CaptureSpec::new(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
+    spec.discover_tail(VirtualPath::EVENTS)?;
     spec.discover_listings([presets_dir.clone(), VirtualPath::ISSUES])?;
     capture_discovering(session, spec, |image, spec| {
         let declarations = crate::repository_state::captured_issue_ids(image)?

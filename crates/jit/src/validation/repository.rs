@@ -652,8 +652,8 @@ fn project_plan_content(
             continue;
         }
         let planning =
-            crate::commands::find_planning_node(issue, template, &templates.roles, &by_id);
-        let Some(path) = planning.and_then(crate::commands::planning_node_plan_path) else {
+            crate::templates::find_planning_node(issue, template, &templates.roles, &by_id);
+        let Some(path) = planning.and_then(crate::templates::planning_node_plan_path) else {
             continue;
         };
         match read_text(read, &path)? {
