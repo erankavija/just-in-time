@@ -12,6 +12,7 @@ pub mod config_manager;
 #[cfg(test)]
 mod crate_source_digest;
 pub mod declarations;
+pub mod dispatch;
 pub mod document;
 pub mod domain;
 pub mod errors;
