@@ -422,7 +422,8 @@
     "Do not set TMPDIR to /mnt/nvme for tests: ext4 directory order breaks a drift test (3e's bug, fix with 944edb32) and fsync-heavy tests time out. ENOSPC under /tmp is a host fault: rerun.",
     "/tmp ENOSPC was inode exhaustion (1.0M inodes; ~473K in leaked /tmp/.tmp* test dirs). Authoritative runs (branch CI, cargo-ci gates) use TMPDIR=/dev/shm/jit-ci/9876a23a under the full-CI lock, created before and removed after each run; workers use /mnt/nvme/jit/tmp/9876-workers (steward rule).",
     "Edits to land-pipeline.zsh only while no pipeline runs it: zsh reads the script while it executes.",
-    "Wave ordering that reuses another task's code must be a dependency edge, not sub-wave order (steward, 2026-11-04)."
+    "Wave ordering that reuses another task's code must be a dependency edge, not sub-wave order (steward, 2026-11-04).",
+    "No advisory test suite of this lead (worker or integrator) runs while an authoritative CI run holds the full-CI lock (steward rule, 2026-11-04): worker briefs run whole-suite tests under `flock -s /tmp/jit-full-ci.lock`. Overlap pushed 1f24e3e9 cargo-ci to 42 s against the 30 s budget."
   ],
   "plan_reviews": {
     "plan-review 2df01664": "passed after amendment (0 findings)",
