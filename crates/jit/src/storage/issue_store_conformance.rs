@@ -292,7 +292,7 @@ fn gate_run_seed(runs: &[GateRunResult]) -> Vec<(VirtualPath, String)> {
     runs.iter()
         .map(|run| {
             (
-                VirtualPath::gate_run_record(&run.run_id),
+                VirtualPath::gate_run_record(&run.issue_id, &run.run_id),
                 String::from_utf8(serialize_gate_run(run).unwrap()).unwrap(),
             )
         })
@@ -688,19 +688,45 @@ fn test_list_gate_runs_for_issue_lists_only_that_issues_runs<B: Backend>() {
         .is_empty());
 }
 
-/// A `gate-runs/` directory whose name is not a run id holds no run.
-fn test_list_gate_runs_for_issue_ignores_a_directory_not_named_by_a_run_id<B: Backend>() {
+/// The path `name` inside `issue`'s gate-run directory.
+fn in_issue_directory(issue: &IssueId, name: impl AsRef<Path>) -> VirtualPath {
+    VirtualPath::data(
+        VirtualPath::gate_run_issue_directory(issue)
+            .relative()
+            .as_path()
+            .join(name),
+    )
+    .unwrap()
+}
+
+/// Inside an issue's directory, only a file named `<run-id>.json` is a run: an
+/// unparseable stem, a missing or other extension, and a deeper file list nothing.
+fn test_list_gate_runs_for_issue_ignores_clutter_in_the_issue_directory<B: Backend>() {
     let issue = crate::test_utils::issue_id(153);
-    let run = executed_run(
-        &crate::test_utils::gate_run_id(1),
-        &issue,
-        &"tests".parse().unwrap(),
-        10,
-    );
-    let seed = [(
-        VirtualPath::data("gate-runs/not-a-run-id/result.json").unwrap(),
-        String::from_utf8(serialize_gate_run(&run).unwrap()).unwrap(),
-    )];
+    let run_id = crate::test_utils::gate_run_id(1);
+    let run = String::from_utf8(
+        serialize_gate_run(&executed_run(
+            &run_id,
+            &issue,
+            &"tests".parse().unwrap(),
+            10,
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let record = VirtualPath::gate_run_record(&issue, &run_id);
+    let seed = [
+        (in_issue_directory(&issue, "not-a-run-id.json"), run.clone()),
+        (in_issue_directory(&issue, run_id.as_str()), run.clone()),
+        (in_issue_directory(&issue, format!("{run_id}.txt")), run),
+        (
+            in_issue_directory(
+                &issue,
+                Path::new("nested").join(record.file_name().unwrap()),
+            ),
+            "{ corrupt".to_string(),
+        ),
+    ];
 
     assert!(Repository::<B>::seeded(&seed)
         .store
@@ -709,20 +735,58 @@ fn test_list_gate_runs_for_issue_ignores_a_directory_not_named_by_a_run_id<B: Ba
         .is_empty());
 }
 
-/// A record under the gate-run root, whatever its shape.
+/// Each reader opens only the named issue's directory, so a corrupt record of
+/// another issue fails neither.
+fn test_gate_run_readers_ignore_a_corrupt_record_of_another_issue<B: Backend>() {
+    let run = executed_run(
+        &crate::test_utils::gate_run_id(1),
+        &crate::test_utils::issue_id(153),
+        &"tests".parse().unwrap(),
+        10,
+    );
+    let mut seed = gate_run_seed(std::slice::from_ref(&run));
+    seed.push((
+        VirtualPath::gate_run_record(
+            &crate::test_utils::issue_id(154),
+            &crate::test_utils::gate_run_id(2),
+        ),
+        "{ corrupt".to_string(),
+    ));
+    let repository = Repository::<B>::seeded(&seed);
+
+    assert_eq!(
+        repository
+            .store
+            .list_gate_runs_for_issue(&run.issue_id)
+            .unwrap(),
+        std::slice::from_ref(&run)
+    );
+    assert_eq!(
+        repository
+            .store
+            .load_gate_run_result(&run.issue_id, &run.run_id)
+            .unwrap(),
+        run
+    );
+}
+
+/// A record in the issue's directory, whatever its shape.
 fn test_gate_run_readers_name_a_malformed_result<B: Backend>() {
-    let run_id = crate::test_utils::gate_run_id(1);
-    let path = VirtualPath::gate_run_record(&run_id);
+    let (issue, run_id) = (
+        crate::test_utils::issue_id(1),
+        crate::test_utils::gate_run_id(1),
+    );
+    let path = VirtualPath::gate_run_record(&issue, &run_id);
     let repository = Repository::<B>::seeded(&[(path.clone(), "{ corrupt".to_string())]);
 
     for error in [
         repository
             .store
-            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+            .load_gate_run_result(&issue, &run_id)
             .unwrap_err(),
         repository
             .store
-            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+            .list_gate_runs_for_issue(&issue)
             .unwrap_err(),
     ] {
         assert!(
@@ -730,53 +794,6 @@ fn test_gate_run_readers_name_a_malformed_result<B: Backend>() {
             "{error:#}"
         );
     }
-}
-
-/// Only a result directly under its run directory is a run: a deeper file and a
-/// file beside the run directories list nothing, and naming the latter is
-/// refused.
-fn test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape<B: Backend>() {
-    let direct_file = crate::test_utils::gate_run_id(2);
-    let nested = VirtualPath::gate_run_record(&crate::test_utils::gate_run_id(1));
-    let nested = nested.relative().as_path();
-    let repository = Repository::<B>::seeded(&[
-        (
-            VirtualPath::data(
-                nested
-                    .parent()
-                    .unwrap()
-                    .join("nested")
-                    .join(nested.file_name().unwrap()),
-            )
-            .unwrap(),
-            "{ corrupt".to_string(),
-        ),
-        (
-            VirtualPath::data(
-                VirtualPath::gate_run_record(&direct_file)
-                    .relative()
-                    .as_path()
-                    .parent()
-                    .unwrap(),
-            )
-            .unwrap(),
-            "root clutter".to_string(),
-        ),
-    ]);
-
-    assert!(repository
-        .store
-        .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-        .unwrap()
-        .is_empty());
-    let named = repository
-        .store
-        .load_gate_run_result(&crate::test_utils::issue_id(1), &direct_file)
-        .unwrap_err();
-    assert!(
-        format!("{named:#}").contains("ordinary directory"),
-        "{named:#}"
-    );
 }
 
 fn test_gate_run_readers_refuse_a_file_as_the_gate_run_root<B: Backend>() {
@@ -804,8 +821,11 @@ fn test_gate_run_readers_refuse_a_file_as_the_gate_run_root<B: Backend>() {
 }
 
 fn test_gate_run_readers_refuse_a_directory_as_a_result<B: Backend>() {
-    let run_id = crate::test_utils::gate_run_id(1);
-    let record = VirtualPath::gate_run_record(&run_id);
+    let (issue, run_id) = (
+        crate::test_utils::issue_id(1),
+        crate::test_utils::gate_run_id(1),
+    );
+    let record = VirtualPath::gate_run_record(&issue, &run_id);
     let repository = Repository::<B>::seeded(&[(
         VirtualPath::data(record.relative().as_path().join("inner")).unwrap(),
         String::new(),
@@ -814,11 +834,11 @@ fn test_gate_run_readers_refuse_a_directory_as_a_result<B: Backend>() {
     for error in [
         repository
             .store
-            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+            .load_gate_run_result(&issue, &run_id)
             .unwrap_err(),
         repository
             .store
-            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
+            .list_gate_runs_for_issue(&issue)
             .unwrap_err(),
     ] {
         let message = format!("{error:#}");
@@ -833,7 +853,7 @@ fn record_outside_gate_runs<B: Backend>(
     issue: &IssueId,
     run_id: &GateRunId,
 ) -> (Repository<B>, VirtualPath) {
-    let record = VirtualPath::gate_run_record(run_id);
+    let record = VirtualPath::gate_run_record(issue, run_id);
     let outside =
         VirtualPath::data(Path::new("outside").join(record.relative().as_path())).unwrap();
     let run = executed_run(run_id, issue, &"tests".parse().unwrap(), 10);
@@ -856,18 +876,16 @@ fn path_prefix(path: &VirtualPath, depth: usize) -> VirtualPath {
     .unwrap()
 }
 
-fn test_gate_run_readers_refuse_a_symlink_as_the_gate_run_root<B: Backend>() {
+/// Both readers refuse `directory` when it is a symlink to a directory holding
+/// the record.
+fn assert_gate_run_readers_refuse_a_symlinked<B: Backend>(directory: &VirtualPath) {
     let (issue, run_id) = (
         crate::test_utils::issue_id(1),
         crate::test_utils::gate_run_id(1),
     );
     let (repository, outside) = record_outside_gate_runs::<B>(&issue, &run_id);
-    let depth = VirtualPath::GATE_RUNS
-        .relative()
-        .as_path()
-        .components()
-        .count();
-    repository.link(&VirtualPath::GATE_RUNS, &path_prefix(&outside, depth + 1));
+    let depth = directory.relative().as_path().components().count();
+    repository.link(directory, &path_prefix(&outside, depth + 1));
 
     for error in [
         repository
@@ -886,30 +904,14 @@ fn test_gate_run_readers_refuse_a_symlink_as_the_gate_run_root<B: Backend>() {
     }
 }
 
-/// A symlinked run directory is refused when named and skipped when listed.
-fn test_gate_run_readers_refuse_a_named_symlinked_run_directory_that_listing_skips<B: Backend>() {
-    let (issue, run_id) = (
-        crate::test_utils::issue_id(1),
-        crate::test_utils::gate_run_id(1),
-    );
-    let (repository, outside) = record_outside_gate_runs::<B>(&issue, &run_id);
-    let run_directory = VirtualPath::gate_run_directory(&run_id);
-    let depth = run_directory.relative().as_path().components().count();
-    repository.link(&run_directory, &path_prefix(&outside, depth + 1));
+fn test_gate_run_readers_refuse_a_symlink_as_the_gate_run_root<B: Backend>() {
+    assert_gate_run_readers_refuse_a_symlinked::<B>(&VirtualPath::GATE_RUNS);
+}
 
-    let named = repository
-        .store
-        .load_gate_run_result(&issue, &run_id)
-        .unwrap_err();
-    assert!(
-        format!("{named:#}").contains("ordinary directory"),
-        "{named:#}"
-    );
-    assert!(repository
-        .store
-        .list_gate_runs_for_issue(&issue)
-        .unwrap()
-        .is_empty());
+fn test_gate_run_readers_refuse_a_symlinked_issue_directory<B: Backend>() {
+    assert_gate_run_readers_refuse_a_symlinked::<B>(&VirtualPath::gate_run_issue_directory(
+        &crate::test_utils::issue_id(1),
+    ));
 }
 
 fn test_gate_run_readers_refuse_a_symlink_as_a_result<B: Backend>() {
@@ -918,7 +920,7 @@ fn test_gate_run_readers_refuse_a_symlink_as_a_result<B: Backend>() {
         crate::test_utils::gate_run_id(1),
     );
     let (repository, outside) = record_outside_gate_runs::<B>(&issue, &run_id);
-    let record = VirtualPath::gate_run_record(&run_id);
+    let record = VirtualPath::gate_run_record(&issue, &run_id);
     repository.link(&record, &outside);
 
     for error in [
@@ -937,21 +939,20 @@ fn test_gate_run_readers_refuse_a_symlink_as_a_result<B: Backend>() {
     }
 }
 
-fn test_gate_run_readers_refuse_a_special_object_as_the_gate_run_root<B: Backend>() {
+/// Both readers refuse a special object at `directory`.
+fn assert_gate_run_readers_refuse_a_special<B: Backend>(directory: &VirtualPath) {
+    let issue = crate::test_utils::issue_id(2);
     let repository = Repository::<B>::seeded(&initialized());
-    repository.plant_special(&VirtualPath::GATE_RUNS);
+    repository.plant_special(directory);
 
     for error in [
         repository
             .store
-            .load_gate_run_result(
-                &crate::test_utils::issue_id(2),
-                &crate::test_utils::gate_run_id(1),
-            )
+            .load_gate_run_result(&issue, &crate::test_utils::gate_run_id(1))
             .unwrap_err(),
         repository
             .store
-            .list_gate_runs_for_issue(&crate::test_utils::issue_id(2))
+            .list_gate_runs_for_issue(&issue)
             .unwrap_err(),
     ] {
         assert!(
@@ -961,48 +962,30 @@ fn test_gate_run_readers_refuse_a_special_object_as_the_gate_run_root<B: Backend
     }
 }
 
-/// A special object in a run directory's place is refused when named and
-/// skipped when listed.
-fn test_gate_run_readers_refuse_a_named_special_run_directory_that_listing_skips<B: Backend>() {
-    let run_id = crate::test_utils::gate_run_id(1);
-    let repository = Repository::<B>::seeded(&initialized());
-    repository.plant_special(
-        &VirtualPath::data(
-            VirtualPath::gate_run_record(&run_id)
-                .relative()
-                .as_path()
-                .parent()
-                .unwrap(),
-        )
-        .unwrap(),
-    );
-
-    let named = repository
-        .store
-        .load_gate_run_result(&crate::test_utils::issue_id(2), &run_id)
-        .unwrap_err();
-    assert!(
-        format!("{named:#}").contains("ordinary directory"),
-        "{named:#}"
-    );
-    assert!(repository
-        .store
-        .list_gate_runs_for_issue(&crate::test_utils::issue_id(2))
-        .unwrap()
-        .is_empty());
+fn test_gate_run_readers_refuse_a_special_object_as_the_gate_run_root<B: Backend>() {
+    assert_gate_run_readers_refuse_a_special::<B>(&VirtualPath::GATE_RUNS);
 }
 
-/// A run directory holding no record holds no run.
-fn test_load_gate_run_result_reports_a_run_directory_without_a_record_as_not_found<B: Backend>() {
-    let run_id = crate::test_utils::gate_run_id(1);
-    let record = VirtualPath::gate_run_record(&run_id);
-    let beside =
-        VirtualPath::data(record.relative().as_path().with_file_name("other.json")).unwrap();
-    let repository = Repository::<B>::seeded(&[(beside, "{}".to_string())]);
+fn test_gate_run_readers_refuse_a_special_object_as_the_issue_directory<B: Backend>() {
+    assert_gate_run_readers_refuse_a_special::<B>(&VirtualPath::gate_run_issue_directory(
+        &crate::test_utils::issue_id(2),
+    ));
+}
+
+/// An issue directory not holding the named record holds no such run.
+fn test_load_gate_run_result_reports_an_issue_directory_without_the_record_as_not_found<
+    B: Backend,
+>() {
+    let (issue, run_id) = (
+        crate::test_utils::issue_id(1),
+        crate::test_utils::gate_run_id(1),
+    );
+    let repository =
+        Repository::<B>::seeded(&[(in_issue_directory(&issue, "other.json"), "{}".to_string())]);
 
     let error = repository
         .store
-        .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+        .load_gate_run_result(&issue, &run_id)
         .unwrap_err();
     assert!(
         error.downcast_ref::<GateRunNotFoundError>().is_some(),
@@ -1402,17 +1385,17 @@ conformance_suite!(
         test_read_archive_evidence_record_is_target_addressed,
         test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found,
         test_list_gate_runs_for_issue_lists_only_that_issues_runs,
-        test_list_gate_runs_for_issue_ignores_a_directory_not_named_by_a_run_id,
+        test_list_gate_runs_for_issue_ignores_clutter_in_the_issue_directory,
+        test_gate_run_readers_ignore_a_corrupt_record_of_another_issue,
         test_gate_run_readers_name_a_malformed_result,
-        test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape,
         test_gate_run_readers_refuse_a_file_as_the_gate_run_root,
         test_gate_run_readers_refuse_a_directory_as_a_result,
         test_gate_run_readers_refuse_a_symlink_as_the_gate_run_root,
-        test_gate_run_readers_refuse_a_named_symlinked_run_directory_that_listing_skips,
+        test_gate_run_readers_refuse_a_symlinked_issue_directory,
         test_gate_run_readers_refuse_a_symlink_as_a_result,
         test_gate_run_readers_refuse_a_special_object_as_the_gate_run_root,
-        test_gate_run_readers_refuse_a_named_special_run_directory_that_listing_skips,
-        test_load_gate_run_result_reports_a_run_directory_without_a_record_as_not_found,
+        test_gate_run_readers_refuse_a_special_object_as_the_issue_directory,
+        test_load_gate_run_result_reports_an_issue_directory_without_the_record_as_not_found,
         test_apply_admits_a_plan_only_against_its_exact_image,
         test_root_is_shared_by_clones_and_names_the_data_root_when_file_backed,
         test_read_repo_file_reads_present_files_and_refuses_unsafe_paths,

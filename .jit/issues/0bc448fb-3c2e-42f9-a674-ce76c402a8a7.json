@@ -21,7 +21,6 @@
     "8f297e60-a74e-4efa-bdcc-54659f9959a4",
     "98cc2097-026d-4744-aeaa-82532910328e",
     "b23b1bf3-e875-44aa-b879-4dc96c0b7caf",
-    "b23faa59-8451-4fc4-97b8-a139d1b210e6",
     "b25c2e54-2614-4d87-b967-0f2cb25c37f9",
     "c9103fcf-aa0c-4642-8531-5360f5fdd58d",
     "cc4ea8a9-6f24-4dc2-ad6a-fccbe7d79be4",
@@ -49,5 +48,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Crate-private executor kernel",
-  "updated_at": "2026-11-02T22:59:43.491927336Z"
+  "updated_at": "2026-11-04T02:59:43.855059964Z"
 }

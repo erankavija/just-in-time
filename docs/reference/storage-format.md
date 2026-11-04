@@ -26,9 +26,9 @@ where each comes up.
 ├── events.jsonl      # Append-only event log
 ├── issues/           # One JSON file per issue
 │   └── <uuid>.json   # Issue data
-├── gate-runs/        # Recorded gate runs, one directory per run
-│   └── <run-id>/
-│       └── result.json  # Run record (see Storage Record Layout)
+├── gate-runs/        # Recorded gate runs, one directory per issue
+│   └── <issue-id>/
+│       └── <run-id>.json  # Run record (see Storage Record Layout)
 ├── schemas/          # JSON Schema files referenced by rules.toml
 └── tmp/              # Machine-local scratch directory
     └── redo.record   # The pending redo record, while a mutation leaves one

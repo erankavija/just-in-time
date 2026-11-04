@@ -1,10 +1,10 @@
 //! Human rendering for project command responses.
 
-use super::HumanRender;
+use super::{HumanRender, OutputMode};
 use crate::commands::ProjectRenderResult;
 
 impl HumanRender for ProjectRenderResult {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         if self.items.is_empty() {
             return "No projections declared\n".to_owned();
         }

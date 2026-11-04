@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b6c3f23558f88403a6c06883beb77b6c313131a7",
+  "completed_at": "2026-11-04T03:36:07.071168272Z",
+  "duration_ms": 269372,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All eight hard criteria are implemented and covered; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "12c0f3fb-fde6-4504-aac0-773b435f0a83",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0e41f5c0-15c2-41f8-bfb1-02c726d0f53f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T03:31:37.698979873Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0a2fb0ed, 7c7427fda, 875ea1d43, 87c044bf4, 12168d358, c133d0c2f, 2651521b2, 334c68c88, 234b59301, 24b0a5e29, e50267d04\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, @/issue/12c0f3fb/decision/D-01, @/issue/5687e281/requirement/REQ-08, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction, @/gate/jit-validate\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: re-read the implementation patch by path, planning decisions, current macro/emitter/test ranges, and relevant individual metadata patches\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All eight hard criteria are implemented and covered; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

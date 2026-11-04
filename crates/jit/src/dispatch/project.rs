@@ -10,8 +10,8 @@ fn render<S: IssueStore + RepositoryStateStore>(
     name: Option<String>,
 ) -> anyhow::Result<Outcome<ProjectRenderResult>> {
     let response = ctx.executor.items().project_render(name.as_deref())?;
-    let message = Some(format!("Rendered {} projection(s)", response.count()));
-    Ok(Outcome::Success { response, message })
+    let message = format!("Rendered {} projection(s)", response.count());
+    Ok(Outcome::success_with(response, message))
 }
 
 command_group! {
