@@ -1118,6 +1118,9 @@
       "status": "in_progress",
       "vendor": "Claude Sonnet",
       "reason": "emitter-level JSON success warnings (D-42); 182f4c03 and cd8e04cc depend on it"
+    },
+    "4a01ccba": {
+      "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43)."
     }
   }
 }
