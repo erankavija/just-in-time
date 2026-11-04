@@ -766,10 +766,6 @@ impl CommandSchema {
                 Some(schema_to_value::<crate::commands::AssetListResult>()),
                 "AssetListResult",
             ),
-            "project_render" => (
-                Some(schema_to_value::<crate::commands::ProjectRenderResult>()),
-                "ProjectRenderResult",
-            ),
             // Default: no specific schema
             _ => (None, "CommandResponse"),
         };
@@ -1121,6 +1117,12 @@ impl CommandSchema {
                 "gate preset apply",
                 3,
                 "A preset target was not found, so the application failed.",
+                false,
+            ),
+            row(
+                "project render",
+                2,
+                "The requested projection name is not declared in repository configuration.",
                 false,
             ),
             // `serve` default (daemon), `--stop`, and `--status` route failures

@@ -40,7 +40,6 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `ITEM_NOT_FOUND` | An issue item-address lookup did not resolve an item. | `1` |
 | `ITEM_COMMAND_FAILED` | An item command failed without a more specific classification. | `1` |
 | `INVARIANT_COMMAND_FAILED` | An invariant command failed without a more specific classification. | `1` |
-| `PROJECT_COMMAND_FAILED` | A project command failed without a more specific classification. | `1` |
 | `PROFILE_ERROR` | A profile command failed without a more specific classification. | `1` |
 | `SEARCH_FAILED` | The search backend failed while executing a query. | `1` |
 | `RIPGREP_NOT_FOUND` | The external ripgrep search tool was not found. | `1` |

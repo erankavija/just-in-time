@@ -3512,9 +3512,8 @@ of a whole-`[projection.*]` run — leaves every target byte-identical. All chan
 targets then publish through one redo record. JSON uses
 the list envelope `{"count": N, "projections": [...]}`, each entry `{name, target,
 mode, style, kinds, count}`. Under `--json` the pre-write guards above surface the
-`VALIDATION_FAILED` envelope; any other command failure (for example, an
-unrecognized `--name`) returns the error envelope with code
-`PROJECT_COMMAND_FAILED`.
+`VALIDATION_FAILED` envelope; an unrecognized `--name` returns the
+`INVALID_ARGUMENT` error envelope and exits `2`.
 
 ### `jit invariant check`
 

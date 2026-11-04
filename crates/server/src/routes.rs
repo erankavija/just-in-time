@@ -59,7 +59,6 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::PresetError
         | ErrorCode::ItemCommandFailed
         | ErrorCode::InvariantCommandFailed
-        | ErrorCode::ProjectCommandFailed
         | ErrorCode::ProfileError
         | ErrorCode::SearchFailed
         | ErrorCode::RipgrepNotFound

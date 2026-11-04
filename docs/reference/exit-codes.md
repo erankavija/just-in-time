@@ -60,6 +60,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `config validate` | `4` | The repo or environment-variable configuration failed to load or carried an invalid value. |  |
 | `doc check-links` | `1` | One or more documents have broken links. Documents with only risky-link warnings exit `0`: warnings are reported, never fatal. | yes |
 | `gate preset apply` | `3` | A preset target was not found, so the application failed. |  |
+| `project render` | `2` | The requested projection name is not declared in repository configuration. |  |
 | `serve, serve --stop, serve --status` | `1` | The daemon PID state could not be parsed (exits 0 on success). |  |
 | `*` | `141` | A downstream reader closed the pipe while jit was still writing. | yes |
 | `serve --fg` | `1` | The foreground server exited with a failure status (`SERVER_EXITED`; the child's status is in `error.details`). |  |
