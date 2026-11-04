@@ -14,6 +14,12 @@
     "code-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "e0bbb6b3-cfd2-4ba6-a751-bee460481ab6",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:27:46.201675760Z",
+      "updated_by": "auto:executor"
+    },
     "code-review": {
       "run_id": "22e72871-42f0-40ea-9d23-f091fbbddeec",
       "status": "failed",
@@ -33,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Compile server modules through the library",
-  "updated_at": "2026-11-04T23:19:47.446435484Z"
+  "updated_at": "2026-11-04T23:27:46.201675760Z"
 }
