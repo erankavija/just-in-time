@@ -79,8 +79,42 @@
       "format": "markdown",
       "label": "Session 1 handoff",
       "path": "dev/active/9876a23a-one-validation-report/handoff.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "76673a6a1d1b7d06b00478f890a517aebd702d7cf0994bf3f2664cf9961f0b85",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "progress.json",
+          "resolved_path": "dev/active/9876a23a-one-validation-report/progress.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "fff1ffc8b033e9ec6aec6ac65bf18ce8345ee132044ecae3c302637f4a99beb1",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "benchmark/README.md",
+          "resolved_path": "dev/active/9876a23a-one-validation-report/benchmark/README.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "4881598d6038ad2375d7214c4c86efec4b5cc7914dbb2583ae77dfc2cb0a7e29",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "handoff.md",
+          "resolved_path": "dev/active/9876a23a-one-validation-report/handoff.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "completion-report",
+      "format": "markdown",
+      "label": "Completion Report",
+      "path": "dev/active/9876a23a-one-validation-report/completion-report.md"
     }
   ],
+  "done_at": "2026-11-04T13:28:28.145007507Z",
   "first_ready_at": "2026-10-20T20:12:37.204716102Z",
   "gates_required": [
     "repo-validate",
@@ -112,7 +146,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Compute one validation report and derive every validation view from it",
-  "updated_at": "2026-11-04T13:27:39.831994427Z"
+  "updated_at": "2026-11-04T13:28:28.145007507Z"
 }

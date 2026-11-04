@@ -24271,3 +24271,6 @@
 {"from":"backlog","id":"8a33f459-4078-44b2-9111-57e7d3b4dfa2","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-04T13:24:31.711683622Z","to":"ready","type":"issue_state_changed"}
 {"gate_key":"code-review","id":"f0e7fc65-85a4-4c51-bb7b-2f5f0b24c094","issue_id":"3b696589-81fa-4a01-a576-460c1e34a7dd","timestamp":"2026-11-04T13:25:31.220787657Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"a210968e-954b-411f-aae7-ab1f085dc724","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-04T13:27:39.831994427Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["documents"],"id":"ba231e20-9354-4f8f-91fb-74cb444c7cc1","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-04T13:28:28.044314867Z","type":"issue_updated","updated_by":"doc-add"}
+{"from":"ready","id":"acd47f2a-e0e4-44cb-a9a5-c9b33a28db49","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-04T13:28:28.145007507Z","to":"done","type":"issue_state_changed"}
+{"id":"c5e24429-8e5b-4f47-bcb1-1c93249816ee","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-04T13:28:28.145007507Z","type":"issue_completed"}
