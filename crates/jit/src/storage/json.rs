@@ -24,7 +24,7 @@ use anyhow::{anyhow, Context, Result};
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap};
 use std::fs;
-use std::io::{BufRead, BufReader, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -1145,42 +1145,33 @@ impl IssueStore for JsonFileStorage {
         parse_known_events(&contents).context("Failed to deserialize event log")
     }
 
-    fn read_artifact_archive_events(&self) -> Result<Vec<Event>> {
-        let events_path = self.resolve_virtual_path(&VirtualPath::EVENTS)?;
-        if !events_path.exists() {
-            return Ok(Vec::new());
-        }
-        let events_lock_path = self.root.join(EVENTS_LOCK_FILE);
-        let _lock = self.locker.lock_shared(&events_lock_path)?;
-        let reader =
-            BufReader::new(fs::File::open(&events_path).context("Failed to open events file")?);
-        let lines = reader
-            .lines()
-            .collect::<std::io::Result<Vec<_>>>()
-            .context("Failed to read line from events file")?;
-        let mut events = Vec::new();
-        for line in &lines {
-            if line.trim().is_empty() {
-                continue;
+    fn read_archive_evidence_record(
+        &self,
+        target: &crate::domain::artifact_plan::PlanTarget,
+    ) -> Result<Option<crate::domain::artifact_execution::ArchiveEvidenceRecord>> {
+        let path = VirtualPath::archive_evidence_record(target);
+        let contents = match crate::storage::repository_state_store::read_repository_file_confined(
+            &self.root,
+            path.relative(),
+        ) {
+            Ok(contents) => contents,
+            Err(RepositoryStateStoreError::Io(error))
+                if error.kind() == std::io::ErrorKind::NotFound =>
+            {
+                None
             }
-            match serde_json::from_str::<serde_json::Value>(line) {
-                Ok(value) => {
-                    let event_type = value
-                        .as_object()
-                        .and_then(|object| object.get("type"))
-                        .and_then(serde_json::Value::as_str)
-                        .context("Event record is missing a string type")?;
-                    if event_type == "artifact_archive_executed" {
-                        let event = serde_json::from_value::<Event>(value)
-                            .context("Failed to deserialize artifact archive event")?;
-                        events.push(event);
-                    }
-                }
-                Err(error) if is_torn_event_prefix(line, &error) => {}
-                Err(error) => return Err(error).context("Failed to deserialize event"),
-            }
-        }
-        Ok(events)
+            Err(error) => return Err(error.into()),
+        };
+        contents
+            .map(|contents| {
+                serde_json::from_slice(&contents).with_context(|| {
+                    format!(
+                        "Failed to deserialize archive evidence record at {}",
+                        path.relative().as_path().display()
+                    )
+                })
+            })
+            .transpose()
     }
 
     fn load_gate_run_result(
@@ -1298,12 +1289,6 @@ impl IssueStore for JsonFileStorage {
             .ok_or_else(|| PathReadError::NotFound(path.to_string()))
         }
     }
-}
-
-fn is_torn_event_prefix(line: &str, error: &serde_json::Error) -> bool {
-    // An object-shaped JSON prefix that fails only because input ended, including
-    // one ending after a nested `}`. Syntax and shape corruption remain fatal.
-    line.trim_start().starts_with('{') && error.is_eof()
 }
 
 fn map_confined_read_error(

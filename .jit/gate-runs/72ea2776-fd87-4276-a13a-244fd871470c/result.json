@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "554cfa8c632931de4576b8df9d9f7ee24610d37d",
+  "completed_at": "2026-11-04T02:59:54.884609311Z",
+  "duration_ms": 218136,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 634,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/9876a23a/requirement/REQ-10",
+          "@/charter/D-20"
+        ],
+        "severity": "high",
+        "summary": "--fix repair planning discards its parsed records and re-decodes issue files after the validation pass."
+      }
+    ],
+    "summary": "The --fix repair-planning path still discards and re-decodes captured issue records.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2b5f452c-ac5a-46ed-8a56-d862f0d93d04",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "72ea2776-fd87-4276-a13a-244fd871470c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:56:16.747855806Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8827 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a47c-601f-7b92-a3d0-c8a2da6a53b9\n--------\nuser\n--- 8814 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 532b649b2, 617922825, a55545bcf, 0df7b08d, c4b4cbc2, 8a075e8f (all `jit:2b5f452c`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/9876a23a/requirement/REQ-10 (issue Markdown); @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T02:54:39Z); code-review pending\nTruncation recovery: Re-read affected commits and focused current capture, repair, record-fidelity, decoder, policy, and test ranges after broad-output truncation.\n\n1. **[blocking][issue-impact]** `--fix` repair planning still discards the records parsed during capture at [crates/jit/src/commands/validate.rs:634](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:634). The `--fix` path first validates, then invokes repair; repair captures and parses issue records again but maps the parsed tuple to the image alone. This fails REQ-01’s requirement that repair planning read the captured records and prevents the one-decode validation path required by REQ-10. References: @/issue/9876a23a/requirement/REQ-10, @/charter/D-20.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The --fix repair-planning path still discards and re-decodes captured issue records.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"--fix repair planning discards its parsed records and re-decodes issue files after the validation pass.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":634,\"references\":[\"@/issue/9876a23a/requirement/REQ-10\",\"@/charter/D-20\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

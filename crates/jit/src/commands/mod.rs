@@ -2198,12 +2198,12 @@ pub(crate) fn validation_overlay(
 fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> Result<Vec<Issue>> {
     use crate::repository_state::{captured_issue_ids, parse_issue_records, IssueRecordsError};
 
-    parse_issue_records(&captured_issue_ids(image)?, |path| image.file_bytes(path)).map_err(
-        |error| match error {
+    parse_issue_records(&captured_issue_ids(image)?, |path| image.file_bytes(path))
+        .map(|records| records.into_iter().map(|(issue, _)| issue).collect())
+        .map_err(|error| match error {
             IssueRecordsError::Missing(id) => crate::storage::IssueNotFoundError::new(id).into(),
             error => error.into(),
-        },
-    )
+        })
 }
 
 /// Each required gate of `issue` paired with the record path of the run its
