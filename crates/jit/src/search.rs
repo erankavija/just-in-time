@@ -501,8 +501,13 @@ mod tests {
         };
         let history = VirtualPath::history_paths();
         let [events, runs, scratch] = &history;
+        let run = VirtualPath::gate_run_record(
+            &crate::test_utils::issue_id(1),
+            &crate::test_utils::gate_run_id(1),
+        );
+        let run = run.relative().as_str();
         write(events);
-        write(&format!("{runs}/run1/result.json"));
+        write(run);
         write(&format!("{scratch}/redo.bin"));
         write(&format!("nested/{events}"));
         write(&format!("nested/{scratch}/x.txt"));
@@ -536,7 +541,7 @@ mod tests {
                 file_pattern: Some(format!("{runs}/**")),
                 ..SearchOptions::default()
             }),
-            [format!("{runs}/run1/result.json")].into()
+            [run.to_string()].into()
         );
     }
 }
