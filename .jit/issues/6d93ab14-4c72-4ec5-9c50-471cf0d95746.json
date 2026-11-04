@@ -14,12 +14,19 @@
       "path": "dev/active/6d93ab14/verification.md"
     }
   ],
+  "done_at": "2026-11-04T23:53:08.097570494Z",
   "first_ready_at": "2026-11-04T23:33:27.949036691Z",
   "gates_required": [
     "npm-ci",
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "run_id": "96be1f4c-cf42-466c-ac88-486ba47b1364",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:52:37.155429143Z",
+      "updated_by": "auto:executor"
+    },
     "npm-ci": {
       "run_id": "91b7467e-e4b0-4110-b917-140499cbb8b5",
       "status": "passed",
@@ -33,7 +40,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Split oversized web rendering chunks",
-  "updated_at": "2026-11-04T23:48:40.677578300Z"
+  "updated_at": "2026-11-04T23:53:08.097570494Z"
 }
