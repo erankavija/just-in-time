@@ -112,6 +112,30 @@
           "worker_reason": "produces plan-document-resolver contract"
         }
       ]
+    },
+    {
+      "wave_number": 4,
+      "base": "2edf9e3de",
+      "issues": [
+        {
+          "short_id": "5d5a1794",
+          "status": "dispatched",
+          "worker": "claude opus",
+          "worker_reason": "produces creation-findings; shared helper over five copies"
+        },
+        {
+          "short_id": "8b56c215",
+          "status": "dispatched",
+          "worker": "codex gpt-6-luna xhigh",
+          "worker_reason": "mechanical vocabulary"
+        },
+        {
+          "short_id": "ccd6e1fb",
+          "status": "dispatched",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "multi-file evaluation change"
+        }
+      ]
     }
   ],
   "held": {},
