@@ -241,7 +241,7 @@ fn test_cargo_build_scripts_share_the_host_lock_and_enable_available_sccache() {
     );
     assert!(
         gate.contains("[ \"${1:-}\" = \"--cargo\" ]")
-            && gate.contains("exec cargo \"$@\""),
+            && gate.contains("cargo \"$@\" || cargo_status=$?"),
         "focused Cargo checks must be able to reuse the gate's host lock and cache setup without running the full gate"
     );
 

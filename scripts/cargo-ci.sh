@@ -17,9 +17,10 @@ set -euo pipefail
 # A clean "N passed, 0 failed" summary is trustworthy evidence and keeps
 # .jit/gate-runs/ small. Modelled on ../gf2/scripts/cargo-ci.sh.
 #
-# The run owns and removes its temporary directory: every step runs with TMPDIR
-# set to a directory made inside the caller's TMPDIR, and the directory goes on
-# every exit, including a trapped INT, TERM or HUP. A compiler-cache server the
+# The run owns and removes its temporary directory: every Cargo, rustc and test
+# process, the wrapper probe and `--cargo` included, runs with TMPDIR set to a
+# directory made inside the caller's TMPDIR, and the directory goes on every
+# exit, including a trapped INT, TERM or HUP. A compiler-cache server the
 # run starts keeps the caller's TMPDIR (scripts/sccache-caller-tmpdir.sh).
 #
 # Exit codes:
@@ -236,6 +237,19 @@ if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
   echo "cargo-ci: flock not found; running without host-wide build lock" >&2
 fi
 
+# The run owns one directory inside the caller's temporary directory and every
+# Cargo, rustc and test process below sees it as TMPDIR, so what a killed test
+# leaves behind dies with the run. The caller's TMPDIR is saved first: the
+# compiler-cache wrapper restores it, because a daemon outlives the run.
+export CARGO_CI_CALLER_TMPDIR="${TMPDIR:-/tmp}"
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+export TMPDIR="$WORK/tmp"
+mkdir "$TMPDIR"
+
 BUSY_HOST_OVERRIDE_FOR_BUDGET="${BUSY_HOST_OVERRIDE:-}"
 unset BUSY_HOST_OVERRIDE
 
@@ -274,9 +288,7 @@ ensure_real_cargo
 # target directory before opting an established checkout into this default.
 if [ -z "${CARGO_CI_NO_SCCACHE:-}" ] && [ -z "${RUSTC_WRAPPER:-}" ] && command -v sccache >/dev/null 2>&1; then
   # Its server inherits the environment of the compile that starts it, so a
-  # stable-path wrapper restores the caller's TMPDIR for it; the run's own
-  # directory is removed on exit.
-  export CARGO_CI_CALLER_TMPDIR="${TMPDIR:-/tmp}"
+  # stable-path wrapper restores the caller's TMPDIR for it.
   RUSTC_WRAPPER="$(cd "$(dirname "$0")" && pwd)/sccache-caller-tmpdir.sh"
   export RUSTC_WRAPPER
 fi
@@ -318,7 +330,9 @@ ensure_compiler_wrapper_runs
 
 if [ "${1:-}" = "--cargo" ]; then
   shift
-  exec cargo "$@"
+  cargo_status=0
+  cargo "$@" || cargo_status=$?
+  exit "$cargo_status"
 fi
 
 # The concise reporter below parses cargo-nextest's human summary contract.
@@ -346,17 +360,6 @@ ensure_pinned_nextest
 # 54.1 s against 25.3 s over the clippy and suite-build steps, at no cost to a
 # cold run. The derivation is under "Provenance" in
 # dev/benchmarks/rust-build-budgets/README.md.
-
-# The run owns one directory inside the caller's temporary directory and every
-# step sees it as TMPDIR, so what a killed test leaves behind dies with the run.
-# Compiler-cache daemons keep the caller's TMPDIR through the sccache wrapper.
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
-export TMPDIR="$WORK/tmp"
-mkdir "$TMPDIR"
 
 # This run's own scratch state (jit:0708d692): the Cargo artifact stream
 # describing what this run built, so the budget step judges what this run
