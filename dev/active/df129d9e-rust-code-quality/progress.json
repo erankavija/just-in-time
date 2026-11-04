@@ -1291,16 +1291,18 @@
       "note": "criteria rewritten per steward (A1, cheaper partial-request fixture first); D-01 records the corrected diagnosis (348a3814b)"
     },
     "f7a59f5f": {
-      "status": "dispatched",
+      "status": "landing",
       "vendor": "Claude Sonnet",
       "reason": "b697a3f7 storage-only, medium",
-      "epic": "b697a3f7 (executed by df129d9e lead; own ledger)"
+      "epic": "b697a3f7 (executed by df129d9e lead; own ledger)",
+      "review": "lead PASS: Arc image + token, token-based apply check, conformance test both backends; +42 lines (b697a3f7 ledger)"
     },
     "f56bad8d": {
-      "status": "dispatched",
+      "status": "landing",
       "vendor": "Codex gpt-6-astra",
       "reason": "b697a3f7 one-file domain, small",
-      "epic": "b697a3f7 (executed by df129d9e lead; own ledger)"
+      "epic": "b697a3f7 (executed by df129d9e lead; own ledger)",
+      "review": "lead PASS at fd2221df3 (Codex); stored resolutions + per-root reachability; +29 lines (b697a3f7 ledger)"
     },
     "4575a03d": {
       "status": "claimed",
