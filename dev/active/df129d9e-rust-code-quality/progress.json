@@ -1559,7 +1559,7 @@
     },
     "75b46be9": {
       "status": "in_progress",
-      "note": "Implementation preserved at 1daddafd1; full branch CI passes; original40% criterion unmet at31.44%, awaiting user decision; not landed, gates pending",
+      "note": "User approved30% floor; tested branch1daddafd1 awaits README reconciliation and gates",
       "model": "gpt-6.1-sol"
     },
     "b22aabce": {
@@ -1824,7 +1824,7 @@
       "75b46be9": "gpt-6.1-sol high: measured compiler/debug behavior and budget calibration"
     },
     "timing_hold": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
-    "status": "waiting for split-debug criterion decision; tested branch preserved",
+    "status": "both scope decisions approved; resume split-debug landing",
     "measurements": {
       "f855d631": {
         "merge": "437c7ccfd",
@@ -1855,11 +1855,16 @@
       }
     },
     "timing_diagnosis": "Private pipe probe reproduced queue wait before test start. Pinned nextest 0.9.133 times wrapper and lacks ready handshake; clean solution requires nextest-side acquisition before attempt clock. User keeps dynamic sharing; no host edits.",
-    "ownership_reconciliation": "Awaiting approval of proposed REQ-01/plan wording to match D-59",
+    "ownership_reconciliation": "Approved and recorded as epic D-05 and story D-01; plan reconciled",
     "current_wave": 2,
-    "open_decisions": [
-      "75b46be9 REQ-02 proposed30% measured floor",
-      "df129d9e REQ-01/plan ownership reconciliation with D-59"
-    ]
+    "open_decisions": []
+  },
+  "session_14": {
+    "status": "resuming approved work",
+    "approvals": [
+      "75b46be9 floor30%",
+      "D-59 ownership wording"
+    ],
+    "timing": "remains deferred; preserve dynamic sharing"
   }
 }

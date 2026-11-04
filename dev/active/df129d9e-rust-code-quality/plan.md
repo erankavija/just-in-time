@@ -5,11 +5,11 @@
 
 ## Outcome and criterion approach
 
-`main.rs` becomes a thin entry: parse, open the repository through a library bootstrap, dispatch one command group to a library-side handler, render one outcome, and exit once. Handlers return typed responses that output owns and the schema derives from, and failures as values that one library classifier turns into the envelope, the exit code and the server's HTTP status. The executor is reached through per-family facades. Build hygiene closes the work: lints in the manifests, one shared harness, a `main.rs` ceiling, and a measured completion report.
+`main.rs` becomes a thin entry: parse, open the repository through a library bootstrap, dispatch one command group to a library-side handler, render one outcome, and exit once. Handlers return typed command or domain results that output renders and the schema derives from, and failures as values that one library classifier turns into the envelope, the exit code and the server's HTTP status. The executor is reached through per-family facades. Build hygiene closes the work: lints in the manifests, one shared harness, a `main.rs` ceiling, and a measured completion report.
 
 | Criterion | Approach | Evidence / open gap |
 |---|---|---|
-| REQ-01 | Each command group moves into a handler whose response type is owned by the output module (`handler-response-ownership`). | Inline bodies: investigation area 2 §1 |
+| REQ-01 | Handlers return typed command or domain results; output owns rendering and envelopes (`handler-response-ownership`). | Inline bodies: investigation area 2 §1 |
 | REQ-02 | `run()` shrinks to group dispatch as groups migrate; a final consolidation leaves `main()` as parse, bootstrap, dispatch, render, exit. | `run()` spans 6,428 lines: area 1 claim 1d |
 | REQ-03 | Per-family facades borrowed from the executor (D-1); the shared kernel becomes crate-private. | 195 methods, 28 blocks, 25 files: area 3 §1 |
 | REQ-04 | The eight per-query structs are dead and are deleted; every live list response becomes a `list-envelope` instantiation. | area 2 §2 |
@@ -57,9 +57,9 @@ Clap parse failures, including a wrong-verb guess, remain outside the failure en
 
 A command whose findings make it exit non-zero returns them as a value. Under `--json` it renders the failure envelope: the registered code is the exit code, and the command's report is `error.details`. In human mode it prints the report and exits with the same code. This is the shape `render_validation_json` already produces for validation. `gate status-all`, `gate evaluate-many` and `doc check-links` move to it from a success envelope with a non-zero exit (D-5).
 
-### `handler-response-ownership` [plan-fixed] — Output owns every success payload
+### `handler-response-ownership` [plan-fixed] — Results stay with their owner; output renders them
 
-Every success response a handler returns is a type defined in the output module (`crates/jit/src/output.rs`, with one submodule per command group under `crates/jit/src/output/` as needed) or is built by an output constructor that wraps a command-layer result. Command-layer result types stay in `commands/` so that dependencies keep pointing inward (D-3). Every response derives or implements `JsonSchema` and a human rendering.
+Handlers return typed command or domain results. Output owns rendering and envelope construction and may depend on those result types; commands never depend on output. Result types provide the registered schema without parallel response types or conversion layers created solely to relocate ownership (D-59; epic D-05).
 
 ### `list-envelope` [implementation-produced] — One generic list envelope
 
@@ -487,7 +487,7 @@ All decisions were taken autonomously under the session's no-question rule. Each
 |---|---|
 | D-1 REQ-03 shape | Chosen: per-family facade structs. Rejected: extension traits, which spread storage bounds into trait where-clauses, need separate traits for the `JsonFileStorage`-only blocks, and add a parallel abstraction. The measured coupling (families call the kernel and rarely each other) fits facades: area 3 §1. |
 | D-2 Handler location | Chosen: handlers in a library `dispatch/` module, because schema generation lives in the library and must reach every handler's response type. Rejected: binary-only modules, which the schema cannot see. |
-| D-3 Response ownership | Chosen: output owns handler response types and wraps command-layer results through constructors; command-layer results stay where they are. `commands/` already imports output types in six files, and this epic adds no new import from `commands/` or `domain/` into output: the shared list shape lives in `domain/`. Rejected: moving `ItemListResult` and similar results into output, which would only relocate types without narrowing any dependency. |
+| D-3 Response ownership (superseded by D-59 and epic D-05) | Chosen: output owns handler response types and wraps command-layer results through constructors; command-layer results stay where they are. `commands/` already imports output types in six files, and this epic adds no new import from `commands/` or `domain/` into output: the shared list shape lives in `domain/`. Rejected: moving `ItemListResult` and similar results into output, which would only relocate types without narrowing any dependency. |
 | D-4 Classifier home | Chosen: `output/failure.rs`, with `output.rs` kept as the module root in the crate's non-`mod.rs` layout. That keeps the epic's literal `output.rs` criteria true and avoids a rename racing the other `output.rs` editors. Rejected: `errors.rs`, which `domain/` imports, so a classifier there would make a pure layer depend outward. |
 | D-5 Findings commands | Chosen: `findings-envelope` for every findings command. Rejected: keeping a success envelope with a non-zero exit, where the exit code equals no envelope code. Deliberate change for `gate status-all`, `gate evaluate-many` and `doc check-links`. |
 | D-6 stderr under `--json` | Chosen: no stderr diagnostic. This rewrites the assertion at `top_level_failure_envelope_tests.rs:58` and the statement at `cli-commands.md:506`. Rejected: keeping the `Error:` line, which renders one failure twice and contradicts the handler-owned paths' empty stderr. |
