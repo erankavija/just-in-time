@@ -267,9 +267,8 @@ impl GraphFinding {
 /// config-error finding on the source issue (no silent Markdown fallback).
 ///
 /// `now` is the injected clock instant against which `gate-recency` rules compute
-/// each gate result's age. CLOCK INJECTION IS MANDATORY: this is the single graph
-/// entry point and the only place a wall-clock instant enters graph evaluation,
-/// so the engine stays pure and deterministic. Callers pass `Utc::now()` at the
+/// each gate result's age. The engine stays pure and deterministic because the
+/// clock is supplied by the caller. Callers pass `Utc::now()` at the
 /// boundary; tests pass a fixed instant.
 ///
 /// `plan_content` is the injected plan-document content map (issue-id → resolved
@@ -298,10 +297,19 @@ pub fn evaluate_graph(
         now,
         plan_content,
     };
+    evaluate_graph_with_context(rules, issues, &context)
+}
+
+/// Evaluate firing subjects against complete repository context.
+pub fn evaluate_graph_with_context(
+    rules: &[&Rule],
+    firing_issues: &[Issue],
+    context: &GraphEvaluationContext<'_>,
+) -> Vec<GraphFinding> {
     rules
         .iter()
         .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
-        .flat_map(|rule| evaluate_one(rule, issues, &context))
+        .flat_map(|rule| evaluate_one(rule, firing_issues, context))
         .collect()
 }
 

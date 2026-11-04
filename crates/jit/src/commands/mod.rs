@@ -716,19 +716,23 @@ impl<'a> CapturedGraphEvidence<'a> {
     fn evaluate_graph(
         &self,
         rules: &[&crate::declarations::rules::Rule],
+        firing_issues: &[Issue],
         issues: &[Issue],
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
         let config = self.declarations.config();
         let namespaces = crate::config_manager::namespaces_from_config(config);
         let hierarchy =
             crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-        Ok(crate::validation::graph::evaluate_graph(
+        Ok(crate::validation::graph::evaluate_graph_with_context(
             rules,
-            issues,
-            &hierarchy,
-            config.content_format(),
-            self.context.timestamp(),
-            &self.plan_content,
+            firing_issues,
+            &crate::validation::graph::GraphEvaluationContext {
+                graph_context: issues,
+                hierarchy: &hierarchy,
+                repo_default_format: config.content_format(),
+                now: self.context.timestamp(),
+                plan_content: &self.plan_content,
+            },
         ))
     }
 }
@@ -1350,10 +1354,9 @@ fn derive_state_transition(
                     .into_iter()
                     .map(|candidate| candidate.id.clone()),
             );
-            let slice = evidence
+            let projected_issues = evidence
                 .issues
                 .iter()
-                .filter(|candidate| ids.contains(&candidate.id))
                 .map(|candidate| {
                     if candidate.id == projected.id {
                         projected.clone()
@@ -1362,13 +1365,20 @@ fn derive_state_transition(
                     }
                 })
                 .collect::<Vec<_>>();
+            let slice = projected_issues
+                .iter()
+                .filter(|candidate| ids.contains(&candidate.id))
+                .cloned()
+                .collect::<Vec<_>>();
             let strictness = evidence.graph.declarations.config().strictness();
             let enforcing = rules
                 .iter()
                 .filter(|rule| rule.enforce)
                 .map(|rule| rule.name.as_str())
                 .collect::<HashSet<_>>();
-            let findings = evidence.graph.evaluate_graph(&rules, &slice)?;
+            let findings = evidence
+                .graph
+                .evaluate_graph(&rules, &slice, &projected_issues)?;
             let mut blocking = Vec::new();
             for finding in findings {
                 let config_error = finding.is_config_error();
@@ -2840,7 +2850,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .iter()
                 .chain(
                     graph
-                        .evaluate_graph(&rules, &issues)?
+                        .evaluate_graph(&rules, &issues, &issues)?
                         .iter()
                         .filter(|finding| finding.issue_id.as_ref() == Some(&issue_id))
                         .map(|finding| &finding.finding),
@@ -3559,6 +3569,93 @@ mod tests {
         assert!(error
             .downcast_ref::<crate::domain::identity::InvalidWorktreeIdError>()
             .is_some());
+    }
+
+    #[test]
+    fn test_derive_state_transition_resolves_containers_outside_firing_slice() {
+        use crate::declarations::rules::RuleSet;
+
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let container_type = taxonomy.type_at_level(2);
+        let breakdown_type = taxonomy.type_at_level(3);
+        let leaf_type = taxonomy.type_at_level(4);
+        let config: JitConfig = toml::from_str(&taxonomy.config_fragment()).unwrap();
+        let rules = RuleSet::parse(
+            &format!(r#"[[rules]]
+name = "coverage"
+when = {{ type = "{breakdown_type}", state = ["in_progress", "done"] }}
+severity = "error"
+enforce = true
+assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[hard]", id-pattern = "REQ-[0-9]+", child-type-exclude = ["{breakdown_type}"] }} }}
+"#),
+            None,
+            [],
+        ).unwrap();
+        let declarations = crate::repository_state::CapturedRepositoryDeclarations::from_parts(
+            config,
+            crate::declarations::GateRegistry::default(),
+            rules,
+        );
+        let context = production_mutation_context();
+        let graph = CapturedGraphEvidence {
+            declarations,
+            plan_content: std::collections::HashMap::new(),
+            context: &context,
+        };
+        let make = |title: &str, kind: &str| {
+            let mut issue = crate::test_utils::fixture_issue(title.into(), String::new());
+            issue.labels = vec![format!("type:{kind}")];
+            issue
+        };
+        let mut old_container = make("Old container", container_type);
+        let mut old_breakdown = make("Old breakdown", breakdown_type);
+        let mut shared_leaf = make("Shared prerequisite", leaf_type);
+        let mut new_container = make("New container", container_type);
+        let mut target = make("New breakdown", breakdown_type);
+        let mut new_leaf = make("New leaf", leaf_type);
+        for (container, breakdown, leaf) in [
+            (&mut old_container, &mut old_breakdown, &mut shared_leaf),
+            (&mut new_container, &mut target, &mut new_leaf),
+        ] {
+            container.description = "## Success Criteria\n\n- [hard] REQ-01: Covered.".into();
+            container.dependencies.push(leaf.id.clone());
+            leaf.dependencies.push(breakdown.id.clone());
+            breakdown
+                .labels
+                .push(format!("brackets:{}", container.short_id()));
+            leaf.labels
+                .push(format!("satisfies:{}/REQ-01", container.short_id()));
+        }
+        target.dependencies.push(shared_leaf.id.clone());
+        old_breakdown.state = State::Done;
+        shared_leaf.state = State::Done;
+        target.state = State::Ready;
+        for state in [State::Done, State::Archived] {
+            old_container.state = state;
+            old_container.archived_from = (state == State::Archived).then_some(State::Done);
+            let issues = vec![
+                old_container.clone(),
+                old_breakdown.clone(),
+                shared_leaf.clone(),
+                new_container.clone(),
+                target.clone(),
+                new_leaf.clone(),
+            ];
+            let result = derive_state_transition(
+                target.clone(),
+                State::InProgress,
+                false,
+                CapturedTransitionEvidence {
+                    issues: &issues,
+                    graph: &graph,
+                },
+            )
+            .unwrap();
+            assert!(
+                matches!(result, DerivedStateTransition::Applied { .. }),
+                "valid container outside firing slice must resolve in state {state:?}"
+            );
+        }
     }
 
     #[test]

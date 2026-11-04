@@ -6,19 +6,33 @@
   "dependencies": [],
   "description": "Preserve complete repository context when checking a scoped lifecycle transition, so a valid container pointer outside the transition's dependency slice cannot block unrelated work.\n\n## Background\n\nTransition graph validation currently supplies the ancestor/dependent slice as both firing subjects and resolution context. A completed breakdown reachable through shared prerequisites can reference a valid container outside that slice; the evaluator then reports an unknown container even though whole-repository validation resolves it. Archival is one triggering topology, not the governing distinction.\n\n## Success Criteria\n\n- [hard] REQ-01: Transition validation resolves container pointers and relationship context against the captured repository while retaining the intended transition firing scope.\n- [hard] REQ-02: A transition sharing prerequisites with a completed breakdown succeeds when that breakdown's valid container lies outside the transition slice, including an archived container.\n- [hard] REQ-03: Missing or ambiguous references relevant to the transition and required gates still block transitions; no force bypass or historical tracker rewrite is introduced.\n- [hard] REQ-04: Scoped transition checks reuse the canonical graph evaluator and remain consistent with whole-repository validation.\n",
   "documents": [],
+  "done_at": "2026-11-04T22:55:01.332019942Z",
   "first_ready_at": "2026-11-04T22:29:05.701483095Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c654cd3f-2dcc-4cde-b41c-b6b9f6e139f0",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:59:55.279929866Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a9c3acfa-4155-4c13-a528-36f978d5bbcc",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:40:41.105296716Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "db094cac-3bdd-442e-8ed1-e80374f6ab8f",
   "labels": [
     "milestone:v1.0",
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Preserve complete graph context during scoped transitions",
-  "updated_at": "2026-11-04T22:29:20.545676029Z"
+  "updated_at": "2026-11-04T22:59:55.279929866Z"
 }
