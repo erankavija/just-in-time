@@ -19,13 +19,10 @@ fn namespaces<S: IssueStore>(
         names,
         NamespacesHumanDetails {
             namespaces: details,
-            quiet: ctx.mode.quiet,
         },
     );
-    Ok(Outcome::Success {
-        message: Some(format!("{} namespace(s)", response.count())),
-        response,
-    })
+    let message = format!("{} namespace(s)", response.count());
+    Ok(Outcome::success_with(response, message))
 }
 
 fn values<S: IssueStore>(
@@ -33,17 +30,9 @@ fn values<S: IssueStore>(
     namespace: String,
 ) -> anyhow::Result<Outcome<LabelValuesResponse>> {
     let values = ctx.executor.issues().list_label_values(&namespace)?;
-    let response = LabelValuesResponse::with_extras(
-        values,
-        LabelValuesScope {
-            namespace,
-            quiet: ctx.mode.quiet,
-        },
-    );
-    Ok(Outcome::Success {
-        message: Some(format!("{} value(s)", response.count())),
-        response,
-    })
+    let response = LabelValuesResponse::with_extras(values, LabelValuesScope { namespace });
+    let message = format!("{} value(s)", response.count());
+    Ok(Outcome::success_with(response, message))
 }
 
 command_group! {
@@ -88,7 +77,8 @@ mod tests {
         };
         let mut out = Vec::new();
 
-        let status = dispatch(LabelCommands::Namespaces, &ctx, &mut out, &mut Vec::new()).unwrap();
+        let mut err = Vec::new();
+        let status = dispatch(LabelCommands::Namespaces, &ctx, &mut out, &mut err).unwrap();
 
         let printed: serde_json::Value = serde_json::from_slice(&out).unwrap();
         assert_eq!(printed["count"], 2);
@@ -96,6 +86,7 @@ mod tests {
         assert!(printed.get("namespace").is_none());
         assert_eq!(printed["message"], "2 namespace(s)");
         assert_eq!(status, ExitCode::Success);
+        assert!(err.is_empty());
         assert_eq!(
             registered_output_schema("label_namespaces")
                 .unwrap()
@@ -122,13 +113,14 @@ mod tests {
         };
         let mut out = Vec::new();
 
+        let mut err = Vec::new();
         let status = dispatch(
             LabelCommands::Values {
                 namespace: "type".to_owned(),
             },
             &ctx,
             &mut out,
-            &mut Vec::new(),
+            &mut err,
         )
         .unwrap();
 
@@ -138,6 +130,7 @@ mod tests {
         assert_eq!(printed["namespace"], "type");
         assert_eq!(printed["message"], "0 value(s)");
         assert_eq!(status, ExitCode::Success);
+        assert!(err.is_empty());
         let schema = registered_output_schema("label_values").unwrap();
         assert_eq!(schema.success, "LabelValuesResponse");
         let success_schema = schema.success_schema.unwrap();

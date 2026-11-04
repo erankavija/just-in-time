@@ -2836,14 +2836,11 @@ pub struct NamespacesHumanDetails {
     #[serde(skip)]
     #[schemars(skip)]
     pub namespaces: Vec<crate::domain::LabelNamespace>,
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub quiet: bool,
 }
 
 impl HumanRender for NamespacesResponse {
-    fn render_human(&self) -> String {
-        let header = if self.extras.quiet {
+    fn render_human(&self, mode: OutputMode) -> String {
+        let header = if mode.quiet {
             String::new()
         } else {
             "Label Namespaces:\n\n".to_owned()
@@ -2885,14 +2882,11 @@ pub type LabelValuesResponse = ListEnvelope<ValuesKey, String, LabelValuesScope>
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct LabelValuesScope {
     pub namespace: String,
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub quiet: bool,
 }
 
 impl HumanRender for LabelValuesResponse {
-    fn render_human(&self) -> String {
-        let header = if self.extras.quiet {
+    fn render_human(&self, mode: OutputMode) -> String {
+        let header = if mode.quiet {
             String::new()
         } else {
             format!("Values in namespace '{}':\n\n", self.extras.namespace)
@@ -2902,7 +2896,7 @@ impl HumanRender for LabelValuesResponse {
             .iter()
             .map(|value| format!("  {value}\n"))
             .collect::<String>();
-        let total = if self.extras.quiet {
+        let total = if mode.quiet {
             String::new()
         } else {
             format!("\nTotal: {}\n", self.count())
@@ -3981,11 +3975,10 @@ mod tests {
             vec!["v1".into(), "v2".into()],
             LabelValuesScope {
                 namespace: "epic".into(),
-                quiet: false,
             },
         );
         assert_eq!(
-            response.render_human(),
+            response.render_human(OutputMode::default()),
             "Values in namespace 'epic':\n\n  v1\n  v2\n\nTotal: 2\n"
         );
         let value = serde_json::to_value(response).unwrap();
@@ -3999,12 +3992,11 @@ mod tests {
             vec!["type".into()],
             NamespacesHumanDetails {
                 namespaces: vec![crate::domain::LabelNamespace::new("Issue type", true)],
-                quiet: false,
             },
         );
 
         assert_eq!(
-            response.render_human(),
+            response.render_human(OutputMode::default()),
             "Label Namespaces:\n\n  type\n    Description: Issue type\n    Unique: true\n\n"
         );
         let value = serde_json::to_value(response).unwrap();
@@ -4015,11 +4007,13 @@ mod tests {
             vec!["type".into()],
             NamespacesHumanDetails {
                 namespaces: vec![crate::domain::LabelNamespace::new("Issue type", true)],
-                quiet: true,
             },
         );
         assert_eq!(
-            quiet.render_human(),
+            quiet.render_human(OutputMode {
+                quiet: true,
+                ..OutputMode::default()
+            }),
             "  type\n    Description: Issue type\n    Unique: true\n\n"
         );
     }
@@ -4030,11 +4024,16 @@ mod tests {
             vec!["task".into()],
             LabelValuesScope {
                 namespace: "type".into(),
-                quiet: true,
             },
         );
 
-        assert_eq!(response.render_human(), "  task\n");
+        assert_eq!(
+            response.render_human(OutputMode {
+                quiet: true,
+                ..OutputMode::default()
+            }),
+            "  task\n"
+        );
         let value = serde_json::to_value(response).unwrap();
         assert_eq!(value["namespace"], "type");
         assert!(value.get("quiet").is_none());
