@@ -1,4 +1,4 @@
-use jit::storage::git::{Git, GitCheckout, ProbedCheckout};
+use jit::storage::git::{Git, GitCheckout, GitError, ProbedCheckout};
 use jit::test_harness::git::GitRepository;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -10,6 +10,21 @@ fn canonical(path: &Path) -> std::path::PathBuf {
 
 fn probe(dir: &Path) -> Option<ProbedCheckout> {
     Git::default().probe(dir).unwrap()
+}
+
+fn checkout(git: Git, root: &Path) -> GitCheckout {
+    GitCheckout::new(git, root.to_path_buf())
+}
+
+#[cfg(unix)]
+fn assert_one_head_lookup(stand_in: &jit::test_harness::git::GitStandIn, root: &Path) {
+    let invocations = stand_in.invocations();
+    assert_eq!(invocations.len(), 1);
+    assert_eq!(invocations[0].directory(), Some(root));
+    assert_eq!(
+        invocations[0].args(),
+        ["rev-parse", "HEAD", "--abbrev-ref", "HEAD"]
+    );
 }
 
 fn committed_repository(dir: &TempDir) -> GitRepository {
@@ -135,6 +150,80 @@ fn test_probe_runs_one_git_process_in_the_probed_directory() {
     let invocations = stand_in.invocations();
     assert_eq!(invocations.len(), 1);
     assert_eq!(invocations[0].directory(), Some(repository.root()));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_branch_checkout_yields_commit_and_branch_with_one_git_process() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let commit = repository.git(&["rev-parse", "HEAD"]);
+    let branch = repository.git(&["branch", "--show-current"]);
+    let stand_in = GitStandIn::new();
+
+    let head = checkout(Git::with_program(stand_in.program()), repository.root())
+        .head()
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(head.commit().as_str(), commit);
+    assert_eq!(head.branch(), Some(branch.as_str()));
+    assert_eq!(head.branch_label(), branch);
+    assert_one_head_lookup(&stand_in, repository.root());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_detached_checkout_yields_commit_and_head_label_with_one_git_process() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let commit = repository.git(&["rev-parse", "HEAD"]);
+    repository.git(&["checkout", "--quiet", "--detach", "HEAD"]);
+    let stand_in = GitStandIn::new();
+
+    let head = checkout(Git::with_program(stand_in.program()), repository.root())
+        .head()
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(head.commit().as_str(), commit);
+    assert_eq!(head.branch(), None);
+    assert_eq!(head.branch_label(), "HEAD");
+    assert_one_head_lookup(&stand_in, repository.root());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_head_unborn_checkout_yields_none_with_one_git_process() {
+    use jit::test_harness::git::GitStandIn;
+
+    let dir = TempDir::new().unwrap();
+    let repository = GitRepository::init(dir.path().join("unborn"));
+    let stand_in = GitStandIn::new();
+
+    let head = checkout(Git::with_program(stand_in.program()), repository.root())
+        .head()
+        .unwrap();
+
+    assert_eq!(head, None);
+    assert_one_head_lookup(&stand_in, repository.root());
+}
+
+#[test]
+fn test_head_unstartable_program_returns_unavailable_error() {
+    let dir = TempDir::new().unwrap();
+    let repository = committed_repository(&dir);
+    let program = dir.path().join("missing-git");
+
+    let error = checkout(Git::with_program(&program), repository.root())
+        .head()
+        .unwrap_err();
+
+    assert!(matches!(error, GitError::Unavailable { program: named, .. } if named == program));
 }
 
 fn dirty_paths(repository: &GitRepository) -> BTreeSet<PathBuf> {
