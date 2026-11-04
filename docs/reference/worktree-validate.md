@@ -169,8 +169,9 @@ jit worktree exec [OPTIONS] -- <COMMAND> [ARGS]...
 #### Description
 
 The command waits for the lock up to `JIT_LOCK_TIMEOUT` seconds, refuses a
-pending redo record without applying it, runs `<COMMAND>`, exits with its status,
-and releases the lock. It knows nothing about what the command does.
+pending redo record without applying it, runs `<COMMAND>` with its stdout and
+stderr attached to the caller, exits with its status, and releases the lock. It
+knows nothing about what the command does.
 
 Every mutation waits for the lock, so what the command reads and writes under
 `.jit/` holds still while it runs. A `jit` mutation run by the command waits on
@@ -288,8 +289,9 @@ event    conflicting      eee505cd-57e8-4ede-9606-e46cb75d5aba
 A checkout with nothing to report prints `No divergent records.` in place of the
 table.
 
-JSON output uses the list envelope (which also carries `message`), plus the two
-compared stores; `reference_store` is `null` when the checkout has none:
+The JSON response uses the shared list shape described in the
+[CLI JSON contracts](cli-commands.md#cli-json-contracts), plus the two compared
+stores; `reference_store` is `null` when the checkout has none:
 
 ```json
 {

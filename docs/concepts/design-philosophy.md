@@ -64,7 +64,7 @@ AI agents are increasingly capable of complex software tasks, but existing tools
 
 ### Key Design Principles
 
-**JSON-First Output:** Commands that emit data support `--json` for structured output agents parse reliably, with no regex scraping; list-emitting commands wrap results in a `{count, <collection>}` envelope.
+**JSON-First Output:** Commands that emit data support structured output agents can parse reliably, with no regex scraping. See the [CLI JSON contracts](../reference/cli-commands.md#cli-json-contracts) for the global `--json` option and list payload shape.
 
 **Recoverable File Publication:** A mutation writes down everything it will
 change as one redo record, syncs it under the data root's scratch directory, and

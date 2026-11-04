@@ -338,8 +338,9 @@ declaration as `{owner, subject, conflict}`; `conflict.owners` names the
 packages defining it differently. `jit --schema` publishes this shape as
 `types.ProfileTargetConflictsError`.
 
-All profile commands support `--json` and use the standard count-wrapped
-`{"count": N, "profiles": [...]}` collection shape. A show response contains
+Profile list responses use the shared shape described in the
+[CLI JSON contracts](cli-commands.md#cli-json-contracts), with `profiles` as the
+collection key. A show response contains
 one package entry per selector occurrence in selector order, including repeated
 selectors. Lifecycle rehearsals and runs report the same ordered observations:
 dependency-only packages once before the selected roots, then every selected
