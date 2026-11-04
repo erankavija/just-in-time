@@ -6,7 +6,7 @@
   "dependencies": [
     "1eb949a5-7b70-4b32-92f3-aa5e2f703d44"
   ],
-  "description": "Slow tests are refactored, never excused. This brings every test the measurement flagged under its layer's limit.\n\n## Background\n\nThe per-test benchmark note under `dev/benchmarks/` lists each test above its layer's limit. Tests that wait on wall-clock timers or sleeps (lease expiry, lock timeouts, server start-up and shutdown, watch loops) are the usual cause. They drive time through an injected clock or an explicit event instead.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test the benchmark note lists runs under its layer's limit on a quiet host, re-measured with the same method.\n- [hard] REQ-02: No refactored test sleeps or waits on wall-clock time to observe the property it owns. Time-dependent behaviour is driven through an injected clock, a channel or an explicit readiness signal.\n- [hard] REQ-03: Each refactored test still owns the property it owned before, at the same or a cheaper layer, with no weakened assertion, no ignored test and no test deleted without its property moving to another owning test.\n\n## Notes\n\nIf a test cannot meet the limit without losing its property, report it as a blocking concern rather than raising the limit.\n",
+  "description": "Slow tests are refactored, never excused. This brings every test the measurement flagged under its layer's limit.\n\n## Background\n\nThe per-test benchmark note under `dev/benchmarks/` lists each test above its layer's limit. Tests that wait on wall-clock timers or sleeps (lease expiry, lock timeouts, server start-up and shutdown, watch loops) are the usual cause. They drive time through an injected clock or an explicit event instead.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test the benchmark note lists runs under its layer's limit on a quiet host, re-measured with the same method.\n- [hard] REQ-02: No refactored test sleeps or waits on wall-clock time to observe the property it owns. Time-dependent behaviour is driven through an injected clock, a channel or an explicit readiness signal.\n- [hard] REQ-03: Each refactored test still owns the property it owned before, at the same or a cheaper layer, with no weakened assertion, no ignored test and no test deleted without its property moving to another owning test.\n\n## Decisions\n\n- D-01: REQ-01's quiet-host evidence for the document and lease tests is the host-wide quiet window (loads 1.82, 3.32, 3.94); their code is unchanged since. The serve test, changed afterwards to an injected clock, was re-measured alone under the exclusive lock at loads 3.36, 3.48 and 3.48: median 0.015 s against 2 s. Both are recorded in `dev/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md` (steward ruling, 2026-11-04).\n\n## Notes\n\nIf a test cannot meet the limit without losing its property, report it as a blocking concern rather than raising the limit.\n",
   "documents": [
     {
       "commit": null,
@@ -23,15 +23,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "58ba2de1-59c4-4a48-9f5c-6f85840fae61",
+      "run_id": "8ed62ba2-d132-4c3c-9b15-220d8c5268a1",
       "status": "passed",
-      "updated_at": "2026-11-04T12:55:25.454100899Z",
+      "updated_at": "2026-11-04T13:31:28.769916902Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "13b970de-e0b7-4e13-93e1-a6dd6280c110",
+      "run_id": "2a14530e-209d-4de4-b433-0a5a58bff2a1",
       "status": "failed",
-      "updated_at": "2026-11-04T12:58:55.145588454Z",
+      "updated_at": "2026-11-04T13:36:40.567562964Z",
       "updated_by": "auto:executor"
     }
   },
@@ -46,5 +46,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Refactor every test over the per-test limit",
-  "updated_at": "2026-11-04T12:58:55.145588454Z"
+  "updated_at": "2026-11-04T13:50:12.447752120Z"
 }

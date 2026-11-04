@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1d21a5117d9ccd867f49b8da21d6f0e1ab6c240b",
+  "completed_at": "2026-11-04T13:27:39.823650Z",
+  "duration_ms": 174320,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are verifiably met on the current validation implementation and its attributable final-tree evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1fbdaea6-ae31-409d-b75f-88243fa28594",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T13:24:45.503468251Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "All 15 hard criteria are substantiated by current code, focused tests, recorded gates, and the final-tree release benchmark. No blocking incoherence found.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met on the current validation implementation and its attributable final-tree evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

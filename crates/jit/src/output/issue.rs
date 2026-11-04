@@ -216,17 +216,12 @@ fn list_text<I: ListedIssue>(
     issues: &[I],
     quiet: bool,
 ) -> String {
-    let text = render_issue_list(
+    render_issue_list(
         &header(issues.len()),
         plain_issue_rows(issues),
         &[IssueColumn::State, IssueColumn::Priority],
         quiet,
-    );
-    if text.is_empty() {
-        text
-    } else {
-        text + "\n"
-    }
+    )
 }
 
 /// Response of `jit issue list`: lean entries, or stored records under `--full`.
@@ -235,16 +230,6 @@ fn list_text<I: ListedIssue>(
 pub enum IssueListing {
     Summary(IssueListResponse),
     Full(IssueListFullResponse),
-}
-
-impl IssueListing {
-    fn render(&self, quiet: bool) -> String {
-        let header = |_| "All issues (filtered):".to_owned();
-        match self {
-            Self::Summary(list) => list_text(header, &list.items, quiet),
-            Self::Full(list) => list_text(header, &list.items, quiet),
-        }
-    }
 }
 
 /// Response of `jit issue search`: lean entries, or stored records under
@@ -256,25 +241,23 @@ pub enum IssueSearchResults {
     Full(IssueSearchFullResponse),
 }
 
-impl IssueSearchResults {
-    fn render(&self, quiet: bool) -> String {
-        let header = |count| format!("Found {count} issue(s):");
-        match self {
-            Self::Summary(list) => list_text(header, &list.items, quiet),
-            Self::Full(list) => list_text(header, &list.items, quiet),
-        }
-    }
-}
-
 impl HumanRender for IssueListing {
     fn render_human(&self, mode: OutputMode) -> String {
-        self.render(mode.quiet)
+        let header = |_| "All issues (filtered):".to_owned();
+        match self {
+            Self::Summary(list) => list_text(header, &list.items, mode.quiet),
+            Self::Full(list) => list_text(header, &list.items, mode.quiet),
+        }
     }
 }
 
 impl HumanRender for IssueSearchResults {
     fn render_human(&self, mode: OutputMode) -> String {
-        self.render(mode.quiet)
+        let header = |count| format!("Found {count} issue(s):");
+        match self {
+            Self::Summary(list) => list_text(header, &list.items, mode.quiet),
+            Self::Full(list) => list_text(header, &list.items, mode.quiet),
+        }
     }
 }
 

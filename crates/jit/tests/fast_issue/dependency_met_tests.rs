@@ -8,6 +8,7 @@ use jit::domain::State;
 use jit::output::IssueShowResponse;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
+use jit::test_utils::add_reducing_edge;
 
 /// Reject an issue outright, the way `jit issue reject` does.
 fn reject(h: &TestHarness, id: &IssueId) {
@@ -20,10 +21,7 @@ fn test_transition_to_ready_allows_rejected_dependency() {
     let dependency = h.create_issue("Abandoned upstream");
     reject(&h, &dependency);
     let dependent = h.create_issue("Dependent");
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &dependency)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &dependency).unwrap();
     jit::test_utils::transition_issue(&h.executor, &dependent, State::Backlog).unwrap();
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
 
@@ -37,10 +35,7 @@ fn test_transition_to_done_allows_rejected_dependency() {
     let h = TestHarness::new();
     let dependent = h.create_issue("Dependent");
     let dependency = h.create_issue("Abandoned upstream");
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &dependency)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &dependency).unwrap();
     reject(&h, &dependency);
 
     jit::test_utils::transition_issue(&h.executor, &dependent, State::InProgress).unwrap();
@@ -55,14 +50,8 @@ fn test_issue_show_omits_rejected_dependency_from_unmet() {
     let dependent = h.create_issue("Dependent");
     let rejected = h.create_issue("Abandoned upstream");
     let pending = h.create_issue("Live upstream");
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &rejected)
-        .unwrap();
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &pending)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &rejected).unwrap();
+    add_reducing_edge(&h.executor, &dependent, &pending).unwrap();
     reject(&h, &rejected);
 
     let issue = h.executor.issues().show_issue(&dependent).unwrap();
@@ -82,10 +71,7 @@ fn test_claim_next_skips_issue_with_unmet_dependency() {
     let h = TestHarness::new();
     let dependent = h.create_ready_issue("Dependent");
     let dependency = h.create_issue("Live upstream");
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &dependency)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &dependency).unwrap();
     // The upstream leaves the ready set itself, so only `dependent` could match.
     jit::test_utils::transition_issue(&h.executor, &dependency, State::InProgress).unwrap();
 
@@ -107,10 +93,7 @@ fn test_adding_rejected_dependency_keeps_issue_ready() {
     let dependency = h.create_issue("Abandoned upstream");
     reject(&h, &dependency);
 
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &dependency)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &dependency).unwrap();
 
     assert_eq!(
         h.storage.load_issue(&dependent).unwrap().state,

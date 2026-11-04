@@ -4,14 +4,28 @@
   "context": {},
   "created_at": "2026-11-04T12:31:55.450000089Z",
   "dependencies": [],
-  "description": "Library functions that only tests call, or that forward to another library function unchanged, are removed, and their tests call the real entry point.\n\n## Background\n\nA read-only survey (2026-11-04) found production functions whose only callers are tests: `query_by_state`, `query_by_priority`, `query_by_label` and `query_by_labels` in `crates/jit/src/commands/query.rs` (the domain queries they wrap are called directly elsewhere); `tail_events` in `commands/events.rs`, which equals `query_events(None, None, n)`; `is_outermost` in `storage/repo_lock.rs`; `get_issue` in `commands/labels.rs`; `deserialize_virtual_path` in `repository_state/path.rs`; and the non-policy `add_dependency` / `add_dependency_with_policy` / `add_dependencies` wrappers in `commands/dependency.rs`, where `add_dependencies_with_policy` is the entry point production uses.\n\n## Success Criteria\n\n- [hard] REQ-01: None of the functions named in the Background exists, and `cargo build` and `cargo clippy --workspace --all-targets` pass with zero warnings.\n- [hard] REQ-02: The `jit events tail` handler reads through `query_events`, with unchanged output.\n- [hard] REQ-03: Every test that called a removed function calls the production entry point instead and asserts the same property, with no assertion weakened and no test deleted without its property moving to another owning test.\n- [hard] REQ-04: No command's JSON payload, human output or exit code changes.\n- [hard] REQ-05: The crate's production lines (`scripts/production-lines.py`, default mode) fall by at least 50.\n\n## Notes\n\nPart of the epic's net-reduction work (plan D-51, D-53).\n",
+  "description": "Library functions that only tests call, or that forward to another library function unchanged, are removed, and their tests call the real entry point.\n\n## Background\n\nA read-only survey (2026-11-04) found production functions whose only callers are tests: `query_by_state`, `query_by_priority`, `query_by_label` and `query_by_labels` in `crates/jit/src/commands/query.rs` (the domain queries they wrap are called directly elsewhere); `tail_events` in `commands/events.rs`, which equals `query_events(None, None, n)`; `is_outermost` in `storage/repo_lock.rs`; `get_issue` in `commands/labels.rs`; `deserialize_virtual_path` in `repository_state/path.rs`; and the non-policy `add_dependency` / `add_dependency_with_policy` / `add_dependencies` wrappers in `commands/dependency.rs`, where `add_dependencies_with_policy` is the entry point production uses.\n\n## Success Criteria\n\n- [hard] REQ-01: None of the functions named in the Background exists, and `cargo build` and `cargo clippy --workspace --all-targets` pass with zero warnings.\n- [hard] REQ-02: The `jit events tail` handler reads through `query_events`, with unchanged output.\n- [hard] REQ-03: Tests call the production entry point, directly or through one shared test fixture defined in test support; no production-code wrapper of it remains. Every test that called a removed function asserts the same property, with no assertion weakened and no test deleted without its property moving to another owning test.\n- [hard] REQ-04: No command's JSON payload, human output or exit code changes.\n- [hard] REQ-05: The crate's production lines (`scripts/production-lines.py`, default mode) fall by at least 50.\n\n## Decisions\n\n- D-01: REQ-03 originally required every migrated test to call the production entry point directly. As written it conflicts with `@/inv/shared-test-contracts`, which requires a shared fixture for frequently repeated setup; its intent is that no production wrapper survives and tests exercise the production entry point. The test-support fixture `add_reducing_edge` over `add_dependencies_with_policy` meets that intent (steward ruling, 2026-11-04).\n\n## Notes\n\nPart of the epic's net-reduction work (plan D-51, D-53).\n",
   "documents": [],
+  "done_at": "2026-11-04T13:50:36.371254154Z",
   "first_ready_at": "2026-11-04T12:31:55.450000089Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cd031e49-b12d-4444-9508-6143a3583854",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:39:48.586747412Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "be23c691-4554-4989-8e32-c5e526b724f3",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:49:53.100824849Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "10fdad38-23f8-4094-8544-4d90ab767464",
   "labels": [
     "epic:rust-code-quality",
@@ -21,7 +35,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Remove library functions only tests call",
-  "updated_at": "2026-11-04T12:32:17.326659989Z"
+  "updated_at": "2026-11-04T13:50:36.371254154Z"
 }

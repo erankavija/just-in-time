@@ -1,0 +1,65 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "73490b18a94f65b515e1fd32c2445b5fb7e26d59",
+  "completed_at": "2026-11-04T13:25:31.218953396Z",
+  "duration_ms": 250652,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/server/tests/server_integration/graceful_shutdown_tests.rs",
+        "id": "F1",
+        "line": 253,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/3b696589/requirement/REQ-04",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The detached stderr collector is not joined before terminal shutdown-log assertions, so logs can be read before force-close records are copied."
+      },
+      {
+        "disposition": "blocking",
+        "id": "F2",
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/3b696589/requirement/REQ-04",
+          "@/gate/cargo-ci"
+        ],
+        "severity": "high",
+        "summary": "The available single cargo-ci projection does not verify REQ-04's required 20 standalone and 20 parallel-workspace runs."
+      },
+      {
+        "disposition": "advisory",
+        "file": "crates/server/tests/server_integration/graceful_shutdown_tests.rs",
+        "id": "F3",
+        "line": 253,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/3b696589/decision/D-01"
+        ],
+        "severity": "low",
+        "summary": "The detached collector contradicts D-01's premise that the log is complete once the child process exits."
+      }
+    ],
+    "summary": "Detached stderr collection can race terminal log assertions, and the required repeated-run evidence is absent.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3b696589-81fa-4a01-a576-460c1e34a7dd",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8f278006-0fe6-418e-8e37-716e8822f208",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T13:21:20.566231710Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4092 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a6b8-a343-74e1-9370-aa762e82f44f\n--------\nuser\n--- 4079 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:3b696589` commits 9c7622740, 348a3814, 6f81dd120\nPolicy sources: AGENTS.md\nResolved items: REQ-01–REQ-04 and D-01 (issue description, markdown-first); @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction, @/invariant/no-ignored-tests (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T13:20:58Z); code-review pending\nTruncation recovery: narrowed a truncated historical-artifact search to this issue’s cargo-ci projection and verdict reference\n\n1. **F1 — blocking, issue-impact (high):** [graceful_shutdown_tests.rs:253](/home/vkaskivuo/Projects/just-in-time/crates/server/tests/server_integration/graceful_shutdown_tests.rs:253) detaches the stderr collector, but `wait_for_exit` and subsequent assertions read the log without joining or otherwise draining it. The exited child can leave the collector unscheduled with terminal log records still in its pipe, recreating the missing `force-closing`-line race under load. This violates deterministic parallel execution. References: @/issue/3b696589/requirement/REQ-04, @/invariant/orthogonal-tests.\n\n2. **F2 — blocking, issue-impact (high):** REQ-04 requires 20 consecutive standalone runs and 20 full parallel-workspace runs. The only supplied validation projection is one passing `cargo-ci` execution; it materially does not verify either repetition requirement. References: @/issue/3b696589/requirement/REQ-04, @/gate/cargo-ci.\n\n3. **F3 — advisory, issue-impact (low):** The detached collector at [graceful_shutdown_tests.rs:253](/home/vkaskivuo/Projects/just-in-time/crates/server/tests/server_integration/graceful_shutdown_tests.rs:253) invalidates D-01’s factual premise that reading the log after process exit makes it complete: process exit does not ensure the separate collector has drained stderr. Reference: @/issue/3b696589/decision/D-01.\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Detached stderr collection can race terminal log assertions, and the required repeated-run evidence is absent.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The detached stderr collector is not joined before terminal shutdown-log assertions, so logs can be read before force-close records are copied.\",\"file\":\"crates/server/tests/server_integration/graceful_shutdown_tests.rs\",\"line\":253,\"references\":[\"@/issue/3b696589/requirement/REQ-04\",\"@/invariant/orthogonal-tests\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The available single cargo-ci projection does not verify REQ-04's required 20 standalone and 20 parallel-workspace runs.\",\"references\":[\"@/issue/3b696589/requirement/REQ-04\",\"@/gate/cargo-ci\"]},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The detached collector contradicts D-01's premise that the log is complete once the child process exits.\",\"file\":\"crates/server/tests/server_integration/graceful_shutdown_tests.rs\",\"line\":253,\"references\":[\"@/issue/3b696589/decision/D-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

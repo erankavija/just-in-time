@@ -713,28 +713,6 @@ impl RepositoryLayout {
         self.data.identity()
     }
 
-    /// Deserialize a virtual path through this layout's canonicality check.
-    ///
-    /// `VirtualPath` deliberately has no ambient `Deserialize` implementation:
-    /// Worktree-under-Data alias rejection requires the selected layout.
-    pub fn deserialize_virtual_path<'de, D>(&self, deserializer: D) -> Result<VirtualPath, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct SerializedVirtualPath {
-            root: RepositoryRootClass,
-            relative: RootRelativePath,
-        }
-
-        let path = SerializedVirtualPath::deserialize(deserializer)?;
-        let path =
-            VirtualPath::from_root(path.root, path.relative).map_err(serde::de::Error::custom)?;
-        self.ensure_canonical(&path)
-            .map_err(serde::de::Error::custom)?;
-        Ok(path)
-    }
-
     /// Resolve an already-canonical virtual identity.
     pub fn resolve(&self, path: &VirtualPath) -> Result<PathBuf, RepositoryLayoutError> {
         self.ensure_canonical(path)?;
@@ -897,15 +875,6 @@ mod tests {
 
     fn root(path: &str) -> RepositoryRootEvidence {
         RepositoryRootEvidence::new(path, format!("id:{path}"), true)
-    }
-
-    fn deserialize_path(
-        layout: &RepositoryLayout,
-        value: serde_json::Value,
-    ) -> Result<VirtualPath, serde_json::Error> {
-        let encoded = serde_json::to_string(&value).unwrap();
-        let mut deserializer = serde_json::Deserializer::from_str(&encoded);
-        layout.deserialize_virtual_path(&mut deserializer)
     }
 
     #[test]
@@ -1167,7 +1136,6 @@ mod tests {
 
     #[test]
     fn test_path_constructors_and_serde_reject_noncanonical_spellings() {
-        let layout = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
         let control = format!("a{}b", '\u{0007}');
         let invalid = [
             "../outside",
@@ -1186,11 +1154,7 @@ mod tests {
                 "{spelling:?}"
             );
             assert!(VirtualPath::worktree(spelling).is_err(), "{spelling:?}");
-            let encoded = serde_json::json!({
-                "root": "worktree",
-                "relative": spelling,
-            });
-            assert!(deserialize_path(&layout, encoded).is_err(), "{spelling:?}");
+            assert!(VirtualPath::data(spelling).is_err(), "{spelling:?}");
         }
     }
 
@@ -1251,24 +1215,19 @@ mod tests {
     }
 
     #[test]
-    fn test_virtual_path_serde_rejects_the_reserved_namespace() {
-        let layout = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
-        let encoded = serde_json::json!({
-            "root": "data",
-            "relative": format!("{RECORD_SCRATCH_DIR}/record.json"),
-        });
-        assert!(deserialize_path(&layout, encoded).is_err());
+    fn test_virtual_path_from_root_rejects_the_reserved_namespace() {
+        let relative =
+            RootRelativePath::parse(format!("{RECORD_SCRATCH_DIR}/record.json")).unwrap();
+        assert!(VirtualPath::from_root(RepositoryRootClass::Data, relative).is_err());
     }
 
     #[test]
-    fn test_layout_rejects_deserialized_worktree_under_data_alias() {
+    fn test_layout_ensure_canonical_rejects_worktree_under_data_alias() {
         let layout = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
         let issue_path = VirtualPath::issue_record(&crate::test_utils::issue_id(1));
-        let encoded = serde_json::json!({
-            "root": "worktree",
-            "relative": format!(".jit/{}", issue_path.relative().as_str()),
-        });
-        let error = deserialize_path(&layout, encoded).unwrap_err();
+        let path =
+            VirtualPath::worktree(format!(".jit/{}", issue_path.relative().as_str())).unwrap();
+        let error = layout.ensure_canonical(&path).unwrap_err();
         assert!(error.to_string().contains("aliases the selected data root"));
     }
 

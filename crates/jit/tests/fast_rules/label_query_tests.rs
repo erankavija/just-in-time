@@ -6,12 +6,14 @@ use jit::domain::Priority;
 use jit::storage::InMemoryStorage;
 
 #[test]
-fn test_query_by_label_invalid_pattern() {
+fn test_query_all_invalid_label_pattern() {
     let storage = InMemoryStorage::new();
     let executor = memory_executor(storage);
 
     // Invalid pattern (no colon)
-    let result = executor.queries().query_by_label("invalidlabel");
+    let result = executor
+        .queries()
+        .query_all(None, None, None, &["invalidlabel".to_string()]);
     assert!(result.is_err());
     assert!(result
         .unwrap_err()
@@ -42,7 +44,7 @@ fn create_labeled(
 }
 
 #[test]
-fn test_search_issues_with_filters_namespace_wildcard_matches_query_by_label_set() {
+fn test_search_issues_with_filters_namespace_wildcard_matches_query_all_label_set() {
     let executor = memory_executor(InMemoryStorage::new());
     create_labeled(&executor, "Task one", &["type:task"]);
     create_labeled(&executor, "Epic one", &["type:epic", "area:auth"]);
@@ -53,7 +55,10 @@ fn test_search_issues_with_filters_namespace_wildcard_matches_query_by_label_set
         .queries()
         .search_issues_with_filters("", None, None, None, std::slice::from_ref(&pattern))
         .unwrap();
-    let queried = executor.queries().query_by_labels(&[pattern]).unwrap();
+    let queried = executor
+        .queries()
+        .query_all(None, None, None, &[pattern])
+        .unwrap();
 
     let ids = |issues: &[jit::domain::Issue]| {
         let mut ids: Vec<IssueId> = issues.iter().map(|i| i.id.clone()).collect();

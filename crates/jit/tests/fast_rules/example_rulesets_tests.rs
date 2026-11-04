@@ -13,6 +13,7 @@
 //! The examples live in the repository's `docs/` tree, not in `.jit/`, so they
 //! never activate on this repository; these tests load them directly from disk.
 
+use jit::test_utils::add_reducing_edge;
 use std::path::{Path, PathBuf};
 
 use jit::declarations::rules::{Rule, RuleScope, RuleSet};
@@ -805,10 +806,7 @@ mod sdd_lifecycle {
             },
         );
         // Wire containment: the epic depends on its child.
-        executor
-            .graph()
-            .add_dependency(&epic_id, &child_id)
-            .unwrap();
+        add_reducing_edge(&executor, &epic_id, &child_id).unwrap();
 
         // Transition to done: must succeed.
         let result = executor.issues().update_issue(

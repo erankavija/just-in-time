@@ -5,7 +5,7 @@ use super::{
     GraphRootsResponse, GraphTreeResponse, HumanRender, OutputMode,
 };
 use crate::domain::identity::IssueId;
-use crate::domain::{MinimalIssue, State};
+use crate::domain::State;
 use crate::output::DependencyTreeNode;
 use crate::visualization::{pretty_document, GraphExportFullResponse, GraphExportSummaryResponse};
 use schemars::JsonSchema;
@@ -140,27 +140,23 @@ fn push_dependency_tree(
 
 impl HumanRender for GraphDownstreamResponse {
     fn render_human(&self, mode: OutputMode) -> String {
-        issue_list_text(
+        render_issue_list(
             &format!("Reverse dependencies of {}:", self.extras.issue_id),
-            &self.items,
-            mode,
+            plain_issue_rows(&self.items),
+            &[],
+            mode.quiet,
         )
     }
 }
 
 impl HumanRender for GraphRootsResponse {
     fn render_human(&self, mode: OutputMode) -> String {
-        issue_list_text("Root issues (no dependencies):", &self.items, mode)
-    }
-}
-
-/// A list's human text: an empty quiet list prints nothing.
-fn issue_list_text(header: &str, items: &[MinimalIssue], mode: OutputMode) -> String {
-    let rendered = render_issue_list(header, plain_issue_rows(items), &[], mode.quiet);
-    if rendered.is_empty() {
-        String::new()
-    } else {
-        format!("{rendered}\n")
+        render_issue_list(
+            "Root issues (no dependencies):",
+            plain_issue_rows(&self.items),
+            &[],
+            mode.quiet,
+        )
     }
 }
 

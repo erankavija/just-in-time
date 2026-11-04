@@ -13,7 +13,7 @@
       "doc_type": "notes",
       "format": "markdown",
       "label": "cargo-ci evidence and commit ancestry",
-      "path": "dev/active/9876a23a-one-validation-report/evidence-70ac98fc-ci-ancestry.md"
+      "path": "dev/archive/9876a23a-one-validation-report/active/evidence-70ac98fc-ci-ancestry.md"
     }
   ],
   "done_at": "2026-11-03T22:41:25.800104712Z",
@@ -49,5 +49,5 @@
   "priority": "high",
   "state": "done",
   "title": "Export, initialization and profile test images use the shared builder",
-  "updated_at": "2026-11-03T22:41:25.800104712Z"
+  "updated_at": "2026-11-04T13:29:05.488724168Z"
 }

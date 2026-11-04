@@ -2062,17 +2062,6 @@ pub struct LinkCheckSummary {
     pub warnings: usize,
 }
 
-/// Result of adding a dependency
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DependencyAddResult {
-    /// Dependency was added
-    Added,
-    /// Dependency was skipped because it's transitive (redundant)
-    Skipped { reason: String },
-    /// Dependency already existed
-    AlreadyExists,
-}
-
 /// How `jit dep add` treats an edge that would break transitive reduction.
 ///
 /// Cycle detection is a write-time guard (@/inv/dag-acyclic); this policy makes the

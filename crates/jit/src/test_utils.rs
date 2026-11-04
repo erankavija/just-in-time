@@ -29,6 +29,20 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tempfile::TempDir;
 
+/// Add one dependency edge, reducing any transitive redundancy.
+#[cfg(any(test, feature = "test-support"))]
+pub fn add_reducing_edge<S: IssueStore + crate::storage::RepositoryStateStore>(
+    executor: &CommandExecutor<S>,
+    issue_id: &IssueId,
+    dependency_id: &IssueId,
+) -> Result<crate::commands::test_helpers::DependenciesAddResult> {
+    executor.graph().add_dependencies_with_policy(
+        issue_id,
+        std::slice::from_ref(dependency_id),
+        crate::commands::RedundancyPolicy::Reduce,
+    )
+}
+
 /// Give a temporary data root a valid repository layout for loader tests.
 #[cfg(any(test, feature = "test-support"))]
 pub fn repository_layout_for_data_root(data_root: &Path) -> RepositoryLayout {

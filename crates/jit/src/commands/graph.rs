@@ -497,7 +497,14 @@ impl<S: IssueStore> GraphOps<'_, S> {
     ///
     /// let epic = new("Epic", vec![format!("type:{}", taxonomy.type_at_level(2))]);
     /// let task = new("Task", vec![format!("type:{}", taxonomy.type_at_level(4))]);
-    /// executor.graph().add_dependency(&epic, &task).unwrap();
+    /// executor
+    ///     .graph()
+    ///     .add_dependencies_with_policy(
+    ///         &epic,
+    ///         std::slice::from_ref(&task),
+    ///         jit::commands::RedundancyPolicy::Reduce,
+    ///     )
+    ///     .unwrap();
     ///
     /// let response = executor.graph().resolve_hierarchy_tree(None).unwrap();
     /// assert_eq!(response.items.len(), 2);
