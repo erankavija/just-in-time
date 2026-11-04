@@ -1,7 +1,7 @@
 //! Library-side command handlers, one module per command group.
 //!
 //! A handler takes a [`CommandContext`] and its parsed arguments and returns
-//! `anyhow::Result<Outcome<R>>` for its registered response type `R`. Each
+//! [`HandlerResult<R>`] for its registered response type `R`. Each
 //! group declares its leaves once with `command_group!`, which generates the
 //! group's `dispatch` and its `output_schema` lookup; a group joins the schema
 //! by adding that lookup to [`REGISTERED_GROUPS`].
@@ -20,7 +20,14 @@ use crate::commands::CommandExecutor;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::output::{ErrorCode, ExitCode, OutputMode, Report};
 use crate::schema::OutputSchema;
-use crate::storage::{IssueNotFoundError, IssueStore};
+use crate::storage::{IssueNotFoundError, IssueStore, RepositoryStateStore};
+
+/// The return type of every handler.
+pub type HandlerResult<R> = anyhow::Result<Outcome<R>>;
+
+/// The store bound handlers share when they read or write repository state.
+pub trait HandlerStore: IssueStore + RepositoryStateStore {}
+impl<S: IssueStore + RepositoryStateStore> HandlerStore for S {}
 
 /// What every handler receives besides its parsed arguments.
 pub struct CommandContext<'a, S: IssueStore> {
@@ -48,6 +55,12 @@ pub enum Outcome<R> {
         report: Box<dyn Report>,
         warnings: Vec<String>,
     },
+}
+
+impl<R> From<R> for Outcome<R> {
+    fn from(response: R) -> Self {
+        Self::success(response)
+    }
 }
 
 impl<R> Outcome<R> {

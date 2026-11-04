@@ -1,15 +1,13 @@
 //! `jit invariant` handlers.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult, Outcome};
 use crate::cli::InvariantCommands;
 use crate::commands::InvariantCheckResult;
 use crate::output::ErrorCode;
 use crate::storage::IssueStore;
 
 /// Enforcement drift is a findings outcome; a clean registry succeeds.
-fn check<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-) -> anyhow::Result<Outcome<InvariantCheckResult>> {
+fn check<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<InvariantCheckResult> {
     let result = ctx.executor.items().check_invariants()?;
     Ok(if result.has_drift() {
         Outcome::findings(

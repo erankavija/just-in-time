@@ -1,6 +1,6 @@
 //! `jit issue` read handlers.
 
-use super::{resolve_issue, CommandContext, Outcome};
+use super::{resolve_issue, CommandContext, HandlerResult, Outcome};
 use crate::cli::{IssueCommands, IssueFilterArgs};
 use crate::commands::ItemShowResult;
 use crate::domain::MinimalIssue;
@@ -34,7 +34,7 @@ fn show<S: IssueStore>(
     summary: bool,
     field: Option<String>,
     fields: Vec<String>,
-) -> anyhow::Result<Outcome<IssueShowOutput>> {
+) -> HandlerResult<IssueShowOutput> {
     let projecting = field.is_some() || !fields.is_empty();
     // Projection targets a single issue.
     if projecting && ids.len() > 1 {
@@ -57,7 +57,7 @@ fn show<S: IssueStore>(
     // contain '/'.
     if !projecting && !summary && requested.contains('/') {
         let item = ctx.executor.items().show_item(requested)?;
-        return Ok(Outcome::success(IssueShowOutput::Item(item)));
+        return Ok(IssueShowOutput::Item(item).into());
     }
     let issues = ctx.executor.issues();
     let issue = issues.show_issue(&resolve_issue(ctx.executor.storage(), requested)?)?;
@@ -84,7 +84,7 @@ fn show<S: IssueStore>(
             Some(name) => IssueProjection::field(&value, &name).ok_or_else(|| unknown(&name))?,
             None => IssueProjection::fields(&value, &fields).map_err(|e| unknown(&e.0))?,
         };
-        return Ok(Outcome::success(IssueShowOutput::Projection(projection)));
+        return Ok(IssueShowOutput::Projection(projection).into());
     }
     let message = format!(
         "Issue {}: {} [{}]",
@@ -103,7 +103,7 @@ pub(super) fn list<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     filters: IssueFilterArgs,
     full: bool,
-) -> anyhow::Result<Outcome<IssueListing>> {
+) -> HandlerResult<IssueListing> {
     let filters = filters.parse()?;
     let issues = ctx.executor.queries().query_all(
         filters.state,
@@ -127,7 +127,7 @@ fn search<S: IssueStore>(
     query: Option<String>,
     filters: IssueFilterArgs,
     full: bool,
-) -> anyhow::Result<Outcome<IssueSearchResults>> {
+) -> HandlerResult<IssueSearchResults> {
     let filters = filters.parse()?;
     // A query-less search needs a filter; otherwise it would dump every issue.
     let has_filter = filters.state.is_some()
@@ -167,7 +167,7 @@ fn search<S: IssueStore>(
 fn status<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     ids: Vec<String>,
-) -> anyhow::Result<Outcome<IssueStatusOutput>> {
+) -> HandlerResult<IssueStatusOutput> {
     let issues = ctx.executor.issues();
     let statuses = ids
         .iter()
@@ -182,29 +182,29 @@ fn status<S: IssueStore>(
         Ok([only]) => IssueStatusOutput::One(only),
         Err(many) => IssueStatusOutput::Many(IssueStatusListResponse::new(many)),
     };
-    Ok(Outcome::success(output))
+    Ok(output.into())
 }
 
 fn children<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
-) -> anyhow::Result<Outcome<IssueChildrenResponse>> {
+) -> HandlerResult<IssueChildrenResponse> {
     let response = ctx
         .executor
         .issues()
         .issue_children(&resolve_issue(ctx.executor.storage(), &id)?)?;
-    Ok(Outcome::success(response))
+    Ok(response.into())
 }
 
 fn progress<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
-) -> anyhow::Result<Outcome<ContainerProgressResponse>> {
+) -> HandlerResult<ContainerProgressResponse> {
     let response = ctx
         .executor
         .issues()
         .issue_progress(&resolve_issue(ctx.executor.storage(), &id)?)?;
-    Ok(Outcome::success(response))
+    Ok(response.into())
 }
 
 command_group! {

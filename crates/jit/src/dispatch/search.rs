@@ -1,6 +1,6 @@
 //! `jit search` handler.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult, Outcome};
 use crate::cli::SearchArgs;
 use crate::output::{SearchHit, SearchQuery, SearchResponse};
 use crate::search::SearchOptions;
@@ -10,7 +10,7 @@ use crate::storage::IssueStore;
 fn search<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     args: SearchArgs,
-) -> anyhow::Result<Outcome<SearchResponse>> {
+) -> HandlerResult<SearchResponse> {
     let SearchArgs {
         query,
         regex,

@@ -1,6 +1,6 @@
 //! `jit graph` handlers.
 
-use super::{resolve_issue, CommandContext, Outcome};
+use super::{resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::GraphCommands;
 use crate::commands::graph::compute_dependency_summary;
 use crate::commands::GraphExportFormat;
@@ -10,7 +10,7 @@ use crate::output::{
     DependencyTreeScope, GraphDepsTreeResponse, GraphDownstreamResponse, GraphExportOutput,
     GraphExportText, GraphExportWritten, GraphRootsResponse, GraphTreeResponse, IssueScope,
 };
-use crate::storage::{IssueStore, RepositoryStateStore};
+use crate::storage::IssueStore;
 use crate::visualization::{GraphExportFullResponse, GraphExportSummaryResponse};
 use std::path::Path;
 
@@ -25,7 +25,7 @@ fn deps<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
     depth: u32,
-) -> anyhow::Result<Outcome<GraphDepsTreeResponse>> {
+) -> HandlerResult<GraphDepsTreeResponse> {
     let id = resolve_issue(ctx.executor.storage(), &id)?;
     let tree = ctx.executor.graph().build_dependency_tree(&id, depth)?;
     let summary = compute_dependency_summary(&tree);
@@ -47,7 +47,7 @@ fn rdeps<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
     depth: u32,
-) -> anyhow::Result<Outcome<GraphDownstreamResponse>> {
+) -> HandlerResult<GraphDownstreamResponse> {
     let id = resolve_issue(ctx.executor.storage(), &id)?;
     let issues = ctx.executor.graph().show_rdeps_with_depth(&id, depth)?;
     let message = format!("{} dependents", issues.len());
@@ -58,9 +58,7 @@ fn rdeps<S: IssueStore>(
     ))
 }
 
-fn roots<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-) -> anyhow::Result<Outcome<GraphRootsResponse>> {
+fn roots<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<GraphRootsResponse> {
     let issues = ctx.executor.graph().show_roots()?;
     let message = format!("{} root issues", issues.len());
     let roots: Vec<MinimalIssue> = issues.iter().map(MinimalIssue::from).collect();
@@ -73,7 +71,7 @@ fn roots<S: IssueStore>(
 fn tree<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     root: Option<String>,
-) -> anyhow::Result<Outcome<GraphTreeResponse>> {
+) -> HandlerResult<GraphTreeResponse> {
     let root = root
         .map(|root| resolve_issue(ctx.executor.storage(), &root))
         .transpose()?;
@@ -82,13 +80,13 @@ fn tree<S: IssueStore>(
     Ok(Outcome::success_with(response, message))
 }
 
-fn export<S: IssueStore + RepositoryStateStore>(
+fn export<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     format: Option<GraphExportFormat>,
     full: bool,
     scope: Option<String>,
     output: Option<String>,
-) -> anyhow::Result<Outcome<GraphExportOutput>> {
+) -> HandlerResult<GraphExportOutput> {
     let json = ctx.mode.json;
     // `--json` is sugar for `--format json`; combining it with an explicit
     // conflicting `--format` (dot/mermaid/batch) is a usage error (exit 2).
@@ -156,7 +154,7 @@ fn export<S: IssueStore + RepositoryStateStore>(
 
 command_group! {
     command: GraphCommands,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [HandlerStore],
     leaves: {
         "graph_deps" => GraphCommands::Deps { id, depth } => deps(id, depth) -> GraphDepsTreeResponse,
         "graph_rdeps" => GraphCommands::Rdeps { id, depth } => rdeps(id, depth) -> GraphDownstreamResponse,

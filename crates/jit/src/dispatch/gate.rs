@@ -1,6 +1,6 @@
 //! Gate definitions and presets; execution and status remain in the CLI.
 
-use super::{resolve_issue, CommandContext, Outcome};
+use super::{resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::{GateCommands, PresetCommands};
 use crate::commands::{FieldEdit, GateUpdate};
 use crate::declarations::{GateChecker, GateMode, GateStage};
@@ -11,7 +11,7 @@ use crate::output::gate::{
     GatePresetCreateResponse, GatePresetError, GatePresetShowResponse, GatePresetSuccess,
 };
 use crate::output::{ErrorCode, GateDefinition, GateListResponse, GatePresetListResponse};
-use crate::storage::{IssueStore, RepositoryStateStore};
+use crate::storage::IssueStore;
 use std::collections::HashMap;
 
 fn parse_env(env: Vec<String>) -> anyhow::Result<HashMap<String, String>> {
@@ -43,7 +43,7 @@ fn field_edit<T>(set: Option<T>, clear: bool, flag: &str) -> anyhow::Result<Fiel
 }
 
 #[allow(clippy::too_many_arguments)]
-fn define<S: IssueStore + RepositoryStateStore>(
+fn define<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     key: String,
     title: String,
@@ -59,7 +59,7 @@ fn define<S: IssueStore + RepositoryStateStore>(
     prompt_file: Option<String>,
     env: Vec<String>,
     priority: u32,
-) -> anyhow::Result<Outcome<GateMutationResponse>> {
+) -> HandlerResult<GateMutationResponse> {
     let key = key.parse()?;
     let mode = if auto {
         GateMode::Auto
@@ -88,11 +88,11 @@ fn define<S: IssueStore + RepositoryStateStore>(
     ctx.executor
         .gates()
         .define_gate(&key, title, description, stage, mode, checker, priority)?;
-    Ok(Outcome::success(GateMutationResponse::new(key, "Defined")))
+    Ok(GateMutationResponse::new(key, "Defined").into())
 }
 
 #[allow(clippy::too_many_arguments)]
-fn update<S: IssueStore + RepositoryStateStore>(
+fn update<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     key: String,
     title: Option<String>,
@@ -112,7 +112,7 @@ fn update<S: IssueStore + RepositoryStateStore>(
     env: Vec<String>,
     clear_env: bool,
     priority: Option<u32>,
-) -> anyhow::Result<Outcome<GateDefinitionResponse>> {
+) -> HandlerResult<GateDefinitionResponse> {
     let key = key.parse()?;
     let working_dir = field_edit(working_dir, clear_working_dir, "working-dir")?;
     let prompt = field_edit(prompt, clear_prompt, "prompt")?;
@@ -151,20 +151,20 @@ fn update<S: IssueStore + RepositoryStateStore>(
     )
 }
 
-fn remove<S: IssueStore + RepositoryStateStore>(
+fn remove<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     key: String,
-) -> anyhow::Result<Outcome<GateMutationResponse>> {
+) -> HandlerResult<GateMutationResponse> {
     let key = key.parse()?;
     let warnings = ctx.executor.gates().remove_gate_definition(&key)?;
     Ok(Outcome::success(GateMutationResponse::new(key, "Removed")).with_warnings(warnings))
 }
 
-fn add<S: IssueStore + RepositoryStateStore>(
+fn add<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
     gate_keys: Vec<String>,
-) -> anyhow::Result<Outcome<GateAddResponse>> {
+) -> HandlerResult<GateAddResponse> {
     let keys = gate_keys
         .into_iter()
         .map(|key| key.parse())
@@ -177,7 +177,7 @@ fn add<S: IssueStore + RepositoryStateStore>(
     )
 }
 
-fn list<S: IssueStore>(ctx: &CommandContext<'_, S>) -> anyhow::Result<Outcome<GateListResponse>> {
+fn list<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<GateListResponse> {
     let gates = ctx.executor.gates().list_gates()?;
     let message = format!("{} gate definition(s)", gates.len());
     Ok(Outcome::success_with(
@@ -189,7 +189,7 @@ fn list<S: IssueStore>(ctx: &CommandContext<'_, S>) -> anyhow::Result<Outcome<Ga
 fn show<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     key: String,
-) -> anyhow::Result<Outcome<GateDefinitionResponse>> {
+) -> HandlerResult<GateDefinitionResponse> {
     let gate = ctx.executor.gates().show_gate_definition(&key.parse()?)?;
     let message = format!("Gate {}: {}", gate.key, gate.title);
     Ok(Outcome::success_with(
@@ -200,7 +200,7 @@ fn show<S: IssueStore>(
 
 fn preset_list<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
-) -> anyhow::Result<Outcome<GatePresetListResponse>> {
+) -> HandlerResult<GatePresetListResponse> {
     let presets = ctx.executor.gates().list_gate_presets()?;
     let message = format!("{} preset(s)", presets.len());
     Ok(Outcome::success_with(
@@ -212,17 +212,17 @@ fn preset_list<S: IssueStore>(
 fn preset_show<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     name: String,
-) -> anyhow::Result<Outcome<GatePresetShowResponse>> {
+) -> HandlerResult<GatePresetShowResponse> {
     let preset = ctx.executor.gates().show_gate_preset(&name)?;
     let message = format!("Preset {}: {}", preset.name, preset.description);
     Ok(Outcome::success_with(preset.into(), message))
 }
 
-fn preset_create<S: IssueStore + RepositoryStateStore>(
+fn preset_create<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     from_issue: String,
     name: String,
-) -> anyhow::Result<Outcome<GatePresetCreateResponse>> {
+) -> HandlerResult<GatePresetCreateResponse> {
     let id = resolve_issue(ctx.executor.storage(), &from_issue)?;
     let path = ctx.executor.gates().create_gate_preset(&name, &id)?;
     let message = format!("Created preset '{}'", name);
@@ -235,7 +235,7 @@ fn preset_create<S: IssueStore + RepositoryStateStore>(
     ))
 }
 
-fn preset_apply<S: IssueStore + RepositoryStateStore>(
+fn preset_apply<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     name: String,
     ids: Vec<String>,
@@ -243,7 +243,7 @@ fn preset_apply<S: IssueStore + RepositoryStateStore>(
     no_precheck: bool,
     no_postcheck: bool,
     except: Vec<String>,
-) -> anyhow::Result<Outcome<GatePresetApplyResponse>> {
+) -> HandlerResult<GatePresetApplyResponse> {
     let except = except
         .into_iter()
         .map(|key| key.parse())
@@ -319,7 +319,7 @@ fn preset_apply<S: IssueStore + RepositoryStateStore>(
 
 command_group! {
     command: GateCommands,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [HandlerStore],
     leaves: {
         "gate_define" => GateCommands::Define { key, title, description, stage, mode, auto, checker_command, timeout, working_dir, pass_context, prompt, prompt_file, env, priority } => define(key, title, description, stage, mode, auto, checker_command, timeout, working_dir, pass_context, prompt, prompt_file, env, priority) -> GateMutationResponse,
         "gate_update" => GateCommands::Update { key, title, description, stage, mode, auto, checker_command, timeout, working_dir, clear_working_dir, pass_context, prompt, clear_prompt, prompt_file, clear_prompt_file, env, clear_env, priority } => update(key, title, description, stage, mode, auto, checker_command, timeout, working_dir, clear_working_dir, pass_context, prompt, clear_prompt, prompt_file, clear_prompt_file, env, clear_env, priority) -> GateDefinitionResponse,
