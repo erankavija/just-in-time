@@ -8,6 +8,7 @@
   ],
   "description": "Update the claim command reference, the coordination and troubleshooting guides, and the contributor testing guide for issue-addressed lease commands and per-issue lease records.\n\n## Background\n\nDocs describe lease-id-addressed commands and an index rebuilt from the log:\n\n- `docs/reference/claim.md` (lease-id arguments; the claims log as audit trail; staleness, the `jit claim status` stale marking and its heartbeat remedy);\n- `docs/reference/cli-command-grammar.md` (renew, heartbeat and force-evict take the lease's own id);\n- `docs/how-to/multi-agent-coordination.md` (\"Rebuild claims index from log\");\n- `docs/how-to/dependency-management.md` (\"rebuildable index\");\n- `docs/concepts/guarantees.md` (the lease-id commands in its eviction and heartbeat examples);\n- `docs/tutorials/parallel-work-worktrees.md`;\n- `docs/how-to/troubleshooting.md` (rebuild the index; delete `claims.jsonl` and the index by hand);\n- `docs/reference/worktree-validate.md` and `docs/reference/cli-commands.md` (claims-index validation, recover rebuilding the index);\n- `dev/TESTING.md` (rebuild property tests and claims-index validation);\n- `.agents/skills/jit-manage/SKILL.md` (the lease record lives in `claims.index.json`).\n\nAfter this epic: renew, heartbeat and force-evict take an issue id, and force-evict also reaches a lease whose issue is deleted; leases are `.git/jit/leases/<issue-id>.json`; `claim list` and `claim status` report unexpired leases and mark a stale one stale; recover cleans locks, evicts expired leases and reclaims stale indefinite leases; validation does not read the claims files. `scripts/hooks/README.md` already says no hook checks leases and needs no change.\n\n## Success Criteria\n\n- [hard] REQ-01: Every listed page addresses renew, heartbeat and force-evict by issue, and none tells an operator to rebuild, delete or edit an index or the claims log.\n- [hard] REQ-02: The recover and validation descriptions match their behaviour, and `claim.md` states that listings mark a stale lease stale and that a heartbeat refreshes it or recover reclaims it.\n- [hard] REQ-03: `dev/TESTING.md` names the claim property tests and coordinator tests that exist.\n",
   "documents": [],
+  "done_at": "2026-11-04T08:32:04.976191999Z",
   "first_ready_at": "2026-11-04T07:41:50.638834685Z",
   "gates_required": [
     "doc-review",
@@ -15,15 +16,15 @@
   ],
   "gates_status": {
     "doc-review": {
-      "run_id": "802cc1ad-dbe2-43d8-9db1-95ac85a2c749",
-      "status": "failed",
-      "updated_at": "2026-11-04T08:26:33.884478642Z",
+      "run_id": "e2c9d9f1-ec82-45b6-8af9-76313370e101",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:32:01.697763025Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "run_id": "3d6723dc-ac98-4e08-93c7-eede57bd48be",
+      "run_id": "64b16a98-b581-4ec4-be17-9d0ac1955e67",
       "status": "passed",
-      "updated_at": "2026-11-04T08:26:36.673042096Z",
+      "updated_at": "2026-11-04T08:32:04.517913483Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,7 +40,7 @@
     "satisfies:f8a6b298/REQ-15"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Lease command and recovery docs match per-issue lease records",
-  "updated_at": "2026-11-04T08:26:36.673042096Z"
+  "updated_at": "2026-11-04T08:32:04.976191999Z"
 }
