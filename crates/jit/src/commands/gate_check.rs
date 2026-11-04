@@ -1228,6 +1228,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .and_then(|state| state.run_id.as_ref())
             .map(|run_id| self.storage.load_gate_run_result(&issue.id, run_id))
             .transpose()
+            .map(|run| run.filter(|run| &run.gate_key == gate_key))
     }
 
     fn build_captured_gate_context(
@@ -1348,7 +1349,8 @@ impl<S: IssueStore> GateOps<'_, S> {
     ///
     /// Registered required gates come first on priority ties; unregistered
     /// states sort last. The second vector includes states and registered
-    /// required gates with no run id.
+    /// required gates with no run id, or whose named run belongs to another
+    /// gate.
     pub fn get_last_gate_runs_for_issue(
         &self,
         issue_id: &IssueId,
@@ -4164,6 +4166,39 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             runs.iter().map(|run| run.run_id.clone()).collect();
         assert_eq!(actual, expected.into_iter().collect());
         assert!(not_run.is_empty());
+    }
+
+    #[test]
+    fn test_get_last_gate_runs_for_issue_omits_a_run_named_by_another_gates_state() {
+        let executor = setup();
+        let mut issue = crate::test_utils::fixture_issue("T".into(), String::new());
+        let own: GateKey = "review".parse().unwrap();
+        let other: GateKey = "lint".parse().unwrap();
+        let run = GateRunResult::attestation(
+            &crate::test_utils::gate_run_id(1),
+            &issue.id,
+            &other,
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        executor.storage.add_data_file(
+            crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
+                .relative()
+                .as_path(),
+            &serde_json::to_string(&run).unwrap(),
+        );
+        issue
+            .gates_status
+            .insert(own.clone(), super::gate_state_from_run(&run));
+        seed_issue(executor.storage(), issue.clone());
+
+        let (runs, not_run) = executor
+            .gates()
+            .get_last_gate_runs_for_issue(&issue.id)
+            .unwrap();
+        assert!(runs.is_empty());
+        assert_eq!(not_run, vec![own]);
     }
 
     #[test]
