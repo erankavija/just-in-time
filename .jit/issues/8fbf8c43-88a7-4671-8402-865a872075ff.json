@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Handler functions state their result type and store bound once through shared aliases where the same spelling repeats across handlers, without renaming any existing type.\n\n## Background\n\nEvery library handler in `crates/jit/src/dispatch/` spells `anyhow::Result<Outcome<R>>` and, in many groups, the store bound `IssueStore + RepositoryStateStore` in full, and many build `Outcome::success(response)` from a bare response value. The remaining handler migrations will add more handlers with the same spelling.\n\n## Success Criteria\n\n- [hard] REQ-01: One result alias names a handler's return type, and every handler uses it.\n- [hard] REQ-02: One trait alias names the store bound the handlers share, and every handler with that bound uses it.\n- [hard] REQ-03: A plain success outcome converts from its response value through one shared conversion, where that removes repeated construction.\n- [hard] REQ-04: No existing type is renamed, and no command's JSON payload, human output or exit code changes.\n- [hard] REQ-05: The change removes at least 30 production lines from `crates/jit/src` (default mode of `scripts/production-lines.py`). If the aliases cannot reach that by removing real repetition, the issue is rejected rather than met by cosmetic edits.\n\n## Notes\n\nSteward ruling (2026-11-04): shortening a name to save lines simplifies nothing, so the `CommandContext` name stays. Lands before the remaining handler moves so they start from the shared spelling. Part of the epic's net-reduction work (plan D-51).\n",
   "documents": [],
+  "done_at": "2026-11-04T14:28:28.833115230Z",
   "first_ready_at": "2026-11-04T12:28:16.107922749Z",
   "gates_required": [
     "cargo-ci",
@@ -34,7 +35,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Handlers share one result alias and store bound",
-  "updated_at": "2026-11-04T14:18:23.407856623Z"
+  "updated_at": "2026-11-04T14:28:28.833115230Z"
 }
