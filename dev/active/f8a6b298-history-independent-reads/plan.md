@@ -85,7 +85,7 @@ An ordinary command reaches the event log only through `CaptureSpec::discover_ta
 
 ### `archive-evidence-record` [plan-fixed] — Per-target archive evidence
 
-`archive-evidence/<target-key>.json` holds the target and its ordered executions. The key is `container/<issue-id>` or `document/<sha256 of the normalized path>`, built by one `VirtualPath` constructor. The directory joins `VirtualPath::RECORDS`. Execute writes `prior + this` in the redo record of its event. Planner, finalizer and preview each read it once.
+`archive-evidence/<target-key>.json` holds the target and its ordered executions. The key is `container/<issue-id>` or `document/<sha256 of the normalized path>`, built by one `VirtualPath` constructor. The directory joins `VirtualPath::RECORDS`. Execute writes `prior + this` in the redo record of its event. Execute reads it once in the planner and passes the decoded record to the finalizer; preview reads it once.
 
 ### `history-paths` [implementation-produced] — Declared history paths
 

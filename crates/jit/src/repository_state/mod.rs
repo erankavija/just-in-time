@@ -26,7 +26,6 @@ mod rule_serialize;
 mod rules_document;
 mod rules_gates_projection;
 
-pub(crate) use archive::captured_archive_events;
 pub use archive::{finalize_archive_execution, ArchiveExecutionError};
 pub(crate) use default_rules::default_rule_membership_diff_from_identities;
 pub use default_rules::{
