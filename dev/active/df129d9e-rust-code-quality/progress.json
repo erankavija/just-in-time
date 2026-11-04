@@ -1031,7 +1031,11 @@
       "epic_net": 1011,
       "crate_base": 78801,
       "crate_main": 74130,
-      "file": "ledger-2026-11-04.txt"
+      "file": "ledger-2026-11-04.txt",
+      "since_2026_11_04": {
+        "f82a2e4a": -60
+      },
+      "epic_net_running": 951
     },
     "survey_2026_11_04": "output+dispatch: ~29 high-confidence, ~75 speculative, ~20 contract-changing (5 dead ErrorCodes, 0eca332a); ~150-250 legacy output helpers die after main.rs migrates. Projected REQ-10 end ~9,200-9,400. Reported to 6a for the user's decision.",
     "net_plan_2026_11_04": {
@@ -1274,7 +1278,7 @@
       "note": "resumed after quiet window"
     },
     "f82a2e4a": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "classifier routing with contract tests",
       "review": "lead PASS at 2cad00a53: edge codes via classify_code (generic -> DependencyError), render_checker table, with_warnings takes Display; -60 lines"
