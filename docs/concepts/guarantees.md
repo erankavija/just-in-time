@@ -685,7 +685,8 @@ jit validate --leases
 # Auto-fix what is mechanically fixable
 jit validate --fix
 # Applies repairable rule/graph/state fixes and derived-state repairs
-# Publishes derived repairs recoverably; an ambiguous target writes nothing
+# Publishes every fix in one recoverable mutation, then validates the result;
+# an ambiguous target writes nothing
 ```
 
 ## See Also
