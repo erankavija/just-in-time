@@ -36,13 +36,13 @@ pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
     RepositoryExportDestination, RepositoryExportError, RepositoryExportIntent,
 };
-pub(crate) use image::CapturedAnswers;
 pub use image::{
     CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, DirectoryListing,
     EntryIdentity, EventLogTail, ExpectedPreimage, FileMode, PinnedDocumentEvidence,
     PinnedSourceClass, ReadMode, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
     RepositoryEntry, RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
 };
+pub(crate) use image::{CapturedAnswers, ImageToken};
 pub use index::RepositoryIndexError;
 #[cfg(test)]
 pub(crate) use index::SUPPORTED_INDEX_SCHEMA_VERSION;

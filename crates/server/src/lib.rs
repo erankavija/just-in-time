@@ -5,6 +5,8 @@
 
 #[cfg(feature = "embed-web")]
 pub mod embedded;
+#[cfg(feature = "test-support")]
+pub mod first_read;
 pub mod routes;
 pub mod shutdown;
 pub mod sse;
