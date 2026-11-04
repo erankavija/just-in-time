@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-11-04T12:09:23.715107913Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "32037cf7-6f27-4cb1-82df-ceb8adf69796",
+      "status": "failed",
+      "updated_at": "2026-11-04T12:12:32.191129661Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "4a01ccba-b6b9-46db-ae4a-cf92a98c9279",
@@ -32,5 +38,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Refactor every test over the per-test limit",
-  "updated_at": "2026-11-04T12:09:23.715107913Z"
+  "updated_at": "2026-11-04T12:12:32.191129661Z"
 }

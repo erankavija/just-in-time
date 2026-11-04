@@ -43,6 +43,7 @@
       "path": "dev/active/f8a6b298-history-independent-reads/format4-cutover.md"
     }
   ],
+  "done_at": "2026-11-04T12:12:58.659591280Z",
   "first_ready_at": "2026-11-04T08:42:45.397338234Z",
   "gates_required": [
     "cargo-ci",
@@ -56,9 +57,9 @@
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "run_id": "2528dd8f-3946-4faa-b0de-9d8d169874ea",
-      "status": "failed",
-      "updated_at": "2026-11-04T11:58:50.331840138Z",
+      "run_id": "66ed30c1-4704-4e3d-919c-7d03aa7c2f13",
+      "status": "passed",
+      "updated_at": "2026-11-04T12:12:48.423654949Z",
       "updated_by": "auto:executor"
     }
   },
@@ -73,7 +74,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Leases are per-issue records under one lease sequence",
-  "updated_at": "2026-11-04T11:59:43.832441793Z"
+  "updated_at": "2026-11-04T12:12:58.659591280Z"
 }

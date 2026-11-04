@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d43a61679cd4a2b93c27430053fbcdb55bd9a53f",
+  "completed_at": "2026-11-04T12:12:48.417299263Z",
+  "duration_ms": 192563,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/format4-cutover.md",
+        "id": "F1",
+        "line": 27,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/5ee85aed/decision/D-1"
+        ],
+        "severity": "medium",
+        "summary": "Exact external cutover table values and runtime timing/PID details lack preserved invocation output or inspectable secondary artifacts in this checkout; @/issue/5ee85aed/decision/D-1 accepts the external outcome."
+      }
+    ],
+    "summary": "All hard criteria are verified; one advisory concerns uncorroborated quantitative cutover details accepted by the binding decision.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "5ee85aed-c152-470f-881c-2b2be7b8ef53",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "66ed30c1-4704-4e3d-919c-7d03aa7c2f13",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T12:09:35.853534448Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. F1 — Advisory (medium): Exact external cutover table values and runtime timing/PID details lack preserved invocation output or inspectable secondary artifacts in this checkout. Decision D-1 accepts the external cutover outcome, so this does not block the verified hard criteria. [`format4-cutover.md:27`](dev/active/f8a6b298-history-independent-reads/format4-cutover.md:27)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verified; one advisory concerns uncorroborated quantitative cutover details accepted by the binding decision.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Exact external cutover table values and runtime timing/PID details lack preserved invocation output or inspectable secondary artifacts in this checkout; @/issue/5ee85aed/decision/D-1 accepts the external outcome.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/format4-cutover.md\",\"line\":27,\"references\":[\"@/issue/5ee85aed/decision/D-1\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

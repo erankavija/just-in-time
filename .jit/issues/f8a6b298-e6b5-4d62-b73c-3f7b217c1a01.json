@@ -31,7 +31,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Restructure storage so reads never scale with project history",
-  "updated_at": "2026-11-04T08:30:34.175107255Z"
+  "updated_at": "2026-11-04T12:12:58.771096068Z"
 }
