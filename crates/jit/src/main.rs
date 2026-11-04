@@ -17,13 +17,13 @@ mod output_macros;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
-    ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
-    GateCommands, GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
+    ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, GateCommands,
+    GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
 };
 use jit::commands::{
     parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
 };
-use jit::dispatch::{invariant, CommandContext};
+use jit::dispatch::{events, invariant, CommandContext};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -891,23 +891,6 @@ fn resolve_dependency_removal_args<S: IssueStore>(
             Ok((matched, unmatched))
         },
     )
-}
-
-/// Parse an issue-id filter into the prefix that matches stored ids: the
-/// canonical id it resolves to or, when it names no live issue, the parsed
-/// input itself, so records of a deleted issue still match.
-///
-/// # Errors
-///
-/// [`InvalidIdPrefixError`](jit::domain::identity::InvalidIdPrefixError) before
-/// any read, or [`AmbiguousIdError`](jit::storage::AmbiguousIdError).
-fn resolve_issue_filter_arg<S: IssueStore>(storage: &S, requested: &str) -> Result<IssueIdPrefix> {
-    let prefix = requested.parse::<IssueIdPrefix>()?;
-    match storage.resolve_issue_id(&prefix) {
-        Ok(id) => Ok(IssueIdPrefix::from(&id)),
-        Err(error) if error.is::<jit::storage::IssueNotFoundError>() => Ok(prefix),
-        Err(error) => Err(error),
-    }
 }
 
 /// Build the [`IssueShowResponse`](jit::output::IssueShowResponse) for a single
@@ -4465,43 +4448,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         },
-        Commands::Events(event_cmd) => match event_cmd {
-            EventCommands::Tail { n } => {
-                let events = executor.queries().tail_events(n)?;
-                if json {
-                    use jit::output::{EventListResponse, JsonOutput};
-                    let msg = format!("{} event(s)", events.len());
-                    let output =
-                        JsonOutput::success(EventListResponse::new(events)).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    for event in events {
-                        println!("{}", serde_json::to_string(&event)?);
-                    }
-                }
-            }
-            EventCommands::Query {
-                event_type,
-                issue_id,
-                limit,
-            } => {
-                let issue = issue_id
-                    .map(|id| resolve_issue_filter_arg(&storage, &id))
-                    .transpose()?;
-                let events = executor.queries().query_events(event_type, issue, limit)?;
-                if json {
-                    use jit::output::{EventListResponse, JsonOutput};
-                    let msg = format!("{} event(s)", events.len());
-                    let output =
-                        JsonOutput::success(EventListResponse::new(events)).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    for event in events {
-                        println!("{}", serde_json::to_string(&event)?);
-                    }
-                }
-            }
-        },
+        Commands::Events(command) => {
+            return events::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
         Commands::Doc(doc_cmd) => match doc_cmd {
             DocCommands::Add {
                 id,
@@ -6667,7 +6616,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 use jit::output::{JsonOutput, LeaseListResponse};
 
                 match issue
-                    .map(|id| resolve_issue_filter_arg(&storage, &id))
+                    .map(|id| jit::dispatch::resolve_issue_filter(&storage, &id))
                     .transpose()
                     .and_then(|issue| executor.claims().status(issue.as_ref(), agent.as_deref()))
                 {

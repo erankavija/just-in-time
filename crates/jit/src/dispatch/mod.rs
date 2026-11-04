@@ -15,9 +15,10 @@
 //! pass `None`.
 
 use crate::commands::CommandExecutor;
+use crate::domain::identity::IssueIdPrefix;
 use crate::output::{ErrorCode, OutputMode, Report};
 use crate::schema::OutputSchema;
-use crate::storage::IssueStore;
+use crate::storage::{IssueNotFoundError, IssueStore};
 
 /// What every handler receives besides its parsed arguments.
 pub struct CommandContext<'a, S: IssueStore> {
@@ -46,6 +47,7 @@ pub enum Outcome<R> {
 /// [`crate::CommandSchema::generate`] before its legacy table. Test builds
 /// also register the test-only group, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
+    events::output_schema,
     invariant::output_schema,
     #[cfg(test)]
     test_group::output_schema,
@@ -108,6 +110,21 @@ macro_rules! command_group {
     };
 }
 
+/// Resolve an issue filter argument to the stored id it prefixes, keeping the
+/// typed prefix when no stored issue matches.
+pub fn resolve_issue_filter<S: IssueStore>(
+    storage: &S,
+    requested: &str,
+) -> anyhow::Result<IssueIdPrefix> {
+    let prefix = requested.parse::<IssueIdPrefix>()?;
+    match storage.resolve_issue_id(&prefix) {
+        Ok(id) => Ok(IssueIdPrefix::from(&id)),
+        Err(error) if error.is::<IssueNotFoundError>() => Ok(prefix),
+        Err(error) => Err(error),
+    }
+}
+
+pub mod events;
 pub mod invariant;
 #[cfg(test)]
 mod test_group;
