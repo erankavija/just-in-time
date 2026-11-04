@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "47d287ae1613276c4b0265bf6a178c44908a6f5d",
+  "completed_at": "2026-11-04T00:07:37.891090842Z",
+  "duration_ms": 208895,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard criteria are met by the attributed change; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ccd6e1fb-1297-4f3e-a5b4-04f9546e2b59",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "813e13c4-c8fb-412e-bca4-9007791bbf3e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T00:04:08.995990539Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3348345310845fcc5c1cb5b9e64d56f1cbdf00e9 (`jit:ccd6e1fb`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-18 and @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-11 and REQ-12 (issue Markdown); @/invariant/essential-code-prose, @/invariant/orthogonal-tests, and @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T00:03:02Z); code-review pending\nTruncation recovery: bounded per-file commit patches; current local/repository/engine reads; caller search; gate projection read\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard criteria are met by the attributed change; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

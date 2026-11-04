@@ -505,9 +505,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             };
             let candidate =
                 Self::batch_candidate_issue(&resolved, id.clone(), priority, declarations.config());
-            if let Err(err) =
-                derive_write_validation(&candidate, declarations, declarations.config(), false)
-            {
+            if let Err(err) = derive_write_validation(&candidate, declarations, false) {
                 problems.push(BatchValidationProblem::WriteValidation {
                     key: def.key.clone(),
                     message: err.to_string(),
