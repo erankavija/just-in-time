@@ -1950,7 +1950,7 @@ fn unpassed_gate_blockers(
 }
 
 /// Information about a git commit
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct CommitInfo {
     pub sha: String,
     pub author: String,
@@ -1976,6 +1976,7 @@ pub enum DocumentsKey {}
 
 impl CollectionKey for DocumentsKey {
     const KEY: &'static str = "documents";
+    const SCHEMA_NAME: Option<&'static str> = Some("DocumentListResult");
 }
 
 /// Result of listing document references for an issue
@@ -1989,7 +1990,7 @@ pub struct DocumentListScope {
 }
 
 /// Git history for a document
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentHistory {
     pub path: String,
     pub commits: Vec<CommitInfo>,
@@ -2000,6 +2001,7 @@ pub enum AssetsKey {}
 
 impl CollectionKey for AssetsKey {
     const KEY: &'static str = "assets";
+    const SCHEMA_NAME: Option<&'static str> = Some("AssetListResult");
 }
 
 /// Result of listing assets for a document
@@ -2008,13 +2010,16 @@ pub type AssetListResult = ListEnvelope<AssetsKey, crate::document::Asset, Asset
 /// Fields of an [`AssetListResult`] beside its `assets`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct AssetListScope {
+    /// Worktree root the human rendering checks asset paths against.
+    #[serde(skip)]
+    pub worktree_root: std::path::PathBuf,
     pub issue_id: IssueId,
     pub document_path: String,
     pub summary: AssetSummary,
 }
 
 /// Document content display result
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentContentResult {
     pub path: String,
     pub label: Option<String>,
@@ -2024,7 +2029,7 @@ pub struct DocumentContentResult {
 }
 
 /// Document diff result
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentDiffResult {
     pub path: String,
     pub from_commit: String,
@@ -2033,7 +2038,7 @@ pub struct DocumentDiffResult {
 }
 
 /// Result of adding a document reference
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentAddResult {
     pub issue_id: IssueId,
     pub document: crate::domain::DocumentReference,
@@ -2043,7 +2048,7 @@ pub struct DocumentAddResult {
 }
 
 /// Result of removing a document reference
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentRemoveResult {
     pub issue_id: IssueId,
     pub path: String,
@@ -2070,18 +2075,18 @@ pub struct SnapshotExportResult {
 }
 
 /// Result of checking document links
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct LinkCheckResult {
     pub valid: bool,
     pub errors: Vec<serde_json::Value>,
-    pub warnings: Vec<serde_json::Value>,
+    pub link_warnings: Vec<serde_json::Value>,
     #[serde(skip)]
     pub scope: String,
     pub summary: LinkCheckSummary,
 }
 
 /// Summary of link check results
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct LinkCheckSummary {
     pub total_documents: usize,
     pub valid: usize,

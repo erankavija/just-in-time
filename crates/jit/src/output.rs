@@ -14,6 +14,7 @@ use std::io::{self, Write};
 use thiserror::Error;
 
 pub mod config;
+mod doc;
 mod emit;
 pub mod failure;
 mod invariant;
@@ -1406,13 +1407,20 @@ collection_keys! {
     ByStateKey = "by_state";
     GatesKey = "gates";
     ResultsKey = "results";
-    ArtifactsKey = "artifacts";
     NamespacesKey = "namespaces";
     WorktreesKey = "worktrees";
     PresetsKey = "presets";
     EventsKey = "events";
     ValuesKey = "values";
     LeasesKey = "leases";
+}
+
+/// Collection key of [`ArtifactConformanceResponse`].
+pub enum ArtifactsKey {}
+
+impl CollectionKey for ArtifactsKey {
+    const KEY: &'static str = "artifacts";
+    const SCHEMA_NAME: Option<&'static str> = Some("ArtifactConformanceResponse");
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)
