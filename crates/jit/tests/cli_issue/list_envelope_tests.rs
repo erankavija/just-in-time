@@ -98,7 +98,7 @@ fn invocations(seeded: &Seeded) -> Vec<Invocation> {
         invocation("worktree store-divergence", &[], "divergences"),
         invocation("graph roots", &[], "roots"),
         invocation("graph rdeps", &[dependency], "dependents"),
-        invocation_via("graph rdeps", "rdeps", &[dependency], "dependents"),
+        invocation("rdeps", &[dependency], "dependents"),
         invocation("graph deps", &[container], "nodes"),
         invocation("graph tree", &[], "nodes"),
         invocation("invariant check", &[], "findings"),

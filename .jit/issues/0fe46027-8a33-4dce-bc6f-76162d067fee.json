@@ -15,7 +15,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cd16c740-3960-4ba4-91fb-69a21140e7e9",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:58.859614276Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "82ac2f5d-ce56-431b-b450-035af7429ae0",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:58.989063619Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0fe46027-8a33-4dce-bc6f-76162d067fee",
   "labels": [
     "type:task",
@@ -33,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Dependency commands move to library handlers",
-  "updated_at": "2026-11-04T02:40:57.072381611Z"
+  "updated_at": "2026-11-04T09:14:58.989063619Z"
 }

@@ -15,7 +15,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b08a3dd9-0f65-403b-bece-806c7765138a",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:59.991236762Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "a17c1ae3-f056-474b-93b1-b784007b225a",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:15:00.118094910Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "52110fb4-8fe5-4090-9f7e-5da7081953ac",
   "labels": [
     "type:task",
@@ -33,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Label commands move to library handlers",
-  "updated_at": "2026-11-04T02:40:57.974028978Z"
+  "updated_at": "2026-11-04T09:15:00.118094910Z"
 }

@@ -94,9 +94,9 @@ pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueCreation, IssueLocalUpdate, IssueMutation, IssueOps};
 pub use item::{ItemListResult, ItemOps, ItemShowResult};
 pub use profile::{
-    parse_profile_selector, ProfileApplyError, ProfileNotFoundError, ProfileOps,
-    ProfileResolutionError, ProfileSelection, ProfileSelectorError, ProfileVariableOptions,
-    SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
+    parse_profile_selector, parse_profile_selectors, parse_profile_variable_assignments,
+    ProfileApplyError, ProfileNotFoundError, ProfileOps, ProfileResolutionError, ProfileSelection,
+    ProfileSelectorError, ProfileVariableOptions, SelectedProfile, UNCOMMITTED_TARGETS_RESOLUTION,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use query::QueryOps;
@@ -2307,6 +2307,8 @@ pub struct CommandExecutor<S: IssueStore> {
     /// The CLI injects its dispatch-time value; non-dispatch library callers
     /// lazily derive it from their selected repository layout.
     worktree_paths: OnceLock<Result<crate::storage::WorktreePaths, String>>,
+    /// Leftover redo records the opening of this repository applied.
+    recovered_records: usize,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -2332,6 +2334,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             namespaces: OnceLock::new(),
             layout: None,
             worktree_paths: OnceLock::new(),
+            recovered_records: 0,
         }
     }
 
@@ -2351,6 +2354,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Construct this executor with the selected data root's worktree authority.
     pub fn with_worktree_paths(mut self, paths: crate::storage::WorktreePaths) -> Self {
         self.worktree_paths = OnceLock::from(Ok(paths));
+        self
+    }
+
+    /// Record the leftover redo records startup recovery applied.
+    pub fn with_recovered_records(mut self, count: usize) -> Self {
+        self.recovered_records = count;
         self
     }
 

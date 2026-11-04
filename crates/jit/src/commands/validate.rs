@@ -7,7 +7,7 @@ use crate::domain::{EventBody, ReadinessCorrection};
 use crate::repository_state::{
     MutationIntent, RepositoryAction, RepositoryDeclarations, RepositoryImage,
 };
-use crate::validation::report::{BuiltInPass, RuleSelectionFault};
+use crate::validation::report::BuiltInPass;
 use anyhow::Context;
 
 #[derive(Clone, Copy)]
@@ -579,10 +579,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 }
             };
         let mut issues = None::<ParsedIssues>;
+        let mut add_base = start.is_some();
         let mut discover = |image: &RepositoryImage, spec: &mut CaptureSpec| -> Result<()> {
-            base(spec)?;
-            if spec != image.capture_spec() {
-                return Ok(());
+            if add_base {
+                add_base = false;
+                base(spec)?;
+                if spec != image.capture_spec() {
+                    return Ok(());
+                }
             }
             // Closure planning is best-effort: a malformed registry cannot fail
             // the capture, because validation itself is the authority that
@@ -1231,78 +1235,6 @@ pub(crate) fn plan_content_with_issues(
         emit_for,
         &templates,
     )
-}
-
-/// Evaluate one configured graph rule against one issue from a closed image.
-///
-/// The selected issue is the sole firing subject. The complete captured issue
-/// set is retained as graph and resolution context, and all rule/configuration
-/// lookup plus selected plan-document projection comes from the same image.
-/// This is the shared evaluation boundary for the live CLI and native gate checker.
-///
-/// A rule that is missing, disabled, non-graph, or inapplicable to the issue is
-/// a configuration fault, returned as the inner `Err` so each caller chooses its
-/// reporting: the CLI an error finding, the gate checker an `error` run.
-pub(super) fn rule_validation_outcome(
-    image: &crate::repository_state::RepositoryImage,
-    issue_id: &IssueId,
-    rule_name: &str,
-) -> Result<std::result::Result<crate::validation::report::RuleReport, RuleSelectionFault>> {
-    use crate::validation::report::{ReportedFinding, RuleReport};
-
-    let issues = super::captured_active_issues(image)?;
-    let issue = issues
-        .iter()
-        .find(|issue| &issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
-    let declarations = crate::repository_state::declarations_from_image(image)?;
-    let config = crate::repository_state::assemble_config(image)?;
-    let repo_format = config.content_format();
-    let rule = match crate::validation::graph::select_graph_rule(
-        &declarations.rules.rules,
-        rule_name,
-        issue,
-    ) {
-        Ok(rule) => rule,
-        Err(message) => {
-            return Ok(Err(RuleSelectionFault {
-                issue_id: issue.id.clone(),
-                rule: rule_name.to_string(),
-                message,
-            }));
-        }
-    };
-
-    let plan_source_ids =
-        crate::validation::graph::graph_rule_plan_source_ids(rule, issue, &issues);
-    let plan_sources = plan_source_ids
-        .iter()
-        .filter_map(|source_id| {
-            issues
-                .iter()
-                .find(|candidate| &candidate.id == source_id)
-                .cloned()
-        })
-        .collect::<Vec<_>>();
-    let plan_content = plan_content_with_issues(image, &issues, &plan_sources)?;
-    let namespaces = crate::config_manager::namespaces_from_config(&config);
-    let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-    let context = crate::validation::graph::GraphEvaluationContext {
-        graph_context: &issues,
-        resolution_index: &issues,
-        hierarchy: &hierarchy,
-        repo_default_format: repo_format,
-        now: chrono::Utc::now(),
-        plan_content: &plan_content,
-    };
-    let findings =
-        crate::validation::graph::evaluate_graph_rule(rule, std::slice::from_ref(issue), &context);
-    Ok(Ok(RuleReport {
-        findings: findings
-            .into_iter()
-            .map(|finding| ReportedFinding::new(finding.issue_id, &finding.finding))
-            .collect(),
-    }))
 }
 
 impl<S: IssueStore> ValidationOps<'_, S> {

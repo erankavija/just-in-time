@@ -15,7 +15,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b76b9902-8e99-4508-844d-3aff48bbf8a0",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:56.742531382Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "5d16d174-86d7-4635-b24b-b9963c6fb922",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:56.880039052Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8f297e60-a74e-4efa-bdcc-54659f9959a4",
   "labels": [
     "type:task",
@@ -34,5 +47,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Init and apply commands move to library handlers",
-  "updated_at": "2026-11-04T02:59:44.425967042Z"
+  "updated_at": "2026-11-04T09:14:56.880039052Z"
 }
