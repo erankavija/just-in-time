@@ -145,7 +145,6 @@ command_group! {
     }
 }
 
-/// `jit recover`, whose unit variant is the single-leaf group's command.
 pub mod recover {
     use super::*;
 
