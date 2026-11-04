@@ -6,17 +6,18 @@
 //! redo records through [`RepositoryStateStore`]. The directory
 //! location can be overridden with the `JIT_DATA_DIR` environment variable.
 
+use super::gate_run_reader::TreeNode;
 use crate::declarations::GateRegistry;
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use crate::domain::{Event, Issue};
 use crate::repository_state::{
-    RepositoryIndex, RepositoryIndexError, RepositoryLayout, VirtualPath, BOOTSTRAP_LOCK_FILE,
-    EVENTS_LOCK_FILE, GATE_RUN_RECORD_FILE, INDEX_LOCK_FILE,
+    RepositoryIndex, RepositoryIndexError, RepositoryLayout, RepositoryRootClass, VirtualPath,
+    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, INDEX_LOCK_FILE,
 };
 use crate::storage::{
-    FileLocker, GateRunNotFoundError, IssueNotFoundError, IssueStore, RecoveryDispatchReport,
-    RepoWriteGuard, RepoWriteLock, RepositoryFormatUnsupportedError, RepositoryMutationSession,
+    FileLocker, IssueNotFoundError, IssueStore, RecoveryDispatchReport, RepoWriteGuard,
+    RepoWriteLock, RepositoryFormatUnsupportedError, RepositoryMutationSession,
     RepositoryNotFoundError, RepositoryStateStore, RepositoryStateStoreError, WorktreePaths,
 };
 use anyhow::{anyhow, Context, Result};
@@ -575,6 +576,14 @@ impl JsonFileStorage {
         Ok(self.path_layout()?.resolve(path)?)
     }
 
+    /// The root `path` is relative to.
+    fn class_root(&self, path: &VirtualPath) -> Result<PathBuf> {
+        Ok(match path.root_class() {
+            RepositoryRootClass::Data => self.root.clone(),
+            RepositoryRootClass::Worktree => self.path_layout()?.worktree_root().to_path_buf(),
+        })
+    }
+
     fn primary_layout(&self) -> Result<Option<RepositoryLayout>> {
         let paths = self.configured_worktree_paths()?;
         let Some(worktree_root) = paths.primary_worktree_root()? else {
@@ -849,98 +858,64 @@ impl JsonFileStorage {
     }
 }
 
-impl JsonFileStorage {
-    /// Read every recorded gate run the predicate keeps.
-    ///
-    /// One enumeration of `gate-runs/` behind every whole-history question, so
-    /// a caller filtering by issue and one filtering by gate and digest walk
-    /// the directory the same way (`@/invariant/convention-convergence`).
-    fn read_gate_runs(
-        &self,
-        mut keep: impl FnMut(&crate::domain::GateRunResult) -> bool,
-    ) -> Result<Vec<crate::domain::GateRunResult>> {
-        let data = match super::repository_state_store::open_absolute_dir_nofollow(&self.root) {
-            Ok(data) => data,
-            Err(RepositoryStateStoreError::Io(error))
-                if error.kind() == std::io::ErrorKind::NotFound =>
-            {
-                return Ok(Vec::new())
-            }
-            Err(error) => return Err(error.into()),
-        };
-        let gate_runs = match data.symlink_metadata(VirtualPath::GATE_RUNS.relative().as_str()) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(error) => return Err(error.into()),
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-                anyhow::bail!(
-                    "Gate run root at {} must be an ordinary directory",
-                    self.resolve_virtual_path(&VirtualPath::GATE_RUNS)?
-                        .display()
-                )
-            }
-            Ok(_) => super::repository_state_store::open_child_dir_nofollow(
-                &data,
-                VirtualPath::GATE_RUNS.relative().as_str(),
-            )?,
-        };
-
-        let mut results = Vec::new();
-        for entry in gate_runs.entries()? {
-            let entry = entry?;
-            let Ok(run_id) = entry.file_name().into_string() else {
-                continue;
-            };
-            let Ok(id) = GateRunId::try_from(run_id.as_str()) else {
-                continue;
-            };
-            let metadata = gate_runs.symlink_metadata(&run_id)?;
-            if metadata.is_symlink() || !metadata.is_dir() {
-                continue;
-            }
-            let run_dir =
-                super::repository_state_store::open_child_dir_nofollow(&gate_runs, &run_id)?;
-            let result_path = self.resolve_virtual_path(&VirtualPath::gate_run_record(&id))?;
-            match run_dir.symlink_metadata(GATE_RUN_RECORD_FILE) {
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-                Err(error) => return Err(error.into()),
-                Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
-                    anyhow::bail!(
-                        "Gate run result at {} must be an ordinary file",
-                        result_path.display()
-                    )
+impl super::gate_run_reader::GateRunTree for JsonFileStorage {
+    fn list_directory(&self, directory: &VirtualPath) -> Result<TreeNode<Vec<String>>> {
+        let root = self.class_root(directory)?;
+        let relative = directory.relative().as_path();
+        let opened =
+            super::repository_state_store::open_absolute_dir_nofollow(&root).and_then(|root| {
+                match relative.as_os_str().is_empty() {
+                    true => Ok(Some(root)),
+                    false => {
+                        super::repository_state_store::open_capability_parent(&root, relative)?
+                            .map(|(parent, leaf)| {
+                                super::repository_state_store::open_child_dir_nofollow(
+                                    &parent, leaf,
+                                )
+                            })
+                            .transpose()
+                    }
                 }
-                Ok(_) => {}
-            }
-            let mut file = super::repository_state_store::open_regular_file_nofollow(
-                &run_dir,
-                GATE_RUN_RECORD_FILE,
-            )
-            .with_context(|| {
-                format!(
-                    "Failed to open gate run result at {}",
-                    result_path.display()
-                )
-            })?;
-            let mut contents = Vec::new();
-            file.read_to_end(&mut contents).with_context(|| {
-                format!(
-                    "Failed to read gate run result at {}",
-                    result_path.display()
-                )
-            })?;
-            let result: crate::domain::GateRunResult = serde_json::from_slice(&contents)
-                .with_context(|| {
-                    format!(
-                        "Failed to deserialize gate run result at {}",
-                        result_path.display()
-                    )
-                })?;
-            if keep(&result) {
-                results.push(result);
-            }
+            });
+        let names = |directory: cap_std::fs::Dir| -> Result<Vec<String>> {
+            directory
+                .entries()?
+                .filter_map(|entry| match entry {
+                    Ok(entry) => entry.file_name().into_string().ok().map(Ok),
+                    Err(error) => Some(Err(error.into())),
+                })
+                .collect()
+        };
+        match tree_node(opened)? {
+            TreeNode::Present(directory) => names(directory).map(TreeNode::Present),
+            TreeNode::Absent => Ok(TreeNode::Absent),
+            TreeNode::OtherKind => Ok(TreeNode::OtherKind),
         }
+    }
 
-        Ok(results)
+    fn read_regular_file(&self, file: &VirtualPath) -> Result<TreeNode<Vec<u8>>> {
+        tree_node(
+            super::repository_state_store::read_repository_file_nofollow(
+                &self.class_root(file)?,
+                file.relative(),
+            ),
+        )
+    }
+}
+
+/// Classify a no-follow read: a missing path or ancestor is absent, and a
+/// target refused as unsafe is an occupant of another kind.
+fn tree_node<T>(read: Result<Option<T>, RepositoryStateStoreError>) -> Result<TreeNode<T>> {
+    match read {
+        Ok(Some(found)) => Ok(TreeNode::Present(found)),
+        Ok(None) => Ok(TreeNode::Absent),
+        Err(RepositoryStateStoreError::Io(error))
+            if error.kind() == std::io::ErrorKind::NotFound =>
+        {
+            Ok(TreeNode::Absent)
+        }
+        Err(RepositoryStateStoreError::UnsafeTarget(_)) => Ok(TreeNode::OtherKind),
+        Err(error) => Err(error.into()),
     }
 }
 
@@ -1213,98 +1188,14 @@ impl IssueStore for JsonFileStorage {
         issue_id: &IssueId,
         run_id: &GateRunId,
     ) -> Result<crate::domain::GateRunResult> {
-        let result_path = self.resolve_virtual_path(&VirtualPath::gate_run_record(run_id))?;
-        let data = match super::repository_state_store::open_absolute_dir_nofollow(&self.root) {
-            Ok(data) => data,
-            Err(RepositoryStateStoreError::Io(error))
-                if error.kind() == std::io::ErrorKind::NotFound =>
-            {
-                return Err(GateRunNotFoundError::new(run_id.clone()).into())
-            }
-            Err(error) => return Err(error.into()),
-        };
-        let gate_runs = match data.symlink_metadata(VirtualPath::GATE_RUNS.relative().as_str()) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Err(GateRunNotFoundError::new(run_id.clone()).into())
-            }
-            Err(error) => return Err(error.into()),
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-                anyhow::bail!(
-                    "Gate run directory at {} must be an ordinary directory",
-                    self.resolve_virtual_path(&VirtualPath::GATE_RUNS)?
-                        .display()
-                )
-            }
-            Ok(_) => super::repository_state_store::open_child_dir_nofollow(
-                &data,
-                VirtualPath::GATE_RUNS.relative().as_str(),
-            )?,
-        };
-        let run_dir = match gate_runs.symlink_metadata(run_id.as_str()) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Err(GateRunNotFoundError::new(run_id.clone()).into())
-            }
-            Err(error) => return Err(error.into()),
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-                anyhow::bail!(
-                    "Gate run directory at {} must be an ordinary directory",
-                    self.resolve_virtual_path(&VirtualPath::gate_run_directory(run_id))?
-                        .display()
-                )
-            }
-            Ok(_) => {
-                super::repository_state_store::open_child_dir_nofollow(&gate_runs, run_id.as_str())?
-            }
-        };
-        match run_dir.symlink_metadata(GATE_RUN_RECORD_FILE) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Err(GateRunNotFoundError::new(run_id.clone()).into())
-            }
-            Err(error) => return Err(error.into()),
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
-                anyhow::bail!(
-                    "Gate run result at {} must be an ordinary file",
-                    result_path.display()
-                )
-            }
-            Ok(_) => {}
-        }
-        let mut file = super::repository_state_store::open_regular_file_nofollow(
-            &run_dir,
-            GATE_RUN_RECORD_FILE,
-        )
-        .with_context(|| {
-            format!(
-                "Failed to open gate run result at {}",
-                result_path.display()
-            )
-        })?;
-        let mut contents = Vec::new();
-        file.read_to_end(&mut contents).with_context(|| {
-            format!(
-                "Failed to read gate run result at {}",
-                result_path.display()
-            )
-        })?;
-        let result: crate::domain::GateRunResult =
-            serde_json::from_slice(&contents).with_context(|| {
-                format!(
-                    "Failed to deserialize gate run result at {}",
-                    result_path.display()
-                )
-            })?;
-
-        if &result.issue_id != issue_id {
-            return Err(GateRunNotFoundError::new(run_id.clone()).into());
-        }
-        Ok(result)
+        super::gate_run_reader::load_gate_run_result(self, issue_id, run_id)
     }
 
     fn list_gate_runs_for_issue(
         &self,
         issue_id: &IssueId,
     ) -> Result<Vec<crate::domain::GateRunResult>> {
-        self.read_gate_runs(|result| &result.issue_id == issue_id)
+        super::gate_run_reader::list_gate_runs_for_issue(self, issue_id)
     }
 
     fn root(&self) -> &Path {
@@ -1435,6 +1326,7 @@ fn map_confined_read_error(
 mod tests {
     use super::*;
     use crate::domain::identity::IssueIdPrefix;
+    use crate::repository_state::GATE_RUN_RECORD_FILE;
     use crate::repository_state::SUPPORTED_INDEX_SCHEMA_VERSION;
     use crate::storage::IssueStore;
     use tempfile::TempDir;
@@ -1688,87 +1580,6 @@ mod tests {
             b"worktree"
         );
         assert!(!external.path().join("docs/guide.md").exists());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_gate_run_readers_reject_symlinked_result_object() {
-        let (_temp, storage) = crate::test_utils::setup_test_repo().unwrap();
-        let run_id = crate::test_utils::gate_run_id(1);
-        let record = storage
-            .path_layout()
-            .unwrap()
-            .resolve(&VirtualPath::gate_run_record(&run_id))
-            .unwrap();
-        fs::create_dir_all(record.parent().unwrap()).unwrap();
-        let target = storage.root.join("target.json");
-        fs::write(&target, "{}").unwrap();
-        std::os::unix::fs::symlink(target, record).unwrap();
-
-        let error = storage
-            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
-            .unwrap_err();
-        assert!(format!("{error:#}").contains("ordinary file"));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_load_gate_run_rejects_symlinked_gate_runs_root() {
-        let temp = TempDir::new().unwrap();
-        let data = temp.path().join(".jit");
-        let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
-        let outside = TempDir::new().unwrap();
-        fs::create_dir(&data).unwrap();
-        let run_id = crate::test_utils::gate_run_id(1);
-        fs::create_dir_all(outside.path().join(run_id.as_str())).unwrap();
-        fs::write(
-            outside
-                .path()
-                .join(run_id.as_str())
-                .join(GATE_RUN_RECORD_FILE),
-            "{}",
-        )
-        .unwrap();
-        std::os::unix::fs::symlink(
-            outside.path(),
-            data_layout.resolve(&VirtualPath::GATE_RUNS).unwrap(),
-        )
-        .unwrap();
-        let storage = JsonFileStorage::new(data);
-
-        let error = storage
-            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
-            .unwrap_err();
-        assert!(format!("{error:#}").contains("ordinary directory"));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_gate_run_readers_reject_targeted_symlinked_run_directory_but_list_ignores_it() {
-        let temp = TempDir::new().unwrap();
-        let data = temp.path().join(".jit");
-        let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
-        let outside = TempDir::new().unwrap();
-        fs::create_dir_all(data_layout.resolve(&VirtualPath::GATE_RUNS).unwrap()).unwrap();
-        fs::write(outside.path().join(GATE_RUN_RECORD_FILE), "{}").unwrap();
-        let run_id = crate::test_utils::gate_run_id(1);
-        std::os::unix::fs::symlink(
-            outside.path(),
-            data_layout
-                .resolve(&VirtualPath::gate_run_directory(&run_id))
-                .unwrap(),
-        )
-        .unwrap();
-        let storage = JsonFileStorage::new(data);
-
-        let error = storage
-            .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
-            .unwrap_err();
-        assert!(format!("{error:#}").contains("ordinary directory"));
-        assert!(storage
-            .list_gate_runs_for_issue(&crate::test_utils::issue_id(1))
-            .unwrap()
-            .is_empty());
     }
 
     #[cfg(unix)]
