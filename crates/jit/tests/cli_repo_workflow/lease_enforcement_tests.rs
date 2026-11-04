@@ -11,6 +11,7 @@ use jit::storage::worktree_paths::WorktreePaths;
 use jit::storage::{PutFile, RedoRecord};
 use jit::test_cli::JitCli;
 use jit::test_lease_store::{history_path, lease_path, plant_lease};
+use jit::test_utils::copy_tree_exact;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::process::Output;
@@ -300,6 +301,21 @@ impl Repo {
         repo
     }
 
+    /// An independent copy of this repository as it stands, so a case that
+    /// mutates its repository starts from the seeded state without replaying
+    /// the setup commands.
+    fn duplicate(&self) -> Self {
+        let dir = tempfile::TempDir::new().unwrap();
+        copy_tree_exact(self.cli.root(), dir.path()).unwrap();
+        Self {
+            cli: JitCli::with_repository(dir),
+            x: self.x.clone(),
+            y: self.y.clone(),
+            z: self.z.clone(),
+            w: self.w.clone(),
+        }
+    }
+
     fn release_leases(&self) {
         self.owner(&["claim", "release", &self.x]);
         self.owner(&["claim", "release", &self.w]);
@@ -572,8 +588,9 @@ fn test_strict_lease_every_cli_leaf_is_classified_and_only_anothers_lease_refuse
         .collect::<BTreeSet<_>>();
     assert_eq!(classified, actual, "classify every CLI leaf");
 
+    let seeded = Repo::new();
     for (leaf, argv) in REFUSES {
-        let repo = Repo::new();
+        let repo = seeded.duplicate();
         let argv = repo.expand(argv);
         let argv = argv.iter().map(String::as_str).collect::<Vec<_>>();
         let before = repo.snapshot();
