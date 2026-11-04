@@ -444,8 +444,8 @@ its repairs complete). It signals findings by exiting non-zero:
 
 - **Declarative-rule errors** — whole-repo or per-issue.
 - **Repository-integrity failures** — a broken dependency, a DAG cycle, an
-  isolated issue, a redundant edge, an unknown gate reference, or a bad claims
-  index. A `--scope` error finding reports the same way.
+  isolated issue, a redundant edge, or an unknown gate reference. A `--scope`
+  error finding reports the same way.
 - **Check failures** under `--explain`, `--branch-drift`, or `--leases`.
 
 It fails as a usage error when `--dry-run` is given without `--fix`, and on the

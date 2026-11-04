@@ -26,7 +26,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Gate runs are addressed per issue, per gate and per inputs digest",
-  "updated_at": "2026-11-02T23:40:58.635324358Z"
+  "updated_at": "2026-11-04T08:42:45.512468882Z"
 }

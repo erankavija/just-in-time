@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T07:53:41.955003984Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -28,5 +28,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Scope validation selects from the report",
-  "updated_at": "2026-11-04T08:06:42.977525525Z"
+  "updated_at": "2026-11-04T08:35:04.544878409Z"
 }

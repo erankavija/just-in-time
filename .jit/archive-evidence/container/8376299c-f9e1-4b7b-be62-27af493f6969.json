@@ -1,0 +1,97 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/8376299c-audit-correctness",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 5415,
+            "sha256": "b952a7f6e778a1dae10e9ae6e3836e33011fb2b0484691c9c3001d6354f5f992"
+          },
+          "source": "dev/active/8376299c-audit-correctness/completion-report.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 12012,
+            "sha256": "067b70fe3cd45efda53c2347ce2a51ec47559c1b33aa21c5708be5a3955064c6"
+          },
+          "source": "dev/active/8376299c-audit-correctness/progress.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 10498,
+            "sha256": "a48e1324dc3d7e20353a530d9ef8f0ff080bc5971e6bfa9bb6b8e089a686c5f5"
+          },
+          "source": "dev/active/8376299c-audit-correctness/repro-verification.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 5415,
+            "sha256": "b952a7f6e778a1dae10e9ae6e3836e33011fb2b0484691c9c3001d6354f5f992"
+          },
+          "destination": "dev/archive/8376299c-audit-correctness/active/completion-report.md",
+          "source": "dev/active/8376299c-audit-correctness/completion-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 12012,
+            "sha256": "067b70fe3cd45efda53c2347ce2a51ec47559c1b33aa21c5708be5a3955064c6"
+          },
+          "destination": "dev/archive/8376299c-audit-correctness/active/progress.json",
+          "source": "dev/active/8376299c-audit-correctness/progress.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 10498,
+            "sha256": "a48e1324dc3d7e20353a530d9ef8f0ff080bc5971e6bfa9bb6b8e089a686c5f5"
+          },
+          "destination": "dev/archive/8376299c-audit-correctness/active/repro-verification.md",
+          "source": "dev/active/8376299c-audit-correctness/repro-verification.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "3996add9921e23a58bccd029b7268aed88e8f2279a8331ee8ed2922393e5c90c"
+          },
+          "destination": "dev/archive/8376299c-audit-correctness/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/8376299c-audit-correctness/repro-verification.md",
+          "issue": "8376299c-f9e1-4b7b-be62-27af493f6969",
+          "to_path": "dev/archive/8376299c-audit-correctness/active/repro-verification.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/8376299c-audit-correctness/completion-report.md",
+          "issue": "8376299c-f9e1-4b7b-be62-27af493f6969",
+          "to_path": "dev/archive/8376299c-audit-correctness/active/completion-report.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/8376299c-audit-correctness/progress.json",
+          "issue": "8376299c-f9e1-4b7b-be62-27af493f6969",
+          "to_path": "dev/archive/8376299c-audit-correctness/active/progress.json"
+        }
+      ],
+      "target": {
+        "id": "8376299c-f9e1-4b7b-be62-27af493f6969",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "8376299c-f9e1-4b7b-be62-27af493f6969",
+    "kind": "container"
+  }
+}
