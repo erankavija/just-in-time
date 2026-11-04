@@ -1077,12 +1077,13 @@
         "b23b1bf3": -53,
         "5687e281": -175,
         "da30b92a": -8,
-        "ae3f4f8b": -13
+        "ae3f4f8b": -13,
+        "0bc448fb": 31
       },
       "epic_net_running": 951,
-      "epic_net_latest": 263,
-      "merges_latest": 96,
-      "crate_main_latest": 73739,
+      "epic_net_latest": 294,
+      "merges_latest": 97,
+      "crate_main_latest": 73770,
       "file_latest": "ledger-2026-11-05.txt",
       "projected_end": "+70..+250 (ceiling +375)",
       "b697a3f7_merges": {
@@ -1485,7 +1486,7 @@
       "vendor": "Claude Opus"
     },
     "0bc448fb": {
-      "status": "dispatched",
+      "status": "done",
       "vendor": "Codex gpt-6.1-sol"
     },
     "6acd7a05": {
