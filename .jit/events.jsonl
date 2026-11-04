@@ -23687,3 +23687,4 @@
 {"id":"41200860-23e9-41ff-b19c-30030ca687e8","issue_id":"fb2dc5c3-1f32-418f-896b-41df16f57997","new_count":1,"old_count":2,"removed_deps":["8a14e8e9-689d-4d78-ac1e-d9b312966faa"],"timestamp":"2026-11-04T04:31:37.901375857Z","type":"dependency_reduced"}
 {"assignee":"agent:df129d9e-lead","id":"c0387ef5-4f32-45bd-bd07-2e82272b2b71","issue_id":"8a14e8e9-689d-4d78-ac1e-d9b312966faa","timestamp":"2026-11-04T04:32:29.795323146Z","type":"issue_claimed"}
 {"from":"ready","id":"e5198b02-846c-4033-b7f0-55ecdd61dea2","issue_id":"8a14e8e9-689d-4d78-ac1e-d9b312966faa","timestamp":"2026-11-04T04:32:29.889990758Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"b4b98374-abd1-4780-809c-21332fea794a","issue_id":"3acaa5a3-ff38-43f6-a252-5984b3cad2d9","timestamp":"2026-11-04T04:33:51.257442956Z","type":"gate_failed","updated_by":"auto:executor"}
