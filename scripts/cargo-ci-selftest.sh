@@ -956,12 +956,12 @@ readonly ENOSPC_FAIL_BLOCK='        FAIL [   0.200s] jit profile_cli_tests::test
 --- STDERR: jit profile_cli_tests::test_pack ---
 thread test_pack panicked at crates/jit/tests/pack.rs:12:5:
 create the bounded package asset directory: Os { code: 28, kind: StorageFull, message: "No space left on device" }
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace'
+note: run with RUST_BACKTRACE=1 environment variable to display a backtrace'
 readonly ENOSPC_ASSERT_BLOCK='        FAIL [   0.200s] jit profile_cli_tests::test_add
 --- STDERR: jit profile_cli_tests::test_add ---
 thread test_add panicked at crates/jit/tests/add.rs:30:5:
 command failed: Output { status: ExitStatus(1), stdout: "", stderr: "write: No space left on device (os error 28)" }
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace'
+note: run with RUST_BACKTRACE=1 environment variable to display a backtrace'
 readonly MIXED_BLOCK='        FAIL [   0.200s] jit gate_tests::test_digest
 --- STDOUT: jit gate_tests::test_digest ---
 log: write failed: No space left on device (os error 28)
@@ -970,7 +970,7 @@ thread test_digest panicked at crates/jit/tests/digest.rs:9:5:
 assertion `left == right` failed
   left: Stable
  right: InputsMoved
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+note: run with RUST_BACKTRACE=1 environment variable to display a backtrace
 log: later No space left on device'
 readonly DURATION_VIOLATION='  - test suite duration: observed 41000 ms, threshold 30000 ms (must be below threshold).'
 readonly FOOTPRINT_VIOLATION='  - integration-test targets: observed 99, limit 10.'
