@@ -1382,6 +1382,31 @@ pub struct StatusResponse {
     pub total: usize,
 }
 
+impl From<crate::commands::StatusSummary> for StatusResponse {
+    fn from(summary: crate::commands::StatusSummary) -> Self {
+        let crate::commands::StatusSummary {
+            backlog,
+            ready,
+            in_progress,
+            gated,
+            done,
+            rejected,
+            blocked,
+            total,
+        } = summary;
+        Self {
+            backlog,
+            ready,
+            in_progress,
+            gated,
+            done,
+            rejected,
+            blocked,
+            total,
+        }
+    }
+}
+
 impl HumanRender for StatusResponse {
     fn render_human(&self, _: OutputMode) -> String {
         format!(
