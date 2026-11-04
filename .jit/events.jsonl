@@ -24478,3 +24478,4 @@
 {"from":"backlog","id":"c5674705-bdf8-4630-b330-0bd4c4934116","issue_id":"578ed10d-29f9-4b25-87c0-b3c50a1e9d6e","timestamp":"2026-11-04T17:49:04.039167387Z","to":"ready","type":"issue_state_changed"}
 {"assignee":"agent:df129d9e-lead","id":"012b51c4-147f-4fd1-88f8-f562c3e4ca2b","issue_id":"578ed10d-29f9-4b25-87c0-b3c50a1e9d6e","timestamp":"2026-11-04T17:49:34.167679307Z","type":"issue_claimed"}
 {"from":"ready","id":"6b808858-923f-4cf2-a40b-98c8e3d5e53d","issue_id":"578ed10d-29f9-4b25-87c0-b3c50a1e9d6e","timestamp":"2026-11-04T17:49:34.268283741Z","to":"in_progress","type":"issue_state_changed"}
+{"fields":["description"],"id":"9f99e68e-7746-4a91-8a1f-31225282d18e","issue_id":"635f23c7-cff1-47bb-8302-4231c73ad276","timestamp":"2026-11-04T17:51:44.437866996Z","type":"issue_updated","updated_by":"issue-update"}
