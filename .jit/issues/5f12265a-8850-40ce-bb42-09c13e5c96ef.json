@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Worktree reclaim harvests only the build artifacts a new worktree can reuse, so the shared cache pool stops growing with every build generation and seeding stops copying stale state into each new worktree.\n\n## Background\n\n`.agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh` copies every top-level directory a reclaimed worktree's git ignores into the shared cache pool, newest file wins, and `dispatch-worker-worktree.sh` seeds each new worktree from that pool. Two kinds of content accumulate:\n\n- **Incremental-compilation state.** `target/*/incremental` is per-worktree and regenerable. On 2026-11-04 two done worktrees held 311 GB and 384 GB of it, and every worktree dispatched that day carried the same 231 incremental entries, seeded from the pool. Deleting it from 21 done worktrees before reclaim raised the free space on the worktree volume from 189 GB to 292 GB.\n- **Superseded hashed artifacts.** Cargo names test executables and libraries `<name>-<hash>`. The harvest keeps every hash ever built, and one worktree held 13 generations of each test executable.\n\nThe pool measured 42 GB after that cleanup.\n\n## Success Criteria\n\n- [hard] REQ-01: Reclaim copies no `incremental` directory under any build profile into the pool.\n- [hard] REQ-02: For each crate and target name, the pool keeps only the newest hashed artifact generation. Superseded generations are absent after a harvest, including generations the pool already held before it.\n- [hard] REQ-03: The worktree cache self-test seeds a worktree with incremental state and with two generations of one hashed artifact. It shows that after reclaim the pool holds no incremental state and only the newer generation.\n- [hard] REQ-04: Reclaiming a worktree built twice from the same sources leaves the pool no larger than after the first reclaim, measured by the self-test.\n- [hard] REQ-05: The script header and the worktree dispatch protocol reference state what the harvest keeps and what it excludes.\n",
   "documents": [],
+  "done_at": "2026-11-04T20:49:16.679236852Z",
   "first_ready_at": "2026-11-04T19:08:57.384545349Z",
   "gates_required": [
     "worktree-cache-test",
@@ -13,15 +14,15 @@
   ],
   "gates_status": {
     "code-review": {
-      "run_id": "89856a23-bd7f-4854-b73a-4b06e9d19d8b",
-      "status": "failed",
-      "updated_at": "2026-11-04T20:42:27.820712407Z",
+      "run_id": "fbc670e2-5a7b-4f54-9006-72667d3155d6",
+      "status": "passed",
+      "updated_at": "2026-11-04T20:48:47.399539196Z",
       "updated_by": "auto:executor"
     },
     "worktree-cache-test": {
-      "run_id": "02417e70-b842-4662-af2b-c2b644e1f172",
+      "run_id": "88de0dd1-586e-4be1-b7c5-e0b81ec0d40d",
       "status": "passed",
-      "updated_at": "2026-11-04T20:37:22.705532805Z",
+      "updated_at": "2026-11-04T20:46:08.712804816Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,7 +35,7 @@
     "type:task"
   ],
   "priority": "critical",
-  "state": "in_progress",
+  "state": "done",
   "title": "Worktree reclaim harvests only reusable, current build artifacts",
-  "updated_at": "2026-11-04T20:42:27.820712407Z"
+  "updated_at": "2026-11-04T20:49:16.679236852Z"
 }
