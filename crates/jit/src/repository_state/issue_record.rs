@@ -3,8 +3,9 @@
 use super::{CaptureError, VirtualPath};
 use crate::domain::identity::IssueId;
 use crate::domain::Issue;
+use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use thiserror::Error;
 
 /// A captured issue record that does not decode, including a non-canonical id
@@ -33,6 +34,10 @@ pub fn decode_issue_record(
 }
 
 /// Decode the record at `path` to its JSON value, and the issue from that value.
+///
+/// Record fidelity compares the value with the issue's serialization, so the
+/// value is the one decode. It rejects a repeated key as the typed decode
+/// does; a typed decode of the bytes runs only to locate a failed issue decode.
 fn decode_issue_value(
     path: &VirtualPath,
     bytes: &[u8],
@@ -41,9 +46,83 @@ fn decode_issue_value(
         path: path.relative().as_str().to_string(),
         source,
     };
-    let value: Value = serde_json::from_slice(bytes).map_err(malformed)?;
-    let issue = Issue::deserialize(&value).map_err(malformed)?;
+    let UniqueKeys(value) = serde_json::from_slice(bytes).map_err(malformed)?;
+    let issue = Issue::deserialize(&value).map_err(|error| {
+        malformed(
+            serde_json::from_slice::<Issue>(bytes)
+                .err()
+                .unwrap_or(error),
+        )
+    })?;
     Ok((issue, value))
+}
+
+/// A JSON value whose objects reject a repeated key at its position.
+struct UniqueKeys(Value);
+
+impl<'de> Deserialize<'de> for UniqueKeys {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer
+            .deserialize_any(UniqueKeysVisitor)
+            .map(UniqueKeys)
+    }
+}
+
+struct UniqueKeysVisitor;
+
+impl<'de> Visitor<'de> for UniqueKeysVisitor {
+    type Value = Value;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a JSON value")
+    }
+
+    fn visit_bool<E>(self, value: bool) -> Result<Value, E> {
+        Ok(value.into())
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Value, E> {
+        Ok(value.into())
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Value, E> {
+        Ok(value.into())
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Value, E> {
+        Ok(value.into())
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Value, E> {
+        Ok(value.into())
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Value, E> {
+        Ok(value.into())
+    }
+
+    fn visit_unit<E>(self) -> Result<Value, E> {
+        Ok(Value::Null)
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Value, A::Error> {
+        std::iter::from_fn(|| seq.next_element::<UniqueKeys>().transpose())
+            .map(|element| element.map(|UniqueKeys(value)| value))
+            .collect::<Result<_, _>>()
+            .map(Value::Array)
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Value, A::Error> {
+        let mut object = Map::new();
+        while let Some(key) = map.next_key::<String>()? {
+            if object.contains_key(&key) {
+                return Err(de::Error::custom(format_args!("duplicate key `{key}`")));
+            }
+            let UniqueKeys(value) = map.next_value()?;
+            object.insert(key, value);
+        }
+        Ok(Value::Object(object))
+    }
 }
 
 /// A listed issue record that could not be read or parsed.
@@ -159,6 +238,34 @@ mod tests {
             matches!(&error, IssueRecordsError::Malformed { id, .. } if *id == issue_id(1)),
             "{error}"
         );
+    }
+
+    #[test]
+    fn test_decode_issue_record_rejects_a_duplicated_key_at_its_position() {
+        let path = VirtualPath::issue_record(&issue_id(1));
+        let record = String::from_utf8(record_bytes(&issue_id(1))).unwrap();
+        let duplicated = record.replacen('{', "{\"title\":\"a\",\n\"title\":\"b\",", 1);
+
+        let error = decode_issue_record(&path, duplicated.as_bytes())
+            .unwrap_err()
+            .into_source();
+
+        assert!(error.to_string().contains("title"), "{error}");
+        assert_eq!((error.line(), error.column()), (2, 7), "{error}");
+    }
+
+    #[test]
+    fn test_decode_issue_record_locates_a_mistyped_field() {
+        let path = VirtualPath::issue_record(&issue_id(1));
+        let mut record =
+            serde_json::to_value(Issue::draft(issue_id(1), "t".into(), String::new())).unwrap();
+        record["title"] = serde_json::json!(7);
+
+        let error = decode_issue_record(&path, &serde_json::to_vec(&record).unwrap())
+            .unwrap_err()
+            .into_source();
+
+        assert!(error.line() > 0, "{error}");
     }
 
     #[test]
