@@ -704,7 +704,7 @@
           "short_id": "0eca332a",
           "title": "Retire error codes that nothing produces",
           "classification": "implementation",
-          "status": "ready"
+          "status": "in_progress"
         },
         {
           "key": "schema-registry-derivation",
@@ -720,7 +720,7 @@
           "short_id": "c06daf50",
           "title": "Library-side command dispatch for crates/jit",
           "classification": "story",
-          "status": "ready"
+          "status": "done"
         },
         {
           "key": "test-speed-ci-lock",
@@ -765,7 +765,15 @@
           "short_id": "f35c86de",
           "title": "Narrow executor surface and storage-free CLI entry",
           "classification": "story",
-          "status": "ready"
+          "status": "done"
+        },
+        {
+          "key": "issue-listing-renderer-regression",
+          "id": "ab168296-45d1-44cb-9ee1-6bdf53b9488c",
+          "short_id": "ab168296",
+          "title": "Issue listing renders directly through the shared output contract",
+          "classification": "implementation",
+          "status": "in_progress"
         }
       ]
     },
@@ -973,7 +981,9 @@
     "5f12265a": 1,
     "f35c86de": 1,
     "487f45a9": 3,
-    "0eca332a": 1
+    "0eca332a": 2,
+    "0546fc82": 2,
+    "ab168296": 0
   },
   "surfaced_pitfalls": [
     {
@@ -1616,7 +1626,7 @@
     },
     "0546fc82": {
       "status": "backlog",
-      "note": "Preparationonly exception approved;docs270d8c7d7 committed isolated;configured doc-review running;dependencyDone and mechanicalgates required"
+      "note": "Docs270d8c7d7 + wording70853144d; configured R2 doc-review PASS5a6df072, record454951f05; still backlog pending0ecaDone and mechanical gate"
     },
     "083c9a91": {
       "status": "done"
@@ -1666,17 +1676,22 @@
       "status": "backlog"
     },
     "487f45a9": {
-      "status": "in_progress",
-      "note": "ConfiguredR4PASS2bc81399 pinnedca17a1b8; afterexplicit stewardadditionalround; livebacklognames corrected4542cd08b; pendingdocsource/mainCargo",
+      "status": "done",
       "production_delta": -1,
       "review": {
-        "verdict": "PASS pending integration",
-        "gates": "cargo-ci passed5040+25; code-reviewR1F1 Git requirement prose omits hooks",
-        "prior_findings": "R1Gitpolicy,R2activemanifest,R3livebacklogdescriptions allclosed; exhaustivehidden/current-source sweep, historypreserved",
-        "criteria": "core criteria met; docs rework awaiting main landing+review",
-        "deferred_items": "no linked design docs",
-        "stale_narrative": "rework covers guarantees,profiles,manualAGENTS; historicalD4 preserved underD24",
-        "required_changes": "land documented rework and rerun authoritative gates"
+        "verdict": "PASS",
+        "gates": "final merged cargo-ci passed; configured R4 code-review passed with zero findings; actual records integrated",
+        "criteria": {
+          "REQ-01": "RequiresGitError / REQUIRES_GIT replace old names, no aliases",
+          "REQ-02": "claims retain exit10 and remediation",
+          "REQ-03": "hooks outside Git use same typed condition",
+          "REQ-04": "generated schema/references and all live issue/manifest requirements use current names",
+          "REQ-05": "human and JSON claim/hooks boundary tests pass"
+        },
+        "prior_findings": "R1 F1 canonical policy closed by D24 + b72bd9aaa; R2 F1 active manifest closed992f62fd3; R3 F1 three live issue descriptions closed4542cd08b; R4 pass2bc81399 under explicit additional-round authorization",
+        "stale_narrative": "exhaustive tracked-file scan including hidden .jit; remaining old tokens only immutable history, explicit cutover background and recorded rationale",
+        "deferred_items": "no linked documents or deferred implementation",
+        "holistic": "one canonical typed requirement; D4 historical text retained with D24 supersession"
       }
     },
     "5962427b": {
@@ -1953,7 +1968,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "c06done;487configuredreviewPASS awaitingdocslanding;0ecaF3repair;0546prepared+docreview;sourcehandoffGit7297",
+    "status": "Parallel holistic rework:0eca census/reachable declarations;0546 corrected search citation;ab168296 renderer regression; approved story plan reconciliation committed on0eca branch.",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -1967,7 +1982,7 @@
       "0eca332a implementation",
       "0546fc82 read-only documentation audit"
     ],
-    "parallelism": "User requested more parallelism: isolated workers for suite topology, result ownership, and requires-Git error. Output type declarations and error declarations are separate; land sequentially with integration validation. Retired-code task follows requires-Git.",
+    "parallelism": "Three isolated rework workers; no idle primary slot reservation. Root coordinates ready-only source merges; focused test/build operations share existing host locks.",
     "f35c86de_rework": "Attempt1 dispatch after fb38 main validation; existing commands operations and private storage accessor",
     "b22aabce": {
       "status": "done",
@@ -1978,7 +1993,7 @@
       "integration_targets": 3,
       "production_delta": 0
     },
-    "production_net": "Default-mode ledger: inherited+171,fb38+37,487\u22121,f35\u22123,build0 = current+204. Prepared0eca\u221241 yields+163; this session core net\u22128, plus8server lines removed.",
+    "production_net": "Default core ledger: inherited+171,fb38+37,487\u22121,f35\u22123,c06/build0=current+204. Prepared0eca\u221239 would yield+165; session core net\u22126, plus8server lines removed.",
     "prepared_branches": {
       "f35c86de": {
         "commit": "c5b146e02",
@@ -2014,6 +2029,22 @@
       "code_review_run": "6e864058-2a2f-4146-8444-11e0013294f0"
     },
     "parallel_reviews": "Steward authorized pinned-worktree configured reviews with local .jit realrecords and conflict-aware integration; no Cargo lock/primarydata redirect forreview. Final mergedCargo stillrequired.",
-    "487_extra_rework": "Steward authorized oneadditionalround beyondMAX2; R4PASS after exactname correction toallthree livebacklogdescriptions and active manifest. Earlier sweep incorrectly excludedlive.jitdescriptions ashistorical."
+    "487_extra_rework": "Steward authorized oneadditionalround beyondMAX2; R4PASS after exactname correction toallthree livebacklogdescriptions and active manifest. Earlier sweep incorrectly excludedlive.jitdescriptions ashistorical.",
+    "487f45a9": {
+      "merge": "05b00219f",
+      "status": "done",
+      "production_delta": -1,
+      "review_run": "2bc81399-c2e8-4f71-a467-7aeaefaaeccb"
+    },
+    "holistic_audit": {
+      "artifact": "/tmp/jit-df129d9e-session14/remaining-stories-audit.md",
+      "findings": {
+        "F1": "0eca rework2 pending: broad ErrorCode::ALL exposes unreachable status6; shared reachable declaration under review",
+        "F2": "ab168296 isolated repair in progress;46 depends on repair",
+        "F3": "0546 fixed32ab62d01; mechanical and affected review pending",
+        "F4": "active findings prose fixed6d61a3c78 with approved story contracts"
+      }
+    },
+    "scope_reconciliation_remaining": "Primary issue contracts ddca5488b; active plan/manifest6d61a3c78 on pending0eca branch. No gates weakened."
   }
 }
