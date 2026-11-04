@@ -17,6 +17,12 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "2a7869ac-d20d-48fc-a600-7f3f26d43079",
+      "status": "failed",
+      "updated_at": "2026-11-04T03:17:30.641229502Z",
+      "updated_by": "auto:executor"
+    },
     "doc-review": {
       "status": "pending",
       "updated_at": "2026-11-02T23:39:46.377198641Z",
@@ -48,5 +54,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Gate-run records live under their issue",
-  "updated_at": "2026-11-04T02:43:22.966121885Z"
+  "updated_at": "2026-11-04T03:17:30.641229502Z"
 }

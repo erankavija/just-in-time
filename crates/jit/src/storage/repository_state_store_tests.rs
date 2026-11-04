@@ -1476,8 +1476,8 @@ fn test_backends_publish_prebuilt_gate_run_and_event_bytes() {
     event_line.push(b'\n');
     let gate_bytes = serialize_gate_run(&result).unwrap();
     // Both backends must publish these prebuilt payloads unchanged.
-    let run_dir = VirtualPath::gate_run_directory(&run_id);
-    let run_file = VirtualPath::gate_run_record(&run_id);
+    let run_dir = VirtualPath::gate_run_issue_directory(&result.issue_id);
+    let run_file = VirtualPath::gate_run_record(&result.issue_id, &run_id);
     let events = VirtualPath::data("events.jsonl").unwrap();
     let build_delta = |layout: &RepositoryLayout| {
         RepositoryDelta::new(
@@ -1508,7 +1508,7 @@ fn test_backends_publish_prebuilt_gate_run_and_event_bytes() {
     let spec = || {
         CaptureSpec::new(
             [
-                VirtualPath::data("gate-runs").unwrap(),
+                VirtualPath::GATE_RUNS,
                 run_dir.clone(),
                 run_file.clone(),
                 events.clone(),
@@ -2956,6 +2956,10 @@ fn test_redo_record_for_finalized_gate_run_precedes_issue_naming_it() {
     let image = ImageBuilder::new()
         .file(issue_path.clone(), serialize_issue(&issue).unwrap())
         .entry(VirtualPath::GATE_RUNS, RepositoryEntry::Absent)
+        .entry(
+            VirtualPath::gate_run_issue_directory(&issue.id),
+            RepositoryEntry::Absent,
+        )
         .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
         .build();
     let key = "review".parse().unwrap();
@@ -2976,7 +2980,7 @@ fn test_redo_record_for_finalized_gate_run_precedes_issue_naming_it() {
             run_id: Some(run.run_id.clone()),
         },
     );
-    let run_path = VirtualPath::gate_run_record(&run.run_id);
+    let run_path = VirtualPath::gate_run_record(&run.issue_id, &run.run_id);
     let plan = finalize(
         &synthetic_layout(),
         &image,
