@@ -365,8 +365,8 @@ confirmation = "invoked"
 path = "gate status"
 argv = ["gate", "status", "00000000-0000-0000-0000-000000000000", "--all", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
-expected_failure = "GATE_CHECK_ERROR: Issue not found: 00000000-0000-0000-0000-000000000000"
-expected_code = "GATE_CHECK_ERROR"
+expected_failure = "Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
 
 [[arms]]

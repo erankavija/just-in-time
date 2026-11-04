@@ -567,26 +567,6 @@ impl CommandSchema {
             ),
 
             // Gate commands
-            "gate_status" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<GateRunSummary>(),
-                        schema_to_value::<GateRunHistoryResponse>(),
-                        schema_to_value::<GateFlatReportResponse>(),
-                        schema_to_value::<GateFindingsResponse>(),
-                        { "type": "null" },
-                    ],
-                    "description": "Default shape: the gate's latest run. With --all or \
-                        --limit: the count-wrapped run history. With --stdout, --stderr or \
-                        --tail: the stored report text. With --findings: the structured \
-                        findings and verdict. null when the selected gate has not run."
-                });
-                (Some(union), "GateRunSummary")
-            }
-            "gate_status-all" => (
-                Some(schema_to_value::<GateCheckAllResponse>()),
-                "GateCheckAllResponse",
-            ),
             "gate_evaluate-many" => (
                 Some(schema_to_value::<GateEvaluateManyResponse>()),
                 "GateEvaluateManyResponse",

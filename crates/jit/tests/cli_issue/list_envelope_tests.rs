@@ -327,6 +327,8 @@ fn test_list_envelope_count_equals_collection_length_for_every_list_emitting_com
                 String::from_utf8_lossy(&output.stderr)
             )
         });
+        // A findings outcome carries its list report in `error.details`.
+        let body = body["error"].get("details").cloned().unwrap_or(body);
         ensure_typed_list_schema(
             &invocation.command,
             &body,

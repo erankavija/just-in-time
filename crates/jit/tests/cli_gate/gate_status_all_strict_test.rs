@@ -28,7 +28,9 @@ fn test_status_all_pending_auto_gate_fails() {
         .get_output()
         .stdout
         .clone();
-    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let envelope: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(envelope["error"]["code"], "GATE_FAILED");
+    let json = &envelope["error"]["details"];
     assert_eq!(json["all_passed"], false);
     assert_eq!(json["total"].as_u64(), Some(1));
     assert_eq!(json["passed"].as_u64(), Some(0));
@@ -51,7 +53,9 @@ fn test_status_all_pending_manual_gate_fails() {
         .get_output()
         .stdout
         .clone();
-    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let envelope: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(envelope["error"]["code"], "GATE_FAILED");
+    let json = &envelope["error"]["details"];
     assert_eq!(json["all_passed"], false);
     assert_eq!(json["total"].as_u64(), Some(1));
     assert_eq!(json["passed"].as_u64(), Some(0));
@@ -83,7 +87,9 @@ fn test_status_all_failed_gate_fails() {
         .get_output()
         .stdout
         .clone();
-    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let envelope: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(envelope["error"]["code"], "GATE_FAILED");
+    let json = &envelope["error"]["details"];
     assert_eq!(json["all_passed"], false);
     assert_eq!(json["passed"].as_u64(), Some(0));
     let entry = &json["gates"][0];
