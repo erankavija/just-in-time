@@ -362,14 +362,8 @@ ensure_pinned_nextest() {
 
 ensure_pinned_nextest
 
-# Incremental compilation is left at the workspace manifest's
-# [profile.dev]/[profile.test] setting for every step below, the same as an
-# ordinary interactive build. A gate run repeated against a warm target
-# directory — which is every agent worktree run and every local re-check —
-# recompiles one edited crate rather than the workspace, measured here at
-# 54.1 s against 25.3 s over the clippy and suite-build steps, at no cost to a
-# cold run. The derivation is under "Provenance" in
-# dev/benchmarks/rust-build-budgets/README.md.
+# Cargo uses the workspace profile settings below: dev builds remain
+# incremental, while test builds disable incremental state in Cargo.toml.
 
 # This run's own scratch state (jit:0708d692): the Cargo artifact stream
 # describing what this run built, so the budget step judges what this run

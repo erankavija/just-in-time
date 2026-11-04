@@ -2,12 +2,9 @@
 //!
 //! REQ-01/02: the workspace manifest bounds `[profile.dev]`/`[profile.test]`
 //! debug info to `line-tables-only` and states the incremental-compilation
-//! intent explicitly, rather than relying on Cargo's undocumented default, so
-//! builds keep line-number backtraces without embedding a full debugger payload
-//! in every test executable. That manifest setting governs gate runs too: the
-//! gate's separate ban on incremental compilation is retired, because a gate
-//! run against a warm target directory does have a later rebuild to amortize
-//! against — every agent worktree run and every local re-check is one.
+//! intent explicitly: development builds remain incremental, while test builds
+//! avoid accumulating disk-heavy state. The manifest policy applies to gate and
+//! local test runs without an environment override.
 //!
 //! jit:6d10e5d4 added the
 //! dependency-package override `[profile.dev.package."*"].opt-level = 1`:
@@ -67,17 +64,27 @@ fn test_dev_and_test_profiles_bound_debug_info_to_line_tables_only() {
 }
 
 #[test]
-fn test_dev_and_test_profiles_state_incremental_intent_explicitly() {
+fn test_dev_profile_enables_incremental_but_test_profile_disables_it() {
     let manifest = workspace_manifest();
 
-    for profile in ["dev", "test"] {
-        let table = profile_table(&manifest, profile);
+    for (profile, incremental, reason) in [
+        (
+            "dev",
+            true,
+            "interactive development builds remain incremental",
+        ),
+        (
+            "test",
+            false,
+            "test builds must not accumulate disk-heavy state",
+        ),
+    ] {
         assert_eq!(
-            table.get("incremental").and_then(|v| v.as_bool()),
-            Some(true),
-            "[profile.{profile}].incremental must explicitly state the \
-             interactive default (true) rather than leaving Cargo's default \
-             undocumented"
+            profile_table(&manifest, profile)
+                .get("incremental")
+                .and_then(toml::Value::as_bool),
+            Some(incremental),
+            "[profile.{profile}].incremental must match policy: {reason}"
         );
     }
 }

@@ -33,9 +33,8 @@ reconstruction of it. One `./scripts/cargo-ci.sh` run reports all three on its
 | active test-executable bytes | `cargo test --workspace --no-run --message-format=json \| jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and .executable != null) \| .executable' \| sort -u \| xargs stat -c %s \| awk '{s+=$1} END {print s}'` |
 | suite clock | `./scripts/cargo-ci.sh`, `suite-clock` line |
 
-The second command inherits the workspace manifest's incremental setting, as
-every gate step now does: measure this budget the way the gate does or the
-number is not the enforced one.
+The second command inherits the workspace test-profile policy, as every gate
+step does; see "Test-profile incremental state" below.
 
 ## What the tree measures
 
@@ -112,21 +111,17 @@ work. The post-cutover fixture-cache margin of 274 ms was accepted by the owner 
 The archived `73482aa1` study holds the pre-optimization baseline, the original
 derivation of these budgets — including the 12-target figure, chosen there as a
 design ceiling for the consolidation it proposed rather than measured from a
-consolidated tree — and the measurements behind two policies. One this document
-does not re-derive and does not change: the `debug = "line-tables-only"` setting
-on `[profile.dev]`/`[profile.test]`. The other, the gate's `CARGO_INCREMENTAL=0`
-export, is **retired**, and the paragraph below records why. The study's
+consolidated tree — and historical build-profile measurements. The study's
 measurements stay valid as the record of what was observed then; its topology
 tables describe the tree before that consolidation landed and are history.
 
-### The gate's incremental ban, retired 2026-09-21
+### Historical measurement of the gate's incremental ban (retired 2026-09-21)
 
 The ban rested on that study's measurement of 19 GiB of incremental state on a
-tree of 140 integration targets and 712 test executables, and on the premise
-that a gate run compiles once and exits with no later rebuild to amortize
-against. Both have lapsed. Today's tree reports 10 targets and 14 executables,
-and the runs that dominate the repository's build cost are repeat runs against a
-warm target directory: every agent worktree run and every local re-check.
+tree of 140 integration targets and 712 test executables, and on the then-current
+premise that a gate run compiles once and exits with no later rebuild to amortize
+against. That premise was later replaced by warm-target measurements on the
+smaller tree; this comparison records the historical basis for the policy change.
 
 Measured on this tree at commit `498bd2449`, 24 cores, isolated target
 directories on NVMe, the gate's two compile steps after touching one file under
@@ -142,8 +137,29 @@ A cold run pays nothing for it (`clippy` 43,731 ms against 44,159 ms;
 `suite-build` 55,783 ms against 54,959 ms). What it costs is disk: the target
 directory measures 3.3 GB without incremental state and 7.1 GB with it.
 
-The workspace manifest's `[profile.dev]`/`[profile.test]` `incremental = true` is
-the one declaration of the policy, and `build_profile_policy_tests.rs` asserts it.
+At the time of this historical comparison, both workspace profiles enabled incremental
+compilation.
 The matched-methodology comparison produced by the same protocol,
 including its fresh-target acceptance thresholds, is
 [../rust-build-efficiency/report.md](../rust-build-efficiency/report.md).
+
+## Test-profile incremental state
+
+The workspace `[profile.test]` sets `incremental = false`. Workspace test builds therefore
+do not accumulate `target/*/incremental` state even when invoked without a
+`CARGO_INCREMENTAL` override. `[profile.dev]` remains incremental for interactive
+development builds. The policy test is `test_dev_profile_enables_incremental_but_test_profile_disables_it`
+in `crates/jit/tests/scratch_build/build_profile_policy_tests.rs`.
+
+REQ-02 was measured on 2026-11-04 from a clean `target` directory. With
+`CARGO_CI_NO_SCCACHE=1`, a disk-backed `TMPDIR`, and the shared exclusive Cargo
+locks, both commands ran with `CARGO_INCREMENTAL` unset:
+
+```sh
+env -u CARGO_INCREMENTAL ./scripts/cargo-ci.sh --cargo test --workspace --no-run
+env -u CARGO_INCREMENTAL ./scripts/cargo-ci.sh --cargo test -p jit --test scratch_build test_dev_profile_enables_incremental_but_test_profile_disables_it
+python3 -c 'from pathlib import Path; print(sum(p.stat().st_size for p in Path("target").rglob("*") if p.is_file() and "incremental" in p.relative_to("target").parts))'
+```
+
+The targeted test passed (1 test), and the measurement printed `0` bytes after
+both runs. The target directory did not exist before the workspace no-run build.
