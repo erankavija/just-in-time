@@ -24590,3 +24590,4 @@
 {"gate_key":"mcp-ci","id":"efd21ddf-bacb-4f29-8818-20a9174b3e27","issue_id":"46fe7593-a860-4767-8a6e-fc631ca1fd81","timestamp":"2026-11-04T22:02:09.489420047Z","type":"gate_removed"}
 {"gate_key":"mcp-ci","id":"11b95c75-0ff9-4f4c-88a6-28e9f175c3d4","issue_id":"9623fe6a-d9f9-4a28-80e2-cc490553b7f9","timestamp":"2026-11-04T22:02:09.595020384Z","type":"gate_removed"}
 {"gate_key":"mcp-ci","id":"e3666361-a0e5-4dd0-aba5-9a18c1b0e4f3","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-11-04T22:02:09.703654868Z","type":"gate_removed"}
+{"fields":["documents"],"id":"0dd947f1-a298-4952-8f14-58715ee4919a","issue_id":"110a4a2f-54fa-4f1a-b055-174b95276675","timestamp":"2026-11-04T22:02:35.505560290Z","type":"issue_updated","updated_by":"doc-add"}
