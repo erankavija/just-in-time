@@ -1454,6 +1454,6 @@
   "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)",
   "notes_for_tasks": {
     "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)",
-    "fb38bf1f": "pre-existing commands->output imports (query, graph, validate, issue, document, worktree); proposed scope amendment sent to 6a"
+    "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)"
   }
 }
