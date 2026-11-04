@@ -1160,9 +1160,8 @@ fn test_claim_acquire_outside_git_repo_emits_git_requirement_error() {
         "agent:test-1",
     ])
     .assert()
-    .failure()
+    .code(10)
     .stderr(predicate::str::contains("git repository"))
-    .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")))
     // REQ-04 (jit:30a3b5c1): no git repository at all hints `git init`.
     .stderr(predicate::str::contains("git init"));
 }
@@ -1174,8 +1173,7 @@ fn test_claim_list_outside_git_repo_emits_git_requirement_error() {
     cli.command(["claim", "list"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("git repository"))
-        .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")));
+        .stderr(predicate::str::contains("git repository"));
 }
 
 /// Running `claim acquire --json` outside a git repository emits a JSON error
@@ -1201,11 +1199,29 @@ fn test_claim_acquire_json_outside_git_repo_reports_git_requirement() {
         .output()
         .unwrap();
 
-    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(10));
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
+    assert_eq!(json["error"]["code"], "REQUIRES_GIT");
     let message = json["error"]["message"].as_str().unwrap();
+    assert!(message.contains("git init"));
+    let human = cli
+        .command([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:test-1",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(human.status.code(), output.status.code());
+    assert_eq!(
+        String::from_utf8(human.stderr).unwrap(),
+        format!("Error: {message}\n")
+    );
     assert!(
         message.contains("git repository"),
         "message must name the git requirement, got: {message}"
@@ -1223,7 +1239,7 @@ fn test_claim_list_json_outside_git_repo_reports_git_requirement() {
     assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
+    assert_eq!(json["error"]["code"], "REQUIRES_GIT");
     let message = json["error"]["message"].as_str().unwrap();
     assert!(
         message.contains("git repository"),
@@ -1332,7 +1348,7 @@ fn test_claim_acquire_json_in_git_repo_without_commits_hints_commit_not_git_init
     assert!(!output.status.success());
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
+    assert_eq!(json["error"]["code"], "REQUIRES_GIT");
     let message = json["error"]["message"].as_str().unwrap();
     assert!(
         message.contains("commit"),

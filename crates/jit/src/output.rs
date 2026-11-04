@@ -949,8 +949,8 @@ wire_vocabulary! {
         PermissionDenied = "PERMISSION_DENIED",
         /// Input data could not be parsed.
         ParseError = "PARSE_ERROR",
-        /// A claim or lease command requires a Git repository.
-        ClaimRequiresGit = "CLAIM_REQUIRES_GIT",
+        /// The command requires a Git repository.
+        RequiresGit = "REQUIRES_GIT",
         /// An ID prefix matched more than one candidate.
         AmbiguousId = "AMBIGUOUS_ID",
         /// An ID prefix was shorter than the accepted minimum.
@@ -1035,7 +1035,7 @@ impl ErrorCode {
             | ErrorCode::LinkedCheckoutWriteRefused => ExitCode::InvalidArgument,
             ErrorCode::AlreadyExists | ErrorCode::GateError => ExitCode::AlreadyExists,
             ErrorCode::IoError
-            | ErrorCode::ClaimRequiresGit
+            | ErrorCode::RequiresGit
             | ErrorCode::RepositoryFormatUnsupported => ExitCode::ExternalError,
             ErrorCode::PermissionDenied => ExitCode::PermissionDenied,
             ErrorCode::LockTimeout => ExitCode::LockTimeout,
@@ -1076,7 +1076,7 @@ impl ErrorCode {
                 "The operation was denied by filesystem or operating-system permissions."
             }
             ErrorCode::ParseError => "Input data could not be parsed.",
-            ErrorCode::ClaimRequiresGit => "The claim or lease operation requires Git.",
+            ErrorCode::RequiresGit => "The command requires Git.",
             ErrorCode::AmbiguousId => "The ID prefix matches more than one candidate.",
             ErrorCode::InvalidIdPrefix => "The ID prefix is shorter than the accepted minimum.",
             ErrorCode::RepositoryNotFound => "No JIT repository exists at the resolved path.",
@@ -3828,7 +3828,7 @@ mod tests {
             (ErrorCode::IoError, ExitCode::ExternalError),
             (ErrorCode::PermissionDenied, ExitCode::PermissionDenied),
             (ErrorCode::ParseError, ExitCode::GenericError),
-            (ErrorCode::ClaimRequiresGit, ExitCode::ExternalError),
+            (ErrorCode::RequiresGit, ExitCode::ExternalError),
             (ErrorCode::AmbiguousId, ExitCode::InvalidArgument),
             (ErrorCode::InvalidIdPrefix, ExitCode::InvalidArgument),
             (ErrorCode::RepositoryNotFound, ExitCode::NotFound),

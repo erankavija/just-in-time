@@ -478,7 +478,7 @@ A tenth enum variant would not appear there and nothing would fail.
   `const &'static str` items** at `output.rs:644-676`: `ISSUE_NOT_FOUND`,
   `GATE_NOT_FOUND`, `CYCLE_DETECTED`, `INVALID_ARGUMENT`, `VALIDATION_FAILED`,
   `ALREADY_EXISTS`, `INVALID_STATE`, `BLOCKED`, `GATE_FAILED`, `IO_ERROR`,
-  `PARSE_ERROR`, `CLAIM_REQUIRES_GIT`, `AMBIGUOUS_ID`, `INVALID_ID_PREFIX`,
+  `PARSE_ERROR`, the then claim-specific Git requirement code, `AMBIGUOUS_ID`, `INVALID_ID_PREFIX`,
   `REPOSITORY_NOT_FOUND`, `REPOSITORY_FORMAT_TOO_NEW`, `STALE_BINARY`,
   `DELETION_NOT_CONFIRMED`, `PROFILE_NOT_FOUND`, `PROFILE_CONFLICT`.
 - **Not exhaustively enumerable at compile time.** No derive, no `strum`, no
