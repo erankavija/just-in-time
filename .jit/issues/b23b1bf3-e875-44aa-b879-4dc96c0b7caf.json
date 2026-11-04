@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
   "claimed_at": "2026-11-04T15:21:25.772608304Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
@@ -8,6 +8,7 @@
   ],
   "description": "The gate evaluation arms build bodies inline and render pass failures through their own error helpers. This moves them to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `GateCommands::{Evaluate, EvaluateAll, Fail}` build success bodies with `json!`, and `GateCommands::EvaluateMany` builds `GateEvaluateManyResponse` inline. Pass failures render through `render_gate_pass_error` and `gate_pass_json_error`, which run their own downcast cascade for `GatePassFailed`, `GateNotRequiredError` and `ManualGateAttestationRequiredError`, attach details and suggestions, and fall back to `GATE_ERROR`; `fail` also substitutes `GATE_ERROR`. `evaluate-many` prints a success envelope and then exits with the first failing entry's code, so its exit matches no envelope code. `evaluate`, `evaluate-all` and `fail` fall back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `gate evaluate|evaluate-all|evaluate-many|fail` to handlers in `crates/jit/src/dispatch/gate.rs`, and `main.rs` keeps no arm body, `render_gate_pass_error` or `gate_pass_json_error`.\n- [hard] REQ-02: Each leaf returns its registered response type, `evaluate-many`'s results are a `ListEnvelope`, human pass lines go through the shared gate-run-status renderer, and the schema names a typed response for every one of them.\n- [hard] REQ-03: Pass failures are returned as errors whose code, details and suggestions come from the classifier; a test asserts one `GATE_ERROR` fallback case now reporting its classified code on both paths.\n- [hard] REQ-04: `gate evaluate-many` with a failing entry returns a findings outcome, and a test asserts the failure envelope carrying the first failing entry's code as the exit status and the per-gate results in `error.details`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged except as the epic's uniform findings-stderr and warnings rules require (epic df129d9e D-03, D-04), and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "first_ready_at": "2026-11-04T15:38:26.464248015Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -29,7 +30,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Gate evaluation commands move to library handlers",
-  "updated_at": "2026-11-04T15:21:37.777813728Z"
+  "updated_at": "2026-11-04T15:38:47.785904826Z"
 }
