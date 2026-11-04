@@ -57,7 +57,6 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::GateError
         | ErrorCode::GateCheckError
         | ErrorCode::PresetError
-        | ErrorCode::ItemCommandFailed
         | ErrorCode::InvariantCommandFailed
         | ErrorCode::ProfileError
         | ErrorCode::SearchFailed

@@ -1046,8 +1046,6 @@ wire_vocabulary! {
         PresetError = "PRESET_ERROR",
         /// An issue item-address lookup failed before resolving an item.
         ItemNotFound = "ITEM_NOT_FOUND",
-        /// An item command failed without a more specific public classification.
-        ItemCommandFailed = "ITEM_COMMAND_FAILED",
         /// An invariant command failed without a more specific public classification.
         InvariantCommandFailed = "INVARIANT_COMMAND_FAILED",
         /// A profile command failed without a more specific public classification.
@@ -1107,7 +1105,6 @@ impl ErrorCode {
             ErrorCode::LockTimeout => ExitCode::LockTimeout,
             ErrorCode::ParseError
             | ErrorCode::ItemNotFound
-            | ErrorCode::ItemCommandFailed
             | ErrorCode::InvariantCommandFailed
             | ErrorCode::ProfileError
             | ErrorCode::SearchFailed
@@ -1170,9 +1167,6 @@ impl ErrorCode {
             ErrorCode::GateCheckError => "A gate-status check failed.",
             ErrorCode::PresetError => "A gate-preset command failed.",
             ErrorCode::ItemNotFound => "An issue item-address lookup did not resolve an item.",
-            ErrorCode::ItemCommandFailed => {
-                "An item command failed without a more specific classification."
-            }
             ErrorCode::InvariantCommandFailed => {
                 "An invariant command failed without a more specific classification."
             }
@@ -3728,7 +3722,6 @@ mod tests {
             (ErrorCode::GateCheckError, ExitCode::NotFound),
             (ErrorCode::PresetError, ExitCode::NotFound),
             (ErrorCode::ItemNotFound, ExitCode::GenericError),
-            (ErrorCode::ItemCommandFailed, ExitCode::GenericError),
             (ErrorCode::InvariantCommandFailed, ExitCode::GenericError),
             (ErrorCode::ProfileError, ExitCode::GenericError),
             (ErrorCode::SearchFailed, ExitCode::GenericError),
@@ -3885,7 +3878,6 @@ mod tests {
 
         for code in [
             ErrorCode::ItemNotFound,
-            ErrorCode::ItemCommandFailed,
             ErrorCode::InvariantCommandFailed,
             ErrorCode::ProfileError,
             ErrorCode::SearchFailed,
