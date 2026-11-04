@@ -341,7 +341,7 @@ EOF
   check "selected sccache fails compiles: the gate exits with the infrastructure status" \
     test "$rc" -eq 75
   check "selected sccache fails compiles: the diagnosis names the wrapper" \
-    grep -qF "compiler wrapper 'sccache'" "$out"
+    grep -qE "compiler wrapper '[^']*sccache-caller-tmpdir.sh'" "$out"
   check "selected sccache fails compiles: the diagnosis carries the wrapper's error" \
     grep -qF "Failed to create temp dir" "$out"
   check "selected sccache fails compiles: no verdict on repository content" \
@@ -553,13 +553,15 @@ case "$*" in
   "nextest run --workspace")
     echo "$TMPDIR" >"$SELFTEST_SEEN"
     : >"$TMPDIR/left-by-a-test"
+    "$RUSTC_WRAPPER" rustc
     echo "Summary [1s] 1 tests run: 1 passed, 0 skipped"
     exit "$SELFTEST_SUITE_STATUS"
     ;;
   *) echo "test result: ok. 1 passed; 0 failed; 0 ignored" ;;
 esac
 EOF
-  chmod +x "$fixture/bin/cargo"
+  printf '#!/usr/bin/env bash\necho "$TMPDIR" >"$SELFTEST_SERVER_TMPDIR"\n' >"$fixture/bin/sccache"
+  chmod +x "$fixture/bin/cargo" "$fixture/bin/sccache"
   for status in 0 1; do
     local caller="$fixture/caller-$status"
     mkdir -p "$caller"
@@ -569,9 +571,12 @@ EOF
         SELFTEST_CARGO_VERSION="$real_cargo_version" \
         SELFTEST_SEEN="$fixture/seen-$status" \
         SELFTEST_SUITE_STATUS="$status" \
-        CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 \
+        SELFTEST_SERVER_TMPDIR="$fixture/server-$status" \
+        CARGO_CI_NO_LOCK=1 \
         "$gate" --suite
     ) >"$fixture/out-$status" 2>&1
+    check "run owning its TMPDIR (suite status $status): a compiler-cache server started by a step keeps the caller's" \
+      test "$(cat "$fixture/server-$status")" = "$caller"
     check "run owning its TMPDIR (suite status $status): the tests see a directory inside the caller's" \
       grep -qF "$caller/" "$fixture/seen-$status"
     check "run owning its TMPDIR (suite status $status): a file a test left is gone and nothing else remains" \
