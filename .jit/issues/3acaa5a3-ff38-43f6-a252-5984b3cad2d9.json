@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "d69c22d9-4f72-46ec-bf78-c733e5f7dac6",
+      "run_id": "4a1a138f-1ab7-428e-8dff-cf158b3889b3",
       "status": "passed",
-      "updated_at": "2026-11-04T02:39:07.395499763Z",
+      "updated_at": "2026-11-04T02:50:43.602301763Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "740adcf7-507d-46e1-be6c-e03179d10957",
+      "run_id": "8ef91c3c-f05c-44bd-be66-892ba905e169",
       "status": "failed",
-      "updated_at": "2026-11-04T02:42:46.880721721Z",
+      "updated_at": "2026-11-04T02:56:00.427083062Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Invariant check computes drift from captured declarations",
-  "updated_at": "2026-11-04T02:45:10.258737450Z"
+  "updated_at": "2026-11-04T02:56:00.427083062Z"
 }
