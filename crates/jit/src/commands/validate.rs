@@ -551,8 +551,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             // (its projection, item-kind, issue, and schema entries drop out),
             // and the subsequent validation report surfaces the parse
             // error as a finding.
-            let config = effective_config(image, &effective_virtual_path)
-                .unwrap_or_else(|_| empty_materialization_config());
+            let config = effective_config(image, &effective_virtual_path).unwrap_or_default();
             let issue_ids =
                 crate::repository_state::overlaid_issue_ids(image, overrides).unwrap_or_default();
             let rules_text = effective_virtual_path(image, &VirtualPath::RULES)?
@@ -892,59 +891,20 @@ type EffectiveVirtualPath<'a> = dyn Fn(
     ) -> Result<Option<Vec<u8>>>
     + 'a;
 
-/// Parse the (possibly overlaid) configuration and invariant registry.
+/// Assemble the (possibly overlaid) configuration.
 fn effective_config(
     image: &crate::repository_state::RepositoryImage,
     effective: &EffectiveVirtualPath<'_>,
 ) -> Result<JitConfig> {
-    let config_bytes = effective(image, &crate::repository_state::VirtualPath::CONFIG)?
-        .ok_or_else(|| anyhow!("captured image has no .jit/config.toml"))?;
-    let declarations = crate::declarations::parse_configuration(&config_bytes)
-        .context("invalid .jit/config.toml")?;
-    let invariants = match effective(image, &crate::repository_state::VirtualPath::INVARIANTS)? {
-        Some(bytes) => crate::declarations::invariants::InvariantRegistry::from_toml_str(
-            &String::from_utf8(bytes)?,
-        )?,
-        None => crate::declarations::invariants::InvariantRegistry::empty(),
-    };
-    Ok(declarations.materialization_config(invariants))
-}
-
-/// Canonical empty declaration view for best-effort closure planning after a
-/// malformed config; the validation pass remains responsible for the finding.
-fn empty_materialization_config() -> JitConfig {
-    crate::declarations::parse_configuration(b"")
-        .expect("empty configuration parses")
-        .materialization_config(crate::declarations::invariants::InvariantRegistry::empty())
-}
-
-/// Parse the (possibly overlaid) template registry, needed to derive plan-document
-/// paths.
-///
-/// Best-effort like the rest of closure planning: a malformed `templates.toml`
-/// yields an empty registry (no plan-document paths), and the subsequent
-/// validation report surfaces the parse error as a validation failure.
-fn effective_templates(
-    image: &crate::repository_state::RepositoryImage,
-    config: &JitConfig,
-    effective: &EffectiveVirtualPath<'_>,
-) -> Result<crate::templates::TemplateRegistry> {
-    let hierarchy_types: Vec<&str> = config
-        .type_hierarchy
-        .as_ref()
-        .map(|hierarchy| hierarchy.types.keys().map(String::as_str).collect())
-        .unwrap_or_default();
-    Ok(
-        match effective(image, &crate::repository_state::VirtualPath::TEMPLATES)? {
-            Some(bytes) => String::from_utf8(bytes)
-                .ok()
-                .and_then(|text| {
-                    crate::templates::TemplateRegistry::from_toml_str(&text, &hierarchy_types).ok()
-                })
-                .unwrap_or_else(crate::templates::TemplateRegistry::empty),
-            None => crate::templates::TemplateRegistry::empty(),
-        },
-    )
+    use crate::repository_state::VirtualPath;
+    let config = effective(image, &VirtualPath::CONFIG)?;
+    let templates = effective(image, &VirtualPath::TEMPLATES)?;
+    let invariants = effective(image, &VirtualPath::INVARIANTS)?;
+    Ok(crate::declarations::assemble_configuration(
+        config.as_deref(),
+        templates.as_deref(),
+        invariants.as_deref(),
+    )?)
 }
 
 /// Add what the captured `issues` name to `spec`: the plan documents, and a
@@ -960,8 +920,6 @@ fn discover_issue_closure(
 ) -> Result<()> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
-    let mut full_config = config.clone();
-    full_config.templates = effective_templates(image, config, effective)?;
     let (issue, precheck) = match precheck_target {
         Some(raw_target) => {
             let target = super::require_issue_in_capture(issues, raw_target)?;
@@ -984,7 +942,7 @@ fn discover_issue_closure(
         }
         None => (None, Vec::new()),
     };
-    spec.discover_paths(plan_document_paths(issues, &full_config)?)?;
+    spec.discover_paths(plan_document_paths(issues, config)?)?;
     let automated = || {
         precheck
             .iter()
@@ -1176,24 +1134,17 @@ pub(crate) fn plan_content_with_issues(
     image: &crate::repository_state::RepositoryImage,
     issues: &[Issue],
 ) -> Result<std::collections::HashMap<IssueId, String>> {
-    let effective_virtual_path =
-        |img: &crate::repository_state::RepositoryImage,
-         path: &crate::repository_state::VirtualPath|
-         -> Result<Option<Vec<u8>>> { super::image_virtual_bytes(img, path) };
-    let effective_virtual_path: &EffectiveVirtualPath<'_> = &effective_virtual_path;
-    let config = effective_config(image, effective_virtual_path)
-        .unwrap_or_else(|_| empty_materialization_config());
-    let templates = effective_templates(image, &config, effective_virtual_path)?;
+    let config = crate::repository_state::assemble_config(image).unwrap_or_default();
     crate::validation::repository::plan_content(
         &|path| super::image_repo_bytes(image, path),
         issues,
         issues,
-        &templates,
+        &config.templates,
     )
 }
 
 impl<S: IssueStore> ValidationOps<'_, S> {
-    pub fn get_status(&self) -> Result<StatusSummary> {
+    pub fn get_status(&self) -> Result<crate::output::StatusResponse> {
         let issues = self.exec.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
 
@@ -1208,7 +1159,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         let rejected = issues.iter().filter(|i| i.state == State::Rejected).count();
         let blocked = issues.iter().filter(|i| i.is_blocked(&resolved)).count();
 
-        Ok(StatusSummary {
+        Ok(crate::output::StatusResponse {
             backlog,
             ready,
             in_progress,

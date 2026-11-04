@@ -178,7 +178,7 @@ pub use rules_document::{parse_rule_identities, splice_default_membership, Rules
 pub use rules_gates_projection::render_rules_and_gates_markdown;
 
 use crate::declarations::rules::RuleSet;
-use crate::declarations::{ConfigurationDeclarationError, ConfigurationDeclarations, GateRegistry};
+use crate::declarations::{ConfigurationAssemblyError, GateRegistry};
 
 /// A typed failure raised while deriving materialized repository state.
 ///
@@ -186,9 +186,6 @@ use crate::declarations::{ConfigurationDeclarationError, ConfigurationDeclaratio
 /// rendering belongs to this type rather than to producer call sites.
 #[derive(Debug, thiserror::Error)]
 pub enum ProducerError {
-    /// A required declaration was absent from the captured repository image.
-    #[error("captured image has no {0}")]
-    MissingCapture(&'static str),
     /// Captured bytes were not valid UTF-8.
     #[error(transparent)]
     MalformedUtf8(#[from] std::string::FromUtf8Error),
@@ -198,18 +195,15 @@ pub enum ProducerError {
     /// A projection references an item kind that is not declared.
     #[error("projection '{projection}' references unknown kind '{kind}'")]
     UnknownKind { projection: String, kind: String },
-    /// An authored config edit could not be parsed.
-    #[error("invalid config.toml edit: {0}")]
-    ConfigParse(#[source] ConfigurationDeclarationError),
     /// Closed-image capture failed.
     #[error(transparent)]
     Capture(#[from] CaptureError),
     /// A producer path was invalid for the repository layout.
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),
-    /// Captured configuration declarations were invalid.
+    /// Captured configuration declarations failed assembly.
     #[error(transparent)]
-    ConfigurationDeclaration(#[from] ConfigurationDeclarationError),
+    Configuration(#[from] ConfigurationAssemblyError),
     /// Captured invariant declarations were invalid.
     #[error(transparent)]
     InvariantConfig(#[from] crate::declarations::invariants::InvariantConfigError),
@@ -244,20 +238,9 @@ pub enum ProducerError {
         #[source]
         source: Box<ProfileRegistryParseError>,
     },
-    /// A supported archive edge target is absent from the proposed plan.
-    #[error("supported archive edge target is absent from plan: {target}")]
-    ProposedLayoutTargetAbsent { target: String },
-    /// A supported archive edge does not resolve after the proposed move.
-    #[error(
-        "supported edge {reference} from {parent} resolves to {resolved} in the proposed layout, not an available target location ({available})",
-        available = .available.join(", ")
-    )]
-    ProposedLayoutEdgeUnavailable {
-        reference: String,
-        parent: String,
-        resolved: String,
-        available: Vec<String>,
-    },
+    /// The proposed archive layout leaves a supported edge unresolvable.
+    #[error(transparent)]
+    ProposedLayout(#[from] crate::domain::artifact_classifier::ProposedLayoutViolation),
 }
 
 /// Typed parse failures for a profile-owned TOML registry.
@@ -326,15 +309,9 @@ pub enum DeclarationParseError {
     /// Captured bytes were not valid UTF-8.
     #[error(transparent)]
     Utf8(#[from] std::str::Utf8Error),
-    /// The repository configuration could not be parsed.
-    #[error(transparent)]
-    Configuration(#[from] ConfigurationDeclarationError),
-    /// The captured configuration could not be assembled into the effective config.
+    /// The captured configuration could not be assembled.
     #[error(transparent)]
     Producer(#[from] ProducerError),
-    /// The template registry could not be parsed.
-    #[error(transparent)]
-    Template(#[from] crate::templates::TemplateConfigError),
     /// The gate registry could not be parsed.
     #[error(".jit/gates.toml: {0}")]
     Gate(#[from] crate::declarations::GateDeclarationError),
@@ -358,8 +335,8 @@ fn resolved_item_kinds(config: &crate::config::JitConfig) -> ResolvedItemKinds {
 pub struct RepositoryDeclarations<'a> {
     /// Resolved kinds, retaining errors for the effective-configuration pass.
     pub item_kinds: ResolvedItemKinds,
-    /// Parsed repository configuration.
-    pub configuration: &'a ConfigurationDeclarations,
+    /// Assembled repository configuration.
+    pub config: &'a crate::config::JitConfig,
     /// Authored gate registry.
     pub gates: &'a GateRegistry,
     /// Authored rule registry.
@@ -370,7 +347,6 @@ pub struct RepositoryDeclarations<'a> {
 /// validation.
 pub(crate) struct CapturedRepositoryDeclarations {
     item_kinds: ResolvedItemKinds,
-    pub(crate) configuration: ConfigurationDeclarations,
     pub(crate) config: crate::config::JitConfig,
     pub(crate) gates: GateRegistry,
     pub(crate) rules: RuleSet,
@@ -379,14 +355,12 @@ pub(crate) struct CapturedRepositoryDeclarations {
 
 impl CapturedRepositoryDeclarations {
     pub(crate) fn from_parts(
-        configuration: ConfigurationDeclarations,
         config: crate::config::JitConfig,
         gates: GateRegistry,
         rules: RuleSet,
     ) -> Self {
         Self {
             item_kinds: resolved_item_kinds(&config),
-            configuration,
             config,
             gates,
             rules,
@@ -397,7 +371,7 @@ impl CapturedRepositoryDeclarations {
     pub(crate) fn borrowed(&self) -> RepositoryDeclarations<'_> {
         RepositoryDeclarations {
             item_kinds: self.item_kinds.clone(),
-            configuration: &self.configuration,
+            config: &self.config,
             gates: &self.gates,
             rules: &self.rules,
         }
@@ -452,32 +426,7 @@ pub(crate) fn declarations_from_image(
 pub(crate) fn validation_declarations_from_image(
     image: &RepositoryImage,
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
-    let config_bytes = image.file_bytes(&VirtualPath::CONFIG)?.ok_or_else(|| {
-        DeclarationParseError::MissingCapture(VirtualPath::CONFIG.repository_relative())
-    })?;
-    let configuration = crate::declarations::parse_configuration(config_bytes)?;
-    let mut config = materialize::assemble_config_from_declarations(image, &configuration)?;
-    let hierarchy_types = config
-        .type_hierarchy
-        .as_ref()
-        .map(|hierarchy| {
-            hierarchy
-                .types
-                .keys()
-                .map(String::as_str)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    config.templates = match image.file_bytes(&VirtualPath::TEMPLATES) {
-        Ok(Some(bytes)) => crate::templates::TemplateRegistry::from_toml_str(
-            std::str::from_utf8(bytes)?,
-            &hierarchy_types,
-        )?,
-        Ok(None) | Err(CaptureError::UndiscoveredRepositoryPath(_)) => {
-            crate::templates::TemplateRegistry::empty()
-        }
-        Err(error) => return Err(error.into()),
-    };
+    let config = materialize::assemble_config(image)?;
     let namespaces = crate::config_manager::namespaces_from_config(&config);
     let gates = match image.file_bytes(&VirtualPath::GATES)? {
         Some(bytes) => crate::declarations::parse_gate_registry(bytes)?,
@@ -505,8 +454,7 @@ pub(crate) fn validation_declarations_from_image(
         Ok(rules) => (rules, None),
         Err(error) => (RuleSet { rules: Vec::new() }, Some(error)),
     };
-    let mut declarations =
-        CapturedRepositoryDeclarations::from_parts(configuration, config, gates, rules);
+    let mut declarations = CapturedRepositoryDeclarations::from_parts(config, gates, rules);
     declarations.rules_load_error = rules_load_error;
     Ok(declarations)
 }
@@ -784,11 +732,12 @@ pub fn derive_materialization(
 /// as one plan — the single-declaration config-mutation session entry.
 ///
 /// The command supplies the edited, preservation-safe `config.toml` bytes; this
-/// parses them through the pure configuration parser first, so a malformed edit is
-/// a typed planning error and never a published file. It then overlays the edited
-/// bytes onto the captured `base` and derives the complete owned-materialization
-/// set — default rules and their schemas, plus every configured projection — from
-/// that edited configuration, exactly as [`derive_semantic_mutation`] does. The
+/// overlays them onto the captured `base` and assembles the edited configuration
+/// first, so an edit that fails assembly is a typed planning error and never a
+/// published file. It then derives the complete owned-materialization set —
+/// default rules and their schemas, plus every configured projection — from that
+/// edited configuration, with `declarations` supplying the gates and rules,
+/// exactly as [`derive_semantic_mutation`] does. The
 /// authored `config.toml` write carries the captured base preimage, and every
 /// derived action its own base preimage, so `session.apply` revalidates against
 /// exactly what was captured.
@@ -801,15 +750,13 @@ pub fn finalize_config_edit(
     edited_config_bytes: &[u8],
     declarations: RepositoryDeclarations<'_>,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
-    // The edit must parse before any planning: a malformed config is a typed
-    // planning error, not a published file.
-    let edited_configuration = crate::declarations::parse_configuration(edited_config_bytes)
-        .map_err(ProducerError::ConfigParse)?;
-
     let config_path = VirtualPath::CONFIG;
     let overlay = std::iter::once((config_path.clone(), Some(edited_config_bytes.to_vec())))
         .collect::<std::collections::BTreeMap<_, _>>();
     let overlaid = apply_overlay(base, overlay)?;
+    // The edit must assemble before any planning: an invalid config is a typed
+    // planning error, not a published file.
+    let edited_config = materialize::assemble_config(&overlaid)?;
 
     // The authored config write carries the base preimage; the complete producer
     // set derives the coupled schemas/rule-membership/projections from the edited
@@ -822,11 +769,9 @@ pub fn finalize_config_edit(
         bytes: edited_config_bytes.to_vec(),
         mode: FileMode::Regular,
     }];
-    let edited_config =
-        materialize::assemble_config_from_declarations(&overlaid, &edited_configuration)?;
     let edited_declarations = RepositoryDeclarations {
         item_kinds: resolved_item_kinds(&edited_config),
-        configuration: &edited_configuration,
+        config: &edited_config,
         gates: declarations.gates,
         rules: declarations.rules,
     };
@@ -901,12 +846,11 @@ fn compose_complete(
     image: &RepositoryImage,
     declarations: &RepositoryDeclarations<'_>,
 ) -> Result<Vec<RepositoryAction>, RepositoryStateError> {
-    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
-    let mut actions = materialize::compose_default_ruleset(image, &config)?;
+    let mut actions = materialize::compose_default_ruleset(image, declarations.config)?;
     actions.extend(materialize::compose_data_root_ignore(image)?);
     actions.extend(
         // A semantic mutation is complete over EVERY declared projection.
-        materialize::compose_configured_projections(image, &config, declarations, None)?.actions,
+        materialize::compose_configured_projections(image, declarations, None)?.actions,
     );
     Ok(actions)
 }
@@ -932,9 +876,7 @@ fn derive_project_render(
     declarations: &RepositoryDeclarations<'_>,
     selected: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<(RepositoryDelta, std::collections::BTreeMap<String, usize>), RepositoryStateError> {
-    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
-    let rendered =
-        materialize::compose_configured_projections(image, &config, declarations, selected)?;
+    let rendered = materialize::compose_configured_projections(image, declarations, selected)?;
     Ok((
         RepositoryDelta::new(image.layout(), rendered.actions)?,
         rendered.counts,
@@ -990,7 +932,7 @@ pub fn repair_target_paths(
     image: &RepositoryImage,
     declarations: RepositoryDeclarations<'_>,
 ) -> Result<std::collections::BTreeSet<VirtualPath>, RepositoryStateError> {
-    let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
+    let config = declarations.config;
     let mut targets = std::collections::BTreeSet::new();
 
     // Default-ruleset family: rules.toml, guarded by capture-spec containment and
@@ -1004,7 +946,7 @@ pub fn repair_target_paths(
             .is_some()
     {
         targets.insert(rules_path);
-        for schema in materialize::serialized_default_ruleset(&config)?.schema_files {
+        for schema in materialize::serialized_default_ruleset(config)?.schema_files {
             let vpath = VirtualPath::schema(&schema.name)?;
             if image.capture_spec().contains_path(&vpath) {
                 targets.insert(vpath);
@@ -1246,9 +1188,9 @@ mod tests {
         );
     }
 
-    fn empty_declarations() -> (ConfigurationDeclarations, GateRegistry, RuleSet) {
+    fn empty_declarations() -> (crate::config::JitConfig, GateRegistry, RuleSet) {
         (
-            crate::declarations::parse_configuration(b"").unwrap(),
+            crate::declarations::assemble_configuration(None, None, None).unwrap(),
             GateRegistry::default(),
             RuleSet { rules: Vec::new() },
         )
@@ -1273,10 +1215,10 @@ mod tests {
     fn test_finalize_gate_registry_edit_missing_edit_intent_is_typed() {
         let image = ImageBuilder::new().build();
         let context = MutationContext::preview();
-        let (configuration, gates, rules) = empty_declarations();
+        let (config, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
             item_kinds: Ok(std::sync::Arc::from([])),
-            configuration: &configuration,
+            config: &config,
             gates: &gates,
             rules: &rules,
         };
@@ -1293,10 +1235,10 @@ mod tests {
     fn test_finalize_gate_registry_edit_multiple_edit_intents_is_typed() {
         let image = ImageBuilder::new().build();
         let context = MutationContext::preview();
-        let (configuration, gates, rules) = empty_declarations();
+        let (config, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
             item_kinds: Ok(std::sync::Arc::from([])),
-            configuration: &configuration,
+            config: &config,
             gates: &gates,
             rules: &rules,
         };
@@ -1326,14 +1268,14 @@ mod tests {
     fn test_finalize_gate_registry_edit_declaration_mismatch_is_typed() {
         let image = ImageBuilder::new().build();
         let context = MutationContext::preview();
-        let (configuration, _default_gates, rules) = empty_declarations();
+        let (config, _default_gates, rules) = empty_declarations();
         let mut mismatched = GateRegistry::default();
         mismatched
             .gates
             .insert("distinct".parse().unwrap(), gate_definition("distinct"));
         let declarations = RepositoryDeclarations {
             item_kinds: Ok(std::sync::Arc::from([])),
-            configuration: &configuration,
+            config: &config,
             gates: &mismatched,
             rules: &rules,
         };
@@ -1369,10 +1311,10 @@ mod tests {
             )
             .build();
         let context = MutationContext::preview();
-        let (configuration, gates, rules) = empty_declarations();
+        let (config, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
             item_kinds: Ok(std::sync::Arc::from([])),
-            configuration: &configuration,
+            config: &config,
             gates: &gates,
             rules: &rules,
         };
@@ -1399,5 +1341,44 @@ mod tests {
             )) => assert_eq!(id, crate::test_utils::issue_id(75)),
             other => panic!("expected a typed missing-issue mutation error, got {other:?}"),
         }
+    }
+
+    const MALFORMED_ITEM_KINDS: &str = "[item_kinds.custom]\nsection = \"Items\"\n";
+
+    #[test]
+    fn test_validation_declarations_from_image_rejects_malformed_item_kinds() {
+        let image = ImageBuilder::new()
+            .files(&[
+                (".jit/config.toml", Some(MALFORMED_ITEM_KINDS)),
+                (".jit/gates.toml", None),
+                (".jit/rules.toml", None),
+            ])
+            .build();
+        assert!(matches!(
+            validation_declarations_from_image(&image),
+            Err(DeclarationParseError::Producer(
+                ProducerError::Configuration(ConfigurationAssemblyError::ItemKinds(_))
+            ))
+        ));
+    }
+
+    #[test]
+    fn test_finalize_config_edit_refuses_edit_that_fails_assembly() {
+        let base = ImageBuilder::new()
+            .files(&[(".jit/config.toml", Some(""))])
+            .build();
+        let (config, gates, rules) = empty_declarations();
+        let declarations = RepositoryDeclarations {
+            item_kinds: Ok(std::sync::Arc::from([])),
+            config: &config,
+            gates: &gates,
+            rules: &rules,
+        };
+        assert!(matches!(
+            finalize_config_edit(&base, MALFORMED_ITEM_KINDS.as_bytes(), declarations),
+            Err(RepositoryStateError::Producer(
+                ProducerError::Configuration(ConfigurationAssemblyError::ItemKinds(_))
+            ))
+        ));
     }
 }

@@ -1,7 +1,7 @@
 //! Filesystem-free authored repository declarations.
 //!
 //! This module is the neutral owner of gate/rule semantics and configuration
-//! parsing. Persistence and validation consume these declarations; neither owns
+//! assembly. Persistence and validation consume these declarations; neither owns
 //! an alternate representation.
 
 mod gates;
@@ -13,76 +13,75 @@ pub use gates::{
     GateDefinition, GateMode, GateRegistry, GateStage, REVIEW_PLACEHOLDER_WARNING,
 };
 
-use crate::config::{
-    DocumentationConfig, HierarchyConfigToml, ItemKindConfig, JitConfig, NamespaceConfig,
-    ProjectionConfig,
-};
-use std::collections::{BTreeMap, HashMap};
+use crate::config::{ItemKindConfigError, JitConfig};
+use crate::declarations::invariants::{InvariantConfigError, InvariantRegistry};
+use crate::templates::{TemplateConfigError, TemplateRegistry};
 
-/// Configuration components used by capture and materialization.
+/// Assemble the repository configuration from the bytes of `config.toml`,
+/// `templates.toml` and `invariants.toml`, each `None` when absent.
 ///
-/// The plan-enumerated components are exposed directly. The complete parsed
-/// configuration is retained privately so materialization consumers that still
-/// need several components can derive their view from this one parse instead of
-/// reparsing captured bytes into a competing authority.
-#[derive(Debug, Clone)]
-pub struct ConfigurationDeclarations {
-    parsed: JitConfig,
-    /// Type hierarchy declaration.
-    pub hierarchy: Option<HierarchyConfigToml>,
-    /// Label namespace declarations.
-    pub namespaces: HashMap<String, NamespaceConfig>,
-    /// Addressable item-kind declarations.
-    pub item_kinds: HashMap<String, ItemKindConfig>,
-    /// Configured projection declarations.
-    pub projections: BTreeMap<String, ProjectionConfig>,
-    /// Documentation lifecycle roots.
-    pub documentation: Option<DocumentationConfig>,
+/// An absent `config.toml` is the empty configuration. Template node types are
+/// checked against the declared `[type_hierarchy].types`, and `[item_kinds]` is
+/// validated; absent templates or invariants are empty registries.
+pub fn assemble_configuration(
+    config: Option<&[u8]>,
+    templates: Option<&[u8]>,
+    invariants: Option<&[u8]>,
+) -> Result<JitConfig, ConfigurationAssemblyError> {
+    let mut assembled = match config {
+        Some(bytes) => toml::from_str::<JitConfig>(
+            std::str::from_utf8(bytes).map_err(ConfigurationAssemblyError::ConfigUtf8)?,
+        )?,
+        None => JitConfig::default(),
+    };
+    assembled.validate_item_kinds()?;
+    let hierarchy_types: Vec<&str> = assembled
+        .type_hierarchy
+        .as_ref()
+        .map(|hierarchy| hierarchy.types.keys().map(String::as_str).collect())
+        .unwrap_or_default();
+    let templates = templates
+        .map(|bytes| {
+            let text =
+                std::str::from_utf8(bytes).map_err(ConfigurationAssemblyError::TemplatesUtf8)?;
+            Ok::<_, ConfigurationAssemblyError>(TemplateRegistry::from_toml_str(
+                text,
+                &hierarchy_types,
+            )?)
+        })
+        .transpose()?
+        .unwrap_or_default();
+    let invariants = invariants
+        .map(|bytes| {
+            let text =
+                std::str::from_utf8(bytes).map_err(ConfigurationAssemblyError::InvariantsUtf8)?;
+            Ok::<_, ConfigurationAssemblyError>(InvariantRegistry::from_toml_str(text)?)
+        })
+        .transpose()?
+        .unwrap_or_default();
+    assembled.templates = templates;
+    assembled.invariants = invariants;
+    Ok(assembled)
 }
 
-impl ConfigurationDeclarations {
-    /// Authored project identity from this authoritative parse.
-    pub fn project_name(&self) -> Option<&crate::config::ProjectName> {
-        self.parsed.project.as_ref()?.name.as_ref()
-    }
-
-    /// Build the projection/default-rule configuration view from this parse.
-    ///
-    /// `invariants.toml` is a sibling declaration, so its registry is supplied by
-    /// the captured-image assembler rather than parsed from `config.toml`.
-    pub(crate) fn materialization_config(
-        &self,
-        invariants: invariants::InvariantRegistry,
-    ) -> JitConfig {
-        let mut config = self.parsed.clone();
-        config.invariants = invariants;
-        config
-    }
-}
-
-/// Parse captured `config.toml` bytes without filesystem access or validation.
-pub fn parse_configuration(
-    bytes: &[u8],
-) -> Result<ConfigurationDeclarations, ConfigurationDeclarationError> {
-    let text = std::str::from_utf8(bytes)?;
-    let config: JitConfig = toml::from_str(text)?;
-    Ok(ConfigurationDeclarations {
-        parsed: config.clone(),
-        hierarchy: config.type_hierarchy.clone(),
-        namespaces: config.namespaces.clone().unwrap_or_default(),
-        item_kinds: config.item_kinds.clone().unwrap_or_default(),
-        projections: config.projection.clone().unwrap_or_default(),
-        documentation: config.documentation.clone(),
-    })
-}
-
-/// Invalid captured configuration declaration.
+/// A configuration source that failed assembly, named by its file.
 #[derive(Debug, thiserror::Error)]
-pub enum ConfigurationDeclarationError {
+pub enum ConfigurationAssemblyError {
     #[error("config.toml is not UTF-8: {0}")]
-    Utf8(#[from] std::str::Utf8Error),
-    #[error("config.toml is invalid: {0}")]
-    Toml(#[from] toml::de::Error),
+    ConfigUtf8(#[source] std::str::Utf8Error),
+    /// Displays the one-line TOML message; the source keeps the full report.
+    #[error("Failed to parse config.toml: {}", .0.message())]
+    Config(#[from] toml::de::Error),
+    #[error("invalid [item_kinds] in config.toml: {0}")]
+    ItemKinds(#[from] ItemKindConfigError),
+    #[error("templates.toml is not UTF-8: {0}")]
+    TemplatesUtf8(#[source] std::str::Utf8Error),
+    #[error("invalid templates.toml: {0}")]
+    Templates(#[from] TemplateConfigError),
+    #[error("invariants.toml is not UTF-8: {0}")]
+    InvariantsUtf8(#[source] std::str::Utf8Error),
+    #[error("invalid invariants.toml: {0}")]
+    Invariants(#[from] InvariantConfigError),
 }
 
 #[cfg(test)]
@@ -90,58 +89,65 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_configuration_is_filesystem_free_and_extracts_materialization_components() {
-        let parsed = parse_configuration(
-            br#"
-[type_hierarchy]
-types = { epic = 2, task = 4 }
-[namespaces.component]
-description = "Component"
-unique = false
-[documentation]
-development_root = "development"
-[projection.reference]
-kind = "definition"
-target = "docs/reference.md"
-"#,
+    fn test_assemble_configuration_absent_config_is_empty_configuration() {
+        let config = assemble_configuration(
+            None,
+            Some(b"[[template]]\nname = \"t\"\napplies_to = [\"any\"]\n"),
+            Some(b"[[invariants]]\nid = \"i\"\nstatement = \"s\"\nkind = \"advisory\"\n"),
         )
         .unwrap();
-        assert_eq!(parsed.hierarchy.unwrap().types["epic"], 2);
-        assert!(parsed.namespaces.contains_key("component"));
-        assert_eq!(
-            parsed.documentation.unwrap().development_root(),
-            "development"
-        );
-        assert_eq!(
-            parsed.projections["reference"].target.as_deref(),
-            Some("docs/reference.md")
-        );
+        assert!(config.type_hierarchy.is_none());
+        assert!(config.item_kinds.is_none());
+        assert!(config.templates.get("t").is_some());
+        assert_eq!(config.invariants.invariants.len(), 1);
     }
 
     #[test]
-    fn test_materialization_config_comes_from_the_same_authoritative_parse() {
-        let parsed = parse_configuration(
-            br#"
-[version]
-schema = 7
-[validation]
-content_format = "html"
-[projection.reference]
-kind = "definition"
-target = "docs/reference.md"
-"#,
+    fn test_assemble_configuration_absent_templates_and_invariants_are_empty_registries() {
+        let config = assemble_configuration(
+            Some(b"[type_hierarchy]\ntypes = { task = 1 }\n"),
+            None,
+            None,
         )
         .unwrap();
+        assert_eq!(config.templates, TemplateRegistry::empty());
+        assert_eq!(config.invariants, InvariantRegistry::empty());
+    }
 
-        let config = parsed.materialization_config(invariants::InvariantRegistry::empty());
-        assert_eq!(config.version.unwrap().schema, 7);
-        assert_eq!(
-            config.validation.unwrap().content_format,
-            Some(crate::domain::ContentFormat::Html)
-        );
-        assert_eq!(
-            config.projection.unwrap()["reference"].target.as_deref(),
-            Some("docs/reference.md")
-        );
+    #[test]
+    fn test_assemble_configuration_rejects_template_type_outside_declared_hierarchy() {
+        let error = assemble_configuration(
+            Some(b"[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n"),
+            Some(
+                b"[[template]]\nname = \"t\"\napplies_to = [\"epic\"]\n\
+                  [[template.nodes]]\nrole = \"r\"\ntype = \"undeclared\"\n",
+            ),
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            ConfigurationAssemblyError::Templates(TemplateConfigError::UnknownType { .. })
+        ));
+    }
+
+    #[test]
+    fn test_assemble_configuration_rejects_malformed_item_kinds() {
+        let error = assemble_configuration(
+            Some(b"[item_kinds.custom]\nsection = \"Items\"\n"),
+            None,
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            ConfigurationAssemblyError::ItemKinds(ItemKindConfigError::MissingFields { .. })
+        ));
+    }
+
+    #[test]
+    fn test_assemble_configuration_rejects_unknown_config_key() {
+        let error = assemble_configuration(Some(b"undeclared_key = 1\n"), None, None).unwrap_err();
+        assert!(matches!(error, ConfigurationAssemblyError::Config(_)));
     }
 }

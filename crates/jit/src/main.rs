@@ -20,16 +20,13 @@ use jit::cli::{Cli, Commands, GateCommands, IssueCommands, ProfileCommands};
 use jit::commands::DescriptionUpdate;
 use jit::dispatch::{
     apply, archive, claim, config, dep, doc, events, graph, hooks, init, invariant, issue, item,
-    label, profile, project, resolve_issue, search, serve, snapshot, validate, version,
+    label, profile, project, query, resolve_issue, search, serve, snapshot, validate, version,
     CommandContext, Dispatched,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, Priority, State};
 use jit::output::failure::{classify, command_json_error};
-use jit::output::{
-    plain_issue_rows, print_issue_list, ErrorCode, ExitCode, IssueColumn, JsonError, JsonOutput,
-    OutputContext, OutputMode,
-};
+use jit::output::{ErrorCode, ExitCode, JsonError, JsonOutput, OutputContext, OutputMode};
 use std::env;
 use std::io;
 use std::path::PathBuf;
@@ -191,65 +188,6 @@ fn read_description_source(path: &str) -> Result<String> {
         std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read description file: {path}"))
     }
-}
-
-/// Reject parent-level `jit query` filters when a subcommand is present.
-///
-/// The bare `jit query` form carries its own filter flags (`--state`,
-/// `--assignee`, `--priority`, `--label`, `--full`). When a
-/// subcommand such as `available` is also given, those parent-level flags
-/// would be silently dropped — a silent-wrong-result footgun for orchestrators
-/// consuming `--json`. Detect any that were supplied and return an actionable
-/// error pointing the user at the subcommand form or the bare form.
-fn reject_parent_query_filters(
-    query_cmd: &jit::cli::QueryCommands,
-    state: Option<&str>,
-    assignee: Option<&str>,
-    priority: Option<&str>,
-    label: &[String],
-    full: bool,
-    json: bool,
-) -> Result<()> {
-    use jit::cli::QueryCommands;
-
-    let offending: Vec<&str> = [
-        state.map(|_| "--state"),
-        assignee.map(|_| "--assignee"),
-        priority.map(|_| "--priority"),
-        (!label.is_empty()).then_some("--label"),
-        full.then_some("--full"),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
-
-    if offending.is_empty() {
-        return Ok(());
-    }
-
-    let sub = match query_cmd {
-        QueryCommands::All { .. } => "all",
-        QueryCommands::Available { .. } => "available",
-        QueryCommands::Blocked { .. } => "blocked",
-        QueryCommands::Strategic { .. } => "strategic",
-        QueryCommands::Closed { .. } => "closed",
-        QueryCommands::Count { .. } => "count",
-        QueryCommands::Divergence => "divergence",
-    };
-
-    // A misplaced pre-subcommand filter is a usage error (exit 2), the same class
-    // as clap's own usage errors — routed through the json-aware
-    // `invalid_argument` helper so `--json` callers get a machine-readable
-    // envelope instead of a bare stderr line. Message text unchanged.
-    let flags = offending.join(" ");
-    Err(invalid_argument(
-        format!(
-            "filter(s) {flags} were given before the `{sub}` subcommand, where they \
-             are ignored. Put them after the subcommand (e.g. `jit query {sub} {flags}`), \
-             or drop the subcommand to use the bare form (e.g. `jit query {flags}`)."
-        ),
-        json,
-    ))
 }
 
 /// True when a caught panic payload is std's "failed printing to
@@ -1363,261 +1301,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         Commands::Archive(archive_cmd) => {
             return archive::dispatch(archive_cmd, &ctx, &mut io::stdout(), &mut io::stderr());
         }
-        Commands::Query {
-            subcommand,
-            filters: bare_filters,
-            full: bare_full,
-        } => match subcommand {
-            None => {
-                return issue::emit_list(
-                    &ctx,
-                    bare_filters,
-                    bare_full,
-                    &mut io::stdout(),
-                    &mut io::stderr(),
-                )
-            }
-            Some(query_cmd) => {
-                // Parent-level filters only apply to the bare `jit query` form.
-                // When a subcommand is present they would be silently ignored
-                // (a machine-readable silent-wrong-result footgun), so reject
-                // them with an actionable message instead.
-                reject_parent_query_filters(
-                    &query_cmd,
-                    bare_filters.state.as_deref(),
-                    bare_filters.assignee.as_deref(),
-                    bare_filters.priority.as_deref(),
-                    &bare_filters.labels,
-                    bare_full,
-                    json,
-                )?;
-                match query_cmd {
-                    jit::cli::QueryCommands::All { filters, full } => {
-                        return issue::emit_list(
-                            &ctx,
-                            filters,
-                            full,
-                            &mut io::stdout(),
-                            &mut io::stderr(),
-                        );
-                    }
-                    jit::cli::QueryCommands::Available { filters, full } => {
-                        let output_ctx = OutputContext::new(quiet, json);
-                        let filters = filters.parse()?;
-                        let issues = executor.queries().query_available(filters)?;
-
-                        if json {
-                            use jit::domain::MinimalIssue;
-                            use jit::output::JsonOutput;
-
-                            let msg = format!("Found {} issue(s)", issues.len());
-                            let output = if full {
-                                JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListFullResponse::new(issues),
-                                )?)
-                            } else {
-                                let minimal: Vec<MinimalIssue> =
-                                    issues.iter().map(MinimalIssue::from).collect();
-                                JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListResponse::new(minimal),
-                                )?)
-                            }
-                            .with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            print_issue_list(
-                                &output_ctx,
-                                "Available issues (unassigned, unblocked):",
-                                plain_issue_rows(&issues),
-                                &[IssueColumn::Priority],
-                            )?;
-                        }
-                    }
-                    jit::cli::QueryCommands::Blocked { filters, full } => {
-                        let output_ctx = OutputContext::new(quiet, json);
-                        let filters = filters.parse()?;
-                        let blocked = executor.queries().query_blocked_filtered(filters)?;
-
-                        if json {
-                            use jit::domain::MinimalIssue;
-                            use jit::output::JsonOutput;
-
-                            let msg = format!("Found {} issue(s)", blocked.len());
-                            let output = if full {
-                                use jit::domain::queries::BlockingReason;
-                                use jit::output::{BlockedIssue, BlockedReason, BlockedReasonType};
-                                let blocked_issues: Vec<BlockedIssue> = blocked
-                                    .iter()
-                                    .map(|(issue, reasons)| {
-                                        let blocked_reasons = reasons
-                                            .iter()
-                                            .map(|r| match r {
-                                                BlockingReason::Dependency { id, title, state } => {
-                                                    BlockedReason {
-                                                        reason_type: BlockedReasonType::Dependency,
-                                                        detail: format!(
-                                                            "{} ({}:{})",
-                                                            id, title, state
-                                                        ),
-                                                    }
-                                                }
-                                                BlockingReason::Gate { key, status } => {
-                                                    BlockedReason {
-                                                        reason_type: BlockedReasonType::Gate,
-                                                        detail: format!("{} ({})", key, status),
-                                                    }
-                                                }
-                                            })
-                                            .collect();
-                                        BlockedIssue {
-                                            issue: MinimalIssue::from(issue),
-                                            blocked_reasons,
-                                        }
-                                    })
-                                    .collect();
-
-                                JsonOutput::success(serde_json::to_value(
-                                    jit::output::BlockedFullListResponse::new(blocked_issues),
-                                )?)
-                            } else {
-                                use jit::domain::MinimalBlockedIssue;
-                                let minimal: Vec<MinimalBlockedIssue> = blocked
-                                    .iter()
-                                    .map(|(issue, reasons)| {
-                                        let reason_strings = reasons
-                                            .iter()
-                                            .map(jit::output::minimal_blocked_reason)
-                                            .collect();
-                                        MinimalBlockedIssue::from((issue, reason_strings))
-                                    })
-                                    .collect();
-
-                                JsonOutput::success(serde_json::to_value(
-                                    jit::output::BlockedListResponse::new(minimal),
-                                )?)
-                            }
-                            .with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            print_issue_list(
-                                &output_ctx,
-                                "Blocked issues:",
-                                blocked.iter().map(|(issue, reasons)| {
-                                    (issue, reasons.iter().map(ToString::to_string).collect())
-                                }),
-                                &[IssueColumn::Priority],
-                            )?;
-                        }
-                    }
-                    jit::cli::QueryCommands::Strategic { filters, full } => {
-                        let output_ctx = OutputContext::new(quiet, json);
-                        let filters = filters.parse()?;
-                        let issues = executor.queries().query_strategic_filtered(filters)?;
-
-                        if json {
-                            use jit::domain::MinimalIssue;
-                            use jit::output::JsonOutput;
-
-                            let msg = format!("Found {} issue(s)", issues.len());
-                            let output = if full {
-                                JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListFullResponse::new(issues),
-                                )?)
-                            } else {
-                                let minimal: Vec<MinimalIssue> =
-                                    issues.iter().map(MinimalIssue::from).collect();
-                                JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListResponse::new(minimal),
-                                )?)
-                            }
-                            .with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            print_issue_list(
-                                &output_ctx,
-                                "Strategic issues:",
-                                plain_issue_rows(&issues),
-                                &[IssueColumn::Priority],
-                            )?;
-                        }
-                    }
-                    jit::cli::QueryCommands::Closed { filters, full } => {
-                        let output_ctx = OutputContext::new(quiet, json);
-                        let filters = filters.parse()?;
-                        let issues = executor.queries().query_closed_filtered(filters)?;
-
-                        if json {
-                            use jit::domain::MinimalIssue;
-                            use jit::output::JsonOutput;
-
-                            let msg = format!("Found {} issue(s)", issues.len());
-                            let output = if full {
-                                JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListFullResponse::new(issues),
-                                )?)
-                            } else {
-                                let minimal: Vec<MinimalIssue> =
-                                    issues.iter().map(MinimalIssue::from).collect();
-                                JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListResponse::new(minimal),
-                                )?)
-                            }
-                            .with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            print_issue_list(
-                                &output_ctx,
-                                "Closed issues (Done or Rejected):",
-                                plain_issue_rows(&issues),
-                                &[IssueColumn::State],
-                            )?;
-                        }
-                    }
-                    jit::cli::QueryCommands::Count { by, filters } => {
-                        let filters = filters.parse()?;
-                        let rollup = match by {
-                            jit::cli::CountDimension::State => {
-                                executor.queries().query_count_by_state(filters)?
-                            }
-                        };
-
-                        if json {
-                            let msg = format!(
-                                "{}/{} done ({}%)",
-                                rollup.extras.done, rollup.extras.total, rollup.extras.percent
-                            );
-                            let output =
-                                jit::output::JsonOutput::success(&rollup).with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            for line in rollup.to_lines() {
-                                println!("{}", line);
-                            }
-                        }
-                    }
-                    jit::cli::QueryCommands::Divergence => {
-                        let output_ctx = OutputContext::new(quiet, json);
-                        let report = executor.graph().detect_divergences()?;
-
-                        if json {
-                            let msg = format!("{} divergence(s)", report.count());
-                            let output = jit::output::JsonOutput::success(report).with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                        } else if report.items.is_empty() {
-                            let _ = output_ctx.print_success("No membership/DAG divergences");
-                        } else {
-                            let _ = output_ctx.print_info(format!(
-                                "{} membership label(s) not backed by the DAG:",
-                                report.count()
-                            ));
-                            for d in &report.items {
-                                println!("  {} | {} | {}", d.short_id, d.label, d.title);
-                            }
-                        }
-                    }
-                } // end match query_cmd
-            } // end Some(query_cmd)
-        }, // end match subcommand
+        Commands::Query(args) => {
+            return query::run(args, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
         Commands::Label(label_cmd) => {
             return label::dispatch(label_cmd, &ctx, &mut io::stdout(), &mut io::stderr());
         }
@@ -1640,25 +1326,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             return search::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Status => {
-            let output_ctx = OutputContext::new(quiet, json);
-            let summary = executor.validation().get_status()?;
-
-            if json {
-                let msg = format!(
-                    "{} backlog, {} ready, {} in_progress, {} done",
-                    summary.backlog, summary.ready, summary.in_progress, summary.done
-                );
-                let output = JsonOutput::success(&summary).with_message(msg);
-                println!("{}", output.to_json_string()?);
-            } else {
-                output_ctx.print_data("Status:")?;
-                output_ctx.print_data(format!("  backlog: {}", summary.backlog))?;
-                output_ctx.print_data(format!("  ready: {}", summary.ready))?;
-                output_ctx.print_data(format!("  in_progress: {}", summary.in_progress))?;
-                output_ctx.print_data(format!("  done: {}", summary.done))?;
-                output_ctx.print_data(format!("  rejected: {}", summary.rejected))?;
-                output_ctx.print_data(format!("  blocked: {}", summary.blocked))?;
-            }
+            return query::status::dispatch((), &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Validate(args) => {
             return validate::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());

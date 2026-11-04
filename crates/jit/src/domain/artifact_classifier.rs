@@ -477,10 +477,11 @@ pub fn resolve_container_destination(
     })
 }
 
-fn required_resolution_evidence<'a>(
-    evidence: &'a ArtifactEvidenceMap,
+/// The value captured for `path`, or `IncompleteEvidence` naming it.
+fn required_resolution_evidence<'a, V>(
+    evidence: &'a BTreeMap<String, V>,
     path: &str,
-) -> Result<&'a ArtifactEvidence, ArtifactEvidenceError> {
+) -> Result<&'a V, ArtifactEvidenceError> {
     evidence
         .get(path)
         .ok_or_else(|| ArtifactEvidenceError::IncompleteEvidence {
@@ -773,14 +774,12 @@ pub fn classify_artifacts(
     // Execution refuses a layout this check rejects, so preview reports it as
     // a blocker rather than as an eligible plan.
     if let Err(violation) = validate_proposed_artifact_layout(&artifacts) {
-        use crate::repository_state::ProducerError;
         plan_blockers.push(PlanBlocker::new(
             BlockerCode::UnpreservableLayout,
-            match violation {
-                ProducerError::ProposedLayoutEdgeUnavailable { parent, .. } => Some(parent),
-                ProducerError::ProposedLayoutTargetAbsent { target } => Some(target),
-                _ => None,
-            },
+            Some(match violation {
+                ProposedLayoutViolation::EdgeUnavailable { parent, .. } => parent,
+                ProposedLayoutViolation::TargetAbsent { target } => target,
+            }),
         ));
     }
 
@@ -814,6 +813,25 @@ fn destination_source_conflicts(
     })
 }
 
+/// A proposed layout that leaves a supported archive edge unresolvable.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ProposedLayoutViolation {
+    /// A supported archive edge target is absent from the proposed plan.
+    #[error("supported archive edge target is absent from plan: {target}")]
+    TargetAbsent { target: String },
+    /// A supported archive edge does not resolve after the proposed move.
+    #[error(
+        "supported edge {reference} from {parent} resolves to {resolved} in the proposed layout, not an available target location ({available})",
+        available = .available.join(", ")
+    )]
+    EdgeUnavailable {
+        reference: String,
+        parent: String,
+        resolved: String,
+        available: Vec<String>,
+    },
+}
+
 /// Verify that every supported edge still resolves to an available path after execution.
 ///
 /// An edge into an artifact the plan retains in place imposes no constraint.
@@ -824,16 +842,14 @@ fn destination_source_conflicts(
 /// [`EvidenceCode::OutsideDevelopmentRoot`] or [`EvidenceCode::PermanentPath`]. A relative citation of such a
 /// target no longer resolves from the archived copy, which is the cost the
 /// decision accepts against duplicating the repository into every archive.
-pub fn validate_proposed_layout(
-    plan: &ArtifactPlan,
-) -> Result<(), crate::repository_state::ProducerError> {
+pub fn validate_proposed_layout(plan: &ArtifactPlan) -> Result<(), ProposedLayoutViolation> {
     validate_proposed_artifact_layout(plan.artifacts())
 }
 
 /// [`validate_proposed_layout`] over a plan's classified artifacts.
 fn validate_proposed_artifact_layout(
     artifacts: &[ArtifactPlanEntry],
-) -> Result<(), crate::repository_state::ProducerError> {
+) -> Result<(), ProposedLayoutViolation> {
     let by_source = artifacts
         .iter()
         .map(|artifact| (artifact.source(), artifact))
@@ -854,7 +870,7 @@ fn validate_proposed_artifact_layout(
                 continue;
             }
             let target = by_source.get(target_source).ok_or_else(|| {
-                crate::repository_state::ProducerError::ProposedLayoutTargetAbsent {
+                ProposedLayoutViolation::TargetAbsent {
                     target: target_source.to_string(),
                 }
             })?;
@@ -887,14 +903,12 @@ fn validate_proposed_artifact_layout(
                     EdgeResolutionMode::External => continue,
                 };
                 if !available.contains(&resolved) {
-                    return Err(
-                        crate::repository_state::ProducerError::ProposedLayoutEdgeUnavailable {
-                            reference: edge.reference.clone(),
-                            parent: parent.source().to_string(),
-                            resolved,
-                            available: available.iter().cloned().collect(),
-                        },
-                    );
+                    return Err(ProposedLayoutViolation::EdgeUnavailable {
+                        reference: edge.reference.clone(),
+                        parent: parent.source().to_string(),
+                        resolved,
+                        available: available.iter().cloned().collect(),
+                    });
                 }
             }
         }
@@ -941,11 +955,7 @@ fn classify_entry(
     }
 
     let source = entry.source().to_string();
-    let location = locations.get(&source).cloned().ok_or_else(|| {
-        ArtifactEvidenceError::IncompleteEvidence {
-            path: source.clone(),
-        }
-    })?;
+    let location = required_resolution_evidence(locations, &source)?.clone();
     let archived_source = policy.is_archived(&source);
     let permanent = policy.is_permanent(&source);
     let outside_development_root = !archived_source && policy.is_outside_development_root(&source);
@@ -2829,7 +2839,7 @@ mod tests {
         let error = validate_proposed_layout(&plan).expect_err("broken edge must be rejected");
         assert!(matches!(
             error,
-            crate::repository_state::ProducerError::ProposedLayoutEdgeUnavailable {
+            ProposedLayoutViolation::EdgeUnavailable {
                 ref reference,
                 ref parent,
                 ref resolved,
@@ -3065,7 +3075,7 @@ mod tests {
             .expect_err("broken path component must still be rejected");
         assert!(matches!(
             error,
-            crate::repository_state::ProducerError::ProposedLayoutEdgeUnavailable {
+            ProposedLayoutViolation::EdgeUnavailable {
                 ref reference,
                 ref parent,
                 ref resolved,

@@ -1926,19 +1926,6 @@ pub struct CommitInfo {
     pub message: String,
 }
 
-/// Status summary for all issues
-#[derive(Debug, Serialize)]
-pub struct StatusSummary {
-    pub backlog: usize,
-    pub ready: usize,
-    pub in_progress: usize,
-    pub gated: usize,
-    pub done: usize,
-    pub rejected: usize, // New: count of rejected issues
-    pub blocked: usize,
-    pub total: usize,
-}
-
 /// Collection key of [`DocumentListResult`].
 pub enum DocumentsKey {}
 
@@ -3372,8 +3359,6 @@ mod tests {
 
         let config_text = crate::test_taxonomy::invalid_hierarchy_config_fragment();
         let config: JitConfig = toml::from_str(&config_text).unwrap();
-        let configuration =
-            crate::declarations::parse_configuration(config_text.as_bytes()).unwrap();
         let rules = RuleSet {
             rules: vec![Rule {
                 name: "graph-probe".to_string(),
@@ -3398,7 +3383,6 @@ mod tests {
             }],
         };
         let declarations = crate::repository_state::CapturedRepositoryDeclarations::from_parts(
-            configuration,
             config,
             crate::declarations::GateRegistry::default(),
             rules,

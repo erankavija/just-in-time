@@ -534,7 +534,7 @@ impl CommandSchema {
     }
 
     /// Legacy output schema table for leaves not yet registered with a
-    /// handler group (e.g., "issue_show", "query_available").
+    /// handler group (e.g., "issue_create").
     pub(crate) fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
         use crate::domain::Issue;
         use crate::output::*;
@@ -545,9 +545,6 @@ impl CommandSchema {
         }
 
         let (schema, type_name) = match cmd_path {
-            // Status command
-            "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
-
             // Issue commands
             //
             // `issue create --json` returns the `issue show` projection with its
@@ -571,49 +568,6 @@ impl CommandSchema {
                 Some(schema_to_value::<GateEvaluateManyResponse>()),
                 "GateEvaluateManyResponse",
             ),
-
-            // Issue-record LIST surfaces emit two shapes: the default lean summary
-            // (`MinimalIssue` entries, no gate fields) and, under `--full`, the
-            // complete stored records (gate list under `gates_required` /
-            // `gates_status`). Declaring both via `oneOf` lets a consumer attribute
-            // a missing gate field to the summary projection rather than the data.
-            // Bare `jit query` (no subcommand) is documented as equivalent to
-            // `query all`, so it declares the same contract.
-            "query" | "query_available" | "query_all" | "query_strategic" | "query_closed" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<IssueListResponse>(),
-                        schema_to_value::<IssueListFullResponse>(),
-                    ],
-                    "description": "Default shape: lean MinimalIssue entries (id, \
-                        short_id, title, state, priority) with no gate fields. \
-                        With --full: complete stored issue records, whose gate list \
-                        is carried under gates_required / gates_status."
-                });
-                (Some(union), "IssueListResponse")
-            }
-            // `query blocked` is the one query whose --full variant is NOT a
-            // record dump: both shapes build on MinimalIssue and carry no
-            // gate-list fields; a blocking gate appears only as a reason.
-            "query_count" => (Some(schema_to_value::<StateRollup>()), "StateRollup"),
-            "query_divergence" => (
-                Some(schema_to_value::<DivergenceResponse>()),
-                "DivergenceResponse",
-            ),
-            "query_blocked" => {
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<BlockedListResponse>(),
-                        schema_to_value::<BlockedFullListResponse>(),
-                    ],
-                    "description": "Default shape: MinimalBlockedIssue entries \
-                        (lean fields plus blocked_reasons strings). With --full: \
-                        BlockedIssue entries (lean fields plus structured \
-                        blocked_reasons). Neither shape carries gate-list fields; \
-                        a blocking gate appears only as a reason entry."
-                });
-                (Some(union), "BlockedListResponse")
-            }
 
             // Default: no specific schema
             _ => (None, "CommandResponse"),
@@ -1654,8 +1608,8 @@ mod tests {
 
     #[test]
     fn test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema() {
-        let resolved = CommandSchema::resolve_output_schema("status").unwrap();
-        let legacy = CommandSchema::get_output_schema_for_command("status").unwrap();
+        let resolved = CommandSchema::resolve_output_schema("issue_create").unwrap();
+        let legacy = CommandSchema::get_output_schema_for_command("issue_create").unwrap();
         assert_eq!(resolved.success, legacy.success);
         assert_eq!(resolved.success_schema, legacy.success_schema);
     }

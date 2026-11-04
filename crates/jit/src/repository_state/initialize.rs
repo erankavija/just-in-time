@@ -210,9 +210,9 @@ impl InitializationScaffold {
         project_name: ProjectName,
         profile: Option<ProfileApplicationInput>,
     ) -> Result<Self, InitializationError> {
-        let parsed = crate::declarations::parse_configuration(config.as_bytes())
-            .map_err(|error| InitializationError::Config(error.to_string()))?;
-        let parsed = parsed.materialization_config(InvariantRegistry::empty());
+        let parsed =
+            crate::declarations::assemble_configuration(Some(config.as_bytes()), None, None)
+                .map_err(|error| InitializationError::Config(error.to_string()))?;
         let namespaces = namespaces_from_config(&parsed);
         let serialized = serialize_ruleset(&default_ruleset(&namespaces))?;
         let schemas = serialized

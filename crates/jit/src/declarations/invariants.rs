@@ -4,9 +4,10 @@
 //! intends to hold, optionally bound to the rule or gate that enforces it. This
 //! module is the registry-first SOURCE for those entries: it owns only the pure
 //! parse/load step (read the file if present, parse with serde + toml, return a
-//! typed error on malformed/invalid content). Wiring the loaded registry into
-//! [`JitConfig::load`](crate::config::JitConfig::load) is the job of [`crate::config`],
-//! and indexing/querying invariants as addressable items (`@/invariant/<self-id>`)
+//! typed error on malformed/invalid content). Wiring the registry into the
+//! configuration is the job of
+//! [`assemble_configuration`](crate::declarations::assemble_configuration), and
+//! indexing/querying invariants as addressable items (`@/invariant/<self-id>`)
 //! is built on top of this registry by a later layer.
 //!
 //! The loader mirrors the production rules filesystem boundary:

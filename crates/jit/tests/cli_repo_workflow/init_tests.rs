@@ -1,7 +1,7 @@
 //! Integration tests for `jit init`
 
 use jit::config::DocumentationConfig;
-use jit::declarations::parse_configuration;
+use jit::declarations::assemble_configuration;
 use jit::domain::artifact_classifier::contains_path;
 use jit::profile::ProfilePackageModel;
 use jit::repository_state::{Contribution, ScalarTarget, SetStringTarget};
@@ -41,9 +41,10 @@ fn test_init_creates_config_toml_carrying_only_repository_derived_declarations()
     // project name slugged from the directory it was created in.
     assert!(parsed.version.is_some(), "the schema version is declared");
     assert_eq!(
-        parse_configuration(content.as_bytes())
-            .unwrap()
-            .project_name()
+        parsed
+            .project
+            .as_ref()
+            .and_then(|project| project.name.as_ref())
             .map(|name| name.as_str().to_string()),
         cli.root()
             .file_name()
@@ -578,12 +579,12 @@ fn test_init_config_is_valid_toml() {
 /// The `[documentation]` policy a repository carries after applying the default
 /// package.
 ///
-/// Read through the configuration parser, so a commented-out block resolves to
+/// Read through the configuration assembler, so a commented-out block resolves to
 /// no policy at all rather than to a table this helper could inspect.
 fn packaged_documentation_policy(dir: &Path) -> DocumentationConfig {
     let bytes = fs::read(dir.join(".jit/config.toml")).expect("init should write config.toml");
-    parse_configuration(&bytes)
-        .expect("the written config.toml should parse")
+    assemble_configuration(Some(&bytes), None, None)
+        .expect("the written config.toml should assemble")
         .documentation
         .expect("applying the default package should author a [documentation] policy")
 }
