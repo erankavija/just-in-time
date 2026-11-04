@@ -10,16 +10,23 @@
   ],
   "description": "Update the command reference for the changed `issue create`, `validate --fix` and `doc check-links` behaviour.\n\n## Background\n\n- `docs/reference/cli-commands.md` documents `jit issue create` (`:899` onwards), `jit doc check-links` (`:2841` onwards) and `jit validate --fix` (`:3249-3334`); `docs/reference/worktree-validate.md` documents `--fix` (`:367-368,449`).\n- `docs/how-to/multi-agent-coordination.md:421-425` tells readers to verify with plain `jit validate` because a `--fix` run that applies no fix reports `No fixes needed` without re-checking. Other pages only show the command.\n- Changed behaviour: `issue create` returns `findings` in JSON and prints the same findings in human output, and `--force` no longer hides them; `validate --fix` publishes every fix through one mutation and renders one report over the fixed repository, with its exit status, including when it applied no fix; `doc check-links` probes each distinct external URL once, with a request timeout and bounded concurrency.\n\n## Success Criteria\n\n- [hard] REQ-01: The `issue create`, `validate --fix` and `doc check-links` sections state the changed behaviour above.\n- [hard] REQ-02: No page under `docs/` describes `--fix` as publishing one mutation per fix or as skipping validation after a run that applied no fix.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T12:58:57.564556909Z",
   "first_ready_at": "2026-11-04T12:18:16.977345413Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
   ],
   "gates_status": {
-    "docs-mechanical": {
-      "run_id": "b134a89f-65e7-4d74-8d0d-27a3e73d946a",
+    "doc-review": {
+      "run_id": "f0dd2559-b493-4bca-96ee-279db27b0de6",
       "status": "passed",
-      "updated_at": "2026-11-04T12:52:31.955809736Z",
+      "updated_at": "2026-11-04T12:58:46.134424509Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "eba30f76-441b-4e11-ba30-89df53087f80",
+      "status": "passed",
+      "updated_at": "2026-11-04T12:57:00.529581880Z",
       "updated_by": "auto:executor"
     }
   },
@@ -37,7 +44,7 @@
     "satisfies:9876a23a/REQ-15"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Command references describe create findings, fix reporting and link probing",
-  "updated_at": "2026-11-04T12:52:31.955809736Z"
+  "updated_at": "2026-11-04T12:58:57.564556909Z"
 }
