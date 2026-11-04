@@ -1,0 +1,60 @@
+{
+  "container": "0f8efc37-8054-420d-9409-dde888ea0040",
+  "planning": "110a4a2f-54fa-4f1a-b055-174b95276675",
+  "breakdown": "32607213-7402-4c17-9889-7a6286e1959e",
+  "manifest_sha256": "95d2994bbda3188936fa9ba94b588aa4df8ea323823ec55c83c4af4d1562338b",
+  "ids": {
+    "api-pruning": "4538b071-a0f7-4ae6-8c1d-a11b76962b6e",
+    "browser-search": "b067c2db-5664-48ed-a960-3c0abe7a21a1",
+    "config-refresh": "cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c",
+    "core-story": "a236e81e-4890-4607-931a-e3d3612c3899",
+    "documents": "d4172016-0225-4ae8-aa37-3e4f28a1922c",
+    "executor-offload": "0f302914-9ded-47e9-bea8-67af1e0e8452",
+    "graph-summary": "83b561ed-0884-4301-a597-dee4cb8a73fe",
+    "layout-binding": "9c3eb2bf-6ab7-430f-9d1e-df1ef7bdd0b6",
+    "layout-indexes": "1cdf5965-226b-4eb0-8707-33b35a7854d5",
+    "raw-responses": "ca44bb7c-c9b9-48cf-a478-71e901023870",
+    "semantic-search": "4d8791fb-01c9-4d12-a54b-2990baa22ace",
+    "server-modules": "abf68973-3771-47cb-89d0-708290cb00ac",
+    "server-story": "c8e79465-e28c-4dea-8c25-ad3fdc812e34",
+    "shared-capture": "6326532e-a505-4bcd-ae8f-d80f3b0350a7",
+    "watch-paths": "1d2235b1-7a07-4428-842b-db338fd133c0",
+    "web-story": "3a61ff16-9afb-4c7c-9583-8ce588581350"
+  },
+  "sources": [
+    "layout-binding",
+    "watch-paths",
+    "executor-offload",
+    "server-modules",
+    "layout-indexes"
+  ],
+  "sinks": [
+    "core-story",
+    "server-story",
+    "web-story"
+  ],
+  "external_dependencies": {
+    "core-story": [
+      "c5062e21-331d-4ab8-8468-3535d16d634f"
+    ],
+    "documents": [
+      "933ff852-7cc9-4902-a424-626b882df531",
+      "fb38bf1f-a4b0-4acf-9b5b-bda244d0ee09",
+      "f35c86de-e4fa-4ce9-bf48-ee1378115355"
+    ],
+    "api-pruning": [
+      "fb38bf1f-a4b0-4acf-9b5b-bda244d0ee09"
+    ],
+    "executor-offload": [
+      "487f45a9-bd42-47f8-8dd1-6487ad287793"
+    ]
+  },
+  "counts": {
+    "issues": 16,
+    "terminals": 13,
+    "internal_edges": 19,
+    "source_edges": 5,
+    "sink_edges": 3,
+    "external_edges": 6
+  }
+}
