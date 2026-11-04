@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, Command, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Condvar, Mutex};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use jit::commands::CommandExecutor;
@@ -106,6 +107,14 @@ struct RunningServer {
     port: u16,
     log_path: PathBuf,
     first_reads: Arc<FirstReads>,
+    /// Copies the server's stderr into the log; finished once the log is whole.
+    collector: Option<JoinHandle<()>>,
+}
+
+/// An exited server's exit code and its complete log.
+struct ExitedServer {
+    code: i32,
+    log: String,
 }
 
 /// The peers whose first bytes the server reported reading, filled from its
@@ -153,25 +162,28 @@ impl RunningServer {
         self.child.id()
     }
 
-    /// The server's captured log, with terminal styling removed so assertions
+    /// The log captured so far, with terminal styling removed so assertions
     /// read the field names and values rather than the escapes around them.
-    fn log(&self) -> String {
+    /// While the server runs, stderr lines may still be in the collector, so
+    /// assertions about shutdown read [`ExitedServer::log`] instead.
+    fn log_so_far(&self) -> String {
         strip_ansi(&std::fs::read_to_string(&self.log_path).unwrap_or_default())
     }
 
-    /// Waits for the process to exit and returns its exit code, holding
+    /// Waits for the process to exit and returns its exit code with its
+    /// complete log, read after the stderr collector reached EOF. Holds
     /// `budget` as the sole statement of how long after `signalled_at` the
     /// process may still exist — on the iteration that finds it running and on
     /// the one that finds it gone. Panics rather than killing the process: a
     /// test-side kill would hide exactly the defect this suite exists to catch.
-    fn wait_for_exit(&mut self, signalled_at: Instant, budget: Duration) -> i32 {
+    fn wait_for_exit(&mut self, signalled_at: Instant, budget: Duration) -> ExitedServer {
         loop {
             let outcome = self.child.try_wait().expect("poll the server process");
             assert!(
                 signalled_at.elapsed() < budget,
                 "the server was still running {:?} after the signal; log:\n{}",
                 signalled_at.elapsed(),
-                self.log()
+                self.log_so_far()
             );
             match outcome {
                 Some(status) => {
@@ -179,11 +191,18 @@ impl RunningServer {
                         status.signal(),
                         None,
                         "the server died from a signal instead of exiting on its own; log:\n{}",
-                        self.log()
+                        self.log_so_far()
                     );
-                    return status
+                    let code = status
                         .code()
                         .expect("a process that was not signalled has an exit code");
+                    if let Some(collector) = self.collector.take() {
+                        collector.join().expect("the stderr collector finishes");
+                    }
+                    return ExitedServer {
+                        code,
+                        log: self.log_so_far(),
+                    };
                 }
                 None => std::thread::sleep(READ_POLL),
             }
@@ -250,13 +269,14 @@ fn spawn_server(
     let stderr = child.stderr.take().expect("the server's stderr is piped");
     let first_reads = Arc::new(FirstReads::default());
     let collector = Arc::clone(&first_reads);
-    std::thread::spawn(move || collector.collect(stderr, log));
+    let collector = std::thread::spawn(move || collector.collect(stderr, log));
 
     let mut server = RunningServer {
         child,
         port: 0,
         log_path,
         first_reads,
+        collector: Some(collector),
     };
     server.port = wait_for_listening_port(&mut server);
     probe_health(server.port);
@@ -271,16 +291,16 @@ fn wait_for_listening_port(server: &mut RunningServer) -> u16 {
         if let Some(status) = server.child.try_wait().expect("poll the server process") {
             panic!(
                 "jit-server exited with {status} during startup; log:\n{}",
-                server.log()
+                server.log_so_far()
             );
         }
-        if let Some(port) = parse_listening_port(&server.log()) {
+        if let Some(port) = parse_listening_port(&server.log_so_far()) {
             return port;
         }
         assert!(
             started.elapsed() < STARTUP_BUDGET,
             "jit-server never reported a listening address; log:\n{}",
-            server.log()
+            server.log_so_far()
         );
         std::thread::sleep(READ_POLL);
     }
@@ -608,10 +628,10 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
         wait_for_close(stream, signalled_at, EXIT_BUDGET);
     }
 
-    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
-    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+    let exited = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exited.code, 0, "server log:\n{}", exited.log);
 
-    let log = server.log();
+    let log = exited.log;
     assert_eq!(log_field(&log, SIGNAL_RECEIVED, "signal"), "SIGTERM");
     assert_eq!(
         log_field(&log, SIGNAL_RECEIVED, "drain_deadline_secs"),
@@ -671,10 +691,10 @@ fn test_the_drain_assertion_rejects_a_server_that_force_closes_early() {
     let signalled_at = Instant::now();
     send_signal(server.pid(), Signal::SIGTERM);
     wait_for_close(&mut stalled, signalled_at, EXIT_BUDGET);
-    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
-    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+    let exited = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exited.code, 0, "server log:\n{}", exited.log);
 
-    let log = server.log();
+    let log = exited.log;
     let seeded_drain = reported_drain(&log, FORCE_CLOSING);
     // The panic this catches carries its own message to stderr; the run is
     // healthy despite it.
@@ -700,11 +720,11 @@ fn test_jit_server_enforces_the_graceful_drain_timeout_when_no_deadline_is_confi
 
     let signalled_at = Instant::now();
     send_signal(server.pid(), Signal::SIGTERM);
-    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
-    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+    let exited = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exited.code, 0, "server log:\n{}", exited.log);
 
     assert_eq!(
-        log_field(&server.log(), SIGNAL_RECEIVED, "drain_deadline_secs"),
+        log_field(&exited.log, SIGNAL_RECEIVED, "drain_deadline_secs"),
         GRACEFUL_DRAIN_TIMEOUT.as_secs().to_string()
     );
 }
@@ -754,8 +774,8 @@ fn test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop() {
     drop(stalled);
     let signalled_at = Instant::now();
     send_signal(server.pid(), Signal::SIGTERM);
-    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
-    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+    let exited = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exited.code, 0, "server log:\n{}", exited.log);
 }
 
 #[test]
@@ -766,13 +786,13 @@ fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
 
     let signalled_at = Instant::now();
     send_signal(first.pid(), Signal::SIGTERM);
-    let exit_code = first.wait_for_exit(signalled_at, EXIT_BUDGET);
-    assert_eq!(exit_code, 0, "server log:\n{}", first.log());
+    let exited = first.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exited.code, 0, "server log:\n{}", exited.log);
     // A server with nothing to drain stops at once rather than sitting out the
     // deadline, and the drain it reports for itself is what says so: the count
     // it samples first is already zero. Taking the duration from the server
     // keeps a busy host from making a prompt shutdown look like a slow one.
-    let drained_for = reported_drain(&first.log(), DRAINED);
+    let drained_for = reported_drain(&exited.log, DRAINED);
     assert!(
         drained_for < GRACEFUL_DRAIN_TIMEOUT,
         "a server with nothing to drain spent {drained_for:?} draining \
@@ -789,6 +809,6 @@ fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
 
     let restart_signalled_at = Instant::now();
     send_signal(second.pid(), Signal::SIGTERM);
-    let restart_exit_code = second.wait_for_exit(restart_signalled_at, EXIT_BUDGET);
-    assert_eq!(restart_exit_code, 0, "server log:\n{}", second.log());
+    let restarted = second.wait_for_exit(restart_signalled_at, EXIT_BUDGET);
+    assert_eq!(restarted.code, 0, "server log:\n{}", restarted.log);
 }
