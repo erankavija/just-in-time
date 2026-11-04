@@ -466,7 +466,7 @@
     "REQ-05",
     "DEC-10",
     "DEC-18",
-    "DEC-23"
+    "DEC-25"
    ],
    "terminal": {
     "consumer_family": "head lookup",
