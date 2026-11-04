@@ -24684,3 +24684,5 @@
 {"gate_key":"cargo-ci","id":"f5769b80-846b-4cec-852b-5c7088ca00dd","issue_id":"4d844e61-f310-4395-b938-81247a964c81","timestamp":"2026-11-04T22:29:09.515353054Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"docs-mechanical","id":"67829068-6766-4b43-96c0-11ece9a6840e","issue_id":"4d844e61-f310-4395-b938-81247a964c81","timestamp":"2026-11-04T22:29:20.646799452Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"repo-validate","id":"abba156e-a331-4fc5-9439-6b1dd3f054e4","issue_id":"4d844e61-f310-4395-b938-81247a964c81","timestamp":"2026-11-04T22:29:33.073931183Z","type":"gate_passed","updated_by":"auto:executor"}
+{"assignee":"agent:f4d9502a-lead","id":"4a8049de-b19a-4161-b483-e5d065627f18","issue_id":"b4ca051c-e241-45a5-b0ae-6f9016ada867","timestamp":"2026-11-04T22:30:43.113718802Z","type":"issue_claimed"}
+{"from":"ready","id":"16f0a285-3efa-4cd4-8ad5-609ba36e39ed","issue_id":"b4ca051c-e241-45a5-b0ae-6f9016ada867","timestamp":"2026-11-04T22:30:43.321370458Z","to":"in_progress","type":"issue_state_changed"}

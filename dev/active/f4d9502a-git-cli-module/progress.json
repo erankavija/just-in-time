@@ -64,7 +64,7 @@
           "short_id": "b4ca051c",
           "title": "Issue visibility pages describe two read sources",
           "classification": "documentation",
-          "status": "ready",
+          "status": "in_progress",
           "external_blockers": []
         },
         {
@@ -537,6 +537,14 @@
       "effort": "high",
       "reason": "Bounded reconciliation of existing head lookup with current storage types and module behavior.",
       "agent": "/root/head_lookup"
+    },
+    {
+      "issue": "b4ca051c",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "classification": "read-only documentation verification",
+      "reason": "Bounded audit of four pages already changed by 1e0dd2572; no implementation needed.",
+      "agent": "/root/read_source_docs"
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -547,7 +555,8 @@
     "4ba18af4 old implementation refreshed against main c76f9ea33; worker resolving two merge conflicts. No source merge before peer coordination.",
     "Direct user authorization received: I authorize your work. Earlier approval blocker resolved; head worker resumed without source edits during the hold.",
     "c5062e21 shared-bootstrap startup contract correction committed as e63c8b273 and 47da420ad; refresh affected planning approval before its implementation.",
-    "Main source landings and full gates remain serialized with df129d9e and steward retirement work."
+    "Main source landings and full gates remain serialized with df129d9e and steward retirement work.",
+    "Steward permits at most two isolated worker trees for this epic; supersedes October temporary one-tree disk-pressure cap. Reclaim after landing. b4ca051c verified already implemented by 1e0dd2572; pending required docs gates."
   ],
   "planning_reviews_pending": [
     {
@@ -555,5 +564,6 @@
       "reason": "Approved c5062e21 shared-bootstrap contract correction changes plan-fixed startup contract.",
       "before_implementation": "c5062e21"
     }
-  ]
+  ],
+  "worker_limit": 2
 }
