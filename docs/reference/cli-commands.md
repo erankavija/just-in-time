@@ -3273,7 +3273,7 @@ jit validate --branch-drift [--leases] [--json]
 |------|--------------|
 | (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, readiness coherence) plus every local and graph rule. |
 | `<ID>` | The local and graph rules for that issue only. |
-| `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`, a rule failure exits `1`, and invalid combinations exit `2`. |
+| `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Findings use `VALIDATION_FAILED` and exit `4` ([exit-code reference](exit-codes.md#command-specific-mappings)); invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
 | `--scope <ID>` | Reports the findings of the issues in a container's transitive dependency closure, bounded at its template's breakdown node, excluding whole-repository rules. Rules evaluate over the whole repository, so coverage children and dependency targets outside the closure count. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
 | `--fix` | Apply automatic rule/graph/state fixes and derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. A repository that still fails validation after nothing was repaired exits `4` with `VALIDATION_FAILED`, naming the findings `--fix` cannot repair; `--fix` and plain `validate` never disagree on validity. |
@@ -3322,12 +3322,10 @@ a whole-repository rule failure reports:
 }
 ```
 
-Whole-repository, per-issue, and `--explain` rule failures keep their established
-exit `1` through the registered `GENERIC_ERROR` mapping, as do failed
-`--branch-drift` and `--leases` checks. A repository-integrity failure or failed
-`--scope` gate check uses `VALIDATION_FAILED` and exits `4`. In every case the
-code's registered mapping, not a separate literal, determines the process
-status.
+Every `jit validate` mode reports error-severity findings, including
+whole-repository rule failures, and repository-integrity failures as
+`VALIDATION_FAILED` with exit code `4`. See the [exit-code
+reference](exit-codes.md#command-specific-mappings).
 
 `divergence_count` and `membership_divergences` mirror
 [`jit query divergence`](#membership-divergence-jit-query-divergence). They are

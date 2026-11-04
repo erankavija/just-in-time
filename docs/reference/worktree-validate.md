@@ -373,7 +373,7 @@ for expiry and references to missing worktrees or issues.
 |--------|-------------|
 | `[ID]` | Positional. Validate this one issue's rules; omit to validate the whole repository |
 | `--explain` | Report which rules matched the issue and whether each passed (requires an `[ID]`) |
-| `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`, and a rule or selection failure exits `1`. Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
+| `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`, and findings use `VALIDATION_FAILED` and exit `4` ([exit-code reference](exit-codes.md#command-specific-mappings)). Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
 | `--scope <ID>` | Evaluate a container's bracket subtree as a deterministic gate checker (the rules whose selector matches each issue in the container's dependency closure). Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, `--explain`, and `--rule` |
 | `--fix` | Auto-fix repairable rule/graph/state findings and derived-state drift |
 | `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
@@ -454,9 +454,10 @@ hidden `--divergence` stub, which errors and redirects to `--branch-drift` or
 `--scope` container does not resolve.
 
 For `--rule`, a missing, disabled, non-graph, or non-matching configured rule is
-a validation finding and exits `1`, just like an uncovered selected application.
-Only invalid flag combinations or a missing required positional issue id are
-usage errors and exit `2`.
+a `VALIDATION_FAILED` finding and exits `4`, just like an uncovered selected application
+([exit-code reference](exit-codes.md#command-specific-mappings)). Only invalid
+flag combinations or a missing required positional issue id are usage errors
+and exit `2`.
 
 The code each outcome exits with — including the codes that signal findings
 rather than errors — is in the [Exit Codes reference](exit-codes.md).
