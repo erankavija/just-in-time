@@ -45,15 +45,16 @@
       "path": "dev/active/f8a6b298-history-independent-reads/format4-dry-run.md"
     }
   ],
+  "done_at": "2026-11-04T05:10:56.548801964Z",
   "first_ready_at": "2026-11-02T23:39:44.698348087Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
-      "run_id": "b9694ac5-c296-41cc-a193-a83fd4cb31b7",
-      "status": "failed",
-      "updated_at": "2026-11-04T05:02:12.394033349Z",
+      "run_id": "91f54b1a-8430-436e-a948-a2e1281d3361",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:10:56.069692472Z",
       "updated_by": "auto:executor"
     }
   },
@@ -71,7 +72,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "A rewrite script and window driver move a repository to format 4",
-  "updated_at": "2026-11-04T05:02:13.109796905Z"
+  "updated_at": "2026-11-04T05:10:56.548801964Z"
 }
