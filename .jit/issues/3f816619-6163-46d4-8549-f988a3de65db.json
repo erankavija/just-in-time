@@ -33,7 +33,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Issue write commands move to library handlers",
-  "updated_at": "2026-11-04T12:28:19.005557760Z"
+  "updated_at": "2026-11-04T14:28:29.032742256Z"
 }

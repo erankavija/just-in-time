@@ -28,7 +28,7 @@
     "satisfies:b697a3f7/REQ-18"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Domain code reports typed errors and imports nothing from repository_state",
-  "updated_at": "2026-10-24T21:23:48.870083974Z"
+  "updated_at": "2026-11-04T14:28:46.034573593Z"
 }

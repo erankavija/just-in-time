@@ -30,7 +30,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Query and status commands move to library handlers",
-  "updated_at": "2026-11-04T12:28:19.515867437Z"
+  "updated_at": "2026-11-04T14:28:28.948084135Z"
 }
