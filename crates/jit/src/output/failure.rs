@@ -1131,7 +1131,7 @@ mod exit_code_projection_tests {
                 schema
                     .command_exit_codes
                     .iter()
-                    .any(|c| c.command == row && c.code == Some(actual)),
+                    .any(|c| c.command == row && c.code == actual),
                 "classifier emits code {actual} for `{error}`, but the \
                  command_exit_codes projection has no `{row}` row documenting it"
             );

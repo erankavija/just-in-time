@@ -91,18 +91,18 @@ fn setup_prospective_cycle(cli: &JitCli) -> (String, String) {
 
 /// The projection's exit status for `command`, asserting its exception
 /// classification.
-fn documented_exit_code(command: &str, code: Option<i32>, exception: bool) -> Option<i32> {
+fn documented_exit_code(command: &str, code: i32, exception: bool) -> i32 {
     let schema = CommandSchema::generate();
     let row = schema
         .command_exit_codes
         .iter()
         .find(|c| c.command == command && c.code == code)
         .unwrap_or_else(|| {
-            panic!("command_exit_codes projection has no row for `{command}` code {code:?}")
+            panic!("command_exit_codes projection has no row for `{command}` code {code}")
         });
     assert_eq!(
         row.exception, exception,
-        "row for `{command}` code {code:?} has wrong exception flag"
+        "row for `{command}` code {code} has wrong exception flag"
     );
     row.code
 }
@@ -123,16 +123,9 @@ fn output_in_form(cli: &JitCli, args: &[&str], json: bool) -> Output {
 /// Bind one projected row to both public invocation forms.
 ///
 /// The expected status comes from the generated projection, not a second
-/// hand-authored numeric assertion. A pass-through row (`code: None`) asserts the
-/// two forms agree on a child-supplied status. Running the same documented
-/// condition with and without `--json` also makes a disagreement between the
-/// two forms fail.
-fn assert_row_status_in_both_forms(
-    command: &str,
-    code: Option<i32>,
-    exception: bool,
-    invoke: Invoke,
-) {
+/// hand-authored numeric assertion. Running the same documented condition with
+/// and without `--json` also makes a disagreement between the two forms fail.
+fn assert_row_status_in_both_forms(command: &str, code: i32, exception: bool, invoke: Invoke) {
     let expected = documented_exit_code(command, code, exception);
     let (plain, json) = (invoke(false), invoke(true));
     assert_eq!(
@@ -150,21 +143,19 @@ fn assert_row_status_in_both_forms(
                 plain_status.is_some(),
                 "plain `{command}` outcome {index} must exit with a status"
             );
-            if let Some(expected) = expected {
-                assert_eq!(
-                    plain_status,
-                    Some(expected),
-                    "plain `{command}` outcome {index} must match its projected row; stderr: {}",
-                    String::from_utf8_lossy(&plain.stderr)
-                );
-                assert_eq!(
-                    json_status,
-                    Some(expected),
-                    "machine-readable `{command}` outcome {index} must match its projected row; \
-                     stderr: {}",
-                    String::from_utf8_lossy(&json.stderr)
-                );
-            }
+            assert_eq!(
+                plain_status,
+                Some(expected),
+                "plain `{command}` outcome {index} must match its projected row; stderr: {}",
+                String::from_utf8_lossy(&plain.stderr)
+            );
+            assert_eq!(
+                json_status,
+                Some(expected),
+                "machine-readable `{command}` outcome {index} must match its projected row; \
+                 stderr: {}",
+                String::from_utf8_lossy(&json.stderr)
+            );
             assert_eq!(
                 plain_status, json_status,
                 "plain and machine-readable `{command}` outcome {index} statuses must agree"
@@ -177,7 +168,7 @@ fn assert_row_status_in_both_forms(
 /// [`BOUND_ROWS`], which the completeness check compares with the projection.
 macro_rules! row_bindings {
     ($($(#[$meta:meta])* $test:ident: ($command:expr, $code:expr, $exception:expr) => $invoke:path;)*) => {
-        const BOUND_ROWS: &[(&str, Option<i32>)] = &[$($(#[$meta])* ($command, $code),)*];
+        const BOUND_ROWS: &[(&str, i32)] = &[$($(#[$meta])* ($command, $code),)*];
         $($(#[$meta])* #[test]
         fn $test() {
             assert_row_status_in_both_forms($command, $code, $exception, $invoke);
@@ -719,38 +710,38 @@ fn invoke_claim_without_git(json: bool) -> Vec<Output> {
 }
 
 row_bindings! {
-    test_command_exit_codes_success_emits_0: ("*", Some(0), false) => invoke_success;
-    test_command_exit_codes_malformed_stored_record_emits_1: ("*", Some(1), false) => invoke_malformed_stored_record;
-    test_command_exit_codes_invalid_argument_emits_2: ("*", Some(2), false) => invoke_invalid_argument;
-    test_command_exit_codes_not_found_emits_3: ("*", Some(3), false) => invoke_not_found;
+    test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
+    test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
+    test_command_exit_codes_invalid_argument_emits_2: ("*", 2, false) => invoke_invalid_argument;
+    test_command_exit_codes_not_found_emits_3: ("*", 3, false) => invoke_not_found;
     #[cfg(unix)]
-    test_command_exit_codes_permission_denied_emits_5: ("*", Some(5), false) => invoke_permission_denied;
-    test_command_exit_codes_unsupported_format_emits_10: ("*", Some(10), false) => invoke_unsupported_format;
-    test_command_exit_codes_expired_lock_wait_emits_11: ("*", Some(11), false) => invoke_expired_lock_wait;
-    test_command_exit_codes_broken_pipe_emits_141: ("*", Some(141), true) => invoke_broken_pipe;
-    test_command_exit_codes_enforcing_write_rule_emits_4: ("any command that writes an issue", Some(4), false) => invoke_enforcing_write_rule;
-    test_command_exit_codes_gate_evaluate_failure_emits_4: ("gate evaluate, gate evaluate-all, gate evaluate-many", Some(4), true) => invoke_gate_evaluate_failure;
-    test_command_exit_codes_gate_evaluate_runner_error_emits_10: ("gate evaluate, gate evaluate-all, gate evaluate-many", Some(10), true) => invoke_gate_evaluate_runner_error;
-    test_command_exit_codes_apply_prospective_cycle_emits_4: ("apply", Some(4), false) => invoke_apply_prospective_cycle;
-    test_command_exit_codes_validate_integrity_emits_4: ("validate", Some(4), true) => invoke_validate_integrity;
-    test_command_exit_codes_validate_rule_findings_emits_1: ("validate", Some(1), true) => invoke_validate_rule_findings;
-    test_command_exit_codes_validate_branch_drift_emits_1: ("validate --branch-drift", Some(1), true) => invoke_validate_branch_drift;
-    test_command_exit_codes_validate_leases_emits_1: ("validate --leases", Some(1), true) => invoke_validate_leases;
-    test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", Some(4), true) => invoke_gate_status_all;
-    test_command_exit_codes_invariant_check_emits_4: ("invariant check", Some(4), true) => invoke_invariant_check;
-    test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", Some(4), false) => invoke_config_validate;
-    test_command_exit_codes_doc_check_links_emits_1: ("doc check-links", Some(1), true) => invoke_doc_check_links;
-    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", Some(3), false) => invoke_gate_preset_apply_missing_target;
-    test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", Some(1), false) => invoke_serve_daemon_error;
+    test_command_exit_codes_permission_denied_emits_5: ("*", 5, false) => invoke_permission_denied;
+    test_command_exit_codes_unsupported_format_emits_10: ("*", 10, false) => invoke_unsupported_format;
+    test_command_exit_codes_expired_lock_wait_emits_11: ("*", 11, false) => invoke_expired_lock_wait;
+    test_command_exit_codes_broken_pipe_emits_141: ("*", 141, true) => invoke_broken_pipe;
+    test_command_exit_codes_enforcing_write_rule_emits_4: ("any command that writes an issue", 4, false) => invoke_enforcing_write_rule;
+    test_command_exit_codes_gate_evaluate_failure_emits_4: ("gate evaluate, gate evaluate-all, gate evaluate-many", 4, true) => invoke_gate_evaluate_failure;
+    test_command_exit_codes_gate_evaluate_runner_error_emits_10: ("gate evaluate, gate evaluate-all, gate evaluate-many", 10, true) => invoke_gate_evaluate_runner_error;
+    test_command_exit_codes_apply_prospective_cycle_emits_4: ("apply", 4, false) => invoke_apply_prospective_cycle;
+    test_command_exit_codes_validate_integrity_emits_4: ("validate", 4, true) => invoke_validate_integrity;
+    test_command_exit_codes_validate_rule_findings_emits_1: ("validate", 1, true) => invoke_validate_rule_findings;
+    test_command_exit_codes_validate_branch_drift_emits_1: ("validate --branch-drift", 1, true) => invoke_validate_branch_drift;
+    test_command_exit_codes_validate_leases_emits_1: ("validate --leases", 1, true) => invoke_validate_leases;
+    test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", 4, true) => invoke_gate_status_all;
+    test_command_exit_codes_invariant_check_emits_4: ("invariant check", 4, true) => invoke_invariant_check;
+    test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", 4, false) => invoke_config_validate;
+    test_command_exit_codes_doc_check_links_emits_1: ("doc check-links", 1, true) => invoke_doc_check_links;
+    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, false) => invoke_gate_preset_apply_missing_target;
+    test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", 1, false) => invoke_serve_daemon_error;
     #[cfg(unix)]
-    test_command_exit_codes_serve_foreground_exit_emits_1: ("serve --fg", Some(1), false) => invoke_serve_foreground_exit;
-    test_command_exit_codes_dep_add_cycle_emits_4: ("dep add", Some(4), false) => invoke_dep_add_cycle;
-    test_command_exit_codes_blocked_transition_emits_4: ("issue update, issue claim, issue claim-next", Some(4), false) => invoke_blocked_transition;
-    test_command_exit_codes_gate_define_duplicate_emits_6: ("gate define", Some(6), false) => invoke_gate_define_duplicate;
-    test_command_exit_codes_issue_delete_unconfirmed_emits_2: ("issue delete", Some(2), false) => invoke_issue_delete_unconfirmed;
-    test_command_exit_codes_batch_create_prevalidation_emits_2: ("issue batch-create", Some(2), false) => invoke_batch_create_prevalidation;
-    test_command_exit_codes_snapshot_export_occupied_emits_6: ("snapshot export", Some(6), false) => invoke_snapshot_export_occupied;
-    test_command_exit_codes_claim_without_git_emits_10: ("claim", Some(10), false) => invoke_claim_without_git;
+    test_command_exit_codes_serve_foreground_exit_emits_1: ("serve --fg", 1, false) => invoke_serve_foreground_exit;
+    test_command_exit_codes_dep_add_cycle_emits_4: ("dep add", 4, false) => invoke_dep_add_cycle;
+    test_command_exit_codes_blocked_transition_emits_4: ("issue update, issue claim, issue claim-next", 4, false) => invoke_blocked_transition;
+    test_command_exit_codes_gate_define_duplicate_emits_6: ("gate define", 6, false) => invoke_gate_define_duplicate;
+    test_command_exit_codes_issue_delete_unconfirmed_emits_2: ("issue delete", 2, false) => invoke_issue_delete_unconfirmed;
+    test_command_exit_codes_batch_create_prevalidation_emits_2: ("issue batch-create", 2, false) => invoke_batch_create_prevalidation;
+    test_command_exit_codes_snapshot_export_occupied_emits_6: ("snapshot export", 6, false) => invoke_snapshot_export_occupied;
+    test_command_exit_codes_claim_without_git_emits_10: ("claim", 10, false) => invoke_claim_without_git;
 }
 
 /// Guard: **every** projected row, exception and standard alike, has exactly one
@@ -760,11 +751,11 @@ row_bindings! {
 #[cfg(unix)]
 #[test]
 fn test_command_exit_codes_every_row_is_verified() {
-    let mut bound: Vec<(String, Option<i32>)> = BOUND_ROWS
+    let mut bound: Vec<(String, i32)> = BOUND_ROWS
         .iter()
         .map(|(command, code)| (command.to_string(), *code))
         .collect();
-    let mut projected: Vec<(String, Option<i32>)> = CommandSchema::generate()
+    let mut projected: Vec<(String, i32)> = CommandSchema::generate()
         .command_exit_codes
         .into_iter()
         .map(|c| (c.command, c.code))
