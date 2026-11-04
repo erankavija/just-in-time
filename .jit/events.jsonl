@@ -24045,3 +24045,5 @@
 {"gate_key":"holistic-review","id":"f50ebdcc-9cf1-4d77-8634-07d310af9b02","issue_id":"735949ef-ad86-4629-bf53-69a6e17ae419","timestamp":"2026-11-04T09:41:34.018062265Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"doc-review","id":"789ea496-d132-46be-805d-3d9c719aa96a","issue_id":"78d897a2-8086-4f9e-a82f-f6b790e9848b","timestamp":"2026-11-04T09:42:12.514009564Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"08e0b84e-9307-4114-a125-6a0e555440bf","issue_id":"5d774061-61dd-4eb4-a4c9-faaa347c9cae","timestamp":"2026-11-04T09:42:26.621276878Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"7e38e173-f5b0-4a63-a7ab-e22923bdc21d","issue_id":"5d774061-61dd-4eb4-a4c9-faaa347c9cae","timestamp":"2026-11-04T09:44:21.575291462Z","to":"done","type":"issue_state_changed"}
+{"id":"54878749-d62f-497d-9518-2c6ed252a2d3","issue_id":"5d774061-61dd-4eb4-a4c9-faaa347c9cae","timestamp":"2026-11-04T09:44:21.575291462Z","type":"issue_completed"}
