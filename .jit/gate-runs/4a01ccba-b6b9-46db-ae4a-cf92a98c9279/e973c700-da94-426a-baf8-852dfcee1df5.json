@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2a9fa47446d0ae73f61653acb1640d5595041514",
+  "completed_at": "2026-11-04T12:34:24.415840397Z",
+  "duration_ms": 224612,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md",
+        "id": "F1",
+        "line": 5,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4a01ccba/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "The remeasurement ran at 1-minute loads of 9.1, 12.3, and 14.2, not under the benchmark's quiet-host threshold below 4."
+      }
+    ],
+    "summary": "REQ-01 lacks the required quiet-host remeasurement evidence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4a01ccba-b6b9-46db-ae4a-cf92a98c9279",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e973c700-da94-426a-baf8-852dfcee1df5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T12:30:39.803255276Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3574 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a68a-3d52-7a63-a087-4b0e054742fa\n--------\nuser\n--- 3561 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: tagged commits 32843b6ab, b1ed23165, 46301855, 3fedb755a, 7360cf535, 5e3f82d8, 65033128f\nPolicy sources: AGENTS.md\nResolved items: @/issue/4a01ccba/requirement/REQ-01, REQ-02, REQ-03 (.jit issue Markdown); @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T12:28:58Z)\nTruncation recovery: narrowed reads of individual patches, affected tests, startup watch, benchmark note, remeasurement note, load samples, and target JUnit cases\n\n1. **[blocking][issue-impact][high]** REQ-01 remains unmet. The new measurement explicitly says the host was not quiet (1-minute loads 9.1, 12.3, and 14.2), while the benchmark’s established quiet-host rule requires load below 4. The recorded sub-limit durations therefore do not constitute the required quiet-host remeasurement. [dev/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md:5] [@/issue/4a01ccba/requirement/REQ-01]\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-01 lacks the required quiet-host remeasurement evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The remeasurement ran at 1-minute loads of 9.1, 12.3, and 14.2, not under the benchmark's quiet-host threshold below 4.\",\"file\":\"dev/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md\",\"line\":5,\"references\":[\"@/issue/4a01ccba/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
