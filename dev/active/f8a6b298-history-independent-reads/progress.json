@@ -450,7 +450,8 @@
     "0851fae4": 1,
     "944edb32": 2,
     "09ca911e": 1,
-    "f0a5b90a": 1
+    "f0a5b90a": 1,
+    "5ee85aed": 1
   },
   "surfaced_pitfalls": [
     {
@@ -468,6 +469,10 @@
     {
       "source": "dd53527f code-review",
       "text": "LeaseLock replayed claims.jsonl on every operation (regression vs REQ-05 for heartbeat/renew/evict); list/status loaded worktree identity through the locking, writing path."
+    },
+    {
+      "source": "lead",
+      "text": "655273d9 was closed on repo-validate before its REQ-03 run-id resolution check was run; run afterwards (3699 cited, 0 unresolved) and recorded in format4-cutover.md."
     }
   ],
   "dispatch_log": [
@@ -772,6 +777,11 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "redispatch after REQ-01 amendment (DEC-25)"
+    },
+    {
+      "id": "5ee85aed-r1",
+      "vendor": "lead",
+      "reason": "holistic-review 0dbcc3b2 F1: commit format4-cutover.md evidence record (655273d9 REQ-03 run-id check included), link to 655273d9/5ee85aed/735949ef"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
