@@ -62,23 +62,24 @@ cache_dirs_for() {
 }
 
 prune_cache() {
-    local entry directory stem key hash kind extension
+    local entry directory stem key hash kind companion
     local -A newest=()
     local -a obsolete=()
     find "$1" -type d -name incremental -prune -exec rm -rf -- {} +
     # Rank generations by their newest companion, keeping profile paths distinct.
     while IFS= read -r -d '' entry; do
         entry="${entry#* }"
-        [[ "$entry" =~ ^(.*/deps/)([^/]+)-([[:xdigit:]]{16})(\.(rlib|rmeta|d|so|dylib|dll|a|lib|exe))?$ ]] || continue
+        [[ "$entry" =~ ^(.*/deps/)([^/]+)-([[:xdigit:]]{16})(\.([^/]+))?$ ]] || continue
         directory="${BASH_REMATCH[1]}" stem="${BASH_REMATCH[2]}"
         hash="${BASH_REMATCH[3]}" kind="${BASH_REMATCH[5]:-}"
-        # Library dep-info lacks the library artifact's `lib` prefix.
-        if [[ "$kind" == d && ! -f "$directory$stem-$hash" && ! -f "$directory$stem-$hash.exe" ]]; then
-            for extension in rlib rmeta so dylib a; do
-                if [[ -f "${directory}lib$stem-$hash.$extension" ]]; then
-                    stem="lib$stem" kind="$extension"
-                    break
-                fi
+        # Resolve dep-info through its artifact; libraries add a `lib` prefix.
+        if [[ "$kind" == d ]]; then
+            for companion in "$directory$stem-$hash" "$directory$stem-$hash".* \
+                "${directory}lib$stem-$hash".{rlib,rmeta} "${directory}lib$stem-$hash".*; do
+                [[ -f "$companion" && "$companion" != *.d ]] || continue
+                [[ "$companion" =~ /([^/]+)-$hash(\.([^/]+))?$ ]] || continue
+                stem="${BASH_REMATCH[1]}" kind="${BASH_REMATCH[3]:-}"
+                break
             done
         fi
         case "$kind" in

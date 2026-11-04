@@ -196,6 +196,17 @@ check_harvest() { # branch, PATH
         put "$wt/target/debug/deps/$rel" 'tied generation'
         touch -d '2020-01-01' "$wt/target/debug/deps/$rel"
     done
+    for rel in portable-1111111111111111.wasm portable-1111111111111111.d \
+        compound-1111111111111111.custom.part; do
+        put "$pool/target/debug/deps/$rel" 'older portable artifact'
+        touch -d '2020-01-01' "$pool/target/debug/deps/$rel"
+    done
+    for rel in portable-2222222222222222.wasm portable-2222222222222222.d \
+        compound-2222222222222222.custom.part; do
+        put "$wt/target/debug/deps/$rel" 'newer portable artifact'
+        touch -d '2021-01-01' "$wt/target/debug/deps/$rel"
+    done
+    touch -d '2018-01-01' "$wt/target/debug/deps/portable-2222222222222222.d"
     # A different profile and target retain their own most recent generation.
     put "$pool/target/other/deps/pkg-4444444444444444" 'other profile'
     put "$pool/target/debug/deps/other-4444444444444444" 'other target'
@@ -236,6 +247,17 @@ check_harvest() { # branch, PATH
         test -f "$pool/target/other/deps/pkg-4444444444444444"
     assert "$branch: another target keeps its own generation" \
         test -f "$pool/target/debug/deps/other-4444444444444444"
+
+    for rel in portable-2222222222222222.wasm portable-2222222222222222.d \
+        compound-2222222222222222.custom.part; do
+        assert "$branch: an arbitrary artifact suffix keeps its newest generation: $rel" \
+            test -f "$pool/target/debug/deps/$rel"
+    done
+    for rel in portable-1111111111111111.wasm portable-1111111111111111.d \
+        compound-1111111111111111.custom.part; do
+        assert "$branch: an arbitrary artifact suffix drops its superseded generation: $rel" \
+            test ! -e "$pool/target/debug/deps/$rel"
+    done
 
     before="$(du -sb "$pool" | cut -f1)"
     (cd "$repo" && LEAD_CACHE_POOL="$pool" LEAD_SNAPSHOT_DIR="$snapshots" "$DISPATCH" b > /dev/null 2>&1)
