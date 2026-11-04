@@ -13,10 +13,15 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use thiserror::Error;
 
+mod claim;
 mod emit;
 pub mod failure;
 mod invariant;
 
+pub use claim::{
+    ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
+    ClaimRenewResponse, LeaseListResponse, LeaseListing, LeasesKey, RecoverResponse,
+};
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 
 use crate::declarations::{GateMode, GateStage};
@@ -977,20 +982,6 @@ wire_vocabulary! {
         GenericError = "GENERIC_ERROR",
         /// Repository recovery failed.
         RecoveryFailed = "recovery_failed",
-        /// Claim acquisition failed.
-        ClaimAcquireError = "CLAIM_ACQUIRE_ERROR",
-        /// Claim release failed.
-        ClaimReleaseError = "CLAIM_RELEASE_ERROR",
-        /// Claim renewal failed.
-        ClaimRenewError = "CLAIM_RENEW_ERROR",
-        /// Claim heartbeat failed.
-        ClaimHeartbeatError = "CLAIM_HEARTBEAT_ERROR",
-        /// Claim status inspection failed without a more specific classification.
-        ClaimStatusError = "CLAIM_STATUS_ERROR",
-        /// Claim enumeration failed without a more specific classification.
-        ClaimListError = "CLAIM_LIST_ERROR",
-        /// Forced claim eviction failed.
-        ClaimForceEvictError = "CLAIM_FORCE_EVICT_ERROR",
         /// A lock wait expired while another jit process held the lock.
         LockTimeout = "LOCK_TIMEOUT",
     }
@@ -1008,12 +999,7 @@ impl ErrorCode {
             | ErrorCode::DocumentNotFound
             | ErrorCode::DependencyError
             | ErrorCode::GateCheckError
-            | ErrorCode::PresetError
-            | ErrorCode::ClaimAcquireError
-            | ErrorCode::ClaimReleaseError
-            | ErrorCode::ClaimRenewError
-            | ErrorCode::ClaimHeartbeatError
-            | ErrorCode::ClaimForceEvictError => ExitCode::NotFound,
+            | ErrorCode::PresetError => ExitCode::NotFound,
             ErrorCode::CycleDetected
             | ErrorCode::ValidationFailed
             | ErrorCode::Blocked
@@ -1046,9 +1032,7 @@ impl ErrorCode {
             | ErrorCode::WorktreeStoreDivergenceError
             | ErrorCode::HooksInstallError
             | ErrorCode::GenericError
-            | ErrorCode::RecoveryFailed
-            | ErrorCode::ClaimStatusError
-            | ErrorCode::ClaimListError => ExitCode::GenericError,
+            | ErrorCode::RecoveryFailed => ExitCode::GenericError,
         }
     }
 
@@ -1125,17 +1109,6 @@ impl ErrorCode {
             ErrorCode::RecoveryFailed => {
                 "Applying a leftover redo record, or a recovery routine, failed."
             }
-            ErrorCode::ClaimAcquireError => "Claim acquisition failed.",
-            ErrorCode::ClaimReleaseError => "Claim release failed.",
-            ErrorCode::ClaimRenewError => "Claim renewal failed.",
-            ErrorCode::ClaimHeartbeatError => "Claim heartbeat failed.",
-            ErrorCode::ClaimStatusError => {
-                "Claim status inspection failed without a more specific classification."
-            }
-            ErrorCode::ClaimListError => {
-                "Claim enumeration failed without a more specific classification."
-            }
-            ErrorCode::ClaimForceEvictError => "Forced claim eviction failed.",
             ErrorCode::LockTimeout => {
                 "A lock wait expired while another jit process held the lock; nothing was changed."
             }
@@ -1385,7 +1358,6 @@ collection_keys! {
     PresetsKey = "presets";
     EventsKey = "events";
     ValuesKey = "values";
-    LeasesKey = "leases";
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)
@@ -2842,9 +2814,6 @@ pub struct LabelValuesScope {
     pub namespace: String,
 }
 
-/// Response for `claim status` and `claim list`.
-pub type LeaseListResponse = ListEnvelope<LeasesKey, crate::commands::claim::ListedLease>;
-
 /// Response for `worktree list` command
 pub type WorktreeListResponse =
     ListEnvelope<WorktreesKey, crate::commands::worktree::WorktreeListEntry>;
@@ -3615,13 +3584,6 @@ mod tests {
             (ErrorCode::HooksInstallError, ExitCode::GenericError),
             (ErrorCode::GenericError, ExitCode::GenericError),
             (ErrorCode::RecoveryFailed, ExitCode::GenericError),
-            (ErrorCode::ClaimAcquireError, ExitCode::NotFound),
-            (ErrorCode::ClaimReleaseError, ExitCode::NotFound),
-            (ErrorCode::ClaimRenewError, ExitCode::NotFound),
-            (ErrorCode::ClaimHeartbeatError, ExitCode::NotFound),
-            (ErrorCode::ClaimStatusError, ExitCode::GenericError),
-            (ErrorCode::ClaimListError, ExitCode::GenericError),
-            (ErrorCode::ClaimForceEvictError, ExitCode::NotFound),
             (ErrorCode::LockTimeout, ExitCode::LockTimeout),
         ];
 
@@ -3757,11 +3719,6 @@ mod tests {
             ErrorCode::DependencyError,
             ErrorCode::GateCheckError,
             ErrorCode::PresetError,
-            ErrorCode::ClaimAcquireError,
-            ErrorCode::ClaimReleaseError,
-            ErrorCode::ClaimRenewError,
-            ErrorCode::ClaimHeartbeatError,
-            ErrorCode::ClaimForceEvictError,
         ] {
             assert_eq!(code.exit_code(), ExitCode::NotFound, "{code}");
         }
@@ -3782,8 +3739,6 @@ mod tests {
             ErrorCode::HooksInstallError,
             ErrorCode::GenericError,
             ErrorCode::RecoveryFailed,
-            ErrorCode::ClaimStatusError,
-            ErrorCode::ClaimListError,
         ] {
             assert_eq!(code.exit_code(), ExitCode::GenericError, "{code}");
         }
@@ -3937,7 +3892,9 @@ mod tests {
             lease,
             stale: false,
         };
-        let value = serde_json::to_value(LeaseListResponse::new(vec![listed])).unwrap();
+        let value =
+            serde_json::to_value(LeaseListResponse::listing(vec![listed], LeaseListing::All))
+                .unwrap();
         assert_envelope_value(&value, "leases", 1);
         assert!(value["leases"][0]["expires_at"].is_null());
         assert!(value["leases"][0]["branch"].is_null());

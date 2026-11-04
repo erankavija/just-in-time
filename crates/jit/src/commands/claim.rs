@@ -265,7 +265,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
 /// Returned by [`ClaimOps::release_by_issue`] so the caller can report which
 /// lease was released, on which issue, and which identity performed the release
 /// (the actor recorded in the audit trail).
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct ReleasedLeaseInfo {
     /// The lease ID that was released (resolved from the issue, not supplied by the user).
     pub lease_id: LeaseId,
@@ -576,8 +576,10 @@ impl<S: IssueStore> ClaimOps<'_, S> {
 }
 
 /// Report of recovery actions taken.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
 pub struct RecoveryReport {
+    /// Leftover redo records applied when the repository was opened
+    pub redo_records_applied: usize,
     /// Number of stale locks cleaned up
     pub stale_locks_cleaned: usize,
     /// Number of expired leases evicted
@@ -692,7 +694,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
         let storage = self.exec.storage();
         use crate::storage::temp_cleanup;
 
-        let mut report = RecoveryReport::default();
+        let mut report = RecoveryReport {
+            redo_records_applied: self.exec.recovered_records,
+            ..RecoveryReport::default()
+        };
 
         // Derived-state drift is repaired before anything that depends on git.
         // The git-dependent phase below aborts in a repository whose HEAD does not

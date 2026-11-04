@@ -46,6 +46,8 @@ pub enum Outcome<R> {
 /// [`crate::CommandSchema::generate`] before its legacy table. Test builds
 /// also register the test-only group, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
+    claim::output_schema,
+    claim::recover::output_schema,
     invariant::output_schema,
     #[cfg(test)]
     test_group::output_schema,
@@ -108,6 +110,7 @@ macro_rules! command_group {
     };
 }
 
+pub mod claim;
 pub mod invariant;
 #[cfg(test)]
 mod test_group;

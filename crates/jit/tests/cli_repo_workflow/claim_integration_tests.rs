@@ -268,6 +268,41 @@ fn test_claim_renew_permission_denied_is_identical_in_plain_and_json_forms() {
     assert_claim_failure_parity(&plain, &json, ErrorCode::PermissionDenied);
 }
 
+/// A failure the classifier leaves generic reports the generic code and status
+/// on both paths, not a per-verb claim code.
+#[test]
+fn test_claim_acquire_already_claimed_reports_generic_error_on_both_paths() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = cli.create_issue(["--title", "Contended claim"]).unwrap();
+    let invoke = |agent: &str, json: bool| {
+        let mut command = cli.command([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            agent,
+        ]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    };
+    assert!(invoke("agent:holder", false).status.success());
+
+    let plain = invoke("agent:rival", false);
+    let json = invoke("agent:rival", true);
+
+    assert_claim_failure_parity(&plain, &json, ErrorCode::GenericError);
+    assert_eq!(plain.status.code(), json.status.code());
+    assert_eq!(
+        json.status.code(),
+        Some(ErrorCode::GenericError.exit_code().code())
+    );
+}
+
 #[test]
 fn test_claim_acquire_external_io_is_identical_in_plain_and_json_forms() {
     let cli = JitCli::initialised().unwrap();
