@@ -1083,11 +1083,13 @@
         "ae3f4f8b": -13,
         "0bc448fb": 31,
         "8b3cce62": -106,
-        "8b3cce62-r1": -21
+        "8b3cce62-r1": -21,
+        "6acd7a05": 4,
+        "6acd7a05-r2": 0
       },
       "epic_net_running": 951,
-      "epic_net_latest": 167,
-      "merges_latest": 99,
+      "epic_net_latest": 171,
+      "merges_latest": 101,
       "crate_main_latest": 73631,
       "file_latest": "ledger-2026-11-05.txt",
       "projected_end": "+70..+250 (ceiling +375)",
@@ -1501,7 +1503,7 @@
       "vendor": "Codex gpt-6.1-sol"
     },
     "6acd7a05": {
-      "status": "rework 2 (lead doc fix)",
+      "status": "done",
       "vendor": "Codex gpt-6-luna",
       "note": "merged fad481d3e; code-review F1 stale archive execution field in cli-commands.md:417; lead fixed"
     },
@@ -1514,6 +1516,22 @@
       "vendor": "Claude Opus",
       "epic": "b697a3f7",
       "note": "merged 56626345e; code-review F1 missing ReadSessionOpen race test (REQ-04)"
+    },
+    "5f12265a": {
+      "status": "ready",
+      "note": "critical; filed 2026-11-04 by user ruling; first next session"
+    },
+    "f855d631": {
+      "status": "ready",
+      "note": "critical; filed 2026-11-04 by user ruling; first next session"
+    },
+    "75b46be9": {
+      "status": "ready",
+      "note": "critical; filed 2026-11-04 by user ruling; first next session"
+    },
+    "b22aabce": {
+      "status": "ready",
+      "note": "critical; filed 2026-11-04 by user ruling; first next session"
     }
   },
   "handoff": {
