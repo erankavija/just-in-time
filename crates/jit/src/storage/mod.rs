@@ -5,8 +5,9 @@
 //! through [`RepositoryStateStore`] capture/apply sessions.
 
 use crate::declarations::GateRegistry;
+use crate::domain::artifact_plan::PlanTarget;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
-use crate::domain::{Event, EventBody, Issue};
+use crate::domain::{Event, Issue};
 use anyhow::Result;
 
 pub mod artifact_discovery;
@@ -282,17 +283,17 @@ pub trait IssueStore: Clone {
     /// Returns an error if events cannot be read.
     fn read_events(&self) -> Result<Vec<Event>>;
 
-    /// Read dependency-aware archive events for reconciliation.
+    /// Read the evidence record addressed by one archive target.
     ///
-    /// File storage overrides this path so a torn event prefix cannot prevent a
-    /// later archive run from repairing and reconciling state.
-    fn read_artifact_archive_events(&self) -> Result<Vec<Event>> {
-        Ok(self
-            .read_events()?
-            .into_iter()
-            .filter(|event| matches!(event.body(), EventBody::ArtifactArchiveExecuted(_)))
-            .collect())
-    }
+    /// Returns `None` when the target has no prior executions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the record cannot be read or decoded.
+    fn read_archive_evidence_record(
+        &self,
+        target: &PlanTarget,
+    ) -> Result<Option<crate::domain::artifact_execution::ArchiveEvidenceRecord>>;
 
     /// Load a gate run result by issue and run ID.
     ///
