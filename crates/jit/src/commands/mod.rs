@@ -107,7 +107,6 @@ pub use template_expand::{
 };
 pub(crate) use validate::validate_claims_index_at;
 pub use validate::ValidationOps;
-pub use validate::{DANGLING_LINK_RULE, ENFORCEMENT_DRIFT_RULE, REVIEW_PLACEHOLDER_RULE};
 
 // Re-export WorktreeIdentity for init return type
 pub use crate::storage::worktree_identity::WorktreeIdentity;

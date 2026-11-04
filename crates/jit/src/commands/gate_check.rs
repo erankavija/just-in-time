@@ -477,7 +477,7 @@ fn captured_issue_rule_report(
             .findings
             .into_iter()
             .filter(|finding| {
-                finding.rule == super::DANGLING_LINK_RULE
+                finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
                     && finding.issue_id.as_ref() == Some(issue_id)
             }),
     );
@@ -551,12 +551,13 @@ fn captured_scope_rule_report(
             .findings
             .into_iter()
             .filter(|finding| {
-                (finding.rule == super::DANGLING_LINK_RULE
+                (finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
                     && finding
                         .issue_id
                         .as_ref()
                         .is_some_and(|id| scope_ids.contains(id)))
-                    || finding.rule == super::ENFORCEMENT_DRIFT_RULE
+                    || finding.rule
+                        == crate::validation::report::BuiltInPass::EnforcementDrift.as_str()
             }),
     );
     Ok(RuleReport { findings })
@@ -1097,7 +1098,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
             GateChecker::ReviewPlaceholder => Ok((
                 vec![GateFinding::builtin(
-                    "review-placeholder",
+                    crate::validation::report::BuiltInPass::ReviewPlaceholder.as_str(),
                     FindingSeverity::High,
                     FindingDisposition::Advisory,
                     FindingOrigin::PreExisting,
@@ -3227,7 +3228,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let findings = executor.validation().review_placeholder_findings().unwrap();
 
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule, crate::commands::REVIEW_PLACEHOLDER_RULE);
+        assert_eq!(
+            findings[0].rule,
+            crate::validation::report::BuiltInPass::ReviewPlaceholder.as_str()
+        );
         assert_eq!(
             findings[0].severity,
             crate::declarations::rules::Severity::Warn
@@ -3444,7 +3448,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "unrelated-local-failure",
             "unrelated-graph-failure",
             "unrelated-label-reference",
-            crate::commands::DANGLING_LINK_RULE,
+            crate::validation::report::BuiltInPass::DanglingItemLink.as_str(),
         ] {
             assert!(
                 broad_report
