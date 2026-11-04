@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T22:24:54.946576604Z",
+  "dependencies": [
+    "9c3eb2bf-6ab7-430f-9d1e-df1ef7bdd0b6",
+    "c5062e21-331d-4ab8-8468-3535d16d634f"
+  ],
+  "description": "Repository layout binding enforces the storage root while server startup uses the shared repository constructor.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage binding rejects a mismatched root and server startup consumes the shared constructor.\n",
+  "documents": [],
+  "gates_required": [
+    "repo-validate",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "a236e81e-4890-4607-931a-e3d3612c3899",
+  "labels": [
+    "type:story",
+    "epic:frontends-share-core",
+    "milestone:v1.0",
+    "satisfies:0f8efc37/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Repository foundations",
+  "updated_at": "2026-11-04T22:25:09.314180990Z"
+}

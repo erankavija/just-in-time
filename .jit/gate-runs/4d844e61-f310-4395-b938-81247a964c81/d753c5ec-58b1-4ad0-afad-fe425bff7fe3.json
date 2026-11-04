@@ -1,0 +1,23 @@
+{
+  "branch": "retire-mcp-4d844e61",
+  "by": "auto:executor",
+  "command": "jit validate",
+  "commit": "8d302d6632b3cf0f248619f25d96dd93af6edb1a",
+  "completed_at": "2026-11-04T22:29:33.071140177Z",
+  "duration_ms": 6306,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "repo-validate",
+  "issue_id": "4d844e61-f310-4395-b938-81247a964c81",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d753c5ec-58b1-4ad0-afad-fe425bff7fe3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:29:26.764303432Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Repository validation passed\nwarning: 80 membership label(s) not backed by the DAG (run `jit query divergence` for details)\n"
+}

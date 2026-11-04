@@ -14,7 +14,7 @@ fn apply<S: HandlerStore>(
     force: bool,
 ) -> HandlerResult<TemplateApplyResponse> {
     let templates = ctx.executor.templates();
-    let resolve = |requested: &str| resolve_issue(ctx.executor.storage(), requested);
+    let resolve = |requested: &str| resolve_issue(ctx.executor, requested);
     let bindings = anchors
         .iter()
         .map(|pair| {

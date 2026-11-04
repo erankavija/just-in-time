@@ -182,7 +182,7 @@ fn add<S: HandlerStore>(
         .into_iter()
         .map(|key| key.parse())
         .collect::<Result<Vec<GateKey>, _>>()?;
-    let full_id = resolve_issue(ctx.executor.storage(), &id)?;
+    let full_id = resolve_issue(ctx.executor, &id)?;
     let (result, warnings) = ctx.executor.gates().add_gates(&full_id, &keys)?;
     Ok(
         Outcome::from(GateAddResponse::new(id, result.added, result.already_exist))
@@ -236,7 +236,7 @@ fn preset_create<S: HandlerStore>(
     from_issue: String,
     name: String,
 ) -> HandlerResult<GatePresetCreateResponse> {
-    let id = resolve_issue(ctx.executor.storage(), &from_issue)?;
+    let id = resolve_issue(ctx.executor, &from_issue)?;
     let path = ctx.executor.gates().create_gate_preset(&name, &id)?;
     let message = format!("Created preset '{}'", name);
     Ok(Outcome::success_with(
@@ -268,7 +268,7 @@ fn preset_apply<S: HandlerStore>(
     };
     let mut warnings = Vec::new();
     for id in ids {
-        let resolved = resolve_issue(ctx.executor.storage(), &id);
+        let resolved = resolve_issue(ctx.executor, &id);
         if let Ok(issue) = &resolved {
             // A foreign lease is an authorization failure, not a per-gate error.
             ctx.executor.refuse_foreign_lease(issue)?;
@@ -344,7 +344,7 @@ fn resolve_status_issue<S: IssueStore>(
     id: &str,
     gate_key: &str,
 ) -> anyhow::Result<IssueId> {
-    resolve_issue(ctx.executor.storage(), id).map_err(|error| {
+    resolve_issue(ctx.executor, id).map_err(|error| {
         if ctx
             .executor
             .gates()
@@ -418,7 +418,7 @@ fn gate_status<S: IssueStore>(
                 })
             })
             .transpose()?;
-        let issue_id = resolve_issue(ctx.executor.storage(), &id)?;
+        let issue_id = resolve_issue(ctx.executor, &id)?;
         let runs = gates
             .list_gate_runs(&issue_id, filter.as_ref())?
             .into_iter()
@@ -439,7 +439,7 @@ fn gate_status<S: IssueStore>(
     }
     if findings || flat {
         let key = resolve_gate_key_for(gate_key, gate_flag, "gate status")?;
-        let issue_id = resolve_issue(ctx.executor.storage(), &id)?;
+        let issue_id = resolve_issue(ctx.executor, &id)?;
         return Ok(match gates.get_last_gate_run(&issue_id, &key)? {
             None => never_run(key, issue_id),
             Some(run) if findings => {
@@ -475,7 +475,7 @@ fn status_all<S: IssueStore>(
     id: String,
     full: bool,
 ) -> HandlerResult<ForIssue<GateCheckAllResponse>> {
-    let issue_id = resolve_issue(ctx.executor.storage(), &id)?;
+    let issue_id = resolve_issue(ctx.executor, &id)?;
     let gates = ctx.executor.gates();
     let (results, _) = gates.get_last_gate_runs_for_issue(&issue_id)?;
     // Readiness across every required gate, automated and manual.
@@ -540,7 +540,7 @@ fn evaluate<S: HandlerStore>(
     force: bool,
 ) -> HandlerResult<GateEvaluateResponse> {
     let key = resolve_gate_key_for(gate_key, gate_flag, "gate evaluate")?;
-    let full_id = resolve_issue(ctx.executor.storage(), &id)?;
+    let full_id = resolve_issue(ctx.executor, &id)?;
     let outcome = ctx.executor.gates().pass_gate(&full_id, &key, by, force)?;
     Ok(Outcome::from(GateEvaluateResponse::new(id, key)).with_warnings(outcome.warnings))
 }
@@ -551,7 +551,7 @@ fn evaluate_all<S: HandlerStore>(
     by: Option<String>,
     force: bool,
 ) -> HandlerResult<GateEvaluateAllResponse> {
-    let full_id = resolve_issue(ctx.executor.storage(), &id)?;
+    let full_id = resolve_issue(ctx.executor, &id)?;
     let results = ctx
         .executor
         .gates()
@@ -585,7 +585,7 @@ fn evaluate_many<S: HandlerStore>(
     let resolved: Vec<(String, anyhow::Result<IssueId>)> = ids
         .into_iter()
         .map(|requested| {
-            let id = resolve_issue(ctx.executor.storage(), &requested);
+            let id = resolve_issue(ctx.executor, &requested);
             (requested, id)
         })
         .collect();
@@ -655,7 +655,7 @@ fn fail<S: HandlerStore>(
     by: Option<String>,
 ) -> HandlerResult<GateFailResponse> {
     let key = gate_key.parse()?;
-    let full_id = resolve_issue(ctx.executor.storage(), &id)?;
+    let full_id = resolve_issue(ctx.executor, &id)?;
     let warnings = ctx.executor.gates().fail_gate(&full_id, &key, by)?;
     Ok(Outcome::from(GateFailResponse::new(id, key)).with_warnings(warnings))
 }
@@ -700,7 +700,9 @@ command_group! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::{memory_executor, seed_gate_registry, seed_issue};
+    use crate::commands::test_helpers::{
+        memory_executor, seed_gate_registry, seed_issue, ExecutorTestAccess,
+    };
     use crate::commands::CommandExecutor;
     use crate::declarations::{GateDefinition as Declared, GateMode, GateStage};
     use crate::output::failure::classify;

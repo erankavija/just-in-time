@@ -45,7 +45,7 @@ fn count<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     label: String,
 ) -> HandlerResult<CountResponse> {
-    let issues = ctx.executor.storage().list_issues()?.len();
+    let issues = ctx.executor.issues().list_issues(None, None, None)?.len();
     Ok(CountResponse { label, issues }.into())
 }
 

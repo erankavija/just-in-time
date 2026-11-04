@@ -20,7 +20,6 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 - Query available work programmatically
 - Use advisory leases when an agent needs exclusive work ownership
 - Enforce quality through automated gates
-- Access via MCP (Model Context Protocol) tools
 
 **Human Developers** - Collaborative users
 - Track personal projects with CLI
@@ -43,7 +42,6 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 
 **Agent-Friendly Architecture**
 - Atomic file replacement guarded by advisory locks (no database, no server)
-- MCP tool integration for AI frameworks
 - Stateless coordination through shared file state
 - Event logs for observability and audit trail
 
@@ -75,7 +73,6 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 - Recoverable record-based publication plus advisory leases for exclusive coordination
 - Explicit dependency DAG (clear work order)
 - Gates integrate quality into workflow (not external)
-- MCP tools for agent frameworks (standardized interface)
 
 **Design Principles:**
 1. **Programmatic-first** - Optimize for agents, humans benefit too

@@ -501,22 +501,22 @@ export JIT_AGENT_ID=agent:main-agent
 # Continue working...
 ```
 
-**Terminal 2: Second agent for MCP work**
+**Terminal 2: Second agent for web work**
 
 ```bash
 # 1. Create worktree with feature branch
-git worktree add ../jit-mcp-work -b feature/mcp-tests
+git worktree add ../jit-web-work -b feature/web-tests
 
 # 2. Enter worktree and set identity
-cd ../jit-mcp-work
-export JIT_AGENT_ID=agent:mcp-worker
+cd ../jit-web-work
+export JIT_AGENT_ID=agent:web-worker
 
 # 3. Verify setup
 jit worktree info
 jit claim list  # See all active claims
 
 # 4. Claim your issue
-jit claim acquire e748afbb  # MCP test coverage issue
+jit claim acquire e748afbb  # web test coverage issue
 
 # 5. Launch Copilot CLI
 copilot-cli
@@ -586,9 +586,9 @@ Then merge from main:
 ```bash
 # Back in main worktree
 git fetch origin
-git merge origin/feature/mcp-tests
+git merge origin/feature/web-tests
 git merge origin/feature/docs-tutorial
-git worktree remove ../jit-mcp-work
+git worktree remove ../jit-web-work
 git worktree remove ../jit-docs
 ```
 

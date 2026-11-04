@@ -2,10 +2,7 @@
 
 use super::{count_message, CommandContext, HandlerResult, Outcome};
 use crate::cli::WorktreeCommands;
-use crate::commands::worktree::{
-    execute_worktree_exec, execute_worktree_info, execute_worktree_list,
-    execute_worktree_store_divergence, WorktreeInfo,
-};
+use crate::commands::worktree::WorktreeInfo;
 use crate::output::{
     StoreComparison, WorktreeExecResponse, WorktreeListResponse, WorktreeStoreDivergenceResponse,
 };
@@ -13,15 +10,13 @@ use crate::storage::JsonFileStorage;
 use anyhow::Context;
 
 fn info(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<WorktreeInfo> {
-    let (info, warnings) =
-        execute_worktree_info(&ctx.executor.storage().configured_worktree_paths()?)?;
+    let (info, warnings) = ctx.executor.worktrees().info()?;
     let message = format!("Worktree {} on branch {}", info.worktree_id, info.branch);
     Ok(Outcome::success_with(info, message).with_warnings(warnings))
 }
 
 fn list(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<WorktreeListResponse> {
-    let (worktrees, warnings) =
-        execute_worktree_list(&ctx.executor.storage().configured_worktree_paths()?)?;
+    let (worktrees, warnings) = ctx.executor.worktrees().list()?;
     let message = count_message(worktrees.len(), "", " worktree(s)");
     Ok(
         Outcome::success_with(WorktreeListResponse::new(worktrees), message)
@@ -32,8 +27,7 @@ fn list(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<WorktreeList
 fn store_divergence(
     ctx: &CommandContext<'_, JsonFileStorage>,
 ) -> HandlerResult<WorktreeStoreDivergenceResponse> {
-    let report =
-        execute_worktree_store_divergence(&ctx.executor.storage().configured_worktree_paths()?)?;
+    let report = ctx.executor.worktrees().store_divergence()?;
     let message = count_message(report.divergences.len(), "", " divergence(s)");
     Ok(Outcome::success_with(
         WorktreeStoreDivergenceResponse::with_extras(
@@ -52,13 +46,7 @@ fn exec(
     command: Vec<String>,
 ) -> HandlerResult<WorktreeExecResponse> {
     let (program, args) = command.split_first().context("no command to run")?;
-    let executor = ctx.executor;
-    let status = execute_worktree_exec(
-        executor.storage(),
-        executor.repository_layout()?,
-        program,
-        args,
-    )?;
+    let status = ctx.executor.worktrees().exec(program, args)?;
     Ok(Outcome::Exited(
         status
             .code()

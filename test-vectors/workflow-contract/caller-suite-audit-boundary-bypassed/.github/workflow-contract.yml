@@ -24,7 +24,7 @@ workflows:
       secrets:
         allowed: []
     callers:
-      require_needs: [cargo-audit, npm-audit-mcp-server, npm-audit-web]
+      require_needs: [cargo-audit, npm-audit-extra, npm-audit-web]
 
   release.yml:
     triggers:

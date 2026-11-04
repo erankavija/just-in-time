@@ -9,8 +9,51 @@
   "description": "Every supported installation, deployment, MCP, compatibility, upgrade, and version-policy workflow has one maintained adopter-facing home.\n\n## Success Criteria\n\n- [hard] REQ-01: `INSTALL.md` owns installing the published native archive and verifying its checksum, plus the contributor build-from-checkout path; `docs/how-to/deployment.md` owns the one-image `/repo` deployment including building that image locally; a canonical MCP guide owns installing the released tarball and starting it from a client; and the release-policy reference owns version, compatibility, upgrade, artifact, and MSRV procedures.\n- [hard] REQ-02: Every command, artifact name, mount path, health URL, runtime prerequisite, and version policy stated in those homes is exercised by automation or derived from a maintained manifest or workflow source.\n- [hard] REQ-03: The canonical pages distinguish the published artifacts from contributor source-checkout workflows, and no instruction depends on an artifact the release does not publish.\n- [hard] REQ-04: Link, command-snippet, and support-matrix checks fail when a canonical path is missing, stale, or duplicated.\n- [hard] REQ-05: The pages state that v1.0 publishes one GitHub release and no package-registry or container-registry version, so an adopter can tell which distribution paths are supported without inferring it.\n\n## Notes\n\nBlast radius: `INSTALL.md`, `docs/how-to/deployment.md`, the canonical MCP integration page (created if absent), one release-policy reference, navigation, and documentation checks; historical and unrelated conceptual documents are unchanged.\n",
   "documents": [
     {
-      "commit": null,
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "86a1ed8ee66997f655b8bab4450dd0e1fbc088ac5d313aad18826fda80a5a8a5",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "20020e8f799425c8befb77bfa2041dbb42ea3b47de33544eb6dcb1acef61d4d8",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "multi-agent-coordination.md",
+          "resolved_path": "docs/how-to/multi-agent-coordination.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "aa88a6efac48fa4effa073f2fd63778bcae9ce59da84273d821d932e09fd68ab",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../INSTALL.md",
+          "resolved_path": "INSTALL.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "a322497bfaaa5e0664e3db8f4337edacb712cbdf3e0916a11061907f186c5343",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/release-policy.md",
+          "resolved_path": "docs/reference/release-policy.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "55c87c281e3fcd9fd7eab89b055e79a093727fe1418495fb65b90238e661bed1",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/compatibility.md",
+          "resolved_path": "docs/reference/compatibility.md"
+        }
+      ],
+      "commit": "f0add631d58304738db38e1746e6151969626dc2",
       "doc_type": "documentation",
+      "format": "markdown",
       "label": "Canonical MCP integration guide",
       "path": "docs/how-to/mcp-integration.md"
     },
@@ -64,5 +107,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Establish canonical installation, deployment, MCP, source, and release references",
-  "updated_at": "2026-10-01T19:33:12.274363349Z"
+  "updated_at": "2026-11-04T22:16:24.713056439Z"
 }
