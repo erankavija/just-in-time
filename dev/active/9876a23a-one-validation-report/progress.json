@@ -1,7 +1,7 @@
 {
   "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
   "epic_short_id": "9876a23a",
-  "current_wave": 8,
+  "current_wave": 9,
   "waves": [
     {
       "wave_number": 1,
@@ -256,6 +256,36 @@
           "worker": "claude opus"
         }
       ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "short_id": "6ac41880",
+          "status": "done 662a9252a (-245)",
+          "worker": "codex gpt-6-luna xhigh"
+        },
+        {
+          "short_id": "78d897a2",
+          "status": "done 4742a3fd9, d72af2908, 34625178a, 96dfde725 (doc-review 3 rounds)",
+          "worker": "claude opus"
+        },
+        {
+          "short_id": "5d774061",
+          "status": "done b65a4c5c1 (REQ-08 met)",
+          "worker": "claude opus"
+        },
+        {
+          "short_id": "03bf6983",
+          "status": "done 170f5859c (0)",
+          "worker": "codex gpt-6.1-sol high"
+        },
+        {
+          "short_id": "f22147ec",
+          "status": "done 42373fb82 (-124; rework 1: shared test fixtures)",
+          "worker": "codex gpt-6.1-sol high"
+        }
+      ]
     }
   ],
   "held": {},
@@ -341,9 +371,20 @@
           "2f12d920": 17,
           "a106d1be": -195
         }
+      },
+      {
+        "wave": 9,
+        "test_support_as_test": -369,
+        "by_issue": {
+          "6ac41880": -245,
+          "03bf6983": 0,
+          "f22147ec": -124,
+          "78d897a2": 0,
+          "5d774061": 0
+        }
       }
     ],
-    "running_total": -28,
+    "running_total": -397,
     "reestimate_2026_11_04": {
       "remaining": -950,
       "epic_end": -470,
