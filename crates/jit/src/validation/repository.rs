@@ -1027,6 +1027,37 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_live_reports_a_verdict_record_that_does_not_reproduce() {
+        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        )
+        .unwrap();
+        executor
+            .validation()
+            .validate_with_fix(true, false)
+            .unwrap();
+        let run_id = seed_attested_gate_run(&mut executor);
+        let path = VirtualPath::gate_verdict_record(
+            &"tests".parse().unwrap(),
+            &crate::domain::repository_inputs::InputsDigest::try_from("d".repeat(64)).unwrap(),
+        );
+        let file = data_path(&executor, &path);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        let record = crate::domain::GateVerdictRecord {
+            issue_id: executor.storage().list_issues().unwrap().remove(0).id,
+            run_id,
+        };
+        std::fs::write(&file, serde_json::to_vec(&record).unwrap()).unwrap();
+
+        let error = validate_live(&executor).unwrap_err().to_string();
+
+        assert!(
+            error.contains("record-fidelity") && error.contains(&path.repository_relative()),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn test_overlay_validation_does_not_read_gate_run_records() {
         let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
