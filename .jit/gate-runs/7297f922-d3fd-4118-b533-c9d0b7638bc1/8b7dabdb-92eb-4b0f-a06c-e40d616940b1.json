@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-7297f922",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2d998c5b7670cda2c3e551b0f2a150c2fa6e0cf1",
+  "completed_at": "2026-11-04T22:58:15.200422220Z",
+  "duration_ms": 127113,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed CLI workflow tests meet all issue criteria and applicable test-policy requirements.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7297f922-d3fd-4118-b533-c9d0b7638bc1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8b7dabdb-92eb-4b0f-a06c-e40d616940b1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:56:08.087345745Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 251bc325, 59f0e349 (`jit:7297f922`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md, markdown-first); @/invariant/orthogonal-tests, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml, registry-first); @/issue/f4d9502a/requirement/REQ-06, @/issue/f4d9502a/requirement/REQ-07 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T22:54:12Z)\nTruncation recovery: recovered broad-search truncation with targeted registry, suite-entry, dependency-status, and charter reads\n\n1. No findings identified.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed CLI workflow tests meet all issue criteria and applicable test-policy requirements.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

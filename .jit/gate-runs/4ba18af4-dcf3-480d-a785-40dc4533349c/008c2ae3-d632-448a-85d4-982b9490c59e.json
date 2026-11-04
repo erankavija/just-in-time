@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8854c45a22efde57a1c3f8c1c9de886eb760a2a2",
+  "completed_at": "2026-11-04T22:52:15.538698851Z",
+  "duration_ms": 288535,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/git.rs",
+        "id": "F1",
+        "line": 141,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "A public unvalidated GitCheckout constructor makes head() classify arbitrary nonzero Git failures as an unborn branch."
+      }
+    ],
+    "summary": "GitCheckout permits unvalidated roots, causing head() to hide non-unborn Git failures as absent heads.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4ba18af4-dcf3-480d-a785-40dc4533349c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "008c2ae3-d632-448a-85d4-982b9490c59e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:47:27.003359138Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 29618 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a8be-ecdc-7481-9968-0915e7fabb65\n--------\nuser\n--- 29605 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f97d6eb3a, 5bce32677\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-05 (parent issue description); relevant invariants (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T22:45:57Z)\nTruncation recovery: narrowed the truncated merge output to combined-diff paths and both parent deltas for the three affected files; read current implementation and tests.\n\n1. **[blocking][issue-impact] F1 — `GitCheckout::new` is public and accepts any path, but `head()` converts every nonzero Git exit into `Ok(None)`.** This breaks REQ-03’s premise that a `GitCheckout` can exist only for a recognized checkout: callers can construct one for a non-repository or failed checkout and silently receive “unborn branch.” Restrict construction to recognized `WorktreePaths` (retaining a test-only constructor if needed), or distinguish non-unborn failures. [crates/jit/src/storage/git.rs:141](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/git.rs:141)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"GitCheckout permits unvalidated roots, causing head() to hide non-unborn Git failures as absent heads.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A public unvalidated GitCheckout constructor makes head() classify arbitrary nonzero Git failures as an unborn branch.\",\"file\":\"crates/jit/src/storage/git.rs\",\"line\":141}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
