@@ -22,8 +22,8 @@ use jit::cli::{
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
-    apply, config, events, init, invariant, item, resolve_issue, resolve_issue_filter, version,
-    CommandContext,
+    apply, config, events, init, invariant, item, resolve_issue, resolve_issue_filter, serve,
+    version, CommandContext,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
@@ -1217,7 +1217,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
     let jit::commands::OpenedRepository {
         retained_session: mut retained_mutation_session,
         executor,
-        data_root: jit_dir,
+        data_root: _,
         worktree_paths,
         layout: executor_layout,
         recovered_records: redo_records_applied,
@@ -5722,254 +5722,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 Err(e) => exit_recovery_failed(&e, json),
             }
         }
-        Commands::Serve {
-            port,
-            stop,
-            status,
-            fg,
-            log,
-            web_dir,
-        } => {
-            use jit::commands::serve::{
-                find_web_dir, server_status, start_server, stop_server, ServeOptions, ServeOutcome,
-                StartupWatch, StopOutcome,
-            };
-            use serde_json::json;
-
-            let log_file = log.map(|l| jit_dir.join(l));
-
-            if stop {
-                match stop_server(&executor_layout) {
-                    Ok(StopOutcome::Stopped { pid, port: p }) => {
-                        if json {
-                            println!(
-                                "{}",
-                                serde_json::to_string_pretty(&json!({
-                                    "status": "stopped",
-                                    "pid": pid,
-                                    "port": p
-                                }))?
-                            );
-                        } else {
-                            println!("Server stopped (was PID {pid} on port {p})");
-                        }
-                    }
-                    Ok(StopOutcome::NotRunning) => {
-                        if json {
-                            println!(
-                                "{}",
-                                serde_json::to_string_pretty(&json!({"status": "not_running"}))?
-                            );
-                        } else {
-                            println!("Server is not running.");
-                        }
-                    }
-                    Err(e) => {
-                        let code = classify(&e).error.code;
-                        if json {
-                            let json_error = command_json_error(&e, code);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            eprintln!("Error stopping server: {e}");
-                            std::process::exit(code.exit_code().code());
-                        }
-                    }
-                }
-            } else if status {
-                match server_status(&executor_layout) {
-                    Ok(Some(pf)) => {
-                        let url = format!("http://localhost:{}", pf.port);
-                        if json {
-                            println!(
-                                "{}",
-                                serde_json::to_string_pretty(&json!({
-                                    "status": "running",
-                                    "pid": pf.pid,
-                                    "port": pf.port,
-                                    "url": url,
-                                    "log_file": pf.log_file,
-                                    "started_at": pf.started_at
-                                }))?
-                            );
-                        } else {
-                            println!(
-                                "Server is running: {} (PID {}, started {})",
-                                url, pf.pid, pf.started_at
-                            );
-                        }
-                    }
-                    Ok(None) => {
-                        if json {
-                            println!(
-                                "{}",
-                                serde_json::to_string_pretty(&json!({"status": "not_running"}))?
-                            );
-                        } else {
-                            println!("Server is not running.");
-                        }
-                    }
-                    Err(e) => {
-                        let code = classify(&e).error.code;
-                        if json {
-                            let json_error = command_json_error(&e, code);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            eprintln!("Error checking server status: {e}");
-                            std::process::exit(code.exit_code().code());
-                        }
-                    }
-                }
-            } else {
-                // Release this process's startup mutation session before
-                // spawning the server it then waits on. Pre-service recovery
-                // already ran on the parent; the server child runs its own
-                // recovery under the ordinary bootstrap → repository chain, so
-                // holding the guards across the wait deadlocks the child against
-                // the parent. Both starts wait: the foreground one on
-                // `child.wait()`, the daemonizing one until the server answers on
-                // its port.
-                if let Some(guard) = retained_mutation_session.take() {
-                    guard.release()?;
-                }
-
-                // Foreground mode: the banner prints from the bound-port callback.
-                if fg {
-                    use jit::commands::serve::{
-                        foreground_exit_code, run_foreground, ForegroundOptions, ForegroundOutcome,
-                    };
-
-                    let opts = ForegroundOptions {
-                        layout: executor_layout.clone(),
-                        preferred_port: port,
-                        web_dir: web_dir.map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d)),
-                        server_binary: None,
-                    };
-                    match run_foreground(opts, |launch| {
-                        if !json {
-                            let url = format!("http://localhost:{}", launch.port);
-                            println!("Starting server on {url} (foreground, Ctrl+C to stop)");
-                            println!("  API: {url}/api");
-                            match &launch.web_dir {
-                                Some(web) => println!("  Web: {url}/ (from {})", web.display()),
-                                None => println!("  Web: {url}/ (embedded assets)"),
-                            }
-                        }
-                    })? {
-                        ForegroundOutcome::AlreadyRunning { pid, port: p } => {
-                            let url = format!("http://localhost:{p}");
-                            if json {
-                                println!(
-                                    "{}",
-                                    serde_json::to_string_pretty(&json!({
-                                        "status": "running",
-                                        "pid": pid,
-                                        "port": p,
-                                        "url": url
-                                    }))?
-                                );
-                            } else {
-                                println!("Server is already running on {url} (PID {pid})");
-                            }
-                        }
-                        ForegroundOutcome::Exited { port: p, status } => {
-                            if json {
-                                println!(
-                                    "{}",
-                                    serde_json::to_string_pretty(&json!({
-                                        "status": "exited",
-                                        "port": p,
-                                        "exit_code": status.code()
-                                    }))?
-                                );
-                            }
-                            if !status.success() {
-                                std::process::exit(foreground_exit_code(status.code()));
-                            }
-                        }
-                    }
-                } else {
-                    // Daemonize via start_server.
-                    let resolved_web_dir = web_dir
-                        .map(|d| jit_dir.parent().unwrap_or(&jit_dir).join(d))
-                        .or_else(find_web_dir);
-                    let web_dir_display = resolved_web_dir
-                        .as_deref()
-                        .filter(|d| d.is_dir())
-                        .map(|d| d.display().to_string());
-                    let opts = ServeOptions {
-                        layout: executor_layout.clone(),
-                        preferred_port: port,
-                        log_file,
-                        web_dir: resolved_web_dir,
-                        server_binary: None,
-                    };
-                    match start_server(opts, StartupWatch::for_live_server()) {
-                        Ok(ServeOutcome::Started {
-                            pid,
-                            port: p,
-                            log_file: lf,
-                        }) => {
-                            let url = format!("http://localhost:{p}");
-                            if json {
-                                println!(
-                                    "{}",
-                                    serde_json::to_string_pretty(&json!({
-                                        "status": "started",
-                                        "pid": pid,
-                                        "port": p,
-                                        "url": url,
-                                        "log_file": lf,
-                                        "web_ui": true,
-                                        "web_ui_source": if web_dir_display.is_some() {
-                                            "filesystem"
-                                        } else {
-                                            "embedded"
-                                        }
-                                    }))?
-                                );
-                            } else {
-                                println!("Server started on {url} (PID {pid})");
-                                println!("  API: {url}/api");
-                                if let Some(ref dir) = web_dir_display {
-                                    println!("  Web: {url}/ (from {dir})");
-                                } else {
-                                    println!("  Web: {url}/ (embedded assets)");
-                                }
-                                println!("  Log: {}", lf.display());
-                            }
-                        }
-                        Ok(ServeOutcome::AlreadyRunning { pid, port: p }) => {
-                            let url = format!("http://localhost:{p}");
-                            if json {
-                                println!(
-                                    "{}",
-                                    serde_json::to_string_pretty(&json!({
-                                        "status": "running",
-                                        "pid": pid,
-                                        "port": p,
-                                        "url": url
-                                    }))?
-                                );
-                            } else {
-                                println!("Server is already running on {url} (PID {pid})");
-                            }
-                        }
-                        Err(e) => {
-                            let code = classify(&e).error.code;
-                            if json {
-                                let json_error = command_json_error(&e, code);
-                                println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error.exit_code().code());
-                            } else {
-                                eprintln!("Error starting server: {e}");
-                                std::process::exit(code.exit_code().code());
-                            }
-                        }
-                    }
-                }
+        Commands::Serve(args) => {
+            // Release this process's startup mutation session before the
+            // server starts: the server child runs its own recovery under the
+            // ordinary bootstrap, so holding the guards across the wait
+            // deadlocks the child against the parent.
+            if let Some(guard) = retained_mutation_session.take() {
+                guard.release()?;
             }
+            return serve::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Claim(claim_cmd) => match claim_cmd {
             ClaimCommands::Acquire {

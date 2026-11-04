@@ -436,32 +436,36 @@ pub enum Commands {
     ///   jit serve --stop           # Stop the running server
     ///   jit serve --fg             # Run in foreground (for debugging)
     ///   jit serve --json           # Machine-readable output
-    Serve {
-        /// Preferred port to listen on (auto-selects from 3000–3099 if
-        /// taken; pass 0 for any OS-assigned free port)
-        #[arg(long, default_value = "3000")]
-        port: u16,
+    Serve(ServeArgs),
+}
 
-        /// Stop the running server for this repository
-        #[arg(long, conflicts_with_all = ["status", "fg"])]
-        stop: bool,
+/// Arguments of `jit serve`.
+#[derive(Args)]
+pub struct ServeArgs {
+    /// Preferred port to listen on (auto-selects from 3000–3099 if
+    /// taken; pass 0 for any OS-assigned free port)
+    #[arg(long, default_value = "3000")]
+    pub port: u16,
 
-        /// Show server status and exit
-        #[arg(long, conflicts_with_all = ["stop", "fg"])]
-        status: bool,
+    /// Stop the running server for this repository
+    #[arg(long, conflicts_with_all = ["status", "fg"])]
+    pub stop: bool,
 
-        /// Run in foreground instead of daemonizing (useful for debugging)
-        #[arg(long)]
-        fg: bool,
+    /// Show server status and exit
+    #[arg(long, conflicts_with_all = ["stop", "fg"])]
+    pub status: bool,
 
-        /// Write server output to this file [default: .jit/server.log]
-        #[arg(long)]
-        log: Option<String>,
+    /// Run in foreground instead of daemonizing (useful for debugging)
+    #[arg(long)]
+    pub fg: bool,
 
-        /// Directory containing built web UI static files (auto-detected if omitted)
-        #[arg(long)]
-        web_dir: Option<String>,
-    },
+    /// Write server output to this file [default: .jit/server.log]
+    #[arg(long)]
+    pub log: Option<String>,
+
+    /// Directory containing built web UI static files (auto-detected if omitted)
+    #[arg(long)]
+    pub web_dir: Option<String>,
 }
 
 /// Addressable structured item subcommands.
@@ -2678,7 +2682,7 @@ impl Commands {
             Self::Project(command) => command.requires_recovery_dispatch(),
             Self::Snapshot(command) => command.requires_recovery_dispatch(),
             Self::Validate { fix, dry_run, .. } => *fix && !*dry_run,
-            Self::Serve { status, .. } => !*status,
+            Self::Serve(args) => !args.status,
             Self::List { .. }
             | Self::Events(_)
             | Self::Graph(_)
@@ -2732,7 +2736,7 @@ impl Commands {
             }
             | Self::Search { .. }
             | Self::Validate { .. }
-            | Self::Serve { .. }
+            | Self::Serve(_)
             | Self::Version { .. }
             | Self::Status { .. } => false,
         }
@@ -3378,14 +3382,14 @@ mod recovery_dispatch_tests {
             dry_run: true,
         })
         .requires_recovery_dispatch());
-        assert!(!Commands::Serve {
+        assert!(!Commands::Serve(ServeArgs {
             port: 3000,
             stop: false,
             status: true,
             fg: false,
             log: None,
             web_dir: None,
-        }
+        })
         .requires_recovery_dispatch());
     }
 

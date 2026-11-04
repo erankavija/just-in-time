@@ -178,8 +178,7 @@ pub struct ExitCodeDoc {
 /// general; this maps the codes back to the command families and conditions
 /// that produce them. `exception` flags a row where the code's meaning here
 /// departs from the global entry — a completed run signalling findings with a
-/// non-zero code, or a pass-through of a subprocess's own code — rather than the
-/// ordinary error classification.
+/// non-zero code — rather than the ordinary error classification.
 ///
 /// The classification rows derive from the typed-error classifier
 /// ([`classify`](crate::output::failure::classify)); the exception rows derive
@@ -193,15 +192,13 @@ pub struct CommandExitCode {
     /// Command or command family (e.g. `gate evaluate`, `validate`), or `*` for
     /// every command.
     pub command: String,
-    /// Exit code emitted, when the command chooses a fixed code (always a member
-    /// of the global taxonomy in [`CommandSchema::exit_codes`]). `None` marks a
-    /// pass-through, where the command exits with a subprocess's own code rather
-    /// than a jit-assigned one (e.g. `serve`).
-    pub code: Option<i32>,
+    /// Exit code emitted (always a member of the global taxonomy in
+    /// [`CommandSchema::exit_codes`]).
+    pub code: i32,
     /// Condition that produces the code.
     pub condition: String,
     /// True when the code's meaning here departs from the global taxonomy entry
-    /// for `code` (a completed-run findings signal, or a pass-through).
+    /// for `code` (a completed-run findings signal).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub exception: bool,
 }
@@ -922,7 +919,7 @@ impl CommandSchema {
     fn generate_command_exit_codes() -> Vec<CommandExitCode> {
         let row = |command: &str, code: i32, condition: &str, exception: bool| CommandExitCode {
             command: command.to_string(),
-            code: Some(code),
+            code,
             condition: condition.to_string(),
             exception,
         };
@@ -1131,15 +1128,13 @@ impl CommandSchema {
                 "A downstream reader closed the pipe while jit was still writing.",
                 true,
             ),
-            // `serve --fg` passes the inline server child's own code through.
-            CommandExitCode {
-                command: "serve --fg".to_string(),
-                code: None,
-                condition: "Foreground mode passes through the inline dev-server \
-                            child's own exit code (1 when the child produced none)."
-                    .to_string(),
-                exception: true,
-            },
+            row(
+                "serve --fg",
+                1,
+                "The foreground server exited with a failure status (`SERVER_EXITED`; \
+                 the child's status is in `error.details`).",
+                false,
+            ),
         ]
     }
 }
@@ -1177,7 +1172,7 @@ pub fn render_exit_code_reference() -> String {
          that produces it: the shared classifier (`classify` in \
          `crates/jit/src/output/failure.rs`) for codes raised as typed errors, and the \
          command's own `std::process::exit` site for codes a completed run emits \
-         directly (the findings signals and the `serve --fg` pass-through).\n\n",
+         directly (the findings signals).\n\n",
     );
 
     out.push_str("## Global taxonomy\n\n");
@@ -1193,22 +1188,17 @@ pub fn render_exit_code_reference() -> String {
          identify the codes a specific command family emits. An **exception** is \
          a code a completed run emits to signal findings, or a code whose meaning \
          departs from the global entry (for example, `doc check-links` exits `1` \
-         for broken links, not a generic error). A `child` code marks a pass-through, \
-         where the command exits with a subprocess's own code. `*` marks a code \
+         for broken links, not a generic error). `*` marks a code \
          every command can reach: `0` on successful completion, and the failure \
          codes through the shared classifier.\n\n",
     );
     out.push_str("| Command | Code | Condition | Exception |\n");
     out.push_str("|---------|------|-----------|-----------|\n");
     for entry in CommandSchema::generate_command_exit_codes() {
-        let code = match entry.code {
-            Some(c) => format!("`{c}`"),
-            None => "`child`".to_string(),
-        };
         out.push_str(&format!(
-            "| `{}` | {} | {} | {} |\n",
+            "| `{}` | `{}` | {} | {} |\n",
             entry.command,
-            code,
+            entry.code,
             entry.condition,
             if entry.exception { "yes" } else { "" }
         ));
@@ -1800,26 +1790,18 @@ mod tests {
     fn test_command_exit_codes_within_global_taxonomy() {
         // Every projected fixed code must be a defined member of the global
         // taxonomy, so the per-command surface can never introduce a code the
-        // taxonomy does not explain. Pass-through rows (`code: None`, e.g.
-        // `serve`) carry no jit-assigned code and are exempt.
+        // taxonomy does not explain.
         let taxonomy: std::collections::HashSet<i32> = CommandSchema::generate_exit_codes()
             .iter()
             .map(|d| d.code)
             .collect();
         for entry in CommandSchema::generate_command_exit_codes() {
-            if let Some(code) = entry.code {
-                assert!(
-                    taxonomy.contains(&code),
-                    "command `{}` documents code {code}, which is absent from the global taxonomy",
-                    entry.command,
-                );
-            } else {
-                assert!(
-                    entry.exception,
-                    "pass-through row for `{}` (code: None) must be an exception",
-                    entry.command,
-                );
-            }
+            assert!(
+                taxonomy.contains(&entry.code),
+                "command `{}` documents code {}, which is absent from the global taxonomy",
+                entry.command,
+                entry.code,
+            );
         }
     }
 

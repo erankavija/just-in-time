@@ -7,15 +7,9 @@
 //! binding because they do not exercise parsing, dispatch, or `--json` output
 //! selection.
 //!
-//! One row has no fixed projected code: `serve --fg` is a pass-through. Its
-//! public plain and JSON forms are exercised with a deterministic child exit,
-//! while `serve::foreground_exit_code` separately covers the full helper-level
-//! pass-through range and signal-termination fallback.
-//!
 //! `test_command_exit_codes_every_row_is_verified` compares the projection with
 //! the rows the binding cases declare: a row without a case, or with two, fails.
 
-use jit::commands::serve::foreground_exit_code;
 use jit::schema::CommandSchema;
 use jit::storage::worktree_paths::WorktreePaths;
 use jit::test_cli::{jit_binary, JitCli};
@@ -96,19 +90,19 @@ fn setup_prospective_cycle(cli: &JitCli) -> (String, String) {
 }
 
 /// The projection's exit status for `command`, asserting its exception
-/// classification; `None` denotes a pass-through row.
-fn documented_exit_code(command: &str, code: Option<i32>, exception: bool) -> Option<i32> {
+/// classification.
+fn documented_exit_code(command: &str, code: i32, exception: bool) -> i32 {
     let schema = CommandSchema::generate();
     let row = schema
         .command_exit_codes
         .iter()
         .find(|c| c.command == command && c.code == code)
         .unwrap_or_else(|| {
-            panic!("command_exit_codes projection has no row for `{command}` code {code:?}")
+            panic!("command_exit_codes projection has no row for `{command}` code {code}")
         });
     assert_eq!(
         row.exception, exception,
-        "row for `{command}` code {code:?} has wrong exception flag"
+        "row for `{command}` code {code} has wrong exception flag"
     );
     row.code
 }
@@ -129,16 +123,9 @@ fn output_in_form(cli: &JitCli, args: &[&str], json: bool) -> Output {
 /// Bind one projected row to both public invocation forms.
 ///
 /// The expected status comes from the generated projection, not a second
-/// hand-authored numeric assertion. A pass-through row (`code: None`) asserts the
-/// two forms agree on a child-supplied status. Running the same documented
-/// condition with and without `--json` also makes a disagreement between the
-/// two forms fail.
-fn assert_row_status_in_both_forms(
-    command: &str,
-    code: Option<i32>,
-    exception: bool,
-    invoke: Invoke,
-) {
+/// hand-authored numeric assertion. Running the same documented condition with
+/// and without `--json` also makes a disagreement between the two forms fail.
+fn assert_row_status_in_both_forms(command: &str, code: i32, exception: bool, invoke: Invoke) {
     let expected = documented_exit_code(command, code, exception);
     let (plain, json) = (invoke(false), invoke(true));
     assert_eq!(
@@ -156,21 +143,19 @@ fn assert_row_status_in_both_forms(
                 plain_status.is_some(),
                 "plain `{command}` outcome {index} must exit with a status"
             );
-            if let Some(expected) = expected {
-                assert_eq!(
-                    plain_status,
-                    Some(expected),
-                    "plain `{command}` outcome {index} must match its projected row; stderr: {}",
-                    String::from_utf8_lossy(&plain.stderr)
-                );
-                assert_eq!(
-                    json_status,
-                    Some(expected),
-                    "machine-readable `{command}` outcome {index} must match its projected row; \
-                     stderr: {}",
-                    String::from_utf8_lossy(&json.stderr)
-                );
-            }
+            assert_eq!(
+                plain_status,
+                Some(expected),
+                "plain `{command}` outcome {index} must match its projected row; stderr: {}",
+                String::from_utf8_lossy(&plain.stderr)
+            );
+            assert_eq!(
+                json_status,
+                Some(expected),
+                "machine-readable `{command}` outcome {index} must match its projected row; \
+                 stderr: {}",
+                String::from_utf8_lossy(&json.stderr)
+            );
             assert_eq!(
                 plain_status, json_status,
                 "plain and machine-readable `{command}` outcome {index} statuses must agree"
@@ -183,7 +168,7 @@ fn assert_row_status_in_both_forms(
 /// [`BOUND_ROWS`], which the completeness check compares with the projection.
 macro_rules! row_bindings {
     ($($(#[$meta:meta])* $test:ident: ($command:expr, $code:expr, $exception:expr) => $invoke:path;)*) => {
-        const BOUND_ROWS: &[(&str, Option<i32>)] = &[$($(#[$meta])* ($command, $code),)*];
+        const BOUND_ROWS: &[(&str, i32)] = &[$($(#[$meta])* ($command, $code),)*];
         $($(#[$meta])* #[test]
         fn $test() {
             assert_row_status_in_both_forms($command, $code, $exception, $invoke);
@@ -595,8 +580,7 @@ fn invoke_serve_daemon_error(json: bool) -> Vec<Output> {
 ///
 /// `find_server_binary` prefers a sibling of the current executable, so this
 /// fixture drives the public foreground dispatch without starting a long-lived
-/// server or relying on PATH. The arbitrary child code is deliberately outside
-/// the documented taxonomy: observing it proves pass-through behavior.
+/// server or relying on PATH.
 #[cfg(unix)]
 fn jit_with_exiting_server(cli: &JitCli, exit_code: i32) -> std::path::PathBuf {
     let bin_dir = cli.root().join("serve-fg-bin");
@@ -614,9 +598,10 @@ fn jit_with_exiting_server(cli: &JitCli, exit_code: i32) -> std::path::PathBuf {
     jit_copy
 }
 
-/// `jit serve --fg` passes the inline dev-server child's own exit code through.
+/// `jit serve --fg` reports a failing server child as `SERVER_EXITED`, carrying
+/// the child's status in `error.details`.
 #[cfg(unix)]
-fn invoke_serve_foreground_passthrough(json: bool) -> Vec<Output> {
+fn invoke_serve_foreground_exit(json: bool) -> Vec<Output> {
     const CHILD_EXIT: i32 = 42;
 
     let cli = JitCli::initialised().unwrap();
@@ -626,17 +611,11 @@ fn invoke_serve_foreground_passthrough(json: bool) -> Vec<Output> {
         command.arg("--json");
     }
     let output = command.output().unwrap();
-    assert_eq!(
-        output.status.code(),
-        Some(CHILD_EXIT),
-        "serve --fg must exit with the child's status; stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
     if json {
         let response: serde_json::Value =
             serde_json::from_slice(&output.stdout).expect("serve --fg --json result");
-        assert_eq!(response["status"], "exited");
-        assert_eq!(response["exit_code"], CHILD_EXIT);
+        assert_eq!(response["error"]["code"], "SERVER_EXITED");
+        assert_eq!(response["error"]["details"]["exit_code"], CHILD_EXIT);
     }
     vec![output]
 }
@@ -764,75 +743,54 @@ fn invoke_claim_without_git(json: bool) -> Vec<Output> {
 }
 
 row_bindings! {
-    test_command_exit_codes_success_emits_0: ("*", Some(0), false) => invoke_success;
-    test_command_exit_codes_malformed_stored_record_emits_1: ("*", Some(1), false) => invoke_malformed_stored_record;
-    test_command_exit_codes_invalid_argument_emits_2: ("*", Some(2), false) => invoke_invalid_argument;
-    test_command_exit_codes_not_found_emits_3: ("*", Some(3), false) => invoke_not_found;
+    test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
+    test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
+    test_command_exit_codes_invalid_argument_emits_2: ("*", 2, false) => invoke_invalid_argument;
+    test_command_exit_codes_not_found_emits_3: ("*", 3, false) => invoke_not_found;
     #[cfg(unix)]
-    test_command_exit_codes_permission_denied_emits_5: ("*", Some(5), false) => invoke_permission_denied;
-    test_command_exit_codes_unsupported_format_emits_10: ("*", Some(10), false) => invoke_unsupported_format;
-    test_command_exit_codes_expired_lock_wait_emits_11: ("*", Some(11), false) => invoke_expired_lock_wait;
-    test_command_exit_codes_broken_pipe_emits_141: ("*", Some(141), true) => invoke_broken_pipe;
-    test_command_exit_codes_enforcing_write_rule_emits_4: ("any command that writes an issue", Some(4), false) => invoke_enforcing_write_rule;
-    test_command_exit_codes_gate_evaluate_failure_emits_4: ("gate evaluate, gate evaluate-all, gate evaluate-many", Some(4), true) => invoke_gate_evaluate_failure;
-    test_command_exit_codes_gate_evaluate_runner_error_emits_10: ("gate evaluate, gate evaluate-all, gate evaluate-many", Some(10), true) => invoke_gate_evaluate_runner_error;
-    test_command_exit_codes_apply_prospective_cycle_emits_4: ("apply", Some(4), false) => invoke_apply_prospective_cycle;
-    test_command_exit_codes_validate_integrity_emits_4: ("validate", Some(4), true) => invoke_validate_integrity;
-    test_command_exit_codes_validate_rule_findings_emits_1: ("validate", Some(1), true) => invoke_validate_rule_findings;
-    test_command_exit_codes_validate_branch_drift_emits_1: ("validate --branch-drift", Some(1), true) => invoke_validate_branch_drift;
-    test_command_exit_codes_validate_leases_emits_1: ("validate --leases", Some(1), true) => invoke_validate_leases;
-    test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", Some(4), true) => invoke_gate_status_all;
-    test_command_exit_codes_invariant_check_emits_4: ("invariant check", Some(4), true) => invoke_invariant_check;
-    test_command_exit_codes_item_failures_emit_2: ("item list, item search, item show, item resolve", Some(2), false) => invoke_item_failures;
-    test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", Some(4), false) => invoke_config_validate;
-    test_command_exit_codes_doc_check_links_emits_1: ("doc check-links", Some(1), true) => invoke_doc_check_links;
-    test_command_exit_codes_init_missing_values_file_emits_2: ("init", Some(2), false) => invoke_init_missing_values_file;
-    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", Some(3), false) => invoke_gate_preset_apply_missing_target;
-    test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", Some(1), false) => invoke_serve_daemon_error;
+    test_command_exit_codes_permission_denied_emits_5: ("*", 5, false) => invoke_permission_denied;
+    test_command_exit_codes_unsupported_format_emits_10: ("*", 10, false) => invoke_unsupported_format;
+    test_command_exit_codes_expired_lock_wait_emits_11: ("*", 11, false) => invoke_expired_lock_wait;
+    test_command_exit_codes_broken_pipe_emits_141: ("*", 141, true) => invoke_broken_pipe;
+    test_command_exit_codes_enforcing_write_rule_emits_4: ("any command that writes an issue", 4, false) => invoke_enforcing_write_rule;
+    test_command_exit_codes_gate_evaluate_failure_emits_4: ("gate evaluate, gate evaluate-all, gate evaluate-many", 4, true) => invoke_gate_evaluate_failure;
+    test_command_exit_codes_gate_evaluate_runner_error_emits_10: ("gate evaluate, gate evaluate-all, gate evaluate-many", 10, true) => invoke_gate_evaluate_runner_error;
+    test_command_exit_codes_apply_prospective_cycle_emits_4: ("apply", 4, false) => invoke_apply_prospective_cycle;
+    test_command_exit_codes_validate_integrity_emits_4: ("validate", 4, true) => invoke_validate_integrity;
+    test_command_exit_codes_validate_rule_findings_emits_1: ("validate", 1, true) => invoke_validate_rule_findings;
+    test_command_exit_codes_validate_branch_drift_emits_1: ("validate --branch-drift", 1, true) => invoke_validate_branch_drift;
+    test_command_exit_codes_validate_leases_emits_1: ("validate --leases", 1, true) => invoke_validate_leases;
+    test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", 4, true) => invoke_gate_status_all;
+    test_command_exit_codes_invariant_check_emits_4: ("invariant check", 4, true) => invoke_invariant_check;
+    test_command_exit_codes_item_failures_emit_2: ("item list, item search, item show, item resolve", 2, false) => invoke_item_failures;
+    test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", 4, false) => invoke_config_validate;
+    test_command_exit_codes_doc_check_links_emits_1: ("doc check-links", 1, true) => invoke_doc_check_links;
+    test_command_exit_codes_init_missing_values_file_emits_2: ("init", 2, false) => invoke_init_missing_values_file;
+    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, false) => invoke_gate_preset_apply_missing_target;
+    test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", 1, false) => invoke_serve_daemon_error;
     #[cfg(unix)]
-    test_command_exit_codes_serve_foreground_passthrough_is_dual_form: ("serve --fg", None, true) => invoke_serve_foreground_passthrough;
-    test_command_exit_codes_dep_add_cycle_emits_4: ("dep add", Some(4), false) => invoke_dep_add_cycle;
-    test_command_exit_codes_blocked_transition_emits_4: ("issue update, issue claim, issue claim-next", Some(4), false) => invoke_blocked_transition;
-    test_command_exit_codes_gate_define_duplicate_emits_6: ("gate define", Some(6), false) => invoke_gate_define_duplicate;
-    test_command_exit_codes_issue_delete_unconfirmed_emits_2: ("issue delete", Some(2), false) => invoke_issue_delete_unconfirmed;
-    test_command_exit_codes_batch_create_prevalidation_emits_2: ("issue batch-create", Some(2), false) => invoke_batch_create_prevalidation;
-    test_command_exit_codes_snapshot_export_occupied_emits_6: ("snapshot export", Some(6), false) => invoke_snapshot_export_occupied;
-    test_command_exit_codes_claim_without_git_emits_10: ("claim", Some(10), false) => invoke_claim_without_git;
-}
-
-/// `serve --fg` passes a child's code through verbatim; the dual-form binding
-/// above observes it through the public command, and this covers the helper's
-/// full pass-through range and signal-termination fallback.
-#[test]
-fn test_command_exit_codes_serve_foreground_is_passthrough() {
-    assert_eq!(documented_exit_code("serve --fg", None, true), None);
-
-    for child_code in [0, 1, 2, 3, 4, 10, 101, 127] {
-        assert_eq!(
-            foreground_exit_code(Some(child_code)),
-            child_code,
-            "serve --fg must pass the child's exit code {child_code} through verbatim"
-        );
-    }
-    assert_eq!(
-        foreground_exit_code(None),
-        1,
-        "a signal-terminated child carries no code, so serve --fg reports 1"
-    );
+    test_command_exit_codes_serve_foreground_exit_emits_1: ("serve --fg", 1, false) => invoke_serve_foreground_exit;
+    test_command_exit_codes_dep_add_cycle_emits_4: ("dep add", 4, false) => invoke_dep_add_cycle;
+    test_command_exit_codes_blocked_transition_emits_4: ("issue update, issue claim, issue claim-next", 4, false) => invoke_blocked_transition;
+    test_command_exit_codes_gate_define_duplicate_emits_6: ("gate define", 6, false) => invoke_gate_define_duplicate;
+    test_command_exit_codes_issue_delete_unconfirmed_emits_2: ("issue delete", 2, false) => invoke_issue_delete_unconfirmed;
+    test_command_exit_codes_batch_create_prevalidation_emits_2: ("issue batch-create", 2, false) => invoke_batch_create_prevalidation;
+    test_command_exit_codes_snapshot_export_occupied_emits_6: ("snapshot export", 6, false) => invoke_snapshot_export_occupied;
+    test_command_exit_codes_claim_without_git_emits_10: ("claim", 10, false) => invoke_claim_without_git;
 }
 
 /// Guard: **every** projected row, exception and standard alike, has exactly one
 /// binding case in [`row_bindings!`]. A row added without a binding, or bound
 /// twice, fails here. Unix-only: the `*`/5 and `serve --fg` rows are bound by
-/// cases that need Unix permissions and signals.
+/// cases that need Unix permissions and shell scripts.
 #[cfg(unix)]
 #[test]
 fn test_command_exit_codes_every_row_is_verified() {
-    let mut bound: Vec<(String, Option<i32>)> = BOUND_ROWS
+    let mut bound: Vec<(String, i32)> = BOUND_ROWS
         .iter()
         .map(|(command, code)| (command.to_string(), *code))
         .collect();
-    let mut projected: Vec<(String, Option<i32>)> = CommandSchema::generate()
+    let mut projected: Vec<(String, i32)> = CommandSchema::generate()
         .command_exit_codes
         .into_iter()
         .map(|c| (c.command, c.code))

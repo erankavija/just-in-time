@@ -79,6 +79,18 @@ fn derive_guidance(error: &anyhow::Error) -> Guidance {
             ],
         };
     }
+    if let Some(failed) = error.downcast_ref::<crate::commands::serve::ServeActionFailed>() {
+        return derive_guidance(&failed.cause);
+    }
+    if let Some(exited) = error.downcast_ref::<crate::commands::serve::ForegroundServerExited>() {
+        return Guidance {
+            details: Some(serde_json::json!({
+                "port": exited.port,
+                "exit_code": exited.status.code(),
+            })),
+            suggestions: Vec::new(),
+        };
+    }
     if let Some(not_required) = error.downcast_ref::<GateNotRequiredError>() {
         let (issue, key) = (&not_required.issue_id, &not_required.gate_key);
         return Guidance {
@@ -214,6 +226,9 @@ pub(super) fn id_resolution_error(error: &anyhow::Error) -> Option<JsonError> {
 /// The registered code of a failure. Human message text is deliberately absent
 /// from this cascade, and its order is semantic.
 fn classify_code(error: &anyhow::Error) -> ErrorCode {
+    if let Some(failed) = error.downcast_ref::<crate::commands::serve::ServeActionFailed>() {
+        return classify_code(&failed.cause);
+    }
     // A rejected `jit dep add` batch (jit:c8518f2a) wraps every rejected edge's
     // own typed error; classify by the batch's dominant edge rather than this
     // wrapper itself, so a mixed batch still maps to the right exit code.
@@ -236,6 +251,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     }
     // Targeting a gate the issue does not require is an argument/lookup error,
     // classified before the run path, never reported as a runner error.
+    if error.is::<crate::commands::serve::ForegroundServerExited>() {
+        return ErrorCode::ServerExited;
+    }
     if error
         .downcast_ref::<crate::commands::GateNotRequiredError>()
         .is_some()
@@ -1125,7 +1143,7 @@ mod exit_code_projection_tests {
                 schema
                     .command_exit_codes
                     .iter()
-                    .any(|c| c.command == row && c.code == Some(actual)),
+                    .any(|c| c.command == row && c.code == actual),
                 "classifier emits code {actual} for `{error}`, but the \
                  command_exit_codes projection has no `{row}` row documenting it"
             );
