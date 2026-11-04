@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3d1937da18bdb8a106f46b9028e95f12a91365cb",
+  "completed_at": "2026-11-04T12:17:02.518604902Z",
+  "duration_ms": 232126,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are verifiably satisfied by the current code, tests, storage references, and recorded gate evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "f8a6b298-e6b5-4d62-b73c-3f7b217c1a01",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cf7e91a4-2f8b-4e89-855a-06f26b785620",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T12:13:10.391738585Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably satisfied by the current code, tests, storage references, and recorded gate evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

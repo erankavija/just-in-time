@@ -1032,7 +1032,23 @@
       "crate_main": 74130,
       "file": "ledger-2026-11-04.txt"
     },
-    "survey_2026_11_04": "output+dispatch: ~29 high-confidence, ~75 speculative, ~20 contract-changing (5 dead ErrorCodes, 0eca332a); ~150-250 legacy output helpers die after main.rs migrates. Projected REQ-10 end ~9,200-9,400. Reported to 6a for the user's decision."
+    "survey_2026_11_04": "output+dispatch: ~29 high-confidence, ~75 speculative, ~20 contract-changing (5 dead ErrorCodes, 0eca332a); ~150-250 legacy output helpers die after main.rs migrates. Projected REQ-10 end ~9,200-9,400. Reported to 6a for the user's decision.",
+    "net_plan_2026_11_04": {
+      "current_net": 1011,
+      "planned_items": "-876..-195 (central ~-530)",
+      "projected_final": "+135..+816 (central ~+480)",
+      "new_tasks_proposed": {
+        "N1": "unify command_group! entry forms -10..-25",
+        "N2": "compact handler signatures >=-90 (rename caveat)",
+        "N4": "survey dead/duplicate renderers >=-25",
+        "N5": "classifier-driven dep batch envelope + table renderers >=-50"
+      },
+      "gap_candidates": [
+        "derive generate_command_exit_codes (329 lines)",
+        "survey commands/storage/repository_state"
+      ],
+      "status": "sent to 6a; nothing dispatched"
+    }
   },
   "wave_notes": {
     "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line). Session 12 (lead 7c): one Claude Opus integrator on w7batch fixes the three cli_issue failures as per-issue fix commits (06ee9b67, 71f5296c, 20fc3b92) and merges main with the 614a6f97 claim port (66790c84); per-branch main merges conflict on registration lines, so fixes go on the batch. Each counts as one rework. Integrator (Opus) finished at 4ad4175c1: fix commits e21e28fe8 (06ee9b67), 287c3bbd9 (71f5296c, interim INVALID_ARGUMENT per steward; 487f45a9 ends it), 9160ec574 (20fc3b92), merge 1f50f71c5 (66790c84 claim port), dccad565d (06ee9b67), 4ad4175c1 (66790c84). Lead review PASS; batch merges cleanly with main. REQ-10: batch takes main+dispatch+output from 9248 to 9503 (+255). Landing queue after batch gating: 182f4c03, 10751360, cd8e04cc, 1ac651c7, cc4ea8a9 (all lead-reviewed; Claude workers could not run whole-tree suites under the shared lock, branch CI is the evidence)."
