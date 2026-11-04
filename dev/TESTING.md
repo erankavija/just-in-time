@@ -336,14 +336,11 @@ harness that produces both.
   `overflow-checks` still hold everywhere. The measured build cost of the override, against the
   matched unoptimized arm and both fixed 25% ceilings, is in
   [dev/benchmarks/dependency-profile-6d10e5d4/](benchmarks/dependency-profile-6d10e5d4/).
-- **Incremental compilation** — both profiles state `incremental = true` explicitly rather
-  than leaving Cargo's default undocumented, and that setting governs gate runs too:
-  `scripts/cargo-ci.sh` overrides it nowhere. The premise that it once did — that a gate run
-  compiles once and exits with no later rebuild to amortize against — does not hold for the
-  runs that dominate the repository's build cost. Every agent worktree run and every local
-  re-check reruns the gate against a warm target directory, where one edited crate recompiles
-  instead of the workspace, at no cost to a cold run. What it costs is disk, which the reclaim
-  path in the worktree dispatch protocol prunes. The measurements are under "Provenance" in
+- **Incremental compilation** — `[profile.dev]` keeps incremental compilation enabled for
+  interactive development. `[profile.test]` sets `incremental = false`, so ordinary workspace
+  test builds do not create incremental state under `target`; this policy is enforced by
+  `build_profile_policy_tests.rs` and does not depend on remembering a Cargo environment
+  override. The build-budget measurements and provenance are in
   [dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md).
 - **Shared compiler cache** — when `sccache` is on `PATH` and no wrapper is set,
   `scripts/cargo-ci.sh` selects it as `RUSTC_WRAPPER`. Every wrapper the run uses, selected or
