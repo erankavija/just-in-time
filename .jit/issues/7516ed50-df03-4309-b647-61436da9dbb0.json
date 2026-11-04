@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "552b1db5-c369-4dba-a068-917ffa9d433a",
+      "status": "passed",
+      "updated_at": "2026-11-04T12:14:55.329728224Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7516ed50-df03-4309-b647-61436da9dbb0",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Link checking probes each distinct URL once through one timed agent",
-  "updated_at": "2026-11-04T12:12:27.440625191Z"
+  "updated_at": "2026-11-04T12:14:55.329728224Z"
 }
