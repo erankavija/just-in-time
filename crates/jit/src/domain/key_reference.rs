@@ -18,6 +18,11 @@ pub fn referenced_key(value: &str) -> Option<&str> {
     (!key.is_empty() && !self_id.is_empty()).then_some(key)
 }
 
+/// A manifest key that names no created issue.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("unknown manifest key '{0}'")]
+pub struct UnknownManifestKey(pub String);
+
 /// Resolve a manifest-key reference in `label` when its namespace is one of
 /// `credit_namespaces`; any other label is returned unchanged.
 ///
@@ -28,14 +33,14 @@ pub fn resolve_key_reference(
     label: &str,
     credit_namespaces: &HashSet<String>,
     issue_id_of: impl Fn(&str) -> Option<IssueId>,
-) -> Result<String, String> {
+) -> Result<String, UnknownManifestKey> {
     let Some((namespace, value)) = label.split_once(':') else {
         return Ok(label.to_string());
     };
     let Some(key) = referenced_key(value).filter(|_| credit_namespaces.contains(namespace)) else {
         return Ok(label.to_string());
     };
-    let id = issue_id_of(key).ok_or_else(|| key.to_string())?;
+    let id = issue_id_of(key).ok_or_else(|| UnknownManifestKey(key.to_string()))?;
     let short = id.short_id();
     let self_id = &value[value.find('/').map_or(value.len(), |i| i + 1)..];
     Ok(format!("{namespace}:{short}/{self_id}"))
@@ -86,7 +91,7 @@ mod tests {
     fn test_resolve_key_reference_reports_unknown_key() {
         let resolved =
             resolve_key_reference("satisfies:{ghost.short_id}/REQ-01", &credit(), |_| None);
-        assert_eq!(resolved, Err("ghost".to_string()));
+        assert_eq!(resolved, Err(UnknownManifestKey("ghost".to_string())));
     }
 
     #[test]

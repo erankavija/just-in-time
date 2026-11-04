@@ -30,7 +30,7 @@ pub fn finalize_archive_execution(
         .executable_artifacts()
         .map_err(ArchiveExecutionError::Plan)?;
     crate::domain::artifact_classifier::validate_proposed_layout(plan)
-        .map_err(ArchiveExecutionError::Producer)?;
+        .map_err(|violation| ArchiveExecutionError::Producer(violation.into()))?;
     let (covered_publications, covered_changes) =
         archive_coverage(&evidence.executions, plan.target(), plan.destination_root());
     let mut actions = Vec::new();
@@ -1135,7 +1135,9 @@ mod tests {
         let error = archive_execution_error(&image, &plan);
         assert!(matches!(
             error,
-            ArchiveExecutionError::Producer(ProducerError::ProposedLayoutTargetAbsent { target })
+            ArchiveExecutionError::Producer(ProducerError::ProposedLayout(
+                crate::domain::artifact_classifier::ProposedLayoutViolation::TargetAbsent { target },
+            ))
                 if target == "missing.png"
         ));
     }

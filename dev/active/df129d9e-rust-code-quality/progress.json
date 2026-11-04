@@ -1005,7 +1005,8 @@
     "test_strict_lease_exempt_paths_write_for_their_stated_reason took 12-13 s in parallel runs (not on the 4a01ccba list); relevant to f487aeef's per-test limits.",
     "Codex workers attempted `jit recover` despite the no-tracker-writes rule; briefs now name it explicitly.",
     "Lead review asked for a shared test helper (shared-test-contracts) that the code-review then read as recreating a removed wrapper against REQ-03; check a rework instruction against the issue's literal criteria before sending it.",
-    "Lead's 4575a03d Notes correction searched only architecture/ paths and wrongly said the f2532a2d copies were gone; they were under eval/. Search the whole archive dir before asserting absence."
+    "Lead's 4575a03d Notes correction searched only architecture/ paths and wrongly said the f2532a2d copies were gone; they were under eval/. Search the whole archive dir before asserting absence.",
+    "Two workers ran git checkout to measure the merge-base line count; briefs now say production-lines.py takes a revision and needs no checkout."
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
@@ -1354,16 +1355,35 @@
       "review": "lead PASS: HandlerResult<R>, HandlerStore trait (blanket impl), From<R> for Outcome replaces Outcome::success; no renames; -31"
     },
     "1ade3e6f": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Opus",
       "reason": "b697a3f7 track B; large config assembler",
       "epic": "b697a3f7",
       "review": "lead PASS at db05aa795: declarations::assemble_configuration; JitConfig::load and ConfigManager::load route through it; -191 (b697a3f7 ledger); 5013 workspace tests passed (worker). Minor: ConfigManager::load rustdoc still says 'from config.toml'."
     },
     "f87f9b00": {
-      "status": "dispatched",
+      "status": "landing",
       "vendor": "Claude Sonnet",
-      "reason": "gate status handler move; first of the four remaining moves"
+      "reason": "gate status handler move; first of the four remaining moves",
+      "review": "lead PASS at 1f76f1deb: gate status/status-all handlers, transposed-arg predicate typed INVALID_ARGUMENT, not-run typed, status-all findings GATE_FAILED; whole-crate -114"
+    },
+    "24a982b7": {
+      "status": "landing",
+      "vendor": "Claude Sonnet",
+      "reason": "query/status handler move; parallel with f87f9b00 (disjoint arms)",
+      "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44)"
+    },
+    "ceaaf0ab": {
+      "status": "landing",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 track B after 4575a03d; worker checks criteria first",
+      "epic": "b697a3f7",
+      "review": "lead PASS at 6d721625c: ProposedLayoutViolation domain error, typed repository_inputs errors, no anyhow in domain types; +19 (b697a3f7 ledger). Worker checked out the merge base to measure (forbidden; restored). Landing CI: all tests passed, suite-clock budget failed (38.9 s vs 30 s) from a cold doctest build (25.2 s; cold 20.3 s / warm 3.2 s on rerun). Asked 6a for a fresh landing. Steward approved one fresh landing (D-56); land-one now retries a budget-only overrun with a cold doctest step once."
+    },
+    "3f816619": {
+      "status": "dispatched",
+      "vendor": "Claude Opus",
+      "reason": "largest remaining move (~580 main.rs lines, 10 leaves)"
     }
   },
   "handoff": {
@@ -1407,7 +1427,7 @@
         "7cd27db8 (30334066)"
       ]
     },
-    "status": "f56bad8d, f7a59f5f done; 1ade3e6f, 4575a03d dispatched; next track A 945f9181 (after 3f816619 sequencing) and ceaaf0ab after 4575a03d",
+    "status": "done: f56bad8d, f7a59f5f, 4575a03d; landing: 1ade3e6f; running: ceaaf0ab; track A 945f9181 waits for 3f816619",
     "criteria_check_2026_11_04": {
       "945f9181": "valid; line cites drifted; large; touches commands/{issue,dependency,template,mod}, overlaps 3f816619/5687e281 files",
       "1ade3e6f": "valid; cites drifted; large; misses ConfigManager::load/EffectiveConfig::load callers",
@@ -1424,5 +1444,8 @@
       "mechanism": "background timer touches the landing hold file at 03:30; lead stops any running worker cargo by 03:55 (TaskStop on owned tasks)"
     }
   ],
-  "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)"
+  "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)",
+  "notes_for_tasks": {
+    "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)"
+  }
 }

@@ -238,20 +238,9 @@ pub enum ProducerError {
         #[source]
         source: Box<ProfileRegistryParseError>,
     },
-    /// A supported archive edge target is absent from the proposed plan.
-    #[error("supported archive edge target is absent from plan: {target}")]
-    ProposedLayoutTargetAbsent { target: String },
-    /// A supported archive edge does not resolve after the proposed move.
-    #[error(
-        "supported edge {reference} from {parent} resolves to {resolved} in the proposed layout, not an available target location ({available})",
-        available = .available.join(", ")
-    )]
-    ProposedLayoutEdgeUnavailable {
-        reference: String,
-        parent: String,
-        resolved: String,
-        available: Vec<String>,
-    },
+    /// The proposed archive layout leaves a supported edge unresolvable.
+    #[error(transparent)]
+    ProposedLayout(#[from] crate::domain::artifact_classifier::ProposedLayoutViolation),
 }
 
 /// Typed parse failures for a profile-owned TOML registry.
