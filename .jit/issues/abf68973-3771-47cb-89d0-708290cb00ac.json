@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "22e72871-42f0-40ea-9d23-f091fbbddeec",
+      "status": "failed",
+      "updated_at": "2026-11-04T23:19:47.446435484Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "abf68973-3771-47cb-89d0-708290cb00ac",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Compile server modules through the library",
-  "updated_at": "2026-11-04T23:13:43.102640247Z"
+  "updated_at": "2026-11-04T23:19:47.446435484Z"
 }
