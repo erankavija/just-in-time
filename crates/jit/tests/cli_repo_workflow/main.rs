@@ -21,6 +21,7 @@ mod format_compat_cli_tests;
 mod gate_preset_tests;
 mod git_hook_tests;
 mod help_cross_reference_tests;
+mod history_isolation_tests;
 mod init_item_kinds_golden;
 mod init_tests;
 mod integration_schema;
