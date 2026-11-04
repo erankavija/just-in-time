@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-c06daf50",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f5c3583f7f0255830d3fe308b7d406b538c545b8",
+  "completed_at": "2026-11-04T22:58:59.015154312Z",
+  "duration_ms": 265458,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable changes satisfy the issue criteria in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c06daf50-c151-402a-851a-fa71a9e6d764",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6e864058-2a2f-4146-8444-11e0013294f0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:54:33.556855040Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c60b5ffc2, e85750436, f32551057, f5c3583f7\nPolicy sources: AGENTS.md\nResolved items: @/issue/c06daf50/decision/D-01 and D-02 (.jit/issues/c06daf50-c151-402a-851a-fa71a9e6d764.json); @/charter/D-23 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci pending (no recorded run or exit code)\nTruncation recovery: narrower rereads of AGENTS.md, dispatch modules, plan sections, registry sources, and affected tests\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable changes satisfy the issue criteria in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
