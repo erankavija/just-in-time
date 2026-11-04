@@ -24,19 +24,17 @@ fn search<S: IssueStore>(
 
 /// A list's `--json` success carries its count as the top-level message.
 fn list_outcome(response: ItemListResult) -> Outcome<ItemListResult> {
-    let message = Some(format!("Found {} item(s)", response.count()));
-    Outcome::Success { response, message }
+    let message = format!("Found {} item(s)", response.count());
+    Outcome::success_with(response, message)
 }
 
 fn show<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     qualified_id: String,
 ) -> anyhow::Result<Outcome<ItemShowResult>> {
-    let response = ctx.executor.items().show_item(&qualified_id)?;
-    Ok(Outcome::Success {
-        response,
-        message: None,
-    })
+    Ok(Outcome::success(
+        ctx.executor.items().show_item(&qualified_id)?,
+    ))
 }
 
 command_group! {
