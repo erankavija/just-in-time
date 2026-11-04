@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T07:02:35.534373355Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -15,7 +15,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6c7b502c-558b-4c38-852b-69f73747da89",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:08:31.862285294Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "728ecfb0-ac90-480c-9122-c34cf5187031",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "One property test owns the selection contract",
-  "updated_at": "2026-11-04T07:17:34.113323615Z"
+  "updated_at": "2026-11-04T08:08:31.862285294Z"
 }

@@ -27,10 +27,7 @@ fn test_fix_transitive_reduction_logs_event() {
 
     // Apply fix
     let executor = h.executor;
-    let (fixes_applied, _) = executor
-        .validation()
-        .validate_with_fix(true, false)
-        .unwrap();
+    let (fixes_applied, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
     assert_eq!(fixes_applied, 1);
 
     // Verify a DependencyReduced event was logged
@@ -105,10 +102,7 @@ fn test_fix_transitive_redundancy() {
 
     // Fix with validate --fix
     let executor = h.executor;
-    let (fixes_applied, _messages) = executor
-        .validation()
-        .validate_with_fix(true, false)
-        .unwrap();
+    let (fixes_applied, _messages, _, _) = executor.validation().validate_with_fix(false).unwrap();
     assert!(fixes_applied > 0, "Should apply at least one fix");
 
     // Verify C was removed from A's dependencies
@@ -150,10 +144,7 @@ fn test_validate_reports_all_redundancies() {
 
     // Fix and verify both removed
     let executor = h.executor;
-    let (fixes_applied, _messages) = executor
-        .validation()
-        .validate_with_fix(true, false)
-        .unwrap();
+    let (fixes_applied, _messages, _, _) = executor.validation().validate_with_fix(false).unwrap();
     assert_eq!(fixes_applied, 2, "Should fix both redundancies");
 
     let fixed_a = h.storage.load_issue(&a).unwrap();
@@ -217,7 +208,7 @@ fn test_dry_run_does_not_modify() {
 
     // Dry run
     let executor = h.executor;
-    let (fixes_count, _messages) = executor.validation().validate_with_fix(true, true).unwrap();
+    let (fixes_count, _messages, _, _) = executor.validation().validate_with_fix(true).unwrap();
     assert!(fixes_count > 0, "Should report fixes available");
 
     // Verify nothing was modified
@@ -250,10 +241,7 @@ fn test_complex_chain_reduction() {
 
     // Fix
     let executor = h.executor;
-    let _ = executor
-        .validation()
-        .validate_with_fix(true, false)
-        .unwrap();
+    let _ = executor.validation().validate_with_fix(false).unwrap();
 
     // Verify
     let fixed_a = h.storage.load_issue(&a).unwrap();
@@ -292,10 +280,7 @@ fn test_multiple_issues_with_redundancies() {
 
     // Fix both
     let executor = h.executor;
-    let (fixes_applied, _messages) = executor
-        .validation()
-        .validate_with_fix(true, false)
-        .unwrap();
+    let (fixes_applied, _messages, _, _) = executor.validation().validate_with_fix(false).unwrap();
     assert_eq!(fixes_applied, 2, "Should fix both issues");
 
     // Verify both fixed

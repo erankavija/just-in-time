@@ -161,7 +161,6 @@ prior pointer; other verdict keys are independent.
 
 `captured_reusable_gate_run` in `commands/gate_check.rs` reads this record by
 `(gate_key, inputs_digest)`, then loads the run addressed by `issue_id` and `run_id`.
-It does not search a run listing.
 
 | Field | Presence | Meaning |
 | --- | --- | --- |
@@ -176,8 +175,7 @@ Archive evidence is addressed by its target. A container record is written at
 repository-relative document path. The archive execution finalizer
 (`finalize_archive_execution`) appends the execution to this record in the same
 redo record as the archive event. The archive preview reader,
-`IssueStore::read_archive_evidence_record(target)`, loads it by target; execution
-captures the same path to append prior evidence.
+`IssueStore::read_archive_evidence_record(target)`, loads it by target.
 
 ```json
 {

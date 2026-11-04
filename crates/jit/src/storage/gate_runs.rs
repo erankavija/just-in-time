@@ -45,6 +45,7 @@ mod tests {
             &[MutationIntent::RecordGateRun {
                 draft: Box::new(draft),
             }],
+            None,
         )
         .unwrap();
         session.apply(&plan).unwrap();

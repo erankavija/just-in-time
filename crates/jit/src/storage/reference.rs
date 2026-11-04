@@ -727,7 +727,6 @@ pub fn render_reference_markdown() -> Result<String> {
          \n\
          `captured_reusable_gate_run` in `commands/gate_check.rs` reads this record by\n\
          `(gate_key, inputs_digest)`, then loads the run addressed by `issue_id` and `run_id`.\n\
-         It does not search a run listing.\n\
          \n\
          | Field | Presence | Meaning |\n\
          | --- | --- | --- |\n\
@@ -741,8 +740,7 @@ pub fn render_reference_markdown() -> Result<String> {
          repository-relative document path. The archive execution finalizer\n\
          (`finalize_archive_execution`) appends the execution to this record in the same\n\
          redo record as the archive event. The archive preview reader,\n\
-         `IssueStore::read_archive_evidence_record(target)`, loads it by target; execution\n\
-         captures the same path to append prior evidence.\n\
+         `IssueStore::read_archive_evidence_record(target)`, loads it by target.\n\
          \n\
          ```json\n\
          {example_archive_evidence}\n\

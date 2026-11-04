@@ -216,7 +216,7 @@ where
             else {
                 return Ok(SessionStep::Retry);
             };
-            let plan = finalize(&layout, &image, &context, &intents)?;
+            let plan = finalize(&layout, &image, &context, &intents, None)?;
             Ok(SessionStep::Apply(plan, ()))
         },
     )
