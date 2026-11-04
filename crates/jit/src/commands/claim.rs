@@ -726,8 +726,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
             .resolve(&crate::repository_state::VirtualPath::CONFIG)?
             .is_file()
         {
-            let executor =
-                crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout);
+            let executor = crate::commands::CommandExecutor::new(storage.clone())
+                .with_layout(layout)
+                .unwrap();
             report.derived_state_repaired = executor.validation().repair_derived_state(false)?.0;
         }
 

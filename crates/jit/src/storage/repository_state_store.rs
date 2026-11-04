@@ -573,6 +573,7 @@ impl RepositoryStateStore for JsonFileStorage {
         layout: RepositoryLayout,
     ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
         let layout = self.session_layout(layout)?;
+        self.configure_repository_layout(&layout)?;
         // A retained session may reenter the reentrant lock chain only for the
         // same canonical layout.
         self.active_mutation_layout().enter(&layout)?;
@@ -618,7 +619,6 @@ impl RepositoryStateStore for JsonFileStorage {
             .root(RepositoryRootClass::Data)
             .map(|_| self.events_lock_spec());
 
-        self.configure_repository_layout(&layout);
         Ok(Box::new(JsonMutationSession {
             layout,
             storage: self.clone(),
@@ -938,7 +938,7 @@ impl JsonMutationSession {
         self.storage
             .active_mutation_layout()
             .rebind_published_root(&refreshed);
-        self.storage.configure_repository_layout(&refreshed);
+        self.storage.configure_repository_layout(&refreshed)?;
         match carries_worktree {
             // Through the published root's capabilities: the record the rename
             // carried in is removed from the scratch directory it now has.

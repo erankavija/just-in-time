@@ -301,7 +301,7 @@ mod artifact_location_tests {
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        storage.configure_repository_layout(&layout);
+        storage.configure_repository_layout(&layout).unwrap();
 
         assert_eq!(
             storage.inspect_artifact_location("leaf.md").unwrap(),
@@ -916,12 +916,19 @@ fn tree_node<T>(
 }
 
 impl IssueStore for JsonFileStorage {
-    fn configure_repository_layout(&self, layout: &RepositoryLayout) {
+    fn configure_repository_layout(
+        &self,
+        layout: &RepositoryLayout,
+    ) -> std::result::Result<(), crate::storage::RepositoryStateStoreError> {
         // Bind once. A refreshed layout for the same roots may replace stale
         // root-presence evidence after this process publishes an absent root;
         // a clone can never redirect readers to different roots.
         if self.root != layout.data_root() {
-            return;
+            return Err(
+                crate::storage::RepositoryStateStoreError::RetryableConflict {
+                    path: layout.data_root().display().to_string(),
+                },
+            );
         }
         let mut configured = self
             .repository_layout
@@ -935,8 +942,15 @@ impl IssueStore for JsonFileStorage {
             {
                 *configured = Some(layout.clone());
             }
-            Some(_) => {}
+            Some(_) => {
+                return Err(
+                    crate::storage::RepositoryStateStoreError::RetryableConflict {
+                        path: layout.worktree_root().display().to_string(),
+                    },
+                )
+            }
         }
+        Ok(())
     }
 
     fn repository_layout(&self) -> Result<RepositoryLayout> {
@@ -1313,7 +1327,7 @@ mod tests {
 
     fn configure_test_layout(storage: &JsonFileStorage, worktree: &Path, data: &Path) {
         let layout = crate::storage::discover_repository_layout(worktree, data).unwrap();
-        storage.configure_repository_layout(&layout);
+        storage.configure_repository_layout(&layout).unwrap();
     }
 
     #[test]
@@ -1337,11 +1351,12 @@ mod tests {
         let data = worktree.path().join(".jit");
         let storage = JsonFileStorage::new(&data);
         let absent = crate::storage::discover_repository_layout(worktree.path(), &data).unwrap();
-        storage.configure_repository_layout(&absent);
+        storage.configure_repository_layout(&absent).unwrap();
 
         let foreign =
             crate::storage::discover_repository_layout(other_worktree.path(), &data).unwrap();
-        storage.configure_repository_layout(&foreign);
+        assert!(storage.configure_repository_layout(&foreign).is_err());
+        assert!(!data.exists());
         assert!(matches!(
             storage.open_mutation_session(foreign),
             Err(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
@@ -1349,7 +1364,7 @@ mod tests {
 
         std::fs::create_dir(&data).unwrap();
         let present = crate::storage::discover_repository_layout(worktree.path(), &data).unwrap();
-        storage.configure_repository_layout(&present);
+        storage.configure_repository_layout(&present).unwrap();
         assert_eq!(
             storage.configured_layout().unwrap().data_identity(),
             present.data_identity()

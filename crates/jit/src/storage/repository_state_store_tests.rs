@@ -226,7 +226,7 @@ fn test_same_storage_reuses_its_own_absent_root_publication_evidence() {
     let data = temp.path().join(".jit");
     let stale_layout = discover_repository_layout(temp.path(), &data).unwrap();
     let storage = JsonFileStorage::new(&data);
-    storage.configure_repository_layout(&stale_layout);
+    storage.configure_repository_layout(&stale_layout).unwrap();
     let path = VirtualPath::data("index.json").unwrap();
     let mut first = storage.open_mutation_session(stale_layout.clone()).unwrap();
     let image = first
@@ -1931,7 +1931,7 @@ impl WriteSetFixture {
         }
         let layout = discover_repository_layout(worktree.path(), &data).unwrap();
         let storage = JsonFileStorage::new(&data);
-        storage.configure_repository_layout(&layout);
+        storage.configure_repository_layout(&layout).unwrap();
         let roots = CapabilityRoots::open(&layout).unwrap().0;
         Self {
             _worktree: worktree,

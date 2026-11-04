@@ -96,7 +96,7 @@ fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
     std::fs::remove_file(storage.root().join("rules.toml")).unwrap();
 
     let layout = jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
+    let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
     // Create a task without parent labels (orphaned at a leaf level).
     let created = executor

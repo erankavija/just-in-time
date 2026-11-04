@@ -390,7 +390,9 @@ fn initialize_profiled_repository_fixture(
     let storage = InMemoryStorage::rooted_at(repository);
     storage.seed_repository_tree_fixture(repository)?;
     let layout = storage.repository_layout();
-    let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone());
+    let executor = CommandExecutor::new(storage.clone())
+        .with_layout(layout.clone())
+        .unwrap();
     let selection = executor.profiles().select_profiles(
         &[PathBuf::from(&selected)],
         &crate::commands::ProfileVariableOptions::default(),
@@ -834,6 +836,7 @@ pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     let layout = discover_repository_layout(temp.path(), &jit_root)?;
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
+        .unwrap()
         .profiles()
         .initialize_fresh_repository(temp.path(), None)?;
     // Claim coordination tests use this as a synthetic Git control directory.
@@ -906,7 +909,7 @@ pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()
 pub fn file_executor(worktree: &Path) -> Result<CommandExecutor<JsonFileStorage>> {
     let jit_root = worktree.join(".jit");
     let layout = discover_repository_layout(worktree, &jit_root)?;
-    Ok(CommandExecutor::new(JsonFileStorage::new(&jit_root)).with_layout(layout))
+    CommandExecutor::new(JsonFileStorage::new(&jit_root)).with_layout(layout)
 }
 
 /// Build an initialised file-backed repository whose `.jit/config.toml` is
@@ -1776,7 +1779,8 @@ mod tests {
             });
             let jit_root = reference.join(".jit");
             let executor = CommandExecutor::new(JsonFileStorage::new(&jit_root))
-                .with_layout(discover_repository_layout(&reference, &jit_root).unwrap());
+                .with_layout(discover_repository_layout(&reference, &jit_root).unwrap())
+                .unwrap();
             let selection = executor
                 .profiles()
                 .select_profiles(

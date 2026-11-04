@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
     let (storage, recovery_session) = prepare_server_storage(executor_layout.clone())?;
 
     info!("Using JIT repository at: {}", data_root.display());
-    let executor = Arc::new(CommandExecutor::new(storage).with_layout(executor_layout));
+    let executor = Arc::new(CommandExecutor::new(storage).with_layout(executor_layout)?);
     if recovery_session.recovery_report().recovered_count() > 0 {
         info!(
             "Applied {} leftover redo record(s) before server startup",
