@@ -1559,7 +1559,7 @@
     },
     "75b46be9": {
       "status": "in_progress",
-      "note": "Before/after executable-byte measurement, existing should-panic backtrace reproduction",
+      "note": "Implementation preserved at 1daddafd1; full branch CI passes; original40% criterion unmet at31.44%, awaiting user decision; not landed, gates pending",
       "model": "gpt-6.1-sol"
     },
     "b22aabce": {
@@ -1730,9 +1730,8 @@
     }
   },
   "handoff": {
-    "file": "handoff-11.md",
-    "from": "session c12148f1",
-    "to": "just-in-time-7c",
+    "file": "handoff-13.md",
+    "from": "Codex session13",
     "date": "2026-11-04"
   },
   "lead": "Codex execution lead (session 13)",
@@ -1825,7 +1824,7 @@
       "75b46be9": "gpt-6.1-sol high: measured compiler/debug behavior and budget calibration"
     },
     "timing_hold": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
-    "status": "split debug information implementation",
+    "status": "waiting for split-debug criterion decision; tested branch preserved",
     "measurements": {
       "f855d631": {
         "merge": "437c7ccfd",
@@ -1842,10 +1841,25 @@
           "acabe5453",
           "61cdc4ec4"
         ]
+      },
+      "75b46be9": {
+        "branch_commit": "1daddafd1",
+        "before_bytes": 1716674768,
+        "after_bytes": 1177006296,
+        "reduction_percent": 31.43685,
+        "budget_bytes": 1293942784,
+        "branch_tests": 5038,
+        "branch_doctests": 25,
+        "backtrace": "workspace source file/line preserved",
+        "criterion": "original40% unmet; proposed30% awaits approval"
       }
     },
     "timing_diagnosis": "Private pipe probe reproduced queue wait before test start. Pinned nextest 0.9.133 times wrapper and lacks ready handshake; clean solution requires nextest-side acquisition before attempt clock. User keeps dynamic sharing; no host edits.",
     "ownership_reconciliation": "Awaiting approval of proposed REQ-01/plan wording to match D-59",
-    "current_wave": 2
+    "current_wave": 2,
+    "open_decisions": [
+      "75b46be9 REQ-02 proposed30% measured floor",
+      "df129d9e REQ-01/plan ownership reconciliation with D-59"
+    ]
   }
 }
