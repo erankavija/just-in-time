@@ -663,44 +663,6 @@ fn test_claim_workflow_end_to_end() {
 }
 
 #[test]
-fn test_recover_empty_claim_log_does_not_warn_about_missing_index() {
-    let cli = JitCli::initialised().unwrap();
-    cli.init_git().unwrap().commit("Initial commit").unwrap();
-
-    let recovered = cli.command(["recover", "--json"]).output().unwrap();
-    assert!(recovered.status.success(), "{recovered:?}");
-
-    let report: Value = serde_json::from_slice(&recovered.stdout).unwrap();
-    assert_eq!(report["index_rebuilt"], false);
-    assert!(!report["warnings"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|warning| warning["kind"] == "index_rebuilt"));
-}
-
-#[test]
-fn test_recover_rebuilds_index_when_claim_log_has_claims_but_index_is_missing() {
-    let cli = JitCli::initialised().unwrap();
-    cli.init_git().unwrap().commit("Initial commit").unwrap();
-    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Claim log recovery"]).unwrap());
-    acquire_lease(&cli, &issue_id, "agent:recovery-test");
-    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
-    fs::remove_file(lease_path(&paths.shared_jit, &issue_id)).unwrap();
-
-    let recovered = cli.command(["recover", "--json"]).output().unwrap();
-    assert!(recovered.status.success(), "{recovered:?}");
-
-    let report: Value = serde_json::from_slice(&recovered.stdout).unwrap();
-    assert_eq!(report["index_rebuilt"], true);
-    assert!(report["warnings"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|warning| warning["kind"] == "index_rebuilt"));
-}
-
-#[test]
 fn test_recover_reports_a_reclaimed_stale_lease_without_appending_an_event() {
     use chrono::{Duration, Utc};
 

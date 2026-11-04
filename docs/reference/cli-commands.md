@@ -3270,7 +3270,7 @@ jit validate --branch-drift [--leases] [--json]
 
 | Mode | What it does |
 |------|--------------|
-| (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, readiness coherence, claims index) plus every local and graph rule. |
+| (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, readiness coherence) plus every local and graph rule. |
 | `<ID>` | The local and graph rules for that issue only. |
 | `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`, a rule failure exits `1`, and invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
@@ -3347,8 +3347,7 @@ Like every mutating command, apply a leftover redo record when the session
 opens ([Publication and Recovery](storage-format.md#publication-and-recovery)),
 then run the repair routines in sequence: repair declaration-derived state
 through the `jit validate --fix` path; in a Git repository, clear claim locks
-left by dead processes (checked by PID), rebuild the claims index from its
-append-only log, evict expired leases, and reclaim indefinite leases whose
+left by dead processes (checked by PID), evict expired leases, and reclaim indefinite leases whose
 heartbeat is [stale](claim.md#staleness); and remove orphaned `*.tmp` files
 under `.jit/` older than the [cleanup threshold](runtime-defaults.md).
 

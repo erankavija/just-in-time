@@ -2365,60 +2365,6 @@ fn recorded_worktree_ids(
         .collect())
 }
 
-/// Validate claims-index consistency for an explicitly selected repository.
-pub(crate) fn validate_claims_index_at(repository_root: &std::path::Path) -> Result<Vec<String>> {
-    use crate::storage::worktree_paths::WorktreePaths;
-
-    let paths =
-        WorktreePaths::detect_from(repository_root).context("Failed to detect worktree paths")?;
-    validate_claims_index_with_paths(&paths)
-}
-
-fn validate_claims_index_with_paths(
-    paths: &crate::storage::worktree_paths::WorktreePaths,
-) -> Result<Vec<String>> {
-    use crate::storage::claim_coordinator::ClaimsIndex;
-    use std::collections::HashSet;
-
-    // Load the active-lease index through storage (an absent index yields an
-    // empty one, i.e. no claims coordination active).
-    let index = ClaimsIndex::load(paths)?;
-
-    let mut issues = Vec::new();
-
-    // Check schema version
-    if index.schema_version != 1 {
-        issues.push(format!(
-            "Invalid schema version: expected 1, found {}",
-            index.schema_version
-        ));
-    }
-
-    // Check for duplicate leases (same issue claimed twice)
-    let mut seen_issues = HashSet::new();
-    for lease in &index.leases {
-        if !seen_issues.insert(&lease.issue_id) {
-            issues.push(format!(
-                "Duplicate lease detected for issue {}: Multiple leases exist for the same issue",
-                lease.issue_id.short_id()
-            ));
-        }
-    }
-
-    // Note: Expired leases are NOT considered corruption - they are normal state
-    // evicted by `jit recover`. Use validate_leases() to check expiration.
-
-    // Report sequence gaps (if any were detected during rebuild)
-    if !index.sequence_gaps.is_empty() {
-        issues.push(format!(
-            "Sequence gaps detected in claims log: missing sequences {:?}",
-            index.sequence_gaps
-        ));
-    }
-
-    Ok(issues)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

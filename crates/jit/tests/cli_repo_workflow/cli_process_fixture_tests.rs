@@ -47,8 +47,7 @@ fn test_program_command_runs_named_program_in_repository_without_inherited_produ
         Path::new(lines.next().unwrap()),
         cli.root().canonicalize().unwrap()
     );
-    let product_vars: Vec<&str> = lines.filter(|line| line.starts_with("JIT_")).collect();
-    assert_eq!(product_vars, ["JIT_TEST_MODE=1"]);
+    assert!(lines.all(|line| !line.starts_with("JIT_")));
 }
 
 #[test]
