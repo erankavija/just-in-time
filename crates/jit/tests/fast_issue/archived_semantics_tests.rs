@@ -6,9 +6,9 @@
 //! the recorded pre-archive state exactly, closing the `done → archived → ready`
 //! resurrection loophole. These tests exercise the dependency, readiness,
 //! transition, rollup, revive, and event-log surfaces.
+use jit::commands::StateRollup;
 use jit::domain::identity::IssueId;
 use jit::domain::{Issue, State};
-use jit::output::StateRollup;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 use jit::test_utils::add_reducing_edge;

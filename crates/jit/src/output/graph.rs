@@ -4,50 +4,10 @@ use super::{
     plain_issue_rows, render_issue_list, GraphDepsTreeResponse, GraphDownstreamResponse,
     GraphRootsResponse, GraphTreeResponse, HumanRender, OutputMode,
 };
+use crate::commands::{DependencyTreeNode, GraphExportOutput, GraphExportWritten};
 use crate::domain::identity::IssueId;
 use crate::domain::State;
-use crate::output::DependencyTreeNode;
-use crate::visualization::{pretty_document, GraphExportFullResponse, GraphExportSummaryResponse};
-use schemars::JsonSchema;
-use serde::Serialize;
 use std::fmt::Write;
-
-/// The success response of `jit graph export`: one of the JSON documents, the
-/// written-file report under `--output`, or the text of a DOT, Mermaid or batch
-/// export. Text is only ever rendered in human mode, since `--json` selects a
-/// JSON format.
-#[derive(Serialize, JsonSchema)]
-#[serde(untagged)]
-pub enum GraphExportOutput {
-    Summary(GraphExportSummaryResponse),
-    Full(GraphExportFullResponse),
-    Written(GraphExportWritten),
-    Text(GraphExportText),
-}
-
-/// The document text of a DOT, Mermaid or batch export.
-#[derive(Serialize, JsonSchema)]
-#[serde(transparent)]
-pub struct GraphExportText(pub String);
-
-/// The `--output` report: the path the export was written to.
-#[derive(Serialize, JsonSchema)]
-pub struct GraphExportWritten {
-    pub path: String,
-}
-
-impl GraphExportOutput {
-    /// The exact bytes an `--output` file receives: the document text without
-    /// its trailing newline. A written report has no document.
-    pub fn document_text(&self) -> Option<String> {
-        match self {
-            Self::Summary(document) => Some(pretty_document(document)),
-            Self::Full(document) => Some(pretty_document(document)),
-            Self::Text(text) => Some(text.0.clone()),
-            Self::Written(_) => None,
-        }
-    }
-}
 
 impl HumanRender for GraphExportOutput {
     fn render_human(&self, mode: OutputMode) -> String {

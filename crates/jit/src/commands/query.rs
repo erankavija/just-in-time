@@ -4,7 +4,107 @@
 //! The wrappers handle storage access and delegate to pure domain functions.
 
 use super::*;
+use crate::domain::list_envelope::{collection_keys, ListEnvelope};
 use crate::domain::queries::{query_all, AllFilter};
+use schemars::JsonSchema;
+use serde::Serialize;
+
+collection_keys! {
+    /// Collection key of [`StateRollup`].
+    ByStateKey = "by_state" as "StateRollup";
+}
+
+/// One `(state, count)` bucket in a [`StateRollup`].
+///
+/// Every [`State`] variant is represented, so `count` is `0` for a state with
+/// no issues rather than the entry being omitted (see [`StateRollup`]).
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct StateCount {
+    /// The lifecycle state this bucket counts.
+    pub state: State,
+    /// Number of issues in that state (`0` when the state is unpopulated).
+    pub count: usize,
+}
+
+/// Counts-by-state aggregation with a terminal-state rollup over a set of
+/// issues, shared by `jit issue progress` (over a container's direct children)
+/// and `jit query count --by state` (over a label bucket or the whole repo).
+///
+/// `by_state` has one [`StateCount`] per [`State`] variant in [`State::ALL`]
+/// order, zero-count states included, so the shape is stable and complete
+/// (@/inv/domain-agnostic — the state list is enumerated, never hardcoded).
+/// `count` is `by_state.len()` (one entry per state).
+///
+/// Effective-terminal semantics ([`Issue::effective_terminal_state`],
+/// `Done`/`Rejected`): the two terminal tallies are reported separately because
+/// a rejected issue is terminal but not delivered. `Archived` is
+/// terminality-preserving, so an issue archived from `Done` counts toward `done`
+/// and one archived from `Rejected` toward `rejected`; an `Archived` issue with a
+/// non-terminal origin is not effectively terminal and counts as `open`. `open` is every issue that is not effectively terminal
+/// (`total − done − rejected`). The `done`/`total` ratio and `percent` (rounded,
+/// `0` when `total` is `0`) measure delivery, i.e. `done` against `total`.
+pub type StateRollup = ListEnvelope<ByStateKey, StateCount, RollupTotals>;
+
+/// Delivery tallies of a [`StateRollup`] beside its `by_state` buckets.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct RollupTotals {
+    /// Total issues aggregated.
+    pub total: usize,
+    /// Issues in `Done`.
+    pub done: usize,
+    /// Issues in `Rejected` (terminal but not delivered).
+    pub rejected: usize,
+    /// Non-terminal issues (`total − done − rejected`).
+    pub open: usize,
+    /// `round(100 * done / total)`, or `0` when `total` is `0`.
+    pub percent: u32,
+}
+
+impl ListEnvelope<ByStateKey, StateCount, RollupTotals> {
+    /// Aggregate a slice of issues into the counts-by-state rollup.
+    ///
+    /// `by_state` is [`count_by_state`](crate::domain::queries::count_by_state)
+    /// (every variant, zero-count states kept); the [`RollupTotals`] follow the
+    /// effective-terminal semantics documented on the type, folding an
+    /// `Archived` issue into its pre-archive terminal origin
+    /// ([`Issue::effective_terminal_state`]).
+    pub fn from_issues(issues: &[Issue]) -> Self {
+        let by_state: Vec<StateCount> = crate::domain::queries::count_by_state(issues)
+            .into_iter()
+            .map(|(state, count)| StateCount { state, count })
+            .collect();
+
+        let total = issues.len();
+        // Delivery accounting folds by effective terminal state: an issue archived
+        // from Done counts as delivered, one archived from Rejected as rejected,
+        // so a fully-delivered-then-archived container still reports 100%.
+        let done = issues
+            .iter()
+            .filter(|i| i.effective_terminal_state() == Some(State::Done))
+            .count();
+        let rejected = issues
+            .iter()
+            .filter(|i| i.effective_terminal_state() == Some(State::Rejected))
+            .count();
+        let open = total - done - rejected;
+        let percent = if total == 0 {
+            0
+        } else {
+            ((done as f64 / total as f64) * 100.0).round() as u32
+        };
+
+        Self::with_extras(
+            by_state,
+            RollupTotals {
+                total,
+                done,
+                rejected,
+                open,
+                percent,
+            },
+        )
+    }
+}
 
 /// Query, search, and event-log operations of a [`CommandExecutor`].
 pub struct QueryOps<'a, S: IssueStore> {
@@ -134,7 +234,7 @@ impl<S: IssueStore> QueryOps<'_, S> {
     }
 
     /// Aggregate filtered issues into the counts-by-state
-    /// [`StateRollup`](crate::output::StateRollup) behind `jit query count --by
+    /// [`StateRollup`](crate::commands::StateRollup) behind `jit query count --by
     /// state`.
     ///
     /// Every supplied field filter narrows the bucket. Label patterns use the
@@ -175,14 +275,14 @@ impl<S: IssueStore> QueryOps<'_, S> {
     pub fn query_count_by_state(
         &self,
         filter: AllFilter<'_>,
-    ) -> Result<crate::output::StateRollup> {
+    ) -> Result<crate::commands::StateRollup> {
         let issues = self.query_all(
             filter.state,
             filter.assignee,
             filter.priority,
             filter.labels,
         )?;
-        Ok(crate::output::StateRollup::from_issues(&issues))
+        Ok(crate::commands::StateRollup::from_issues(&issues))
     }
 
     /// Query closed issues, narrowed by every supplied field filter.
