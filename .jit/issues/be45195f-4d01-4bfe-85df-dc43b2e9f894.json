@@ -16,9 +16,6 @@
   "id": "be45195f-4d01-4bfe-85df-dc43b2e9f894",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-gate-runs",
     "component:core",
     "per:@/charter/D-18",
     "satisfies:f8a6b298/REQ-02",
@@ -27,5 +24,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "The run-scanning latest selection is gone",
-  "updated_at": "2026-11-02T23:41:47.468586226Z"
+  "updated_at": "2026-11-04T22:42:45.038476238Z"
 }

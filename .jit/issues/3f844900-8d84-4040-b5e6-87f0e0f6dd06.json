@@ -1,0 +1,23 @@
+{
+  "assignee": "agent:membership-cleanup",
+  "claimed_at": "2026-11-04T22:42:15.213984339Z",
+  "context": {},
+  "created_at": "2026-11-04T22:41:57.757772648Z",
+  "dependencies": [],
+  "description": "Reconcile membership labels that claim containment unsupported by the authoritative dependency graph so repository validation reports no membership divergences.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository reports zero membership divergences, with each correction grounded in its configured namespace and dependency graph.\n- [hard] REQ-02: Corrected historical issues retain their states, dependency edges, descriptions, nonmembership labels, and gate status and history.\n- [hard] REQ-03: Whole-repository validation passes without membership divergence warnings.",
+  "documents": [],
+  "first_ready_at": "2026-11-04T22:41:57.757772648Z",
+  "gates_required": [
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "id": "3f844900-8d84-4040-b5e6-87f0e0f6dd06",
+  "labels": [
+    "milestone:v1.0",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Reconcile stale membership labels with the dependency graph",
+  "updated_at": "2026-11-04T22:42:15.213984339Z"
+}

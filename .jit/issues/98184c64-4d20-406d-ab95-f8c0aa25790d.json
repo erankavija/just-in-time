@@ -17,9 +17,6 @@
   "id": "98184c64-4d20-406d-ab95-f8c0aa25790d",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-leases",
     "component:validation",
     "component:storage",
     "per:@/charter/D-18",
@@ -30,5 +27,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Repository validation stops checking the claims index",
-  "updated_at": "2026-11-02T23:41:50.653451650Z"
+  "updated_at": "2026-11-04T22:42:44.530786480Z"
 }

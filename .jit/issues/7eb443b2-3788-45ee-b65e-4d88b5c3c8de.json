@@ -35,7 +35,6 @@
     "type:task",
     "epic:one-validation-report",
     "milestone:v1.0",
-    "story:report-core",
     "component:validation",
     "per:@/charter/D-20",
     "satisfies:9876a23a/REQ-02"
@@ -43,5 +42,5 @@
   "priority": "high",
   "state": "done",
   "title": "Graph findings record their firing subject",
-  "updated_at": "2026-11-03T22:11:30.411418649Z"
+  "updated_at": "2026-11-04T22:42:44.115987940Z"
 }

@@ -17,9 +17,6 @@
   "id": "34dd339e-38cf-4898-a15d-02bdd89f06de",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:history-boundary",
     "component:docs",
     "per:@/charter/D-17",
     "enforces:@/invariant/single-source-prose",
@@ -29,5 +26,5 @@
   "priority": "normal",
   "state": "rejected",
   "title": "Append-position prose says committed length",
-  "updated_at": "2026-11-02T23:41:51.857516013Z"
+  "updated_at": "2026-11-04T22:42:43.386539148Z"
 }

@@ -16,9 +16,6 @@
   "id": "915be53e-b0e0-4085-86d1-7f96fb3b0a2c",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-leases",
     "component:storage",
     "per:@/charter/D-19",
     "satisfies:f8a6b298/REQ-05",
@@ -27,5 +24,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Storage offers one lock-free lease read path and one activeness rule",
-  "updated_at": "2026-11-02T23:41:49.469221915Z"
+  "updated_at": "2026-11-04T22:42:44.325144385Z"
 }

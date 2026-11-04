@@ -17,9 +17,6 @@
   "id": "627fdcc4-6245-4b37-bf8d-c3d52a7dbe8b",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-leases",
     "component:cli",
     "per:@/charter/D-19",
     "per:@/charter/D-20",
@@ -29,5 +26,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Git hooks check leases through the claim status command",
-  "updated_at": "2026-11-02T23:41:55.570796344Z"
+  "updated_at": "2026-11-04T22:42:43.703081451Z"
 }
