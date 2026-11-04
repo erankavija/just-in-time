@@ -403,7 +403,14 @@ fn invoke_apply_prospective_cycle(json: bool) -> Vec<Output> {
     )]
 }
 
-/// `jit validate` on repository-integrity findings.
+/// `jit validate` on repository-integrity findings and on error-severity rule
+/// findings: the one `validate` row covers both.
+fn invoke_validate(json: bool) -> Vec<Output> {
+    let mut outputs = invoke_validate_integrity(json);
+    outputs.extend(invoke_validate_rule_findings(json));
+    outputs
+}
+
 fn invoke_validate_integrity(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
     let id = cli.create_issue(["--title", "Corruptible"]).unwrap();
@@ -870,8 +877,7 @@ row_bindings! {
     test_command_exit_codes_gate_evaluate_failure_emits_4: ("gate evaluate, gate evaluate-all, gate evaluate-many", 4, true) => invoke_gate_evaluate_failure;
     test_command_exit_codes_gate_evaluate_runner_error_emits_10: ("gate evaluate, gate evaluate-all, gate evaluate-many", 10, true) => invoke_gate_evaluate_runner_error;
     test_command_exit_codes_apply_prospective_cycle_emits_4: ("apply", 4, false) => invoke_apply_prospective_cycle;
-    test_command_exit_codes_validate_integrity_emits_4: ("validate", 4, true) => invoke_validate_integrity;
-    test_command_exit_codes_validate_rule_findings_emits_4: ("validate", 4, true) => invoke_validate_rule_findings;
+    test_command_exit_codes_validate_findings_emits_4: ("validate", 4, true) => invoke_validate;
     test_command_exit_codes_validate_branch_drift_emits_4: ("validate --branch-drift", 4, true) => invoke_validate_branch_drift;
     test_command_exit_codes_validate_leases_emits_4: ("validate --leases", 4, true) => invoke_validate_leases;
     test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", 4, true) => invoke_gate_status_all;
