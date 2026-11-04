@@ -24506,3 +24506,7 @@
 {"id":"2559d04f-ff31-4544-9730-2bf19f1a5706","issue_id":"75b46be9-ebc5-4320-92c7-454b01ecb4db","priority":"critical","timestamp":"2026-11-04T19:09:02.842879201Z","title":"Test executables keep debug information out of the linked binary","type":"issue_created"}
 {"id":"430f11e3-a0e2-4caf-b17f-c98e9cc3bed6","issue_id":"b22aabce-7c9b-4af5-ad75-d807fd062c1c","priority":"critical","timestamp":"2026-11-04T19:09:02.971448978Z","title":"The jit crate's integration tests build as one or two suites","type":"issue_created"}
 {"fields":["dependencies"],"id":"07644186-0851-4804-abaa-96f045737126","issue_id":"fb2dc5c3-1f32-418f-896b-41df16f57997","timestamp":"2026-11-04T19:09:09.128592396Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"code-review","id":"2bde704e-0bc7-4ec2-be93-aa87c73bd317","issue_id":"635f23c7-cff1-47bb-8302-4231c73ad276","timestamp":"2026-11-04T19:09:52.170782097Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"f10995ee-dadc-4336-bd0e-f829b2ec823f","issue_id":"635f23c7-cff1-47bb-8302-4231c73ad276","timestamp":"2026-11-04T19:10:07.634396228Z","to":"done","type":"issue_state_changed"}
+{"id":"eaf33953-be4d-44fc-af0a-db39fd55bd6d","issue_id":"635f23c7-cff1-47bb-8302-4231c73ad276","timestamp":"2026-11-04T19:10:07.634396228Z","type":"issue_completed"}
+{"from":"backlog","id":"5447d537-6aa5-4904-88a4-ed20907c0521","issue_id":"c2b3cefa-d690-4c6c-94dd-feaa3156acea","timestamp":"2026-11-04T19:10:07.748735065Z","to":"ready","type":"issue_state_changed"}
