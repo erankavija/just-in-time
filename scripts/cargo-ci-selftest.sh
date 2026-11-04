@@ -538,6 +538,47 @@ EOF
   done
 }
 
+# A run owns its temporary directory: a file a test leaves in the TMPDIR it was
+# given is gone once the run ends, whether the run passed or failed. The caller's
+# TMPDIR is a directory this test owns, so it also holds what the run leaves.
+test_run_removes_its_temporary_directory() {
+  local fixture="$scratch/tmpdir-owned" status
+  mkdir -p "$fixture/bin" "$fixture/repo"
+  cat >"$fixture/bin/cargo" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  --version) echo "$SELFTEST_CARGO_VERSION" ;;
+  "nextest --version") echo "cargo-nextest 0.9.133 (selftest fixture)" ;;
+  check*) ;;
+  "nextest run --workspace")
+    echo "$TMPDIR" >"$SELFTEST_SEEN"
+    : >"$TMPDIR/left-by-a-test"
+    echo "Summary [1s] 1 tests run: 1 passed, 0 skipped"
+    exit "$SELFTEST_SUITE_STATUS"
+    ;;
+  *) echo "test result: ok. 1 passed; 0 failed; 0 ignored" ;;
+esac
+EOF
+  chmod +x "$fixture/bin/cargo"
+  for status in 0 1; do
+    local caller="$fixture/caller-$status"
+    mkdir -p "$caller"
+    (
+      cd "$fixture/repo" || exit 3
+      PATH="$fixture/bin:$PATH" TMPDIR="$caller" \
+        SELFTEST_CARGO_VERSION="$real_cargo_version" \
+        SELFTEST_SEEN="$fixture/seen-$status" \
+        SELFTEST_SUITE_STATUS="$status" \
+        CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 \
+        "$gate" --suite
+    ) >"$fixture/out-$status" 2>&1
+    check "run owning its TMPDIR (suite status $status): the tests see a directory inside the caller's" \
+      grep -qF "$caller/" "$fixture/seen-$status"
+    check "run owning its TMPDIR (suite status $status): a file a test left is gone and nothing else remains" \
+      test -z "$(ls -A "$caller")"
+  done
+}
+
 # --- fixture construction ----------------------------------------------------
 
 # Base commit of a throwaway crate: dependency-free, two independent modules.
@@ -1071,6 +1112,7 @@ run_test test_classifier_enospc_exit_paths
 run_test test_build_lock_status_propagation
 run_test test_script_build_lock_wait
 run_test test_unrunnable_compiler_wrapper
+run_test test_run_removes_its_temporary_directory
 
 run_test run_scenario healthy "healthy_mainline" "healthy_worker" pass
 run_test run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail

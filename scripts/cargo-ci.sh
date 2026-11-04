@@ -17,6 +17,10 @@ set -euo pipefail
 # A clean "N passed, 0 failed" summary is trustworthy evidence and keeps
 # .jit/gate-runs/ small. Modelled on ../gf2/scripts/cargo-ci.sh.
 #
+# The run owns and removes its temporary directory: every step runs with TMPDIR
+# set to a directory made inside the caller's TMPDIR, and the directory goes on
+# every exit, including a trapped INT, TERM or HUP.
+#
 # Exit codes:
 #   0 — all steps passed
 #   1 — one or more steps failed on repository content (a verdict)
@@ -337,8 +341,17 @@ ensure_pinned_nextest
 # cold run. The derivation is under "Provenance" in
 # dev/benchmarks/rust-build-budgets/README.md.
 
+# The run owns one directory inside the caller's temporary directory and every
+# step sees it as TMPDIR, so what a killed test leaves behind dies with the run.
+# The wrapper probe above already started any compiler-cache daemon under the
+# caller's TMPDIR, which outlives this directory.
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+export TMPDIR="$WORK/tmp"
+mkdir "$TMPDIR"
 
 # This run's own scratch state (jit:0708d692): the Cargo artifact stream
 # describing what this run built, so the budget step judges what this run
