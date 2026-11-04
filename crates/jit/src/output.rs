@@ -16,6 +16,7 @@ use thiserror::Error;
 mod apply;
 pub mod config;
 mod emit;
+mod events;
 pub mod failure;
 mod init;
 mod invariant;
@@ -1387,7 +1388,6 @@ collection_keys! {
     NamespacesKey = "namespaces";
     WorktreesKey = "worktrees";
     PresetsKey = "presets";
-    EventsKey = "events";
     ValuesKey = "values";
     LeasesKey = "leases";
 }
@@ -2840,6 +2840,15 @@ pub struct SearchQuery {
 
 /// Response for `gate preset list` command
 pub type GatePresetListResponse = ListEnvelope<PresetsKey, crate::gate_presets::PresetInfo>;
+
+/// Collection key of [`EventListResponse`]. Its schema keeps the response's
+/// name, since no other response carries the `events` key.
+pub enum EventsKey {}
+
+impl CollectionKey for EventsKey {
+    const KEY: &'static str = "events";
+    const SCHEMA_NAME: Option<&'static str> = Some("EventListResponse");
+}
 
 /// Response for `events tail` and `events query`
 pub type EventListResponse = ListEnvelope<EventsKey, crate::domain::Event>;

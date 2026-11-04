@@ -750,10 +750,6 @@ impl CommandSchema {
                 Some(schema_to_value::<GatePresetListResponse>()),
                 "GatePresetListResponse",
             ),
-            "events_tail" | "events_query" => (
-                Some(schema_to_value::<EventListResponse>()),
-                "EventListResponse",
-            ),
             "label_values" => (
                 Some(schema_to_value::<LabelValuesResponse>()),
                 "LabelValuesResponse",

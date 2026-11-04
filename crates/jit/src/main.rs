@@ -17,12 +17,13 @@ mod output_macros;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
-    ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
-    GateCommands, GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
+    ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, GateCommands,
+    GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
-    apply, config, init, invariant, resolve_issue, resolve_issue_filter, version, CommandContext,
+    apply, config, events, init, invariant, resolve_issue, resolve_issue_filter, version,
+    CommandContext,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
@@ -4230,43 +4231,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         },
-        Commands::Events(event_cmd) => match event_cmd {
-            EventCommands::Tail { n } => {
-                let events = executor.queries().tail_events(n)?;
-                if json {
-                    use jit::output::{EventListResponse, JsonOutput};
-                    let msg = format!("{} event(s)", events.len());
-                    let output =
-                        JsonOutput::success(EventListResponse::new(events)).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    for event in events {
-                        println!("{}", serde_json::to_string(&event)?);
-                    }
-                }
-            }
-            EventCommands::Query {
-                event_type,
-                issue_id,
-                limit,
-            } => {
-                let issue = issue_id
-                    .map(|id| resolve_issue_filter(&storage, &id))
-                    .transpose()?;
-                let events = executor.queries().query_events(event_type, issue, limit)?;
-                if json {
-                    use jit::output::{EventListResponse, JsonOutput};
-                    let msg = format!("{} event(s)", events.len());
-                    let output =
-                        JsonOutput::success(EventListResponse::new(events)).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    for event in events {
-                        println!("{}", serde_json::to_string(&event)?);
-                    }
-                }
-            }
-        },
+        Commands::Events(command) => {
+            return events::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
         Commands::Doc(doc_cmd) => match doc_cmd {
             DocCommands::Add {
                 id,

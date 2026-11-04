@@ -128,6 +128,7 @@ pub fn resolve_issue_filter<S: IssueStore>(
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     apply::output_schema,
     config::output_schema,
+    events::output_schema,
     init::output_schema,
     invariant::output_schema,
     version::output_schema,
@@ -318,6 +319,7 @@ macro_rules! command_group {
 
 pub mod apply;
 pub mod config;
+pub mod events;
 pub mod init;
 pub mod invariant;
 #[cfg(test)]
