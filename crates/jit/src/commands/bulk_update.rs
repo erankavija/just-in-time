@@ -355,7 +355,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{declarations_from_image, finalize};
+        use crate::repository_state::finalize;
         use std::collections::HashSet;
 
         let layout = self.exec.require_layout()?;
@@ -371,11 +371,8 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 else {
                     return Ok(SessionStep::Retry);
                 };
-                let declarations = declarations_from_image(&image)?;
-                let config = declarations.config();
-                let plan_content =
-                    crate::commands::validate::plan_content_with_issues(&image, &active, &active)?;
                 let context = super::production_mutation_context();
+                let graph = super::CapturedGraphEvidence::capture(&image, &active, &context)?;
 
                 let confirmed = candidates
                     .iter()
@@ -388,10 +385,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                             &request,
                             CapturedTransitionEvidence {
                                 issues: &active,
-                                declarations: &declarations,
-                                config,
-                                plan_content: &plan_content,
-                                context: &context,
+                                graph: &graph,
                             },
                         )
                         .ok()?;
