@@ -881,7 +881,8 @@
     "9529b9ac": 1,
     "06ee9b67": 1,
     "71f5296c": 1,
-    "66790c84": 1
+    "66790c84": 1,
+    "d952d057": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1079,7 +1080,8 @@
       "status": "codex_done_unreviewed",
       "vendor": "Codex gpt-6.1-sol (high)",
       "reason": "self-contained migration without sockets",
-      "note": "lead-preserve ac9220229"
+      "note": "lead-preserve ac9220229",
+      "review": "lead R1 FAIL (7c), Tier 2.5 only: main.rs:536 rustdoc links [`resolve_gate_key`], which moved to jit::dispatch. Criteria otherwise met on reading. Rework with the main merge after the batch lands."
     },
     "06ee9b67": {
       "status": "in_batch",
@@ -1113,13 +1115,15 @@
       "status": "codex_partial",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
-      "note": "lead-preserve e1bff4aae; +68 lines to reconcile"
+      "note": "lead-preserve e1bff4aae; +68 lines to reconcile",
+      "review": "lead (7c): partial; migrate group no longer exists on main (842b0ac6 archived), so scope is snapshot export alone per its Notes. Completion dispatch after the batch lands; reconcile the +68 lines."
     },
     "cd8e04cc": {
       "status": "codex_done_unreviewed",
       "vendor": "Codex gpt-6-astra (default)",
       "reason": "self-contained migration without sockets",
-      "note": "lead-preserve 2cb30f0ac"
+      "note": "lead-preserve 2cb30f0ac",
+      "review": "lead R1 FAIL (7c): three new worktree exit-code rows (3, 5, 10) have no row_bindings case in command_exit_code_projection_tests.rs, so test_command_exit_codes_every_row_is_verified fails; HumanRender for WorktreeInfo is one ~250-char format! line, split it. Rework after the batch lands (needs a main merge)."
     },
     "8e91126b": {
       "status": "in_batch",
@@ -1151,7 +1155,8 @@
     "d952d057": {
       "status": "dispatched",
       "vendor": "Claude Sonnet",
-      "reason": "script change with self-test; steward priority"
+      "reason": "script change with self-test; steward priority",
+      "review": "lead R1 FAIL (7c): Notes forbid a daemon the run starts inheriting the per-run TMPDIR; an sccache idle-out restart mid-run would. Rework 1 to the same worker."
     },
     "b51291e4": {
       "status": "dispatched",
