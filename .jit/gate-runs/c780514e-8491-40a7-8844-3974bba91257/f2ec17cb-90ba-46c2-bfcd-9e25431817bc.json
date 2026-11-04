@@ -1,0 +1,26 @@
+{
+  "branch": null,
+  "by": "auto:executor",
+  "command": "./scripts/generate-shipped-policy-regions-selftest.sh",
+  "commit": null,
+  "completed_at": "2026-11-01T11:24:32.445240008Z",
+  "duration_ms": 0,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "shipped-policy-regions-selftest",
+  "inputs_digest": "81674bd4e8f5b8ecbea9940af6a0d2fe5f9cad6b8c436847a00cbc55fce1f3d2",
+  "issue_id": "c780514e-8491-40a7-8844-3974bba91257",
+  "message": null,
+  "origin": {
+    "derivation": "reused",
+    "source_issue": "89406e14-32f3-4b41-8b8f-8d8cb6255e76",
+    "source_run": "93df51f9-7e20-425f-b937-4707c919bab9"
+  },
+  "run_id": "f2ec17cb-90ba-46c2-bfcd-9e25431817bc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-01T11:24:32.445240008Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

@@ -1,0 +1,104 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/cfb3ba94-docs",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 7825,
+            "sha256": "e628c86640d527db0633b5de55813a37f9badd2d27bda7ff07c2d1f53a58634f"
+          },
+          "source": "dev/sessions/session-2026-01-01-example-md-migration.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 7825,
+            "sha256": "e628c86640d527db0633b5de55813a37f9badd2d27bda7ff07c2d1f53a58634f"
+          },
+          "destination": "dev/archive/cfb3ba94-docs/dev/sessions/session-2026-01-01-example-md-migration.md",
+          "source": "dev/sessions/session-2026-01-01-example-md-migration.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 8663,
+            "sha256": "8669e7551fd341d3b78dd2d1d6197c3353dfcd97ff4b4b12ac99e639fec686df"
+          },
+          "destination": "dev/archive/cfb3ba94-docs/dev/studies/documentation-organization-strategy.md",
+          "source": "dev/studies/documentation-organization-strategy.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "7c995f335b71873c552c9c0fb67164435fb4f3a8f5952ba1fe444e794d39a0cf"
+          },
+          "destination": "dev/archive/cfb3ba94-docs/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/studies/documentation-organization-strategy.md",
+          "issue": "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
+          "to_path": "dev/archive/cfb3ba94-docs/dev/studies/documentation-organization-strategy.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/sessions/session-2026-01-01-example-md-migration.md",
+          "issue": "d6dc4dfa-6784-43a8-8b8a-761bd5a3f38a",
+          "to_path": "dev/archive/cfb3ba94-docs/dev/sessions/session-2026-01-01-example-md-migration.md"
+        }
+      ],
+      "target": {
+        "id": "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/cfb3ba94-docs",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 569,
+            "sha256": "1314c99fec2f6fc677f5521973b036ccf549182f7cf430ca434ba7f2af6b3a2a"
+          },
+          "source": "dev/active/cfb3ba94-7406-4bc3-9f36-cecdcebacf0e-plan.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 569,
+            "sha256": "1314c99fec2f6fc677f5521973b036ccf549182f7cf430ca434ba7f2af6b3a2a"
+          },
+          "destination": "dev/archive/cfb3ba94-docs/dev/active/cfb3ba94-7406-4bc3-9f36-cecdcebacf0e-plan.md",
+          "source": "dev/active/cfb3ba94-7406-4bc3-9f36-cecdcebacf0e-plan.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 2,
+          "from_path": "dev/active/cfb3ba94-7406-4bc3-9f36-cecdcebacf0e-plan.md",
+          "issue": "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
+          "to_path": "dev/archive/cfb3ba94-docs/dev/active/cfb3ba94-7406-4bc3-9f36-cecdcebacf0e-plan.md"
+        }
+      ],
+      "target": {
+        "id": "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
+    "kind": "container"
+  }
+}

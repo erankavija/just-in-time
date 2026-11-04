@@ -1,0 +1,241 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/842b0ac6-greenfield-cutover",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 2040,
+            "sha256": "72067f3b93edba8918384e8327ab0c5c27cc67db7b51e192b82935c691f8249b"
+          },
+          "source": "dev/active/63c11d08/review.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 137124,
+            "sha256": "81306c658a5e3b6a851647853c1944759e66012a02741c8cd2c3e236d9b2c69e"
+          },
+          "source": "dev/active/842b0ac6-greenfield-cutover/breakdown.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 6436,
+            "sha256": "bc1e96a66a761ed00aaab8caa77319f225cf41dd500df9b7b47baf431c7b122e"
+          },
+          "source": "dev/active/842b0ac6-greenfield-cutover/completion-report.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 110358,
+            "sha256": "ac31bad1ba7cda52caa4139f25f6fabe1d07a4559045bbfbe6f028fffd2110cf"
+          },
+          "source": "dev/active/842b0ac6-greenfield-cutover/investigation.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 32120,
+            "sha256": "741dd0da9cbc934b2e18a3174490c1bb1f45c3b589af1806af4695ae9af6d845"
+          },
+          "source": "dev/active/842b0ac6-greenfield-cutover/plan.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 25159,
+            "sha256": "536bb07ea7fc5d86c831b8bbe99eb34f6471b96894fd65f7afb5d9d8045ba0a3"
+          },
+          "source": "dev/active/842b0ac6-greenfield-cutover/progress.json"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 2040,
+            "sha256": "72067f3b93edba8918384e8327ab0c5c27cc67db7b51e192b82935c691f8249b"
+          },
+          "destination": "dev/archive/842b0ac6-greenfield-cutover/active/63c11d08/review.md",
+          "source": "dev/active/63c11d08/review.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 137124,
+            "sha256": "81306c658a5e3b6a851647853c1944759e66012a02741c8cd2c3e236d9b2c69e"
+          },
+          "destination": "dev/archive/842b0ac6-greenfield-cutover/active/breakdown.json",
+          "source": "dev/active/842b0ac6-greenfield-cutover/breakdown.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 6436,
+            "sha256": "bc1e96a66a761ed00aaab8caa77319f225cf41dd500df9b7b47baf431c7b122e"
+          },
+          "destination": "dev/archive/842b0ac6-greenfield-cutover/active/completion-report.md",
+          "source": "dev/active/842b0ac6-greenfield-cutover/completion-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 110358,
+            "sha256": "ac31bad1ba7cda52caa4139f25f6fabe1d07a4559045bbfbe6f028fffd2110cf"
+          },
+          "destination": "dev/archive/842b0ac6-greenfield-cutover/active/investigation.md",
+          "source": "dev/active/842b0ac6-greenfield-cutover/investigation.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 32120,
+            "sha256": "741dd0da9cbc934b2e18a3174490c1bb1f45c3b589af1806af4695ae9af6d845"
+          },
+          "destination": "dev/archive/842b0ac6-greenfield-cutover/active/plan.md",
+          "source": "dev/active/842b0ac6-greenfield-cutover/plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 25159,
+            "sha256": "536bb07ea7fc5d86c831b8bbe99eb34f6471b96894fd65f7afb5d9d8045ba0a3"
+          },
+          "destination": "dev/archive/842b0ac6-greenfield-cutover/active/progress.json",
+          "source": "dev/active/842b0ac6-greenfield-cutover/progress.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "bfa24572ad0e421af8f08b5c8009e9d63badac2b13cc56ba0e2e63db08b0476d"
+          },
+          "destination": "dev/archive/842b0ac6-greenfield-cutover/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/842b0ac6-greenfield-cutover/investigation.md",
+          "issue": "201634a8-3df6-4b53-aa3d-6beb59115b54",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/842b0ac6-greenfield-cutover/plan.md",
+          "issue": "201634a8-3df6-4b53-aa3d-6beb59115b54",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/plan.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/842b0ac6-greenfield-cutover/breakdown.json",
+          "issue": "201634a8-3df6-4b53-aa3d-6beb59115b54",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/breakdown.json"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/63c11d08/review.md",
+          "issue": "63c11d08-054e-471a-9b0c-491c30b8d8a1",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/63c11d08/review.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/842b0ac6-greenfield-cutover/plan.md",
+          "issue": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/plan.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/842b0ac6-greenfield-cutover/progress.json",
+          "issue": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/progress.json"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/842b0ac6-greenfield-cutover/completion-report.md",
+          "issue": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/completion-report.md"
+        }
+      ],
+      "target": {
+        "id": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/842b0ac6-greenfield-cutover",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 140179,
+            "sha256": "273b812ca7ba0a6352f120966cd5e64679bddb7f33430517c54560ca28fa1b5c"
+          },
+          "source": "dev/active/842b0ac6-greenfield-cutover/sweep-66bd4b5c.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 140179,
+            "sha256": "273b812ca7ba0a6352f120966cd5e64679bddb7f33430517c54560ca28fa1b5c"
+          },
+          "destination": "dev/archive/842b0ac6-greenfield-cutover/active/sweep-66bd4b5c.md",
+          "source": "dev/active/842b0ac6-greenfield-cutover/sweep-66bd4b5c.md"
+        }
+      ],
+      "reconciling": true,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/investigation.md",
+          "issue": "201634a8-3df6-4b53-aa3d-6beb59115b54",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/plan.md",
+          "issue": "201634a8-3df6-4b53-aa3d-6beb59115b54",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/plan.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/breakdown.json",
+          "issue": "201634a8-3df6-4b53-aa3d-6beb59115b54",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/breakdown.json"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/plan.md",
+          "issue": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/plan.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/progress.json",
+          "issue": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/progress.json"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/completion-report.md",
+          "issue": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/completion-report.md"
+        },
+        {
+          "document_index": 3,
+          "from_path": "dev/active/842b0ac6-greenfield-cutover/sweep-66bd4b5c.md",
+          "issue": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+          "to_path": "dev/archive/842b0ac6-greenfield-cutover/active/sweep-66bd4b5c.md"
+        }
+      ],
+      "target": {
+        "id": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+    "kind": "container"
+  }
+}

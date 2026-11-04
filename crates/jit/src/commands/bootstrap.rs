@@ -126,7 +126,8 @@ pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedReposit
     };
     let executor = CommandExecutor::new(storage.clone())
         .with_layout(layout.clone())
-        .with_worktree_paths(worktree_paths.clone());
+        .with_worktree_paths(worktree_paths.clone())
+        .with_recovered_records(recovered_records);
     let write_override_annotation = write_override.map(DispatchMutationAnnotation::install);
 
     if !invocation.is_validation_exempt {

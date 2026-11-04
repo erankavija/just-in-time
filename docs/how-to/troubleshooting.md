@@ -108,7 +108,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 3. **Coordinate** — If you know the other agent, ask them to release
 4. **Force evict (admin)** — For crashed agents:
    ```bash
-   jit claim force-evict <lease-id> --reason "Agent crashed"
+   jit claim force-evict <issue-id> --reason "Agent crashed"
    ```
 
 ### Lease Expired During Work
@@ -119,7 +119,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 **Prevention:**
 - Use longer TTL: `jit claim acquire <issue> --ttl 3600`
-- Renew before expiration: `jit claim renew <lease-id>`
+- Renew before expiration: `jit claim renew <issue-id>`
 - Use indefinite lease for manual work: `jit claim acquire <issue> --ttl 0 --reason "..."`
 
 **Recovery:**
@@ -145,7 +145,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 1. **Send heartbeat** if still working:
    ```bash
-   jit claim heartbeat <lease-id>
+   jit claim heartbeat <issue-id>
    ```
 2. **Release** if done:
    ```bash
@@ -227,8 +227,9 @@ rm .git/jit/leases/<issue-id>.json
 
 ### Coordination-State Repair
 
-`jit validate` reports repository validation findings. Stale locks and expired
-leases are coordination state for `jit recover` to repair; it also removes orphaned `*.tmp` files. It never removes `redo.record`
+`jit validate` reports repository validation findings. Use `jit recover` to
+clear stale locks, evict expired leases, and reclaim stale indefinite leases.
+It also removes orphaned `*.tmp` files, lease stage files included. It never removes `redo.record`
 from the scratch directory `.jit/tmp/`: that record is a pending mutation's
 commit point. [Stale Temporary Files](../concepts/guarantees.md#stale-temporary-files)
 names what is safe to remove by hand.

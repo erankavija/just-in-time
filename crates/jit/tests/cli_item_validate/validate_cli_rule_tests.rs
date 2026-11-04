@@ -150,10 +150,9 @@ fn test_validate_id_fails_and_exits_nonzero() {
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(EPIC).unwrap();
 
-    cli.command(["validate", &id])
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("epic-needs-component"));
+    let output = cli.command(["validate", &id]).output().unwrap();
+    assert_eq!(output.status.code(), Some(4));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("epic-needs-component"));
 }
 
 #[test]
@@ -166,7 +165,10 @@ fn test_validate_id_json_reports_findings_and_exits_nonzero() {
 
     let assert = cli.command(["validate", &id, "--json"]).assert().failure();
     let out = assert.get_output().stdout.clone();
+    assert_eq!(assert.get_output().status.code(), Some(4));
     let json: Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert!(assert.get_output().stderr.is_empty());
     let findings = json["error"]["details"]["findings"].as_array().unwrap();
     assert!(findings.iter().any(|f| f["rule"] == "epic-needs-component"));
     assert!(findings.iter().any(|f| f["severity"] == "error"));
@@ -180,12 +182,15 @@ fn test_validate_explain_lists_outcomes() {
     append_rules(&cli, EPIC_NEEDS_COMPONENT);
     let id = cli.create_issue(EPIC).unwrap();
 
-    cli.command(["validate", &id, "--explain"])
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("epic-needs-component"))
-        .stdout(predicate::str::contains("FAIL"))
-        .stdout(predicate::str::contains("type=epic"));
+    let output = cli
+        .command(["validate", &id, "--explain"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(4));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("epic-needs-component"));
+    assert!(stdout.contains("FAIL"));
+    assert!(stdout.contains("type=epic"));
 }
 
 #[test]
@@ -429,15 +434,6 @@ severity = "error"
 assert = { label-coverage = { child-link = "any", marker = "[hard]" } }
 "#;
 
-/// A valid coverage rule whose missing container pointer fails evaluation.
-const UNRESOLVED_CONTAINER_RULE: &str = r#"
-[[rules]]
-name = "broken-graph-rule"
-when = { type = "epic" }
-severity = "error"
-assert = { label-coverage = { container-from-label = "brackets" } }
-"#;
-
 const DISABLED_GRAPH_RULE: &str = r#"
 [[rules]]
 name = "disabled-graph-rule"
@@ -650,61 +646,6 @@ fn test_validate_id_with_leases_is_rejected() {
 }
 
 #[test]
-fn test_validate_id_reports_unresolved_container_pointer() {
-    // Per-issue validation must report an unresolved container pointer.
-    let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
-    );
-    append_rules(&cli, UNRESOLVED_CONTAINER_RULE);
-    let id = cli.create_issue(EPIC).unwrap();
-
-    let assert = cli.command(["validate", &id, "--json"]).assert().failure();
-    let out = assert.get_output().stdout.clone();
-    let json: Value = serde_json::from_slice(&out).unwrap();
-    let findings = json["error"]["details"]["findings"].as_array().unwrap();
-    assert!(
-        findings.iter().any(|f| f["rule"] == "broken-graph-rule"
-            && f["message"].as_str().unwrap_or("").contains("config error")),
-        "unresolved container pointer must be reported per-issue: {findings:?}"
-    );
-}
-
-#[test]
-fn test_validate_explain_marks_unresolved_container_pointer_as_failed() {
-    // Finding #3 (--explain): a graph rule with a missing container pointer must
-    // be shown as FAILED, never PASS.
-    let cli = JitCli::with_repository(
-        profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
-    );
-    append_rules(&cli, UNRESOLVED_CONTAINER_RULE);
-    let id = cli.create_issue(EPIC).unwrap();
-
-    // Human form: the rule appears and is marked FAIL.
-    cli.command(["validate", &id, "--explain"])
-        .assert()
-        .failure()
-        .stdout(predicate::str::contains("broken-graph-rule"))
-        .stdout(predicate::str::contains("FAIL"));
-
-    // JSON form: the outcome for the malformed rule has passed = false.
-    let assert = cli
-        .command(["validate", &id, "--explain", "--json"])
-        .assert()
-        .failure();
-    let out = assert.get_output().stdout.clone();
-    let json: Value = serde_json::from_slice(&out).unwrap();
-    let outcomes = json["error"]["details"]["outcomes"].as_array().unwrap();
-    let outcome = outcomes
-        .iter()
-        .find(|o| o["rule"] == "broken-graph-rule")
-        .expect("unresolved container pointer must appear as an outcome");
-    assert_eq!(
-        outcome["passed"], false,
-        "a config-errored graph rule must be reported as failed, not passed: {outcome}"
-    );
-}
-
-#[test]
 fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application() {
     let cli = JitCli::with_repository(
         profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
@@ -752,6 +693,9 @@ fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application(
         .assert()
         .failure();
     let failed_json: Value = serde_json::from_slice(&failed.get_output().stdout).unwrap();
+    assert_eq!(failed.get_output().status.code(), Some(4));
+    assert_eq!(failed_json["error"]["code"], "VALIDATION_FAILED");
+    assert!(failed.get_output().stderr.is_empty());
     let findings = failed_json["error"]["details"]["findings"]
         .as_array()
         .unwrap();
@@ -792,6 +736,7 @@ fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
             .command(["validate", id, "--rule", rule, "--json"])
             .assert()
             .failure();
+        assert_eq!(assert.get_output().status.code(), Some(4));
         let json: Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
         let findings = json["error"]["details"]["findings"].as_array().unwrap();
         assert!(

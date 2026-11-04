@@ -108,8 +108,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                     };
                     probe = expanded;
                 }
-                let delta_overlay = super::validation_overlay(
-                    &probe,
+                let delta_overlay = crate::repository_state::action_overrides(
                     derive_materialization(
                         &probe,
                         MaterializationRequest::Initialize {
@@ -117,8 +116,9 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                             context: &context,
                         },
                     )?
-                    .delta(),
-                )?;
+                    .delta()
+                    .actions(),
+                );
 
                 // Grow the probe by the exact write set's validation closure, then
                 // finalize, validate, and publish under the same held session.
@@ -159,8 +159,10 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 // it cannot complete.
                 crate::profile::ensure_publishable_targets(&plan)
                     .map_err(crate::repository_state::RepositoryStateError::from)?;
-                let proposed =
-                    apply_overlay(&base, super::validation_overlay(&base, plan.delta())?)?;
+                let proposed = apply_overlay(
+                    &base,
+                    crate::repository_state::action_overrides(plan.delta().actions()),
+                )?;
                 let validation = crate::validation::report(
                     &crate::validation::CapturedValidation::from_image(&proposed),
                     &crate::validation::ReportInputs {

@@ -1,0 +1,891 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/f1dc843a-redo-mutations",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 10049,
+            "sha256": "0391789c4647a06e1f9011e75d0d7447c7480629c0049dda98701eaad76e59cd"
+          },
+          "source": "dev/active/2d4fda72/relocation-evidence.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 4400,
+            "sha256": "80f7a9779bc28868dedf45575443538936b602e8600eb422c9c4f9a6fe7f5c23"
+          },
+          "source": "dev/active/48e4f65c/event-log-capture-ceilings.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 13642,
+            "sha256": "cd429abf25d78feede5846deeb115c1ae88430c06e5d2544692978c2a7f5ee88"
+          },
+          "source": "dev/active/7226f00b/whole-log-read-cost.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 83093,
+            "sha256": "fca0f65a09556cf11b59a796c2f76e480b24106b9342499e770d5f1b5f6e6000"
+          },
+          "source": "dev/active/e346d387/sweep-evidence.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 18961,
+            "sha256": "84c6158011f9dfcd4307edab19de8f239937b7cb3acdaa7c184b34fbb62a0ff7"
+          },
+          "source": "dev/active/e590fa91/checkpoint-evidence.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 2176,
+            "sha256": "c268e6a0564cfae144b336f39b5df1d8aa0ad5aba82e6c13e572a9f22e8cb3f6"
+          },
+          "source": "dev/active/e590fa91/phase-net.py"
+        },
+        {
+          "content_identity": {
+            "byte_size": 7159,
+            "sha256": "9855e1256256e76c86bc20341112cd4c8d04b55050664dae35397b3f5c416913"
+          },
+          "source": "dev/active/ef7848ea/checkpoint-evidence.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 131166,
+            "sha256": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 7734,
+            "sha256": "1c6162397d9f0cde725f32979e038a5981689d1fcef7e9fd0981250932066607"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/completion-report.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 5223,
+            "sha256": "0a830f20204ff3eaafde406f140236ae8b1a3fb4fc5ea21caf2381a222c357d1"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/footprint.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 5731,
+            "sha256": "61f1309b9e0134506f31e9b7abcfc4b7f777078cbde8ff6c2c8fe650695e93f2"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/footprint.py"
+        },
+        {
+          "content_identity": {
+            "byte_size": 12821,
+            "sha256": "1b0308cd62ffdf50799ab0a681d872f295e9f92bce4729ed890162c45185f713"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/handoff-2.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 11809,
+            "sha256": "f08386312c413a67a98756ad0d4c4001d10ce9ee2203447f0fbe7d38ac0eb6ef"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/handoff-3.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 8318,
+            "sha256": "7b67cf2cef23169dd99d16d136cb04a474532d6a6cf21c366051971e4811d04f"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/handoff-4.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 8654,
+            "sha256": "708d2647a6e76fa454df7f5cbd6b671254662e485b2db5abf26c81f17724b06d"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/handoff-5.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 10069,
+            "sha256": "3f50e0cabd8dbe587164b4670de95c06356a58ca78a5d7ea8a0249a938466adb"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/handoff.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 6767,
+            "sha256": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 173898,
+            "sha256": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 46782,
+            "sha256": "4bf630264baa465aa18d6f1c0036758336b67fb45458c446661a8479da238eed"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/plan.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 178007,
+            "sha256": "5c4425065b2f0d1f83ee2551f0a1ea7ce0a2c10cdf934c7eaff1b4130cd912e2"
+          },
+          "source": "dev/active/f1dc843a-redo-mutations/progress.json"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 10049,
+            "sha256": "0391789c4647a06e1f9011e75d0d7447c7480629c0049dda98701eaad76e59cd"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/2d4fda72/relocation-evidence.md",
+          "source": "dev/active/2d4fda72/relocation-evidence.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4400,
+            "sha256": "80f7a9779bc28868dedf45575443538936b602e8600eb422c9c4f9a6fe7f5c23"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/48e4f65c/event-log-capture-ceilings.md",
+          "source": "dev/active/48e4f65c/event-log-capture-ceilings.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 13642,
+            "sha256": "cd429abf25d78feede5846deeb115c1ae88430c06e5d2544692978c2a7f5ee88"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/7226f00b/whole-log-read-cost.md",
+          "source": "dev/active/7226f00b/whole-log-read-cost.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 83093,
+            "sha256": "fca0f65a09556cf11b59a796c2f76e480b24106b9342499e770d5f1b5f6e6000"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/e346d387/sweep-evidence.md",
+          "source": "dev/active/e346d387/sweep-evidence.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 18961,
+            "sha256": "84c6158011f9dfcd4307edab19de8f239937b7cb3acdaa7c184b34fbb62a0ff7"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/e590fa91/checkpoint-evidence.md",
+          "source": "dev/active/e590fa91/checkpoint-evidence.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 2176,
+            "sha256": "c268e6a0564cfae144b336f39b5df1d8aa0ad5aba82e6c13e572a9f22e8cb3f6"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/e590fa91/phase-net.py",
+          "source": "dev/active/e590fa91/phase-net.py"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 7159,
+            "sha256": "9855e1256256e76c86bc20341112cd4c8d04b55050664dae35397b3f5c416913"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/ef7848ea/checkpoint-evidence.md",
+          "source": "dev/active/ef7848ea/checkpoint-evidence.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 131166,
+            "sha256": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/breakdown.json",
+          "source": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 7734,
+            "sha256": "1c6162397d9f0cde725f32979e038a5981689d1fcef7e9fd0981250932066607"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/completion-report.md",
+          "source": "dev/active/f1dc843a-redo-mutations/completion-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 5223,
+            "sha256": "0a830f20204ff3eaafde406f140236ae8b1a3fb4fc5ea21caf2381a222c357d1"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/footprint.md",
+          "source": "dev/active/f1dc843a-redo-mutations/footprint.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 5731,
+            "sha256": "61f1309b9e0134506f31e9b7abcfc4b7f777078cbde8ff6c2c8fe650695e93f2"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/footprint.py",
+          "source": "dev/active/f1dc843a-redo-mutations/footprint.py"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 12821,
+            "sha256": "1b0308cd62ffdf50799ab0a681d872f295e9f92bce4729ed890162c45185f713"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/handoff-2.md",
+          "source": "dev/active/f1dc843a-redo-mutations/handoff-2.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 11809,
+            "sha256": "f08386312c413a67a98756ad0d4c4001d10ce9ee2203447f0fbe7d38ac0eb6ef"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/handoff-3.md",
+          "source": "dev/active/f1dc843a-redo-mutations/handoff-3.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 8318,
+            "sha256": "7b67cf2cef23169dd99d16d136cb04a474532d6a6cf21c366051971e4811d04f"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/handoff-4.md",
+          "source": "dev/active/f1dc843a-redo-mutations/handoff-4.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 8654,
+            "sha256": "708d2647a6e76fa454df7f5cbd6b671254662e485b2db5abf26c81f17724b06d"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/handoff-5.md",
+          "source": "dev/active/f1dc843a-redo-mutations/handoff-5.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 10069,
+            "sha256": "3f50e0cabd8dbe587164b4670de95c06356a58ca78a5d7ea8a0249a938466adb"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/handoff.md",
+          "source": "dev/active/f1dc843a-redo-mutations/handoff.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 6767,
+            "sha256": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/intake.md",
+          "source": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 173898,
+            "sha256": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/investigation.md",
+          "source": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 46782,
+            "sha256": "4bf630264baa465aa18d6f1c0036758336b67fb45458c446661a8479da238eed"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/plan.md",
+          "source": "dev/active/f1dc843a-redo-mutations/plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 178007,
+            "sha256": "5c4425065b2f0d1f83ee2551f0a1ea7ce0a2c10cdf934c7eaff1b4130cd912e2"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/active/progress.json",
+          "source": "dev/active/f1dc843a-redo-mutations/progress.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4606,
+            "sha256": "b31238e91ee7bed867b363705ea8906e6c1d50ceef1a99ed0db9da77d8207ea0"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/benchmarks/cold-warm-verdict-0708d692/README.md",
+          "source": "dev/benchmarks/cold-warm-verdict-0708d692/README.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4475,
+            "sha256": "12a2257ef46ee903d23bf95aeed3974f7e4a8f6b3dd719ad20c1f87a83d02da2"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/benchmarks/publication-cost-722878d4/README.md",
+          "source": "dev/benchmarks/publication-cost-722878d4/README.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 3727,
+            "sha256": "1ff67454951e463917ee1d265eb265a73876bb3d0052810ee62d8d21afce6974"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/benchmarks/publication-cost-722878d4/rust-balance.py",
+          "source": "dev/benchmarks/publication-cost-722878d4/rust-balance.py"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 8239,
+            "sha256": "a30511da6f5344fed5507ad383ff57ebdd86b5f771a46fd44243ee502b32e75c"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/benchmarks/rust-build-budgets/README.md",
+          "source": "dev/benchmarks/rust-build-budgets/README.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 5013,
+            "sha256": "80aa4dbd99abed89d5d4edaf1480c13c1885471de9d96c7c4598e8a5b741e4bf"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/benchmarks/rust-build-efficiency/baseline.json",
+          "source": "dev/benchmarks/rust-build-efficiency/baseline.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4399,
+            "sha256": "9261a47f942f6e6312e913def9927a4fd6fc9639325cbd0f6d8d29f1fd868390"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/benchmarks/rust-build-efficiency/optimized.json",
+          "source": "dev/benchmarks/rust-build-efficiency/optimized.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 471662,
+            "sha256": "ccd40904bb046626b165d30e40564d4329b56b496ba402e842d813c47f86eff0"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/benchmarks/rust-build-efficiency/post-change-test-inventory.json",
+          "source": "dev/benchmarks/rust-build-efficiency/post-change-test-inventory.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 478622,
+            "sha256": "a9798c9b7848d34d3bf6568380582cf439526fc52048eb254b09ea006c6b12e8"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/benchmarks/rust-build-efficiency/pre-change-test-inventory.json",
+          "source": "dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 31387,
+            "sha256": "4da3d262647ed29067c08ad72d7732ddcf9f464394d816f126c72f80b0ba188d"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/benchmarks/rust-build-efficiency/raw/clean-1/executable-remeasure.json",
+          "source": "dev/benchmarks/rust-build-efficiency/raw/clean-1/executable-remeasure.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 28160,
+            "sha256": "2c04f2b39aeb35eb79a7456bcc4fb91d4b39f7e0de27a68f4225113a51e9c4c5"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/benchmarks/rust-build-efficiency/report.md",
+          "source": "dev/benchmarks/rust-build-efficiency/report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "37517a29eda8c3cae47260d20816ecda22c9b5073f22843013bb9ecb8a9e1762"
+          },
+          "destination": "dev/archive/f1dc843a-redo-mutations/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/investigation.md",
+          "issue": "08b8c0ef-d55d-479b-bcaf-d649a8c3a193",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "08b8c0ef-d55d-479b-bcaf-d649a8c3a193",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "0938d99e-1c0b-418b-9428-cc8a1d00ef3b",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "10ba2e35-5e36-4aac-b7d4-29c6141dc4e7",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "19e7298a-59a1-40a2-a9d7-7a63bbcfed02",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/footprint.md",
+          "issue": "21e976d1-1650-474f-8da8-4a5e9f1207be",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/footprint.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/footprint.py",
+          "issue": "21e976d1-1650-474f-8da8-4a5e9f1207be",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/footprint.py"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "21e976d1-1650-474f-8da8-4a5e9f1207be",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/2d4fda72/relocation-evidence.md",
+          "issue": "2d4fda72-41e1-4cfc-88fd-eafcc48b60ee",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/2d4fda72/relocation-evidence.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "2d4fda72-41e1-4cfc-88fd-eafcc48b60ee",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "33f97287-2561-424c-84b4-a9c30edf3212",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "35544121-9268-4068-8248-98e9d2df16f5",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "3d9150d7-e423-400f-903a-b9a7aec1ba7f",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 6,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "42478e5d-90aa-472e-bca2-f628a1d883c2",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "4319256e-edab-443b-814e-923d241e84f0",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "434a60b7-a837-432d-b6ef-8711026e2210",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/48e4f65c/event-log-capture-ceilings.md",
+          "issue": "48e4f65c-e73a-4fff-b2e9-771be7d3fb3a",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/48e4f65c/event-log-capture-ceilings.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "48e4f65c-e73a-4fff-b2e9-771be7d3fb3a",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "4b765a1e-8a5b-4c08-a642-058a87e7c51b",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "4e818d10-4433-4610-a525-29817677f87c",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "51eb1aa6-186d-44c0-a60f-a1e3b0393110",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "555ff4be-dc73-48e2-a587-f9274ac97bb1",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/investigation.md",
+          "issue": "581bddcf-a189-4ab8-8349-21c64e82dc90",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "581bddcf-a189-4ab8-8349-21c64e82dc90",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/7226f00b/whole-log-read-cost.md",
+          "issue": "7226f00b-acc0-4dcd-bd85-fab6cce24b65",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/7226f00b/whole-log-read-cost.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "7226f00b-acc0-4dcd-bd85-fab6cce24b65",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/footprint.md",
+          "issue": "722878d4-fb2a-4226-b007-6c07e6d49cb9",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/footprint.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "722878d4-fb2a-4226-b007-6c07e6d49cb9",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/benchmarks/publication-cost-722878d4/README.md",
+          "issue": "722878d4-fb2a-4226-b007-6c07e6d49cb9",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/benchmarks/publication-cost-722878d4/README.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/investigation.md",
+          "issue": "7658bf81-1aa1-4fee-a656-11b12c7a5b62",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "7658bf81-1aa1-4fee-a656-11b12c7a5b62",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "79252d23-23ab-4c04-9327-8d2986f361d8",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "816df12a-a2ff-49dc-85aa-5a7da65dabab",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "8454236c-c254-419c-826e-0b8da050711f",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "8559f529-dec6-40fd-befe-91d48d00d4ac",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/benchmarks/rust-build-budgets/README.md",
+          "issue": "8b6a9e34-60c7-45f5-b506-de20afbb98ce",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/benchmarks/rust-build-budgets/README.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "8b6a9e34-60c7-45f5-b506-de20afbb98ce",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "8d7f4cec-8375-4199-9756-8d4157d2c391",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "91168745-1434-4cf8-9442-ab8d3e9135f8",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/investigation.md",
+          "issue": "99a12b66-3895-46c2-91ab-4f29e41af65e",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/breakdown.json",
+          "issue": "99a12b66-3895-46c2-91ab-4f29e41af65e",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/breakdown.json"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "99a12b66-3895-46c2-91ab-4f29e41af65e",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/investigation.md",
+          "issue": "b0ee2dd6-5393-4193-a88d-f3301601234e",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "b0ee2dd6-5393-4193-a88d-f3301601234e",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "b4483ad6-5ce9-4209-933b-aa386cb74b3a",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "b7c99dcb-073f-46c7-938a-0a465c8131ee",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "be13da79-f8df-45e2-8421-c99515470712",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/7226f00b/whole-log-read-cost.md",
+          "issue": "c88822a5-b92a-4992-9521-f1c0ad145b9e",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/7226f00b/whole-log-read-cost.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "c88822a5-b92a-4992-9521-f1c0ad145b9e",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "ccea63de-f191-497b-8941-6d5b6133b50a",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "d591a1c8-eca2-4547-9989-ed4b972a2d37",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "dd1b984c-7ade-4967-ad6c-f75cf498ec63",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/e346d387/sweep-evidence.md",
+          "issue": "e346d387-eee8-4657-93eb-9b64621fd900",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/e346d387/sweep-evidence.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "e346d387-eee8-4657-93eb-9b64621fd900",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/e590fa91/checkpoint-evidence.md",
+          "issue": "e590fa91-6164-4d62-bab2-a7ad5cbc42fb",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/e590fa91/checkpoint-evidence.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/e590fa91/phase-net.py",
+          "issue": "e590fa91-6164-4d62-bab2-a7ad5cbc42fb",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/e590fa91/phase-net.py"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "e590fa91-6164-4d62-bab2-a7ad5cbc42fb",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "e6e25f9a-62ea-4686-b44b-21ad51b8afe5",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 4,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "ead8f86d-2e45-4144-98e7-2f814b643091",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "ec72359b-67dd-4dcd-8639-74b751b1cdf9",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "ef7848ea-910d-40f7-a005-854be92229a0",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/benchmarks/publication-cost-722878d4/README.md",
+          "issue": "ef7848ea-910d-40f7-a005-854be92229a0",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/benchmarks/publication-cost-722878d4/README.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/ef7848ea/checkpoint-evidence.md",
+          "issue": "ef7848ea-910d-40f7-a005-854be92229a0",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/ef7848ea/checkpoint-evidence.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/investigation.md",
+          "issue": "f05a7965-9b2b-4655-8fab-e108652586c2",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "f05a7965-9b2b-4655-8fab-e108652586c2",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/handoff.md",
+          "issue": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/handoff.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f1dc843a-redo-mutations/progress.json",
+          "issue": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/progress.json"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/f1dc843a-redo-mutations/handoff-2.md",
+          "issue": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/handoff-2.md"
+        },
+        {
+          "document_index": 3,
+          "from_path": "dev/active/f1dc843a-redo-mutations/footprint.md",
+          "issue": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/footprint.md"
+        },
+        {
+          "document_index": 4,
+          "from_path": "dev/active/f1dc843a-redo-mutations/handoff-3.md",
+          "issue": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/handoff-3.md"
+        },
+        {
+          "document_index": 5,
+          "from_path": "dev/active/f1dc843a-redo-mutations/handoff-4.md",
+          "issue": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/handoff-4.md"
+        },
+        {
+          "document_index": 6,
+          "from_path": "dev/active/f1dc843a-redo-mutations/intake.md",
+          "issue": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/intake.md"
+        },
+        {
+          "document_index": 8,
+          "from_path": "dev/active/f1dc843a-redo-mutations/completion-report.md",
+          "issue": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/completion-report.md"
+        },
+        {
+          "document_index": 9,
+          "from_path": "dev/active/f1dc843a-redo-mutations/handoff-5.md",
+          "issue": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/handoff-5.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f1dc843a-redo-mutations/plan.md",
+          "issue": "faa668c9-158b-4e08-af34-79ae81b58dd7",
+          "to_path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
+        }
+      ],
+      "target": {
+        "id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+    "kind": "container"
+  }
+}

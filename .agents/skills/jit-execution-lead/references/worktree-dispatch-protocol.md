@@ -36,7 +36,9 @@ The script lives in this skill's directory and is generic across projects (it op
 3. For each short-id, runs `git worktree add -b worktree-agent-<short-id> .agents/worktrees/agent-<short-id> <main-HEAD-sha>`. Anchoring explicitly on `main`'s commit SHA (not the branch name) prevents any race where main moves mid-dispatch.
 4. Verifies each worktree's HEAD SHA exactly matches `main`'s HEAD SHA.
 5. Seeds each worktree from the shared cache pool when one exists (see **Build-artifact recycling**).
-6. Emits a prompt-header block per dispatched issue.
+6. Creates one temporary directory per worktree and emits a prompt-header block per dispatched issue. The worker exports that directory as `TMPDIR` for every build and test command.
+
+The temporary directory is `<LEAD_WORKTREE_TMP_ROOT>/<repo-root-without-leading-slash>/agent-<short-id>`. `LEAD_WORKTREE_TMP_ROOT` defaults to `/tmp/lead-worker-tmp`; set it to an absolute path outside the repository when another disk is needed. Use the same value for dispatch and reclaim. The directories stay outside the worktrees, so reclaim removes them without harvesting them into the cache pool.
 
 ### Step 3 — Dispatch
 
@@ -171,6 +173,6 @@ The scripts live in this skill's `scripts/` subdirectory and are project-agnosti
 - `.agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh`
 - `.agents/skills/jit-execution-lead/scripts/land.sh`
 
-Read them directly if you need to understand the invariants. They are shellcheck-clean and smoke-tested. Their only configuration is the optional `LEAD_CACHE_POOL`, `LEAD_CACHE_DIRS` and `LEAD_SNAPSHOT_DIR`.
+Read them directly if you need to understand the invariants. They are shellcheck-clean and smoke-tested. Each script's header comment documents its optional environment variables.
 
 Do **not** copy the scripts into individual project trees — the canonical copy lives with the skill, and projects should reference them via the relative path conventions used in this protocol so improvements propagate to every project automatically.

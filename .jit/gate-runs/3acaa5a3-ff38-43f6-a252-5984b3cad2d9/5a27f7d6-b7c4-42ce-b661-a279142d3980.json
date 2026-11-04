@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f41a1dd4462ab52fbf9292f6a552c3a70a262ee8",
+  "completed_at": "2026-11-04T04:15:23.998800263Z",
+  "duration_ms": 226488,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied; the prior mixed-config finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3acaa5a3-ff38-43f6-a252-5984b3cad2d9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5a27f7d6-b7c4-42ce-b661-a279142d3980",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T04:11:37.510584845Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8032c9f1b, b26136a03, ffb2cd8a4, a1fa4e777, a91e3b5cb\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18, @/charter/D-20, @/charter/D-22 (dev/vision/9db27a3a-charter.md); @/issue/3acaa5a3/decision/D-01 (issue description); @/issue/9876a23a/requirement/REQ-05 (parent issue description)\nGate evidence: cargo-ci failed (exit code none; no stdout provided); prior code-review failed (exit 1), with its cached-config finding addressed by a91e3b5cb\nTruncation recovery: re-read narrow current source/test ranges and the relevant decision/plan and follow-up patch hunks; historic event/progress records were outside the impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; the prior mixed-config finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

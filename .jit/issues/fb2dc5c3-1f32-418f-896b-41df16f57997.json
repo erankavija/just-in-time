@@ -3,7 +3,9 @@
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
-    "a08c4b38-f5c2-4589-a195-a5ba1a8e6324"
+    "a08c4b38-f5c2-4589-a195-a5ba1a8e6324",
+    "b51291e4-8f88-44fe-92e6-90790e235ca3",
+    "d952d057-f781-455b-9982-05678fd7e0e1"
   ],
   "description": "The zero-warning bar, the test harness and the size of `main.rs` are enforced by manifests and the budget script rather than by convention, and the epic closes with a measured before/after report.\n\n## Background\n\nNeither workspace manifest declares a `[lints]` table, so `cargo clippy --workspace --all-targets` without `-D warnings` does not reproduce the gate's bar, and `#![deny(unsafe_code)]` sits on four crate roots only. `crates/jit/tests/common/harness.rs` is `#[path]`-included into four integration targets and recompiles in each. `scripts/rust-build-budget.sh` enforces integration-target count, executable bytes and suite duration, but nothing stops `crates/jit/src/main.rs` from regrowing after the dispatch refactor. The survey's production-line figure was not reproducible until the counter `dev/active/df129d9e-rust-code-quality/prodlines.py` was committed.\n\n## Success Criteria\n\n- [hard] REQ-01: Both workspace crate manifests inherit a `[workspace.lints]` table that denies `warnings` and `unsafe_code`, and a bare `cargo clippy --workspace --all-targets` fails on any warning.\n- [hard] REQ-02: The shared integration-test harness is compiled once inside `jit`'s `test-support` surface, and no integration target includes it by `#[path]`.\n- [hard] REQ-03: `scripts/rust-build-budget.sh` fails when `crates/jit/src/main.rs` exceeds a declared production-code-line ceiling and reports the measured value on its existing `rust-build-budget:` success line.\n- [hard] REQ-04: A committed completion report records production code lines for `crates/jit/src` per top-level module before and after the epic, counted by one committed counter, together with the re-measured integration-target and executable-byte budgets.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
@@ -24,5 +26,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Build hygiene and measured completion for crates/jit",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-11-04T06:50:10.163053450Z"
 }

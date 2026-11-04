@@ -22,8 +22,8 @@ use crate::repository_state::{
     captured_issue_ids, parse_issue_records, IssueRecordsError, RepositoryImage, RepositoryIndex,
     VirtualPath,
 };
-use crate::validation::engine::{Finding, SchemaEngine};
-use crate::validation::report::{ReportedFinding, RuleReport};
+use crate::validation::engine::SchemaEngine;
+use crate::validation::report::{BuiltInPass, ReportFinding, RuleReport, Selectable};
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
 use std::borrow::Cow;
@@ -58,7 +58,7 @@ pub enum RepositoryValidationPass {
 pub struct CapturedValidation<'a> {
     pub(crate) image: Cow<'a, RepositoryImage>,
     pub(crate) index: std::result::Result<RepositoryIndex, Arc<anyhow::Error>>,
-    pub(crate) issues: std::result::Result<Vec<Issue>, Arc<anyhow::Error>>,
+    pub(crate) issues: std::result::Result<Arc<[Issue]>, Arc<anyhow::Error>>,
     /// The JSON value each of `issues` decoded from, in order; empty when they failed.
     pub(crate) values: Vec<serde_json::Value>,
 }
@@ -82,7 +82,7 @@ impl<'a> CapturedValidation<'a> {
     ) -> Self {
         Self {
             index: records_pass(load_index(&image)),
-            issues: records_pass(issues),
+            issues: records_pass(issues).map(Arc::from),
             values,
             image,
         }
@@ -93,10 +93,10 @@ impl CapturedValidation<'static> {
     /// Parse `image`'s index beside the issue records and values its capture parsed.
     pub(crate) fn with_records(
         image: RepositoryImage,
-        issues: Vec<Issue>,
+        issues: Result<Vec<Issue>>,
         values: Vec<serde_json::Value>,
     ) -> Self {
-        Self::new(Cow::Owned(image), Ok(issues), values)
+        Self::new(Cow::Owned(image), issues, values)
     }
 }
 
@@ -130,8 +130,10 @@ pub struct ValidationReport {
     pub structural_failure: Option<Arc<anyhow::Error>>,
     /// Whether the report judged the history verdicts.
     pub has_history: bool,
-    /// Declarative and built-in findings, in wire form.
-    pub rule_report: RuleReport,
+    /// Declarative and built-in findings with their provenance.
+    pub findings: Vec<ReportFinding>,
+    /// What selections read, or the failure that left them nothing to read.
+    pub(super) selectable: std::result::Result<Box<Selectable>, Arc<anyhow::Error>>,
 }
 
 impl ValidationReport {
@@ -143,15 +145,32 @@ impl ValidationReport {
             .is_some_and(|error| error.downcast_ref::<RepositoryJudgedInvalid>().is_some())
     }
 
+    /// Every finding in wire form.
+    pub fn rule_report(&self) -> RuleReport {
+        RuleReport {
+            findings: self
+                .findings
+                .iter()
+                .map(|finding| finding.reported.clone())
+                .collect(),
+        }
+    }
+
     /// The structural failure as an owned error, and the findings. The error
     /// keeps its typed causes when the report holds its only reference, as it
     /// does once its [`CapturedValidation`] is dropped; a shared error keeps
     /// only its message.
     pub fn into_parts(self) -> (Option<anyhow::Error>, RuleReport) {
-        let failure = self
-            .structural_failure
+        let rule_report = self.rule_report();
+        let Self {
+            structural_failure,
+            selectable,
+            ..
+        } = self;
+        drop(selectable);
+        let failure = structural_failure
             .map(|error| Arc::try_unwrap(error).unwrap_or_else(|shared| anyhow!("{shared:#}")));
-        (failure, self.rule_report)
+        (failure, rule_report)
     }
 }
 
@@ -181,20 +200,19 @@ fn image_read(image: &RepositoryImage, repo_rel: &str) -> Result<Option<Vec<u8>>
 /// state.
 pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> ValidationReport {
     let image = &*captured.image;
-    let mut report = ValidationReport {
-        passes: Vec::new(),
-        structural_failure: None,
-        has_history: inputs.history.is_some(),
-        rule_report: RuleReport::default(),
+    let failed = |error: anyhow::Error| {
+        let error = Arc::new(error);
+        ValidationReport {
+            passes: Vec::new(),
+            structural_failure: Some(Arc::clone(&error)),
+            has_history: inputs.history.is_some(),
+            findings: Vec::new(),
+            selectable: Err(error),
+        }
     };
     let declarations = match crate::repository_state::validation_declarations_from_image(image) {
         Ok(declarations) => declarations,
-        Err(error) => {
-            report.structural_failure = Some(Arc::new(
-                anyhow!(error).context("declaration validation pass"),
-            ));
-            return report;
-        }
+        Err(error) => return failed(anyhow!(error).context("declaration validation pass")),
     };
     let expected = match declarations
         .rules_loaded()
@@ -213,42 +231,35 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
             // Whole-repository validation names the pass; a proposed overlay's
             // caller reports the producer's error as it is.
             let error = anyhow!(error);
-            report.structural_failure = Some(Arc::new(match inputs.history {
+            return failed(match inputs.history {
                 Some(_) => error.context("derived-materialization validation pass"),
                 None => error,
-            }));
-            return report;
+            });
         }
     };
     let read = move |path: &str| image_read(image, path);
     let read: &ReadBytes<'_> = &read;
-    let passes = &mut report.passes;
     let config = declarations.config();
     if let Err(error) = config.validate_item_kinds() {
-        report.structural_failure = Some(Arc::new(
-            anyhow!(error).context("effective-config validation pass"),
-        ));
-        return report;
+        return failed(anyhow!(error).context("effective-config validation pass"));
     }
-    passes.push(RepositoryValidationPass::EffectiveConfig);
+    let mut passes = vec![RepositoryValidationPass::EffectiveConfig];
 
     let namespaces = crate::config_manager::namespaces_from_config(config);
     let rules = declarations.rules();
     let rules_loaded = declarations.rules_loaded();
-    let findings = &mut report.rule_report.findings;
-    if rules_loaded {
-        passes.push(RepositoryValidationPass::RulesAndSchemas);
-    } else if let Some(error) = declarations.rules_load_error() {
-        findings.push(ReportedFinding::new(
+    let mut findings = Vec::new();
+    let rules_file_message = declarations
+        .rules_load_error()
+        .map(|error| format!("config error: {error:#}"));
+    match &rules_file_message {
+        Some(message) => findings.push(ReportFinding::built_in(
+            BuiltInPass::RulesFile,
             None,
-            &Finding {
-                rule: crate::validation::report::BuiltInPass::RulesFile
-                    .as_str()
-                    .to_owned(),
-                severity: Severity::Error,
-                message: format!("config error: {error:#}"),
-            },
-        ));
+            Severity::Error,
+            message.clone(),
+        )),
+        None => passes.push(RepositoryValidationPass::RulesAndSchemas),
     }
 
     let mut structural_error = None;
@@ -258,7 +269,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
     let issues = match captured.index.as_ref().and(captured.issues.as_ref()) {
         Ok(issues) => {
             passes.push(RepositoryValidationPass::Records);
-            Some(issues.as_slice())
+            Some(&issues[..])
         }
         Err(error) => {
             structural_error = Some(Arc::clone(error));
@@ -293,6 +304,8 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
     }
 
     let mut namespace_and_hierarchy_complete = rules_loaded;
+    // A rule pass that failed leaves every selection's findings incomplete.
+    let mut rule_pass_error = None;
     if rules_loaded {
         if let Some(issues) = issues {
             match collect_rule_findings(read, issues, rules, &namespaces, config, inputs.now)
@@ -301,7 +314,9 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
                 Ok(rule_findings) => findings.extend(rule_findings),
                 Err(error) => {
                     namespace_and_hierarchy_complete = false;
-                    structural_error.get_or_insert(Arc::new(error));
+                    let error = Arc::new(error);
+                    structural_error.get_or_insert(Arc::clone(&error));
+                    rule_pass_error = Some(error);
                 }
             }
         } else {
@@ -349,8 +364,25 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
         }
     }
 
-    report.structural_failure = structural_error;
-    report
+    let selectable = match (
+        captured.index.as_ref().and(captured.issues.as_ref()),
+        rule_pass_error,
+    ) {
+        (Ok(records), None) => Ok(Box::new(Selectable {
+            records: Arc::clone(records),
+            rules: rules_file_message.map_or_else(|| Ok(declarations.rules), Err),
+            templates: declarations.config.templates,
+        })),
+        (Err(error), _) => Err(Arc::clone(error)),
+        (Ok(_), Some(error)) => Err(error),
+    };
+    ValidationReport {
+        passes,
+        structural_failure: structural_error,
+        has_history: inputs.history.is_some(),
+        findings,
+        selectable,
+    }
 }
 
 /// A repository byte source keyed by repo-relative path.
@@ -519,7 +551,7 @@ fn collect_rule_findings(
     namespaces: &crate::domain::LabelNamespaces,
     config: &JitConfig,
     now: DateTime<Utc>,
-) -> Result<Vec<ReportedFinding>> {
+) -> Result<Vec<ReportFinding>> {
     let repo_format = config.content_format();
     let engine = SchemaEngine::new();
     let mut reported = Vec::new();
@@ -534,7 +566,7 @@ fn collect_rule_findings(
             evaluation
                 .findings()
                 .into_iter()
-                .map(|finding| ReportedFinding::new(Some(issue.id.clone()), finding)),
+                .map(|finding| ReportFinding::local(&issue.id, finding)),
         );
     }
     let graph_rules: Vec<_> = rules
@@ -552,35 +584,32 @@ fn collect_rule_findings(
         now,
         &plan_content,
     );
-    reported.extend(
-        graph_findings
-            .iter()
-            .map(|finding| ReportedFinding::new(finding.issue_id.clone(), &finding.finding)),
-    );
+    reported.extend(graph_findings.iter().map(|finding| {
+        let repo_wide = graph_rules.iter().any(|rule| {
+            rule.name == finding.finding.rule && rule.assert.is_repo_wide_at_transition()
+        });
+        ReportFinding::graph(finding, repo_wide)
+    }));
     Ok(reported)
 }
 
 fn collect_enforcement_drift_findings(
     declarations: &crate::repository_state::CapturedRepositoryDeclarations,
-) -> Vec<ReportedFinding> {
+) -> Vec<ReportFinding> {
     crate::validation::drift::from_declarations(declarations)
         .into_iter()
         .map(|finding| {
-            ReportedFinding::new(
+            ReportFinding::built_in(
+                BuiltInPass::EnforcementDrift,
                 None,
-                &Finding {
-                    rule: crate::validation::report::BuiltInPass::EnforcementDrift
-                        .as_str()
-                        .to_owned(),
-                    severity: Severity::Error,
-                    message: finding.message(),
-                },
+                Severity::Error,
+                finding.message(),
             )
         })
         .collect()
 }
 
-fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFinding> {
+fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportFinding> {
     let mut keys: Vec<&GateKey> = gates
         .gates
         .iter()
@@ -592,18 +621,14 @@ fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFind
     if keys.is_empty() {
         Vec::new()
     } else {
-        vec![ReportedFinding::new(
+        vec![ReportFinding::built_in(
+            BuiltInPass::ReviewPlaceholder,
             None,
-            &Finding {
-                rule: crate::validation::report::BuiltInPass::ReviewPlaceholder
-                    .as_str()
-                    .to_owned(),
-                severity: Severity::Warn,
-                message: format!(
-                    "WARNING: passing external-review placeholder still configured for gate(s): {}. Replace each placeholder with a real review checker before relying on these gates.",
-                    keys.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
-                ),
-            },
+            Severity::Warn,
+            format!(
+                "WARNING: passing external-review placeholder still configured for gate(s): {}. Replace each placeholder with a real review checker before relying on these gates.",
+                keys.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ")
+            ),
         )]
     }
 }
@@ -642,7 +667,7 @@ fn collect_item_link_findings(
     config: &JitConfig,
     kinds: &[ItemKind],
     credit_namespaces: &HashSet<String>,
-) -> Result<Vec<ReportedFinding>> {
+) -> Result<Vec<ReportFinding>> {
     if kinds.is_empty() && credit_namespaces.is_empty() {
         return Ok(Vec::new());
     }
@@ -701,15 +726,11 @@ fn collect_item_link_findings(
             if let Some(message) =
                 unqualified_link_message(&issue.id, namespace, value, kinds, credit_namespaces)
             {
-                findings.push(ReportedFinding::new(
+                findings.push(ReportFinding::built_in(
+                    BuiltInPass::DanglingItemLink,
                     Some(issue.id.clone()),
-                    &Finding {
-                        rule: crate::validation::report::BuiltInPass::DanglingItemLink
-                            .as_str()
-                            .to_owned(),
-                        severity: Severity::Error,
-                        message,
-                    },
+                    Severity::Error,
+                    message,
                 ));
                 continue;
             }
@@ -724,18 +745,14 @@ fn collect_item_link_findings(
                 }
                 Err(error) => error.to_string(),
             };
-            findings.push(ReportedFinding::new(
+            findings.push(ReportFinding::built_in(
+                BuiltInPass::DanglingItemLink,
                 Some(issue.id.clone()),
-                &Finding {
-                    rule: crate::validation::report::BuiltInPass::DanglingItemLink
-                        .as_str()
-                        .to_owned(),
-                    severity: Severity::Error,
-                    message: format!(
-                        "issue {} has a dangling item link '{label}': {detail}",
-                        issue.short_id()
-                    ),
-                },
+                Severity::Error,
+                format!(
+                    "issue {} has a dangling item link '{label}': {detail}",
+                    issue.short_id()
+                ),
             ));
         }
     }
@@ -774,6 +791,70 @@ mod tests {
     use crate::storage::{IssueStore, JsonFileStorage};
     use std::path::PathBuf;
 
+    fn image_report(
+        issues: &[Issue],
+        item_kinds: &[&str],
+        rules: &str,
+        gates: &str,
+        invariants: &str,
+    ) -> ValidationReport {
+        let config = format!(
+            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\n\
+             description = \"Issue type\"\nunique = true\n{}",
+            crate::test_utils::shipped_item_kind_tables(item_kinds)
+        );
+        let listing = crate::repository_state::DirectoryListing::new(
+            issues
+                .iter()
+                .map(|issue| format!("{}.json", issue.id))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        let builder = crate::test_harness::image::ImageBuilder::new()
+            .file(VirtualPath::CONFIG, config)
+            .file(VirtualPath::RULES, rules)
+            .file(VirtualPath::GATES, gates)
+            .file(VirtualPath::INVARIANTS, invariants)
+            .file(
+                VirtualPath::INDEX,
+                crate::repository_state::fresh_index_bytes().unwrap(),
+            )
+            .listing(VirtualPath::ISSUES, listing);
+        let builder = issues.iter().fold(builder, |builder, issue| {
+            builder.file(
+                VirtualPath::issue_record(&issue.id),
+                crate::repository_state::serialize_issue(issue).unwrap(),
+            )
+        });
+        overlay_report(&builder.build())
+    }
+
+    fn issue_with_labels(title: &str, description: &str, labels: &[&str]) -> Issue {
+        let mut issue = crate::test_utils::fixture_issue(title.to_owned(), description.to_owned());
+        issue.labels = labels.iter().map(|label| (*label).to_owned()).collect();
+        issue
+    }
+
+    fn pass_findings(
+        report: &ValidationReport,
+        pass: crate::validation::report::BuiltInPass,
+    ) -> Vec<&crate::validation::ReportedFinding> {
+        report
+            .findings
+            .iter()
+            .map(|finding| &finding.reported)
+            .filter(|finding| finding.rule == pass.as_str())
+            .collect()
+    }
+
+    fn item_link_findings(report: &ValidationReport) -> Vec<&crate::validation::ReportedFinding> {
+        assert!(report.passes.contains(&RepositoryValidationPass::ItemLinks));
+        pass_findings(
+            report,
+            crate::validation::report::BuiltInPass::DanglingItemLink,
+        )
+    }
+
     fn seed_fixture_issue(
         executor: &mut crate::commands::CommandExecutor<JsonFileStorage>,
         title: &str,
@@ -801,10 +882,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -898,7 +976,9 @@ mod tests {
             },
         )
         .unwrap();
-        overrides.extend(crate::commands::validation_overlay(plan.image(), plan.delta()).unwrap());
+        overrides.extend(crate::repository_state::action_overrides(
+            plan.delta().actions(),
+        ));
         let image = executor.capture_validation_image_with(&overrides).unwrap();
         split(overlay_report(&image))
     }
@@ -938,10 +1018,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -951,7 +1028,7 @@ mod tests {
         let plain = validate_live(&executor).unwrap();
         let planned = validate_overlaid::<&str>(&executor, []).unwrap();
         assert_eq!(plain.passes, planned.passes);
-        assert_eq!(plain.rule_report, planned.rule_report);
+        assert_eq!(plain.rule_report(), planned.rule_report());
         assert_eq!(plain.passes.len(), 8);
     }
 
@@ -1004,10 +1081,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         let (issue_id, run_id) = seed_attested_gate_run(&mut executor);
         let path = VirtualPath::gate_run_record(&issue_id, &run_id);
         let stored = read_fixture(&executor, &path.repository_relative()).unwrap();
@@ -1034,10 +1108,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         let (issue_id, run_id) = seed_attested_gate_run(&mut executor);
         let path = VirtualPath::gate_verdict_record(
             &"tests".parse().unwrap(),
@@ -1062,10 +1133,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         let (issue_id, run_id) = seed_attested_gate_run(&mut executor);
         std::fs::write(
             data_path(&executor, &VirtualPath::gate_run_record(&issue_id, &run_id)),
@@ -1077,39 +1145,20 @@ mod tests {
     }
 
     #[test]
-    fn test_unloadable_rules_preserve_rules_file_and_enforcement_drift_findings() {
-        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
-            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
-        )
-        .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
-        seed_fixture_issue(
-            &mut executor,
-            "Root",
-            "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
-            vec!["type:task".to_string()],
+    fn test_image_report_preserves_rules_file_and_enforcement_drift_findings() {
+        let report = image_report(
+            &[],
+            &["invariant"],
+            "not toml = [",
+            "",
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\n\
+             kind = \"enforced\"\nenforced-by = \"@/rule/bad-rule\"\n",
         );
-        std::fs::write(
-            data_path(&executor, &VirtualPath::RULES),
-            "[[rules]]\nname = \"bad-rule\"\nseverity = \"error\"\n\
-             assert = { this-is-not-a-valid-kind = { foo = 1 } }\n",
-        )
-        .unwrap();
-        std::fs::write(
-            data_path(&executor, &VirtualPath::INVARIANTS),
-            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-             enforced-by = \"@/rule/bad-rule\"\n",
-        )
-        .unwrap();
-
-        let report = validate_live(&executor).unwrap();
-        assert!(report.rule_report.findings.iter().any(
+        assert!(report.structural_failure.is_none(), "{report:?}");
+        assert!(report.rule_report().findings.iter().any(
             |finding| finding.rule == "rules-file" && finding.message.contains("config error")
         ));
-        assert!(report.rule_report.findings.iter().any(|finding| {
+        assert!(report.rule_report().findings.iter().any(|finding| {
             finding.rule == crate::validation::report::BuiltInPass::EnforcementDrift.as_str()
                 && finding.message.contains("declared-but-unenforced")
                 && finding.message.contains("failed to load")
@@ -1117,6 +1166,42 @@ mod tests {
         assert!(!report
             .passes
             .contains(&RepositoryValidationPass::Projections));
+    }
+
+    #[test]
+    fn test_image_report_warns_for_sorted_placeholder_gate_keys() {
+        let mut gates = crate::declarations::GateRegistry::default();
+        for key in ["z-review", "a-review"] {
+            let key: GateKey = key.parse().unwrap();
+            gates.gates.insert(
+                key.clone(),
+                crate::declarations::GateDefinition {
+                    version: 1,
+                    key: key.clone(),
+                    title: key.to_string(),
+                    description: String::new(),
+                    stage: crate::declarations::GateStage::Postcheck,
+                    mode: crate::declarations::GateMode::Manual,
+                    checker: Some(crate::declarations::GateChecker::ReviewPlaceholder),
+                    inputs: None,
+                    priority: 100,
+                    reserved: Default::default(),
+                },
+            );
+        }
+        let gates =
+            String::from_utf8(crate::declarations::serialize_gate_registry(&gates).unwrap())
+                .unwrap();
+        let report = image_report(&[], &[], "", &gates, "");
+        let findings = pass_findings(
+            &report,
+            crate::validation::report::BuiltInPass::ReviewPlaceholder,
+        );
+
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].severity, Severity::Warn);
+        assert!(findings[0].issue_id.is_none());
+        assert!(findings[0].message.contains("a-review, z-review"));
     }
 
     #[test]
@@ -1187,10 +1272,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1211,10 +1293,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1243,10 +1322,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1262,7 +1338,7 @@ mod tests {
         .is_ok());
         assert!(validate_live(&executor)
             .unwrap()
-            .rule_report
+            .rule_report()
             .findings
             .iter()
             .any(|finding| finding.rule == "rules-file"));
@@ -1274,10 +1350,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1302,7 +1375,7 @@ mod tests {
         .is_ok());
         assert!(validate_live(&executor)
             .unwrap()
-            .rule_report
+            .rule_report()
             .findings
             .iter()
             .any(|finding| finding.rule == "rules-file"
@@ -1315,10 +1388,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1339,10 +1409,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1364,10 +1431,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1375,14 +1439,8 @@ mod tests {
             vec!["type:task".to_string()],
         );
 
-        let report = validate_overlaid(
-            &executor,
-            [put(
-                VirtualPath::EVENTS.repository_relative(),
-                "not jsonl\n",
-            )],
-        )
-        .unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::EVENTS), "not jsonl\n").unwrap();
+        let report = validate_overlaid::<PathBuf>(&executor, []).unwrap();
 
         assert!(report.passes.contains(&RepositoryValidationPass::Records));
     }
@@ -1393,10 +1451,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         std::fs::write(data_path(&executor, &VirtualPath::EVENTS), "not jsonl\n").unwrap();
 
         let error = failure(&validate_live(&executor).unwrap_err());
@@ -1415,10 +1470,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1461,10 +1513,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1479,9 +1528,9 @@ mod tests {
             )],
         )
         .unwrap();
-        assert!(report.rule_report.has_errors());
+        assert!(report.rule_report().has_errors());
         assert!(report
-            .rule_report
+            .rule_report()
             .findings
             .iter()
             .any(|finding| finding.rule == "type-hierarchy-known"));
@@ -1493,10 +1542,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1513,8 +1559,8 @@ mod tests {
             )],
         )
         .unwrap();
-        assert_eq!(report.rule_report.error_count(), 1);
-        assert_eq!(report.rule_report.findings[0].rule, "task-needs-req");
+        assert_eq!(report.rule_report().error_count(), 1);
+        assert_eq!(report.rule_report().findings[0].rule, "task-needs-req");
     }
 
     #[test]
@@ -1523,10 +1569,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1544,7 +1587,7 @@ mod tests {
                      severity = \"error\"\nenforce = false\n\
                      assert = { require-label = { label = \"req:*\", min = 1 } }\n";
         let live = validate_live(&executor).unwrap();
-        assert!(!live.rule_report.has_errors());
+        assert!(!live.rule_report().has_errors());
         let partial = validate_materialized_overlaid(
             &executor,
             [
@@ -1560,8 +1603,153 @@ mod tests {
         )
         .unwrap_err();
         assert!(failure(&partial).contains("does not exist"), "{partial:?}");
-        assert_eq!(partial.rule_report.error_count(), 1);
-        assert_eq!(partial.rule_report.findings[0].rule, "task-needs-req");
+        assert_eq!(partial.rule_report().error_count(), 1);
+        assert_eq!(partial.rule_report().findings[0].rule, "task-needs-req");
+    }
+
+    #[test]
+    fn test_image_report_resolves_enforces_rule_and_gate_links() {
+        let issue = issue_with_labels(
+            "node",
+            "",
+            &[
+                "enforces:@/rule/require-success-criteria",
+                "enforces:@/gate/cargo-ci",
+            ],
+        );
+        let report = image_report(
+            &[issue],
+            &["invariant", "rule", "gate"],
+            "[[rules]]\nname = \"require-success-criteria\"\n\
+             assert = { require-section = { heading = \"Success Criteria\" } }\n",
+            "[[gates]]\nversion = 1\nkey = \"cargo-ci\"\ntitle = \"Cargo CI\"\n\
+             description = \"CI\"\nstage = \"postcheck\"\nmode = \"manual\"\n",
+            "",
+        );
+
+        assert!(item_link_findings(&report).is_empty());
+    }
+
+    #[test]
+    fn test_image_report_finds_unresolvable_enforces_rule_and_gate_links() {
+        let issue = issue_with_labels(
+            "node",
+            "",
+            &[
+                "enforces:@/rule/no-such-rule",
+                "enforces:@/gate/no-such-gate",
+            ],
+        );
+        let report = image_report(
+            &[issue],
+            &["invariant", "rule", "gate"],
+            "[[rules]]\nname = \"require-success-criteria\"\n\
+             assert = { require-section = { heading = \"Success Criteria\" } }\n",
+            "[[gates]]\nversion = 1\nkey = \"cargo-ci\"\ntitle = \"Cargo CI\"\n\
+             description = \"CI\"\nstage = \"postcheck\"\nmode = \"manual\"\n",
+            "",
+        );
+        let findings = item_link_findings(&report);
+
+        assert_eq!(findings.len(), 2);
+        assert!(findings
+            .iter()
+            .any(|finding| finding.message.contains("no-such-rule")));
+        assert!(findings
+            .iter()
+            .any(|finding| finding.message.contains("no-such-gate")));
+    }
+
+    #[test]
+    fn test_image_report_finds_unresolvable_issue_qualified_id() {
+        let target = issue_with_labels(
+            "target",
+            "## Success Criteria\n\n- [hard] REQ-01: real one\n",
+            &[],
+        );
+        let short = target.short_id();
+        let node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
+        let node_id = node.id.clone();
+        let report = image_report(&[target, node], &["invariant", "requirement"], "", "", "");
+        let findings = item_link_findings(&report);
+
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].issue_id.as_ref(), Some(&node_id));
+        assert_eq!(
+            findings[0].rule,
+            crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
+        );
+        assert_eq!(findings[0].severity, Severity::Error);
+        assert!(findings[0].message.contains("BOGUS"));
+        assert!(findings[0].message.contains("dangling item link"));
+    }
+
+    #[test]
+    fn test_image_report_resolves_qualified_links_across_item_scopes_and_forms() {
+        let target = issue_with_labels(
+            "target",
+            "## Success Criteria\n\n- [hard] REQ-01: a\n\n\
+             ## Decisions\n\n- D-01: a\n\n## Risks\n\n- RISK-01: a\n",
+            &[],
+        );
+        let short = target.short_id();
+        let node = issue_with_labels(
+            "node",
+            "",
+            &[
+                &format!("satisfies:{short}/REQ-01"),
+                &format!("per:{short}/D-01"),
+                &format!("mitigates:{short}/RISK-01"),
+                "enforces:@/invariant/sample-invariant",
+                &format!("satisfies:@/issue/{short}/requirement/REQ-01"),
+            ],
+        );
+        let report = image_report(
+            &[target, node],
+            &["invariant", "requirement", "decision", "risk"],
+            "",
+            "",
+            "[[invariants]]\nid = \"sample-invariant\"\n\
+             statement = \"Every dependency edge stays acyclic.\"\nkind = \"enforced\"\n",
+        );
+
+        let findings = item_link_findings(&report);
+        assert!(findings.is_empty(), "{findings:?}");
+    }
+
+    #[test]
+    fn test_image_report_finds_named_project_link_without_panicking() {
+        let issue = issue_with_labels("node", "", &["enforces:@acme/invariant/sample-invariant"]);
+        let report = image_report(
+            &[issue],
+            &["invariant"],
+            "",
+            "",
+            "[[invariants]]\nid = \"sample-invariant\"\n\
+             statement = \"Every dependency edge stays acyclic.\"\nkind = \"enforced\"\n",
+        );
+        let findings = item_link_findings(&report);
+
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].message.contains("project 'acme'"));
+        assert!(findings[0].message.contains("invariant/sample-invariant"));
+    }
+
+    #[test]
+    fn test_image_report_finds_unresolvable_explicit_invariant_address() {
+        let issue = issue_with_labels("node", "", &["enforces:@/invariant/missing-invariant"]);
+        let report = image_report(
+            &[issue],
+            &["invariant"],
+            "",
+            "",
+            "[[invariants]]\nid = \"sample-invariant\"\n\
+             statement = \"Every dependency edge stays acyclic.\"\nkind = \"enforced\"\n",
+        );
+        let findings = item_link_findings(&report);
+
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].message.contains("missing-invariant"));
     }
 
     #[test]
@@ -1570,10 +1758,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",
@@ -1605,68 +1790,48 @@ mod tests {
         )
         .unwrap();
 
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         let live = validate_live(&executor).unwrap();
-        assert!(!live.rule_report.has_errors(), "{:?}", live.rule_report);
+        assert!(!live.rule_report().has_errors(), "{:?}", live.rule_report());
         let planned = validate_materialized_overlaid(
             &executor,
             [(VirtualPath::INVARIANTS.repository_relative(), None)],
         )
         .unwrap();
-        assert!(planned.rule_report.findings.iter().any(|finding| {
+        assert!(planned.rule_report().findings.iter().any(|finding| {
             finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
         }));
     }
 
     #[test]
-    fn test_validate_live_reports_unqualified_item_link() {
-        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
-            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
-        )
-        .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
-        seed_fixture_issue(
-            &mut executor,
+    fn test_image_report_reports_unqualified_links_and_ignores_other_namespaces() {
+        let issue = issue_with_labels(
             "Root",
             "## Success Criteria\n\n- [hard] REQ-01: planned bytes\n",
-            vec!["type:task".to_string()],
+            &[
+                "type:task",
+                "epic:foo",
+                "enforces:planned",
+                "satisfies:REQ-01",
+            ],
         );
-        let config = format!(
-            "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n{}",
-            crate::test_utils::shipped_item_kind_tables(&["invariant"])
+        let report = image_report(
+            &[issue],
+            &["invariant", "requirement"],
+            "",
+            "",
+            "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\n\
+             kind = \"advisory\"\n",
         );
-        std::fs::write(
-            data_path(&executor, &VirtualPath::CONFIG),
-            config.as_bytes(),
-        )
-        .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
-        let id = &executor.storage().list_issues().unwrap().remove(0).id;
-        let mut issue: Issue = serde_json::from_slice(
-            &read_fixture(&executor, &issue_path(id).repository_relative()).unwrap(),
-        )
-        .unwrap();
-        issue.labels.push("enforces:planned".to_string());
-        std::fs::write(
-            data_path(&executor, &issue_path(id)),
-            serde_json::to_vec_pretty(&issue).unwrap(),
-        )
-        .unwrap();
+        let findings = item_link_findings(&report);
 
-        let live = validate_live(&executor).unwrap();
-        assert!(live.rule_report.findings.iter().any(|finding| {
-            finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
-                && finding.message.contains("'enforces:@/invariant/planned'")
-        }));
+        assert_eq!(findings.len(), 2);
+        assert!(findings
+            .iter()
+            .any(|finding| finding.message.contains("'enforces:@/invariant/planned'")));
+        assert!(findings
+            .iter()
+            .any(|finding| finding.message.contains("'satisfies:REQ-01'")));
     }
 
     #[test]
@@ -1675,10 +1840,7 @@ mod tests {
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
         seed_fixture_issue(
             &mut executor,
             "Root",

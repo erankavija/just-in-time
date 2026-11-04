@@ -1,40 +1,16 @@
 //! Responses and human renderings of the `jit issue` read commands.
 
 use super::{
-    render_issue_rows, ContainerProgressResponse, HumanRender, IssueChildrenResponse, IssueColumn,
-    IssueListFullResponse, IssueListResponse, IssueRow, IssueSearchFullResponse,
-    IssueSearchResponse, IssueShowListResponse, IssueShowResponse, IssueShowSummaryResponse,
-    IssueStatusListResponse, IssueStatusResponse, OutputMode,
+    plain_issue_rows, render_issue_list, ContainerProgressResponse, HumanRender,
+    IssueChildrenResponse, IssueColumn, IssueListFullResponse, IssueListResponse,
+    IssueSearchFullResponse, IssueSearchResponse, IssueShowListResponse, IssueShowResponse,
+    IssueShowSummaryResponse, IssueStatusListResponse, IssueStatusResponse, ListedIssue,
+    OutputMode,
 };
 use crate::commands::ItemShowResult;
-use crate::domain::list_envelope::CollectionKey;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::fmt::Write;
-
-/// Collection key of [`IssueListResponse`].
-pub enum ListedIssuesKey {}
-
-impl CollectionKey for ListedIssuesKey {
-    const KEY: &'static str = "issues";
-    const SCHEMA_NAME: Option<&'static str> = Some("IssueListResponse");
-}
-
-/// Collection key of [`IssueSearchResponse`].
-pub enum SearchedIssuesKey {}
-
-impl CollectionKey for SearchedIssuesKey {
-    const KEY: &'static str = "issues";
-    const SCHEMA_NAME: Option<&'static str> = Some("IssueSearchResponse");
-}
-
-/// Collection key of [`IssueChildrenResponse`].
-pub enum ChildrenKey {}
-
-impl CollectionKey for ChildrenKey {
-    const KEY: &'static str = "issues";
-    const SCHEMA_NAME: Option<&'static str> = Some("IssueChildrenResponse");
-}
 
 /// The named top-level field(s) of one issue's show response: plain text for
 /// `--field`, one compact JSON object for `--fields`.
@@ -173,21 +149,6 @@ impl HumanRender for IssueShowResponse {
     }
 }
 
-impl HumanRender for ItemShowResult {
-    fn render_human(&self, _: OutputMode) -> String {
-        let item = &self.item;
-        let owner = match (&self.issue_full_id, &self.issue_title) {
-            (Some(id), Some(title)) => format!("Issue:        {id} | {title}"),
-            // A project-scoped item has no owning issue.
-            _ => "Scope:        @ (project)".to_owned(),
-        };
-        format!(
-            "Qualified id: {}\nKind:         {}\nSelf id:      {}\n{owner}\nText:         {}\n",
-            item.qualified_id, item.kind, item.self_id, item.text
-        )
-    }
-}
-
 /// Response of `jit issue status`: a bare status for one id, the list envelope
 /// for several.
 #[derive(Serialize, JsonSchema)]
@@ -250,15 +211,14 @@ fn append_dangling(text: &mut String, dangling: &[crate::domain::identity::Issue
 
 /// The issue-list text of `issues`: `header(count)` and `Total: N` around the
 /// rows, or the rows alone under `quiet` (nothing when there are none).
-fn list_text<I: IssueRow>(
+fn list_text<I: ListedIssue>(
     header: impl FnOnce(usize) -> String,
     issues: &[I],
     quiet: bool,
 ) -> String {
-    let rows = issues.iter().map(|issue| (issue, Vec::new()));
-    let text = render_issue_rows(
+    let text = render_issue_list(
         &header(issues.len()),
-        rows,
+        plain_issue_rows(issues),
         &[IssueColumn::State, IssueColumn::Priority],
         quiet,
     );

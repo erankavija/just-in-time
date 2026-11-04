@@ -387,14 +387,8 @@ impl ValidationFailedError {
     }
 }
 
-/// A lease-not-found failure.
-///
-/// Most lease lookups previously stringified an [`ActionableError`] into an
-/// `anyhow!("{}", ...)` (causes + remediation); one path used a plain
-/// `anyhow!("Lease {} not found", id)`. The CLI could only classify either by
-/// scanning for "not found". This dedicated type makes a lease-not-found
-/// downcastable (exit code `3`) instead, while each constructor reproduces its
-/// origin's message verbatim through `Display`.
+/// A lease-not-found failure, downcastable to exit code `3`, whose `Display`
+/// is the rendered [`ActionableError`] verbatim.
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("{message}")]
 pub struct LeaseNotFoundError {
@@ -403,18 +397,10 @@ pub struct LeaseNotFoundError {
 
 impl LeaseNotFoundError {
     /// Build a [`LeaseNotFoundError`] capturing the full rendered message of an
-    /// [`ActionableError`] (e.g. from [`no_active_lease`] or [`lease_not_found`]).
+    /// [`ActionableError`] (e.g. from [`no_active_lease`]).
     pub fn new(error: &ActionableError) -> Self {
         Self {
             message: error.to_string(),
-        }
-    }
-
-    /// Build a [`LeaseNotFoundError`] for a bare lookup miss, using the plain
-    /// "Lease <id> not found" phrasing (no remediation block).
-    pub fn by_id(lease_id: impl std::fmt::Display) -> Self {
-        Self {
-            message: format!("Lease {} not found", lease_id),
         }
     }
 
@@ -975,18 +961,6 @@ impl fmt::Display for TransitionBlocker {
     }
 }
 
-/// Helper to create lease not found errors with standard remediation.
-pub fn lease_not_found(lease_id: &str) -> ActionableError {
-    ActionableError::new(format!("Lease {} not found", lease_id))
-        .with_cause("The lease may have expired")
-        .with_cause("The lease ID may be incorrect")
-        .with_cause("The lease may have been released or evicted")
-        .with_remedy(
-            "List all active leases: jit claim list --json | jq -r '.data.leases[].lease_id'",
-        )
-        .with_remedy("Check lease status: jit claim status --json")
-}
-
 /// Helper to create "no acting identity" errors with standard remediation.
 ///
 /// Used by `jit claim release <issue-id>` when neither a configured agent id
@@ -1003,21 +977,16 @@ pub fn no_acting_identity() -> ActionableError {
 
 /// Helper to create "issue has no active lease" errors with standard remediation.
 ///
-/// Used by `jit claim release <issue-id>` when the issue has no active lease to
-/// release. The message contains "not found" so callers that map error text to
-/// exit codes treat it like other lookup failures.
-pub fn no_active_lease(issue_id: &IssueId) -> ActionableError {
-    ActionableError::new(format!(
-        "Issue {} has no active lease to release (not found)",
-        issue_id
-    ))
-    .with_cause("No agent currently holds a lease on this issue")
-    .with_cause("The lease may have already expired or been released")
-    .with_remedy(format!(
-        "Check active leases for this issue: jit claim status --issue {} --json",
-        issue_id
-    ))
-    .with_remedy("List all active leases: jit claim list --json")
+/// Used by the lease commands addressed by issue (`jit claim release`, `renew`,
+/// `heartbeat` and `force-evict`) when the issue has no unexpired lease.
+pub fn no_active_lease(issue: impl std::fmt::Display) -> ActionableError {
+    ActionableError::new(format!("Issue {issue} has no active lease (not found)"))
+        .with_cause("No agent currently holds a lease on this issue")
+        .with_cause("The lease may have already expired or been released")
+        .with_remedy(format!(
+            "Check active leases for this issue: jit claim status --issue {issue} --json"
+        ))
+        .with_remedy("List all active leases: jit claim list --json")
 }
 
 /// Helper to create already claimed errors with standard remediation.
@@ -1037,7 +1006,9 @@ pub fn already_claimed(issue_id: &IssueId, agent_id: &str, expires_info: &str) -
         "Contact the agent owner to coordinate: {}",
         agent_id
     ))
-    .with_remedy("If the agent crashed, force evict with: jit claim force-evict <lease-id> --reason \"<reason>\"")
+    .with_remedy(format!(
+        "If the agent crashed, force evict with: jit claim force-evict {issue_id} --reason \"<reason>\""
+    ))
 }
 
 /// Helper to create git command failure errors with standard remediation.
@@ -1233,16 +1204,6 @@ mod tests {
     }
 
     #[test]
-    fn test_lease_not_found_helper() {
-        let error = lease_not_found("abc123");
-        let msg = error.to_error_message();
-
-        assert!(msg.contains("Lease abc123 not found"));
-        assert!(msg.contains("jit claim list"));
-        assert!(msg.contains("jit claim status"));
-    }
-
-    #[test]
     fn test_already_claimed_helper() {
         let id = crate::test_utils::issue_id(0x1234_4234_8234_1234_5678_9abc_1234_5678);
         let error = already_claimed(&id.clone(), "agent:worker-1", "until 2026-01-15");
@@ -1251,7 +1212,7 @@ mod tests {
         assert!(msg.contains(&format!("Issue {id} already claimed")));
         assert!(msg.contains("agent:worker-1"));
         assert!(msg.contains("jit claim status --issue"));
-        assert!(msg.contains("force-evict"));
+        assert!(msg.contains(&format!("jit claim force-evict {id} ")));
     }
 
     // The generic message-carrier errors exist so the top-level exit-code
@@ -1328,7 +1289,7 @@ mod tests {
     fn test_lease_not_found_error_renders_actionable_message_verbatim() {
         // LeaseNotFoundError captures the full rendered ActionableError text so
         // the rich remediation block is preserved while remaining downcastable.
-        let actionable = no_active_lease(&crate::test_utils::issue_id(
+        let actionable = no_active_lease(crate::test_utils::issue_id(
             0x123442348234123456789abcabc12345,
         ));
         let expected = actionable.to_string();
@@ -1338,19 +1299,6 @@ mod tests {
 
         let any: anyhow::Error = err.into();
         assert_eq!(any.to_string(), expected);
-        assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
-    }
-
-    #[test]
-    fn test_lease_not_found_error_by_id_is_plain_message() {
-        // The bare lookup path keeps its plain "Lease <id> not found" phrasing
-        // (no remediation block) while still being the dedicated, downcastable type.
-        let err = LeaseNotFoundError::by_id("xyz789");
-        assert_eq!(err.to_string(), "Lease xyz789 not found");
-        assert_eq!(err.message(), "Lease xyz789 not found");
-
-        let any: anyhow::Error = err.into();
-        assert_eq!(any.to_string(), "Lease xyz789 not found");
         assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
     }
 }

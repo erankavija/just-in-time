@@ -13,7 +13,7 @@
 //! status in `main()`. Handlers build successes with [`Outcome::success`] and
 //! [`Outcome::success_with`]; a `message` becomes the `--json` envelope's
 //! top-level `message`, and [`Outcome::with_warnings`] attaches warnings the
-//! emitter renders. Handlers resolve issue-id arguments with
+//! emitter renders (human) or lists (`--json`). Handlers resolve issue-id arguments with
 //! [`resolve_issue`].
 
 use crate::commands::CommandExecutor;
@@ -32,19 +32,21 @@ pub struct CommandContext<'a, S: IssueStore> {
 pub enum Outcome<R> {
     /// `message`, when present, is the `--json` success envelope's top-level
     /// `message`; the human rendering ignores it. `warnings` print as
-    /// `Warning:` lines on stderr in human, non-quiet mode and are dropped
-    /// otherwise.
+    /// `Warning:` lines on stderr in human, non-quiet mode; under `--json`,
+    /// non-empty `warnings` are the envelope's top-level `warnings` array.
     Success {
         response: R,
         message: Option<String>,
         warnings: Vec<String>,
     },
     /// Findings that fail the command: `code` is the envelope code and exit
-    /// status, and `report` is the envelope's `error.details`.
+    /// status, and `report` is the envelope's `error.details`. `warnings`
+    /// render as on a success, beside `error` under `--json`.
     Findings {
         code: ErrorCode,
         message: String,
         report: Box<dyn Report>,
+        warnings: Vec<String>,
     },
 }
 
@@ -67,16 +69,30 @@ impl<R> Outcome<R> {
         }
     }
 
-    /// This outcome with `warnings` appended when it is a success.
+    /// Findings that fail the command, with no warnings.
+    pub fn findings(
+        code: ErrorCode,
+        message: impl Into<String>,
+        report: impl Report + 'static,
+    ) -> Self {
+        Self::Findings {
+            code,
+            message: message.into(),
+            report: Box::new(report),
+            warnings: Vec::new(),
+        }
+    }
+
+    /// This outcome with `warnings` appended.
     #[must_use]
     pub fn with_warnings<I>(mut self, warnings: I) -> Self
     where
         I: IntoIterator,
         I::Item: Into<String>,
     {
-        if let Self::Success { warnings: own, .. } = &mut self {
-            own.extend(warnings.into_iter().map(Into::into));
-        }
+        let (Self::Success { warnings: own, .. } | Self::Findings { warnings: own, .. }) =
+            &mut self;
+        own.extend(warnings.into_iter().map(Into::into));
         self
     }
 }
@@ -126,9 +142,28 @@ pub fn resolve_issue_filter<S: IssueStore>(
 /// [`crate::CommandSchema::generate`] before its legacy table. Test builds
 /// also register the test-only groups, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
+    apply::output_schema,
+    archive::output_schema,
+    claim::output_schema,
+    claim::recover::output_schema,
+    config::output_schema,
+    dep::output_schema,
+    doc::output_schema,
+    events::output_schema,
+    graph::output_schema,
+    graph::rdeps::output_schema,
+    hooks::output_schema,
+    init::output_schema,
     invariant::output_schema,
     issue::output_schema,
     issue::alias_output_schema,
+    item::output_schema,
+    label::output_schema,
+    project::output_schema,
+    search::output_schema,
+    serve::output_schema,
+    validate::output_schema,
+    version::output_schema,
     #[cfg(test)]
     test_group::output_schema,
     #[cfg(test)]
@@ -314,9 +349,26 @@ macro_rules! command_group {
     };
 }
 
+pub mod apply;
+pub mod archive;
+pub mod claim;
+pub mod config;
+pub mod dep;
+pub mod doc;
+pub mod events;
+pub mod graph;
+pub mod hooks;
+pub mod init;
 pub mod invariant;
 pub mod issue;
+pub mod item;
+pub mod label;
+pub mod project;
+pub mod search;
+pub mod serve;
 #[cfg(test)]
 mod test_forms;
 #[cfg(test)]
 mod test_group;
+pub mod validate;
+pub mod version;

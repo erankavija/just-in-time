@@ -1,0 +1,185 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/2195c98f-semantic-types",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 242033,
+            "sha256": "8e766260dc839d5da3e1806f3cd5d5e49dbad3d8ee854dd3c19ee969e9463339"
+          },
+          "source": "dev/active/2195c98f-semantic-types/breakdown.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 4548,
+            "sha256": "112cc46e2bf32c92ba3f04f899c74f5c2730b28bb9053d7e154333bca4aa9738"
+          },
+          "source": "dev/active/2195c98f-semantic-types/completion-report.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 9691,
+            "sha256": "cd411db21ad2ea821477fec91c9161fb0339a2bc5aeb5f2dc9d6d399ec7f318a"
+          },
+          "source": "dev/active/2195c98f-semantic-types/handoff-2.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 7468,
+            "sha256": "10bffb81ee9407d6407ce1c67122ca090cca29a771add07b4ef1b77c2c431b89"
+          },
+          "source": "dev/active/2195c98f-semantic-types/handoff.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 94541,
+            "sha256": "f0c88bef31a866abaffb273a941ccfa4fa843c243ac759f035d38909f9c7f9cb"
+          },
+          "source": "dev/active/2195c98f-semantic-types/investigation.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 51677,
+            "sha256": "5337dacbef0c37d62c5884c71c140a4acdc99077be03eba3aa032cbd7dba1ae5"
+          },
+          "source": "dev/active/2195c98f-semantic-types/plan.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 1709,
+            "sha256": "2b0422fdfe2af4d93928809ab92a7651f88239cdbfc579aa0e560ddfb7380e38"
+          },
+          "source": "dev/active/2195c98f-semantic-types/raw-identity-sites.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 242033,
+            "sha256": "8e766260dc839d5da3e1806f3cd5d5e49dbad3d8ee854dd3c19ee969e9463339"
+          },
+          "destination": "dev/archive/2195c98f-semantic-types/active/breakdown.json",
+          "source": "dev/active/2195c98f-semantic-types/breakdown.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4548,
+            "sha256": "112cc46e2bf32c92ba3f04f899c74f5c2730b28bb9053d7e154333bca4aa9738"
+          },
+          "destination": "dev/archive/2195c98f-semantic-types/active/completion-report.md",
+          "source": "dev/active/2195c98f-semantic-types/completion-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 9691,
+            "sha256": "cd411db21ad2ea821477fec91c9161fb0339a2bc5aeb5f2dc9d6d399ec7f318a"
+          },
+          "destination": "dev/archive/2195c98f-semantic-types/active/handoff-2.md",
+          "source": "dev/active/2195c98f-semantic-types/handoff-2.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 7468,
+            "sha256": "10bffb81ee9407d6407ce1c67122ca090cca29a771add07b4ef1b77c2c431b89"
+          },
+          "destination": "dev/archive/2195c98f-semantic-types/active/handoff.md",
+          "source": "dev/active/2195c98f-semantic-types/handoff.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 94541,
+            "sha256": "f0c88bef31a866abaffb273a941ccfa4fa843c243ac759f035d38909f9c7f9cb"
+          },
+          "destination": "dev/archive/2195c98f-semantic-types/active/investigation.md",
+          "source": "dev/active/2195c98f-semantic-types/investigation.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 51677,
+            "sha256": "5337dacbef0c37d62c5884c71c140a4acdc99077be03eba3aa032cbd7dba1ae5"
+          },
+          "destination": "dev/archive/2195c98f-semantic-types/active/plan.md",
+          "source": "dev/active/2195c98f-semantic-types/plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 1709,
+            "sha256": "2b0422fdfe2af4d93928809ab92a7651f88239cdbfc579aa0e560ddfb7380e38"
+          },
+          "destination": "dev/archive/2195c98f-semantic-types/active/raw-identity-sites.md",
+          "source": "dev/active/2195c98f-semantic-types/raw-identity-sites.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "0b72583a47547bd1faa0a59d48668efd246acc4e4fbe18442db1dfbeaee8aecd"
+          },
+          "destination": "dev/archive/2195c98f-semantic-types/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/2195c98f-semantic-types/raw-identity-sites.md",
+          "issue": "1a3db2c3-0faa-42c9-9498-d7bf7c0efaee",
+          "to_path": "dev/archive/2195c98f-semantic-types/active/raw-identity-sites.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/2195c98f-semantic-types/handoff.md",
+          "issue": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
+          "to_path": "dev/archive/2195c98f-semantic-types/active/handoff.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/2195c98f-semantic-types/handoff-2.md",
+          "issue": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
+          "to_path": "dev/archive/2195c98f-semantic-types/active/handoff-2.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/2195c98f-semantic-types/completion-report.md",
+          "issue": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
+          "to_path": "dev/archive/2195c98f-semantic-types/active/completion-report.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/2195c98f-semantic-types/investigation.md",
+          "issue": "8aa53c43-e838-4f3e-995e-d5b0960ea1f9",
+          "to_path": "dev/archive/2195c98f-semantic-types/active/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/2195c98f-semantic-types/plan.md",
+          "issue": "8aa53c43-e838-4f3e-995e-d5b0960ea1f9",
+          "to_path": "dev/archive/2195c98f-semantic-types/active/plan.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/2195c98f-semantic-types/breakdown.json",
+          "issue": "8aa53c43-e838-4f3e-995e-d5b0960ea1f9",
+          "to_path": "dev/archive/2195c98f-semantic-types/active/breakdown.json"
+        }
+      ],
+      "target": {
+        "id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "2195c98f-95a9-45d0-8582-d93c1d1fec45",
+    "kind": "container"
+  }
+}

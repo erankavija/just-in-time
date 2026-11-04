@@ -1,0 +1,37 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 67154,
+            "sha256": "0bf7c70564f134de4120d3e079329dc6ee19f238674063b83004e2f4eb7c0ea5"
+          },
+          "source": "dev/active/2195c98f-semantic-types/progress.json"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 67154,
+            "sha256": "0bf7c70564f134de4120d3e079329dc6ee19f238674063b83004e2f4eb7c0ea5"
+          },
+          "destination": "dev/archive/active/2195c98f-semantic-types/progress.json",
+          "source": "dev/active/2195c98f-semantic-types/progress.json"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "kind": "document",
+        "path": "dev/active/2195c98f-semantic-types/progress.json"
+      }
+    }
+  ],
+  "target": {
+    "kind": "document",
+    "path": "dev/active/2195c98f-semantic-types/progress.json"
+  }
+}

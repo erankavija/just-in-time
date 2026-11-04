@@ -1,0 +1,81 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/53e3fa36-agent-ergonomics",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 20989,
+            "sha256": "9f46bbeb8eee662858bee29ffabd8afea0adce4c0af7c19bd9172a776695b3a8"
+          },
+          "source": "dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 16017,
+            "sha256": "3cfb31cb6d67558139b642b71fd0a024c6feb645ec47c281c45db86a3a8b0279"
+          },
+          "source": "dev/studies/session-mining-jit-improvements.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 20989,
+            "sha256": "9f46bbeb8eee662858bee29ffabd8afea0adce4c0af7c19bd9172a776695b3a8"
+          },
+          "destination": "dev/archive/53e3fa36-agent-ergonomics/dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md",
+          "source": "dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 16017,
+            "sha256": "3cfb31cb6d67558139b642b71fd0a024c6feb645ec47c281c45db86a3a8b0279"
+          },
+          "destination": "dev/archive/53e3fa36-agent-ergonomics/dev/studies/session-mining-jit-improvements.md",
+          "source": "dev/studies/session-mining-jit-improvements.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "8b2f76a4fd4121f330fd800ac749b2b319e8c6d3bdba786cad55dd52ea235a04"
+          },
+          "destination": "dev/archive/53e3fa36-agent-ergonomics/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md",
+          "issue": "2937919f-87ba-4170-812f-23a8d168f08c",
+          "to_path": "dev/archive/53e3fa36-agent-ergonomics/dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/studies/session-mining-jit-improvements.md",
+          "issue": "53e3fa36-c0cb-4206-8e8e-0a21aafb213e",
+          "to_path": "dev/archive/53e3fa36-agent-ergonomics/dev/studies/session-mining-jit-improvements.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md",
+          "issue": "53e3fa36-c0cb-4206-8e8e-0a21aafb213e",
+          "to_path": "dev/archive/53e3fa36-agent-ergonomics/dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md"
+        }
+      ],
+      "target": {
+        "id": "53e3fa36-c0cb-4206-8e8e-0a21aafb213e",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "53e3fa36-c0cb-4206-8e8e-0a21aafb213e",
+    "kind": "container"
+  }
+}

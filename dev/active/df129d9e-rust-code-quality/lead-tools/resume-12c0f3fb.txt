@@ -1,0 +1,18 @@
+12c0f3fb has landed on main at 4baff2cb3. Resume now.
+
+1. Run `git merge main` in your worktree and resolve conflicts. Take main's `dispatch/mod.rs`, `output/emit.rs` and `HumanRender` forms over any local variant of your own, and drop any local macro rule, quiet hook or pass-through clause.
+2. Read the new forms in `crates/jit/src/dispatch/mod.rs`: its rustdoc and `dispatch/test_forms.rs` show each one.
+   - Executor-free: omit `storage:`.
+   - Single-leaf: `command:` is the variant's `clap::Args` type, or `()` for a unit variant.
+   - Concrete store: `storage: Type`.
+   - Union schema: a leaf ending `as union [A, B] "description"`.
+   - Transitional pass-through for split groups: `, unmigrated: <pat>`, after which `dispatch` returns `Dispatched<C>`.
+   - Ceremony: `Outcome::success`, `success_with` and `with_warnings`, plus the shared `resolve_issue` and `resolve_issue_filter` in `dispatch/`.
+   - Quiet: `render_human(&self, mode)`.
+3. Apply what my earlier messages to you said to do once 12c0f3fb landed. Replace private helpers with the shared ones. Warnings go through `with_warnings`, never `OutputContext::print_warning`, and under `--json` no human line reaches either stream.
+4. Rerun fmt, clippy (zero warnings), doctests and your leaf tests. Report the production-line delta of `main.rs` + `dispatch/` + `output` (`python3 scripts/production-lines.py`) against main.
+5. Commit on your branch and return with the return contract from your brief.
+
+# Temp directory rule (steward, 2026-11-04)
+
+Your own test runs are advisory: prefix every cargo test or nextest command with `TMPDIR=/mnt/nvme/jit/tmp/df129d9e-workers CARGO_INCREMENTAL=0`, so parallel worker suites do not fill the shared `/tmp` tmpfs during the lead's authoritative runs. On that disk-backed TMPDIR a few tests are known to fail for disk-only reasons: `commands::gate_check::tests::test_check_gate_classifies_named_run_drift_but_not_unrelated_run` (directory order) and sync-heavy tests that time out at 20 s (the re-application proptest, `test_strict_lease_every_cli_leaf_is_classified_and_only_anothers_lease_refuses`, the `test_profile_*` package tests). Report them in your return; do not rework for them. The lead's branch CI and gates run on the default `/tmp`.

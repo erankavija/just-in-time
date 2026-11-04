@@ -1,0 +1,53 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/a9b5dd08-use-strategic-label-slugs-in-archive-directory-n",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 6947,
+            "sha256": "e4d567b9475b6701fb40aa3a91f910b1c976a472b1a2cd9b7a09e9b35916a808"
+          },
+          "source": "dev/active/a9b5dd08-archive-directory-slugs.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "844f62f7d9f03a7ca13976fb237186ef6b6cc701c3422601c7b6a67dc1938f06"
+          },
+          "destination": "dev/archive/a9b5dd08-use-strategic-label-slugs-in-archive-directory-n/.jit-container",
+          "source": null
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 6947,
+            "sha256": "e4d567b9475b6701fb40aa3a91f910b1c976a472b1a2cd9b7a09e9b35916a808"
+          },
+          "destination": "dev/archive/a9b5dd08-use-strategic-label-slugs-in-archive-directory-n/dev/active/a9b5dd08-archive-directory-slugs.md",
+          "source": "dev/active/a9b5dd08-archive-directory-slugs.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/a9b5dd08-archive-directory-slugs.md",
+          "issue": "a9b5dd08-c6ae-4add-99f1-275289e43f0c",
+          "to_path": "dev/archive/a9b5dd08-use-strategic-label-slugs-in-archive-directory-n/dev/active/a9b5dd08-archive-directory-slugs.md"
+        }
+      ],
+      "target": {
+        "id": "a9b5dd08-c6ae-4add-99f1-275289e43f0c",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "a9b5dd08-c6ae-4add-99f1-275289e43f0c",
+    "kind": "container"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 5824,
+            "sha256": "9b66bfc587cbc2bff68bb80bf4b61c5e1b86e1b71a758a78d88fdfd4f5bb881c"
+          },
+          "source": "dev/active/a2546471-json-error-contract/completion-report.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 5824,
+            "sha256": "9b66bfc587cbc2bff68bb80bf4b61c5e1b86e1b71a758a78d88fdfd4f5bb881c"
+          },
+          "destination": "dev/archive/dev/active/a2546471-json-error-contract/completion-report.md",
+          "source": "dev/active/a2546471-json-error-contract/completion-report.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "kind": "document",
+        "path": "dev/active/a2546471-json-error-contract/completion-report.md"
+      }
+    }
+  ],
+  "target": {
+    "kind": "document",
+    "path": "dev/active/a2546471-json-error-contract/completion-report.md"
+  }
+}

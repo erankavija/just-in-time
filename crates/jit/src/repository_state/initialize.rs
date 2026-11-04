@@ -672,9 +672,7 @@ fn apply_action_overlay(
     base: &RepositoryImage,
     actions: &[RepositoryAction],
 ) -> Result<RepositoryImage, InitializationError> {
-    super::action_overrides(base, actions)
-        .map_err(super::OverlayError::from)
-        .and_then(|overrides| super::apply_overlay(base, overrides))
+    super::apply_overlay(base, super::action_overrides(actions))
         .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
 }
 

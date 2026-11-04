@@ -93,7 +93,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Temp-file cleanup threshold",
             format!("{TEMP_CLEANUP_THRESHOLD_SECS} seconds"),
-            "Minimum age at which `jit recover` removes an orphaned `*.tmp` file under `.jit/`. A pending redo record is not swept: the next mutation session applies it (see [Publication and Recovery](storage-format.md#publication-and-recovery)).",
+            "Minimum age at which `jit recover` removes an orphaned `*.tmp` file under `.jit/` or `.git/jit/leases/`. A pending redo record is not swept: the next mutation session applies it (see [Publication and Recovery](storage-format.md#publication-and-recovery)).",
         ),
         (
             "Claim lease TTL",

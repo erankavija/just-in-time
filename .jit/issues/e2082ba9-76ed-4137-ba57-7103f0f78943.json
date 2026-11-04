@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "The report's item-link pass reports a `<short-id>/<self-id>` link label as dangling when the self-id matches the id pattern of more than one issue-scoped item kind, although the item exists and the executor resolves it.\n\n## Background\n\n- `ItemAddressIndex::contains` (`crates/jit/src/domain/item.rs`) expands a sugar address through `expand_sugar_address`, which picks the kind by matching the self-id against each issue-scoped kind's id pattern and fails with `ItemError::SugarKindAmbiguous` when several match (`item.rs:422-438`).\n- The executor's link resolution (`resolve_link_label` → `show_item`, `crates/jit/src/commands/item.rs:347,559`) resolves the same labels, so the two disagree.\n- A report test written for c1af05ac shows it: with the item kinds `invariant`, `requirement`, `decision` and `risk` declared, `per:<short>/D-01` and `mitigates:<short>/RISK-01` on an issue whose description declares `D-01` and `RISK-01` are reported as dangling by the report and resolved by the executor.\n- The report reached this path with the item-address index (001a9c46); repository validation and every view built on the report inherit it.\n\n## Success Criteria\n\n- [hard] REQ-01: The report resolves a `<short-id>/<self-id>` link label to the item it names whenever exactly one item exists at that address under the issue-scoped kinds the self-id's pattern admits, and reports it as dangling only when no such item exists or more than one does.\n- [hard] REQ-02: The report and the executor's link resolution agree on every link label in the existing item-link tests, including the `per:` and `mitigates:` sugar labels above.\n- [hard] REQ-03: Unit tests over the address index show a sugar address resolving when its self-id matches several kinds' patterns but one item exists, and staying dangling when none exists.\n\n## Notes\n\n- Found while relocating the executor-pass tests (c1af05ac), whose report suite cannot pass until this is fixed.",
   "documents": [],
+  "done_at": "2026-11-04T05:16:36.755948659Z",
   "first_ready_at": "2026-11-04T02:47:06.826404367Z",
   "gates_required": [
     "cargo-ci",
@@ -13,9 +14,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "05057289-b31d-4c77-b8f2-3e37a91bfc4d",
-      "status": "failed",
-      "updated_at": "2026-11-04T03:02:31.508572223Z",
+      "run_id": "16190cb4-f63c-4faf-b439-efb29949f5dd",
+      "status": "passed",
+      "updated_at": "2026-11-04T04:51:57.515944293Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -34,7 +35,7 @@
     "component:validation"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Item links resolve sugar addresses whose self-id several kinds admit",
-  "updated_at": "2026-11-04T03:06:29.404198312Z"
+  "updated_at": "2026-11-04T05:16:36.755948659Z"
 }

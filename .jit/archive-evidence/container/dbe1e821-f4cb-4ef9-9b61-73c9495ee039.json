@@ -1,0 +1,29 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/dbe1e821-work-graph-integrity",
+      "planned_deletions": [],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "f10021172dfe621f525c204075a969c291b803778d080cd3621f53c361fa8d34"
+          },
+          "destination": "dev/archive/dbe1e821-work-graph-integrity/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "id": "dbe1e821-f4cb-4ef9-9b61-73c9495ee039",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "dbe1e821-f4cb-4ef9-9b61-73c9495ee039",
+    "kind": "container"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b6ebed65bb43f07e51ded0175156a3c5a7098800",
+  "completed_at": "2026-11-04T08:26:33.587658042Z",
+  "duration_ms": 145940,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/worktree-validate.md",
+        "id": "F1",
+        "line": 445,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The validation failure-mode list still says plain jit validate can fail on a bad claims index, although only --leases reads lease records."
+      }
+    ],
+    "summary": "One issue-impact documentation omission leaves plain validation inaccurately described as checking a claims index.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "f0a5b90a-d717-46cc-8cb4-61e24efb187d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "802cc1ad-dbe2-43d8-9db1-95ac85a2c749",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T08:24:07.647201041Z",
+  "status": "failed",
+  "stderr": "grep: /dev/shm/jit-ci/f8a6-lead52/tmp.NxtVbsizJx: binary file matches\n--- agent stderr (first 12 of 10297 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a5a8-8953-70b3-95fe-d63e4bb7dd6e\n--------\n--- 10285 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: leaf task with no resolved children; reviewed its reachable tagged commit `866d37b` individually and verified current source. The documentation update is largely accurate, but one affected validation failure-mode statement remains obsolete.\n\n1. **F1 — blocking, issue-impact, medium:** [docs/reference/worktree-validate.md:445](/home/vkaskivuo/Projects/just-in-time/docs/reference/worktree-validate.md:445) still lists “a bad claims index” as a plain `jit validate` repository-integrity failure. Plain validation does not read lease records; only `jit validate --leases` performs that check. Remove that phrase; the following `--leases` bullet already covers its correct behavior.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact documentation omission leaves plain validation inaccurately described as checking a claims index.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The validation failure-mode list still says plain jit validate can fail on a bad claims index, although only --leases reads lease records.\",\"file\":\"docs/reference/worktree-validate.md\",\"line\":445}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
