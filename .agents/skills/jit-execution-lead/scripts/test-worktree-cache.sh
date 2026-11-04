@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DISPATCH="$SCRIPT_DIR/dispatch-worker-worktree.sh"
 RECLAIM="$SCRIPT_DIR/reclaim-worker-worktree.sh"
 
-for tool in git rsync stat diff; do
+for tool in git rsync stat diff tar; do
     command -v "$tool" > /dev/null 2>&1 || { echo "ERROR: '$tool' not on PATH"; exit 2; }
 done
 
@@ -126,7 +126,7 @@ assert "a copied seed shares no inode with the pool" different_inode \
 
 # --- Harvest --------------------------------------------------------------
 no_rsync="$FIX/no-rsync-bin"; mkdir -p "$no_rsync"
-for tool in bash git cp mkdir basename rm; do
+for tool in bash git cp mkdir basename rm find sort tar xargs; do
     ln -s "$(command -v "$tool")" "$no_rsync/$tool"
 done
 
@@ -157,6 +157,49 @@ check_harvest() { # branch, PATH
     put "$wt/target/debug/kept" 'worktree'
     touch -d '2020-01-01' "$wt/target/debug/kept"
 
+    mkdir -p "$wt/target/debug/empty"
+    touch -d '2017-01-01' "$wt/target/debug/empty"
+    local empty_mtime
+    empty_mtime="$(stat -c %Y "$wt/target/debug/empty")"
+    local profile rel before
+    for profile in debug release triple/debug; do
+        put "$pool/target/$profile/incremental/old/state" 'old incremental'
+        put "$wt/target/$profile/incremental/new/state" 'new incremental'
+        for rel in pkg-1111111111111111 pkg-1111111111111111.d \
+            libpkg-1111111111111111.rlib libpkg-1111111111111111.rmeta; do
+            put "$pool/target/$profile/deps/$rel" 'old pool generation'
+            touch -d '2019-01-01' "$pool/target/$profile/deps/$rel"
+        done
+        for rel in pkg-2222222222222222 pkg-2222222222222222.d \
+            libpkg-2222222222222222.rlib libpkg-2222222222222222.rmeta \
+            pkg-3333333333333333 pkg-3333333333333333.d \
+            libpkg-3333333333333333.rlib libpkg-3333333333333333.rmeta; do
+            put "$wt/target/$profile/deps/$rel" 'built from the same sources'
+            touch -d '2020-01-01' "$wt/target/$profile/deps/$rel"
+        done
+        touch -d '2021-01-01' "$wt/target/$profile/deps/pkg-3333333333333333"
+        touch -d '2021-01-01' "$wt/target/$profile/deps/libpkg-3333333333333333.rlib"
+        # The selected generation keeps its older companions as a unit.
+        touch -d '2018-01-01' "$wt/target/$profile/deps/pkg-3333333333333333.d" \
+            "$wt/target/$profile/deps/libpkg-3333333333333333.rmeta"
+    done
+    for rel in libcrate-1111111111111111.rlib crate-1111111111111111.d \
+        libcrate-2222222222222222.rlib crate-2222222222222222.d; do
+        put "$wt/target/debug/deps/$rel" 'library companion'
+        touch -d '2020-01-01' "$wt/target/debug/deps/$rel"
+    done
+    touch -d '2021-01-01' "$wt/target/debug/deps/libcrate-2222222222222222.rlib"
+    touch -d '2018-01-01' "$wt/target/debug/deps/crate-2222222222222222.d"
+    put "$wt/target/debug/deps/libpkg-6666666666666666.so" 'dynamic library'
+    touch -d '2015-01-01' "$wt/target/debug/deps/libpkg-6666666666666666.so"
+    for rel in tied-7777777777777777 tied-8888888888888888; do
+        put "$wt/target/debug/deps/$rel" 'tied generation'
+        touch -d '2020-01-01' "$wt/target/debug/deps/$rel"
+    done
+    # A different profile and target retain their own most recent generation.
+    put "$pool/target/other/deps/pkg-4444444444444444" 'other profile'
+    put "$pool/target/debug/deps/other-4444444444444444" 'other target'
+
     (cd "$repo" && PATH="$search_path" LEAD_CACHE_POOL="$pool" "$RECLAIM" a > /dev/null 2>&1)
     assert "$branch: reclaim succeeds" test "$?" -eq 0
     assert "$branch: a newer file reaches the pool" has_content "$pool/target/debug/fresh" 'worktree'
@@ -164,6 +207,49 @@ check_harvest() { # branch, PATH
     assert "$branch: the harvest replaces an unshared file's inode" \
         test "$(stat -c %i "$pool/target/debug/unshared")" != "$unshared_inode"
     assert "$branch: a newer pool file wins" has_content "$pool/target/debug/kept" 'pool'
+    assert "$branch: no incremental directory reaches or remains in the pool" \
+        test -z "$(find "$pool" -type d -name incremental -print -quit)"
+    assert "$branch: superseded generations from either source are absent" \
+        test -z "$(find "$pool" -name 'pkg-1111111111111111*' -o -name 'pkg-2222222222222222*' \
+            -o -name 'libpkg-1111111111111111*' -o -name 'libpkg-2222222222222222*')"
+    assert "$branch: an empty cache directory survives" test -d "$pool/target/debug/empty"
+    assert "$branch: empty directory metadata survives" \
+        test "$(stat -c %Y "$pool/target/debug/empty" 2>/dev/null)" = "$empty_mtime"
+    assert "$branch: library dep-info follows its library generation" \
+        test -f "$pool/target/debug/deps/crate-2222222222222222.d"
+    assert "$branch: superseded library dep-info is absent" \
+        test ! -e "$pool/target/debug/deps/crate-1111111111111111.d"
+    assert "$branch: a dynamic library is separate from rlib and rmeta" \
+        test -f "$pool/target/debug/deps/libpkg-6666666666666666.so"
+    assert "$branch: tied mtimes keep one deterministic generation" \
+        test -f "$pool/target/debug/deps/tied-8888888888888888"
+    assert "$branch: the other tied generation is absent" \
+        test ! -e "$pool/target/debug/deps/tied-7777777777777777"
+    for profile in debug release triple/debug; do
+        for rel in pkg-3333333333333333 pkg-3333333333333333.d \
+            libpkg-3333333333333333.rlib libpkg-3333333333333333.rmeta; do
+            assert "$branch: $profile/$rel survives as a coherent generation" \
+                test -f "$pool/target/$profile/deps/$rel"
+        done
+    done
+    assert "$branch: another profile keeps its own generation" \
+        test -f "$pool/target/other/deps/pkg-4444444444444444"
+    assert "$branch: another target keeps its own generation" \
+        test -f "$pool/target/debug/deps/other-4444444444444444"
+
+    before="$(du -sb "$pool" | cut -f1)"
+    (cd "$repo" && LEAD_CACHE_POOL="$pool" LEAD_SNAPSHOT_DIR="$snapshots" "$DISPATCH" b > /dev/null 2>&1)
+    wt="$repo/.agents/worktrees/agent-b"
+    put "$wt/target/debug/incremental/rebuilt/state" 'regenerated'
+    for rel in pkg-5555555555555555 pkg-5555555555555555.d \
+        libpkg-5555555555555555.rlib libpkg-5555555555555555.rmeta; do
+        put "$wt/target/debug/deps/$rel" 'built from the same sources'
+        touch -d '2022-01-01' "$wt/target/debug/deps/$rel"
+    done
+    (cd "$repo" && PATH="$search_path" LEAD_CACHE_POOL="$pool" "$RECLAIM" b > /dev/null 2>&1)
+    assert "$branch: reclaim of a repeated build succeeds" test "$?" -eq 0
+    assert "$branch: a repeated build does not grow the pool" \
+        test "$(du -sb "$pool" | cut -f1)" -le "$before"
 }
 
 check_harvest rsync "$PATH"
