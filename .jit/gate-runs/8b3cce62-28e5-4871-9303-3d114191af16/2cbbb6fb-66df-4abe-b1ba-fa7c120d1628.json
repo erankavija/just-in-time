@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e1b2bf52b85dffcda81b2cc16662ac0c868154c4",
+  "completed_at": "2026-11-04T19:02:22.762993692Z",
+  "duration_ms": 252180,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are met; the prior undeclared-findings gap is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8b3cce62-28e5-4871-9303-3d114191af16",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2cbbb6fb-66df-4abe-b1ba-fa7c120d1628",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T18:58:10.582389531Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a07c62022, 009770cec\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T18:56:13Z); mcp-ci passed (exit 0, 2026-11-04T18:57:51Z)\nTruncation recovery: re-read affected per-commit patches and focused dispatch/schema/test/document sections after truncated broad queries\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are met; the prior undeclared-findings gap is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -74,7 +74,7 @@ pub struct ArchiveExecutionResult {
     /// Sources actually removed.
     pub deleted_sources: Vec<String>,
     /// Planning and non-fatal deletion diagnostics.
-    pub warnings: Vec<PlanWarning>,
+    pub plan_warnings: Vec<PlanWarning>,
     /// Whether this run appended an archive commit event.
     pub event_appended: bool,
     /// Whether the event repaired previously unrecorded adopted state.

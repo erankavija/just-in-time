@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "76db2d2a-d6bc-4d71-b1d1-79296f68fd01",
+      "status": "passed",
+      "updated_at": "2026-11-04T18:42:38.565027422Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "bf825b57-a307-460f-bdcf-f29e152fb4d6",
+      "status": "failed",
+      "updated_at": "2026-11-04T18:46:31.672432526Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "578ed10d-29f9-4b25-87c0-b3c50a1e9d6e",
   "labels": [
     "type:task",
@@ -31,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Validate, link checks and profile previews read through the read driver",
-  "updated_at": "2026-11-04T17:49:34.268283741Z"
+  "updated_at": "2026-11-04T18:46:31.672432526Z"
 }

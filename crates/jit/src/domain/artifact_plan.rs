@@ -590,7 +590,7 @@ pub struct ArtifactPlanEntry {
     pending_deletions: Vec<PendingDeletion>,
     evidence: Vec<EvidenceCode>,
     blockers: Vec<PlanBlocker>,
-    warnings: Vec<PlanWarning>,
+    plan_warnings: Vec<PlanWarning>,
 }
 
 impl ArtifactPlanEntry {
@@ -616,7 +616,7 @@ impl ArtifactPlanEntry {
             pending_deletions: Vec::new(),
             evidence: Vec::new(),
             blockers: Vec::new(),
-            warnings: Vec::new(),
+            plan_warnings: Vec::new(),
         }
     }
 
@@ -694,8 +694,8 @@ impl ArtifactPlanEntry {
     }
 
     /// Supply artifact-level warnings.
-    pub fn with_warnings(mut self, warnings: Vec<PlanWarning>) -> Self {
-        self.warnings = warnings;
+    pub fn with_plan_warnings(mut self, plan_warnings: Vec<PlanWarning>) -> Self {
+        self.plan_warnings = plan_warnings;
         self
     }
 
@@ -778,8 +778,8 @@ impl ArtifactPlanEntry {
     }
 
     /// Canonically ordered artifact-level warnings.
-    pub fn warnings(&self) -> &[PlanWarning] {
-        &self.warnings
+    pub fn plan_warnings(&self) -> &[PlanWarning] {
+        &self.plan_warnings
     }
 
     pub(crate) fn normalize(&mut self) -> Result<(), PlanError> {
@@ -853,10 +853,10 @@ impl ArtifactPlanEntry {
             blocker.path = blocker.path.take().map(|path| normalize_path(&path));
         }
         sort_blockers(&mut self.blockers);
-        for warning in &mut self.warnings {
+        for warning in &mut self.plan_warnings {
             warning.path = warning.path.take().map(|path| normalize_path(&path));
         }
-        sort_warnings(&mut self.warnings);
+        sort_warnings(&mut self.plan_warnings);
 
         if self.version.is_pinned()
             && (self.action != ArtifactAction::Retain
@@ -953,7 +953,7 @@ struct PlanHeader {
     policy_status: PolicyStatus,
     action_counts: ActionCounts,
     blockers: Vec<PlanBlocker>,
-    warnings: Vec<PlanWarning>,
+    plan_warnings: Vec<PlanWarning>,
 }
 
 impl ArtifactPlan {
@@ -1006,7 +1006,7 @@ impl ArtifactPlan {
                 policy_status,
                 action_counts,
                 blockers,
-                warnings,
+                plan_warnings: warnings,
             },
         )))
     }
@@ -1047,8 +1047,8 @@ impl ArtifactPlan {
     }
 
     /// Canonically ordered target-level warnings.
-    pub fn warnings(&self) -> &[PlanWarning] {
-        &self.0.extras.warnings
+    pub fn plan_warnings(&self) -> &[PlanWarning] {
+        &self.0.extras.plan_warnings
     }
 
     /// Deterministically ordered artifacts used by preview rendering.

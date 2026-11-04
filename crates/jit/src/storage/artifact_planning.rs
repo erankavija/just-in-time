@@ -557,7 +557,7 @@ mod tests {
         );
         plan.artifacts()
             .iter()
-            .flat_map(ArtifactPlanEntry::warnings)
+            .flat_map(ArtifactPlanEntry::plan_warnings)
             .filter(|warning| warning.code == WarningCode::MovingPathCitation)
             .filter_map(|warning| warning.path.as_deref())
             .filter_map(|location| location.rsplitn(3, ':').nth(2))

@@ -42,7 +42,10 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `gate preset apply` | `3` | One or more preset targets failed; the findings report retains successful targets and per-target errors. | yes |
 | `gate status-all` | `4` | One or more required gates have not passed. | yes |
 | `gate evaluate, gate evaluate-all` | `4` | A quality-gate checker did not pass. |  |
-| `gate evaluate-many` | `4` | A target's checker ran and its verdict was fail; the batch reports under its first failing target's code. | yes |
+| `gate evaluate-many` | `4` | The first failing target's checker ran and its verdict was fail. | yes |
+| `gate evaluate-many` | `10` | The first failing target's checker could not run to a verdict. | yes |
+| `gate evaluate-many` | `3` | The first failing target's id resolves to no issue. | yes |
+| `gate evaluate-many` | `2` | The first failing target does not require the gate, or its manual gate lacks `--by`. The first failing target's id prefix is too short. The first failing target's id prefix matches several issues. | yes |
 | `invariant check` | `4` | Enforcement drift was found (declared enforcement not backed by an enforcing rule). | yes |
 | `profile diff` | `4` | The difference report found targets or final validation that prevent publication. | yes |
 | `profile apply` | `4` | Profile planning found packages being applied that define one target or declaration differently. A profile application would overwrite paths that differ from HEAD; committing or discarding those changes lets it proceed. |  |

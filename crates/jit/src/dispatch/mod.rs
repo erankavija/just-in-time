@@ -283,19 +283,20 @@ pub fn resolve_gate_key_for(
     Ok(resolve_gate_key(positional, flag, command)?.parse()?)
 }
 
-/// One leaf's declared failure codes beyond the universal ones.
+/// One leaf's declared failure codes: its non-universal typed codes and every
+/// code its findings outcome reports under.
 pub struct LeafCodes {
     /// The leaf's schema path.
     pub path: &'static str,
     /// Typed codes the leaf raises through the shared classifier.
     pub raises: &'static [ErrorCode],
-    /// The code and condition of the leaf's findings outcome.
-    pub findings: Option<(ErrorCode, &'static str)>,
+    /// Each code the leaf's findings outcome reports under, with its condition.
+    pub findings: &'static [(ErrorCode, &'static str)],
 }
 
 impl LeafCodes {
-    /// Pass `outcome` through unless it reports findings under a code that is
-    /// neither this leaf's declared findings code nor universal.
+    /// Pass `outcome` through unless it reports findings under an undeclared
+    /// code.
     ///
     /// # Errors
     ///
@@ -303,8 +304,7 @@ impl LeafCodes {
     pub fn admit<R>(&self, outcome: Outcome<R>) -> anyhow::Result<Outcome<R>> {
         match &outcome {
             Outcome::Findings { code, .. }
-                if !code.is_universal()
-                    && self.findings.map(|(declared, _)| declared) != Some(*code) =>
+                if !self.findings.iter().any(|(declared, _)| declared == code) =>
             {
                 Err(anyhow!(
                     "`{}` reported findings under undeclared code {}",
@@ -393,9 +393,10 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 ///
 /// After the handler call, a leaf may declare `raises [Code, ...]`, the
 /// non-universal [`ErrorCode`]s its typed failures classify to, and
-/// `findings Code "condition"`, its findings outcome. The exit-code projection
-/// derives the leaf's rows from these, and `dispatch` refuses a findings
-/// outcome under an undeclared, non-universal code ([`LeafCodes::admit`]).
+/// one `findings Code "condition"` per code its findings outcome reports
+/// under. The exit-code projection derives the leaf's rows from these, and
+/// `dispatch` refuses a findings outcome under an undeclared code
+/// ([`LeafCodes::admit`]).
 ///
 /// The `storage:` entry picks the group's form, which generates
 /// `dispatch(command, ctx, out, err) -> anyhow::Result<RunStatus>`,
@@ -458,7 +459,7 @@ macro_rules! command_group {
             $(
                 $path:literal => $pattern:pat => $handler:ident ( $($arg:expr),* $(,)? )
                     $(raises [$($raised:ident),+ $(,)?])?
-                    $(findings $finding:ident $condition:literal)?
+                    $(findings $finding:ident $condition:literal)*
                     -> $response:ty
                     $(as union [$($member:ty),+ $(,)?] $description:expr)?
             ),+ $(,)?
@@ -475,7 +476,7 @@ macro_rules! command_group {
                 $( $pattern => {
                     let outcome: $crate::dispatch::Outcome<$response> =
                         command_group!(@call $handler $handler_args ($($arg),*))?;
-                    let outcome = command_group!(@codes $path [$($($raised),+)?] $($finding $condition)?)
+                    let outcome = command_group!(@codes $path [$($($raised),+)?] $($finding $condition)*)
                         .admit(outcome)?;
                     $crate::output::emit_outcome(&outcome, $mode, out, err)
                 } )+
@@ -493,19 +494,15 @@ macro_rules! command_group {
         #[allow(dead_code)]
         pub const GROUP: $crate::dispatch::RegisteredGroup = $crate::dispatch::RegisteredGroup {
             output_schema,
-            leaves: &[$(command_group!(@codes $path [$($($raised),+)?] $($finding $condition)?)),+],
+            leaves: &[$(command_group!(@codes $path [$($($raised),+)?] $($finding $condition)*)),+],
         };
     };
-    (@codes $path:literal [$($raised:ident),*] $($finding:ident $condition:literal)?) => {
+    (@codes $path:literal [$($raised:ident),*] $($finding:ident $condition:literal)*) => {
         $crate::dispatch::LeafCodes {
             path: $path,
             raises: &[$($crate::output::ErrorCode::$raised),*],
-            findings: command_group!(@findings $($finding $condition)?),
+            findings: &[$(($crate::output::ErrorCode::$finding, $condition)),*],
         }
-    };
-    (@findings) => { None };
-    (@findings $finding:ident $condition:literal) => {
-        Some(($crate::output::ErrorCode::$finding, $condition))
     };
     (@call $handler:ident [$($handler_args:tt)*] ($($arg:expr),*)) => {
         $handler($($handler_args)* $($arg),*)
@@ -553,6 +550,25 @@ pub mod worktree;
 #[cfg(test)]
 mod tests {
     use super::{count_message, REGISTERED_GROUPS};
+    use crate::output::ErrorCode;
+
+    /// The codes the universal `*` exit-code rows describe.
+    const UNIVERSAL: &[ErrorCode] = &[
+        ErrorCode::GenericError,
+        ErrorCode::ParseError,
+        ErrorCode::InvalidArgument,
+        ErrorCode::AmbiguousId,
+        ErrorCode::InvalidIdPrefix,
+        ErrorCode::IssueNotFound,
+        ErrorCode::GateNotFound,
+        ErrorCode::PresetError,
+        ErrorCode::RepositoryNotFound,
+        ErrorCode::DocumentNotFound,
+        ErrorCode::PermissionDenied,
+        ErrorCode::IoError,
+        ErrorCode::RepositoryFormatUnsupported,
+        ErrorCode::LockTimeout,
+    ];
 
     #[test]
     fn test_registered_groups_no_leaf_raises_a_universal_code() {
@@ -560,7 +576,7 @@ mod tests {
             .iter()
             .flat_map(|group| group.leaves)
             .flat_map(|leaf| leaf.raises.iter().map(move |code| (leaf.path, *code)))
-            .filter(|(_, code)| code.is_universal())
+            .filter(|(_, code)| UNIVERSAL.contains(code))
             .collect();
         assert!(restated.is_empty(), "{restated:?}");
     }

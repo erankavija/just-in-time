@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fad481d3efee91758a8fc28f53bb31f74df788bf",
+  "completed_at": "2026-11-04T18:54:42.978203319Z",
+  "duration_ms": 279720,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 417,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/decision/D-04",
+          "@/charter/D-13",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "The canonical archive execution JSON field list still names `warnings` although the shipped response is `plan_warnings`."
+      }
+    ],
+    "summary": "Archive execution documentation retains an obsolete JSON field name.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6acd7a05-b199-43f8-b619-554b536dc420",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "424a7843-d459-473e-a35d-d0da14e391b8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T18:50:03.258011593Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4849 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a7e5-98a8-79b1-a16c-4c19131c761d\n--------\nuser\n--- 4836 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 6c890025f, e7c4ad68b (`jit:6acd7a05`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/decision/D-03 and D-04 (issue description); @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (0, 18:48 UTC) and mcp-ci passed (0, 18:49 UTC); code-review pending\nTruncation recovery: narrowed schema, archive response/test, documentation, and MCP-schema reads after truncated mixed searches\n\n1. **[blocking][issue-impact]** [docs/reference/cli-commands.md:417](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:417) still documents archive execution’s JSON field as `warnings`. The attributable refactor serializes `ArchiveExecutionResult.plan_warnings`, and its CLI contract test asserts that exact field. This leaves the canonical adopter documentation with an obsolete response shape, failing REQ-04. References: @/issue/df129d9e/decision/D-04, @/charter/D-13, @/invariant/single-source-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Archive execution documentation retains an obsolete JSON field name.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical archive execution JSON field list still names `warnings` although the shipped response is `plan_warnings`.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":417,\"references\":[\"@/issue/df129d9e/decision/D-04\",\"@/charter/D-13\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

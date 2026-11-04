@@ -308,7 +308,7 @@ pub fn inventory_explicit_roots(
             let mut entry = ArtifactPlanEntry::new(path, version, ArtifactAction::Retain)
                 .with_provenance(vec![ArtifactProvenance::Explicit])
                 .with_owners(owners)
-                .with_warnings(warnings);
+                .with_plan_warnings(warnings);
             entry.normalize()?;
             Ok(entry)
         })

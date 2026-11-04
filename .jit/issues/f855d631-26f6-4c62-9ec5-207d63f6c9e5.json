@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T19:09:02.716236454Z",
+  "dependencies": [],
+  "description": "Test builds no longer produce incremental-compilation state by default, so a build that omits an environment override cannot fill the disk with it.\n\n## Background\n\nThe workspace `Cargo.toml` declares `incremental = true` under both `[profile.dev]` and `[profile.test]`. Worker briefs ask for `CARGO_INCREMENTAL=0`, but any invocation that misses the variable writes `target/<profile>/incremental` state. A sandboxed shell or a single `cargo doc` run is enough. On 2026-11-04 that state reached hundreds of gigabytes per worktree and spread through the shared worktree cache.\n\n## Success Criteria\n\n- [hard] REQ-01: The workspace test profile does not enable incremental compilation, and its comment states why.\n- [hard] REQ-02: A worker-style build and test run without `CARGO_INCREMENTAL` set (`cargo test --workspace --no-run`, then one targeted test) leaves zero bytes under `target/*/incremental` for workspace crates, measured from a clean target directory and reported with the measurement command.\n- [hard] REQ-03: The build profile policy test asserts the profile setting, and the existing build-budget checks pass.\n- [hard] REQ-04: `dev/TESTING.md` and the build-budget README describe the setting, with no remaining instruction that depends on remembering the environment variable.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T19:09:02.716236454Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f855d631-26f6-4c62-9ec5-207d63f6c9e5",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:build-hygiene",
+    "type:task"
+  ],
+  "priority": "critical",
+  "state": "ready",
+  "title": "Test builds produce no incremental-compilation state by default",
+  "updated_at": "2026-11-04T19:09:02.716236454Z"
+}

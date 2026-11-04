@@ -8,6 +8,7 @@
   ],
   "description": "Each leaf's handler registration declares the codes it raises and its findings code, and the per-command rows of the exit-code projection are derived from those declarations instead of being kept by hand beside the classifier.\n\n## Background\n\n`CommandSchema::generate_command_exit_codes` in `crates/jit/src/schema.rs` holds 48 hand-written `row(command, code, condition, exception)` entries, projected into `docs/reference/exit-codes.md` and the `command_exit_codes` field of `jit --schema`. Of these, 8 are universal rows; 15 only restate what the shared classifier and the universal rows already imply; 16 state a typed error only some leaves raise; and 9 state the code a findings outcome emits. The `exception` flag is set inconsistently (`config validate` findings are unflagged). Handlers register per leaf through `command_group!` in `crates/jit/src/dispatch/mod.rs`, and `ErrorCode` in `crates/jit/src/output.rs` already carries each code's exit status and description. A subprocess binding test in `crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs` proves each row.\n\n## Success Criteria\n\n- [hard] REQ-01: Every non-universal row of `command_exit_codes` is computed from per-leaf or per-group declarations in `command_group!` registrations: its code from `ErrorCode::exit_code`, its condition from `ErrorCode::description` or the leaf's declared findings condition. The hand-written list holds only the universal `*` rows.\n- [hard] REQ-02: No row restates a code that a universal row and the shared classifier already imply for that command.\n- [hard] REQ-03: A row is marked `exception` exactly when it is a declared findings code or the broken-pipe row.\n- [hard] REQ-04: A test fails when a leaf returns a findings outcome whose code differs from its declaration, and the completeness guard fails unless every derived row has exactly one subprocess binding case asserting its exit status in human and `--json` forms.\n- [hard] REQ-05: `docs/reference/exit-codes.md` is regenerated and equals the projection. No command's exit status changes, and MCP tool generation and its tests pass against the regenerated schema.\n- [hard] REQ-06: The crate's production lines (`scripts/production-lines.py`, default mode) fall by at least 90.\n\n## Decisions\n\n- D-01: The steward accepts these content changes in the exit-code reference: the restating rows are removed, typed-error conditions take the `ErrorCode` descriptions (so the issue-delete row no longer names its environment variable), rows are merged by code, and the exception flag changes for `config validate` and `gate evaluate` (steward ruling, 2026-11-04).\n\n## Notes\n\nMerit: one source for each exit-code fact (`@/inv/single-source-prose`, `@/charter/D-20`). Lands after the remaining handler moves and the main.rs reduction, so every leaf is registered and the macro is edited once; its declarations then serve as the census of live codes for retiring unproduced ones.\n",
   "documents": [],
+  "done_at": "2026-11-04T19:02:34.249478945Z",
   "first_ready_at": "2026-11-04T12:32:05.407284708Z",
   "gates_required": [
     "cargo-ci",
@@ -16,21 +17,21 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "f4a973dd-a8b9-4534-9776-c060843b72e3",
+      "run_id": "18898f1d-5091-45c0-840e-e16cf90c5b75",
       "status": "passed",
-      "updated_at": "2026-11-04T18:24:05.795100493Z",
+      "updated_at": "2026-11-04T18:57:51.612019367Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "11c3afb1-59a2-49e6-95b2-a7748f68ee9b",
-      "status": "failed",
-      "updated_at": "2026-11-04T18:28:33.721296181Z",
+      "run_id": "2cbbb6fb-66df-4abe-b1ba-fa7c120d1628",
+      "status": "passed",
+      "updated_at": "2026-11-04T19:02:22.767539648Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
-      "run_id": "8aeca5c9-5259-4c43-ba11-1a9256227406",
+      "run_id": "15742f5c-2bbf-4e74-800f-d7bf6386ccb2",
       "status": "passed",
-      "updated_at": "2026-11-04T18:24:23.043601759Z",
+      "updated_at": "2026-11-04T18:58:10.463503631Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,7 +44,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Derive per-command exit-code rows from the handler registry",
-  "updated_at": "2026-11-04T18:28:33.721296181Z"
+  "updated_at": "2026-11-04T19:02:34.249478945Z"
 }

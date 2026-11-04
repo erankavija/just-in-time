@@ -365,15 +365,50 @@ fn invoke_gate_evaluate_failure(json: bool) -> Vec<Output> {
     )]
 }
 
+/// `gate evaluate-many` over `target` (`None`: the issue requiring the gate)
+/// after the gate's checker is set to `checker_command`.
+fn evaluate_many_output(checker_command: &str, target: Option<&str>, json: bool) -> Output {
+    let cli = JitCli::initialised().unwrap();
+    let id = setup_auto_gate_issue(&cli, checker_command);
+    let target = match target {
+        Some(target) => target.to_owned(),
+        None => id,
+    };
+    output_in_form(
+        &cli,
+        &[
+            "gate",
+            "evaluate-many",
+            "projection-gate",
+            &target,
+            "--force",
+        ],
+        json,
+    )
+}
+
 /// `gate evaluate-many` over a target whose checker ran and failed.
 fn invoke_gate_evaluate_many_failure(json: bool) -> Vec<Output> {
-    let cli = JitCli::initialised().unwrap();
-    let id = setup_auto_gate_issue(&cli, "false");
-    vec![output_in_form(
-        &cli,
-        &["gate", "evaluate-many", "projection-gate", &id, "--force"],
+    vec![evaluate_many_output("false", None, json)]
+}
+
+/// `gate evaluate-many` over a target whose checker cannot run.
+fn invoke_gate_evaluate_many_runner_error(json: bool) -> Vec<Output> {
+    vec![evaluate_many_output(
+        "jit-projection-command-does-not-exist",
+        None,
         json,
     )]
+}
+
+/// `gate evaluate-many` over an id that resolves to no issue.
+fn invoke_gate_evaluate_many_missing_target(json: bool) -> Vec<Output> {
+    vec![evaluate_many_output("true", Some("0000000000000000"), json)]
+}
+
+/// `gate evaluate-many` over a too-short id prefix.
+fn invoke_gate_evaluate_many_invalid_target(json: bool) -> Vec<Output> {
+    vec![evaluate_many_output("true", Some("ab"), json)]
 }
 
 /// The prospective-cycle guard rejects template application before it mutates.
@@ -843,6 +878,9 @@ row_bindings! {
     test_command_exit_codes_gate_status_all_emits_4: ("gate status-all", 4, true) => invoke_gate_status_all;
     test_command_exit_codes_gate_evaluate_failure_emits_4: ("gate evaluate, gate evaluate-all", 4, false) => invoke_gate_evaluate_failure;
     test_command_exit_codes_gate_evaluate_many_failure_emits_4: ("gate evaluate-many", 4, true) => invoke_gate_evaluate_many_failure;
+    test_command_exit_codes_gate_evaluate_many_runner_error_emits_10: ("gate evaluate-many", 10, true) => invoke_gate_evaluate_many_runner_error;
+    test_command_exit_codes_gate_evaluate_many_missing_target_emits_3: ("gate evaluate-many", 3, true) => invoke_gate_evaluate_many_missing_target;
+    test_command_exit_codes_gate_evaluate_many_invalid_target_emits_2: ("gate evaluate-many", 2, true) => invoke_gate_evaluate_many_invalid_target;
     test_command_exit_codes_invariant_check_emits_4: ("invariant check", 4, true) => invoke_invariant_check;
     test_command_exit_codes_profile_diff_conflicting_findings_emit_4: ("profile diff", 4, true) => invoke_profile_diff_conflict;
     test_command_exit_codes_profile_apply_conflict_emits_4: ("profile apply", 4, false) => invoke_profile_apply_conflict;

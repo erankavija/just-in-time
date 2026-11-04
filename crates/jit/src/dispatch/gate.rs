@@ -267,7 +267,6 @@ fn preset_apply<S: HandlerStore>(
         errors: Vec::new(),
     };
     let mut warnings = Vec::new();
-    let mut lock_timed_out = false;
     for id in ids {
         let resolved = resolve_issue(ctx.executor.storage(), &id);
         if let Ok(issue) = &resolved {
@@ -296,8 +295,9 @@ fn preset_apply<S: HandlerStore>(
                     already_existed: result.already_exist,
                 });
             }
+            // Contention fails the run, so it exits as a lock timeout.
+            Err(error) if crate::storage::is_lock_timeout(&error) => return Err(error),
             Err(error) => {
-                lock_timed_out |= crate::storage::is_lock_timeout(&error);
                 report.errors.push(GatePresetError {
                     issue_id: id,
                     error: error.to_string(),
@@ -314,11 +314,7 @@ fn preset_apply<S: HandlerStore>(
         Outcome::success_with(report, message)
     } else {
         Outcome::findings(
-            if lock_timed_out {
-                ErrorCode::LockTimeout
-            } else {
-                ErrorCode::PresetError
-            },
+            ErrorCode::PresetError,
             format!(
                 "Failed to apply preset '{}' to {} issue(s)",
                 report.preset,
@@ -690,7 +686,13 @@ command_group! {
         "gate_evaluate-all" => GateCommands::EvaluateAll { id, by, force } => evaluate_all(id, by, force)
             raises [GateFailed] -> GateEvaluateAllResponse,
         "gate_evaluate-many" => GateCommands::EvaluateMany { gate_key, ids, by, force } => evaluate_many(gate_key, ids, by, force)
-            findings GateFailed "A target's checker ran and its verdict was fail; the batch reports under its first failing target's code." -> GateEvaluateManyResponse,
+            findings GateFailed "The first failing target's checker ran and its verdict was fail."
+            findings IoError "The first failing target's checker could not run to a verdict."
+            findings IssueNotFound "The first failing target's id resolves to no issue."
+            findings InvalidArgument "The first failing target does not require the gate, or its manual gate lacks `--by`."
+            findings InvalidIdPrefix "The first failing target's id prefix is too short."
+            findings AmbiguousId "The first failing target's id prefix matches several issues."
+            -> GateEvaluateManyResponse,
         "gate_fail" => GateCommands::Fail { id, gate_key, by } => fail(id, gate_key, by) -> GateFailResponse,
     },
 }
