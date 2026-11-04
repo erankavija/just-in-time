@@ -123,6 +123,25 @@ const getClusterAwareLayout = (
   allOriginalEdges: GraphEdge[],
   expansionState: ExpansionState
 ) => {
+  const nodesById = new Map<string, Node>();
+  nodes.forEach(node => {
+    if (!nodesById.has(node.id)) nodesById.set(node.id, node);
+  });
+  const clustersById = new Map<string, SubgraphCluster>();
+  const clusterNodesById = new Map<SubgraphCluster, Map<string, ApiGraphNode>>();
+  const topClusterByNodeId = new Map<string, SubgraphCluster>();
+  clusterData.clusters.forEach(cluster => {
+    if (!clustersById.has(cluster.containerId)) clustersById.set(cluster.containerId, cluster);
+    const clusterNodes = new Map<string, ApiGraphNode>();
+    cluster.nodes.forEach(node => {
+      if (!clusterNodes.has(node.id)) clusterNodes.set(node.id, node);
+      if (cluster.parentClusterId === null && !topClusterByNodeId.has(node.id)) {
+        topClusterByNodeId.set(node.id, cluster);
+      }
+    });
+    clusterNodesById.set(cluster, clusterNodes);
+  });
+
   // Separate top-level clusters only (parentClusterId === null)
   // Nested sub-clusters are handled within their parent's layout
   const expandedClusters: SubgraphCluster[] = [];
@@ -140,7 +159,7 @@ const getClusterAwareLayout = (
         collapsedClusters.push(cluster);
 
         // Treat collapsed cluster container as an orphan node
-        const containerNode = cluster.nodes.find(n => n.id === cluster.containerId);
+        const containerNode = clusterNodesById.get(cluster)?.get(cluster.containerId);
         if (containerNode) {
           // Collapsed clusters are never blocked (the container itself is shown)
           collapsedAsOrphans.push({ ...containerNode, blocked: false });
@@ -159,12 +178,8 @@ const getClusterAwareLayout = (
   const virtualEdgesByCluster = new Map<string, GraphEdge[]>();
   clusterData.virtualEdges.forEach(ve => {
     // Find which top-level cluster(s) these nodes belong to
-    const fromTopCluster = clusterData.clusters.find(c => 
-      c.parentClusterId === null && c.nodes.some(n => n.id === ve.from)
-    );
-    const toTopCluster = clusterData.clusters.find(c => 
-      c.parentClusterId === null && c.nodes.some(n => n.id === ve.to)
-    );
+    const fromTopCluster = topClusterByNodeId.get(ve.from);
+    const toTopCluster = topClusterByNodeId.get(ve.to);
     
     // If both endpoints are in the same TOP-LEVEL cluster, it's an internal virtual edge
     if (fromTopCluster && toTopCluster && fromTopCluster.containerId === toTopCluster.containerId) {
@@ -203,15 +218,15 @@ const getClusterAwareLayout = (
   
   // Add cluster container boxes ONLY for expanded clusters
   layoutResult.clusters.forEach((clusterPos, clusterId) => {
-    const cluster = clusterData.clusters.find(c => c.containerId === clusterId);
+    const cluster = clustersById.get(clusterId);
     if (!cluster) return;
     
     const isExpanded = expansionState[clusterId] ?? false; // Default to collapsed
     
     // Only render the visual container box if expanded
     if (isExpanded) {
-      const containerNode = nodes.find(n => n.id === clusterId);
-      const clusterTitle = containerNode?.data?.label || (cluster.nodes.find(n => n.id === clusterId)?.short_id ?? clusterId);
+      const containerNode = nodesById.get(clusterId);
+      const clusterTitle = containerNode?.data?.label || (clusterNodesById.get(cluster)?.get(clusterId)?.short_id ?? clusterId);
       
       const CLUSTER_PADDING = 40;
       const NODE_PADDING = 10; // Vertical padding from ClusterNode style
@@ -243,7 +258,7 @@ const getClusterAwareLayout = (
   
   // Convert layout result to ReactFlow nodes
   layoutResult.nodes.forEach(layoutNode => {
-    const originalNode = nodes.find(n => n.id === layoutNode.id);
+    const originalNode = nodesById.get(layoutNode.id);
     if (!originalNode) {
       throw new Error(`Node ${layoutNode.id} not found in original nodes`);
     }
@@ -644,6 +659,10 @@ export function GraphView({
         edgesToRender = Array.from(edgeMap.values());
       }
       
+      const clustersById = new Map<string, SubgraphCluster>();
+      clusterData?.clusters.forEach(cluster => {
+        if (!clustersById.has(cluster.containerId)) clustersById.set(cluster.containerId, cluster);
+      });
       const flowNodes: Node[] = nodesToRender.map((node: ApiGraphNode) => {
         const filterResult = nodeFilterResults.get(node.id)!;
         const isDimmed = filterResult.dimmed;
@@ -653,7 +672,7 @@ export function GraphView({
         const typeIcon = nodeType && hierarchyConfig?.icons?.[nodeType];
         
         // Check if this node is a cluster container
-        const cluster = clusterData?.clusters.find(c => c.containerId === node.id);
+        const cluster = clustersById.get(node.id);
         const isClusterContainer = !!cluster;
         
         // For cluster containers when using compact layout, add collapse/expand functionality
@@ -828,9 +847,13 @@ export function GraphView({
 
       if (layoutInputsUnchanged) {
         // Patch node data/style in-place — positions are NOT touched.
+        const flowNodesById = new Map<string, Node>();
+        flowNodes.forEach(node => {
+          if (!flowNodesById.has(node.id)) flowNodesById.set(node.id, node);
+        });
         setNodes(prev =>
           prev.map(existing => {
-            const updated = flowNodes.find(n => n.id === existing.id);
+            const updated = flowNodesById.get(existing.id);
             if (!updated) return existing;
             return { ...existing, data: updated.data, style: updated.style };
           })
