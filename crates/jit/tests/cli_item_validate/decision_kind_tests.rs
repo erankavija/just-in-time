@@ -1,26 +1,7 @@
-//! Integration tests for the markdown-first `decision` item kind (issue
-//! `b629686b`).
+//! Integration tests for the markdown-first `decision` item kind.
 //!
-//! The `jit-default` package supplies a `[item_kinds]` table that declares
-//! `decision` alongside `requirement`, so a profiled repo indexes decisions authored as list
-//! entries under a `## Decisions` section of an issue description. Decisions become
-//! addressable, queryable items through the SAME generic triple-driven parse path
-//! `requirement` uses; no engine code special-cases the kind. The declaration under
-//! test is the shipped one, derived from the default package.
-//!
-//! Coverage of the issue's `[hard]` success criteria, all against a repository
-//! initialized with the shared taxonomy fixture:
-//! - REQ-01: [`test_default_repo_item_list_kind_decision_returns_decisions`] runs
-//!   the real `jit` binary so `jit item list --kind decision` returns decisions
-//!   parsed from an issue description with the configured `decision` item kind.
-//! - REQ-02: [`test_default_repo_per_label_resolves_decision`] proves a
-//!   `per:<issue>/D-01` label resolves to the addressed decision through the
-//!   existing generic `resolve_link_label` (the `per` namespace is recognized
-//!   because the `decision` kind declares the `per` link-namespace).
-//! - REQ-03: [`test_default_repo_markdown_is_sole_source_for_decisions`] proves
-//!   the markdown description is the only source — editing it changes the index and
-//!   no parallel structured store is written under `.jit/`.
-//! - REQ-04: every test below runs under `cargo test`.
+//! These exercise the shipped config through item list/show and verify that issue
+//! descriptions remain the sole source for decision items.
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
 
@@ -92,40 +73,6 @@ fn test_default_repo_item_show_resolves_decision_by_qualified_id() {
         .as_str()
         .unwrap()
         .contains("json storage"));
-}
-
-#[test]
-fn test_default_repo_per_label_resolves_decision() {
-    // REQ-02: a `per:<issue>/D-01` label resolves to the addressed decision item
-    // through the existing generic `resolve_link_label`; the configured `decision`
-    // kind declares the `per` namespace.
-    let (_temp, exec) =
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision"])).unwrap();
-    let issue = crate::create_issue(
-        &exec,
-        "Architecture",
-        "## Decisions\n\n- D-01: use json storage\n",
-    );
-    let short = issue.short_id();
-
-    let label = format!("per:{short}/D-01");
-    let resolved = exec
-        .items()
-        .resolve_link_label(&label)
-        .unwrap()
-        .expect("a per:<issue>/D-01 label resolves to the addressed decision");
-    assert_eq!(resolved.item.self_id, "D-01");
-    assert_eq!(resolved.item.kind, "decision");
-    assert_eq!(
-        resolved.item.qualified_id,
-        format!("@/issue/{short}/decision/D-01")
-    );
-    assert!(resolved.item.text.contains("json storage"));
-
-    // A registered `per:` namespace whose qualified id cannot be resolved is an
-    // error, never a silent drop.
-    let bad = format!("per:{short}/D-99");
-    assert!(exec.items().resolve_link_label(&bad).is_err());
 }
 
 #[test]

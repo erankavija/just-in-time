@@ -17,9 +17,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "97fc6589-0593-442b-bcbe-c671a8378022",
+      "run_id": "83a0c96b-7c20-40c6-8a30-d165e7098fca",
       "status": "passed",
-      "updated_at": "2026-11-04T08:58:40.288145737Z",
+      "updated_at": "2026-11-04T09:50:51.417698885Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -29,9 +29,9 @@
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
-      "run_id": "6b3133f2-e621-470d-9c9f-91867540732c",
+      "run_id": "804da1f7-43ee-4d89-b0c9-c5d21cd67abd",
       "status": "passed",
-      "updated_at": "2026-11-04T08:59:03.967031503Z",
+      "updated_at": "2026-11-04T09:51:08.862682790Z",
       "updated_by": "auto:executor"
     }
   },
@@ -52,5 +52,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Validate command moves to a library handler",
-  "updated_at": "2026-11-04T09:15:48.070075888Z"
+  "updated_at": "2026-11-04T09:51:08.862682790Z"
 }

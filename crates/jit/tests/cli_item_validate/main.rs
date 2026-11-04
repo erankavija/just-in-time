@@ -18,28 +18,6 @@ mod validate_document_tests;
 mod validate_drift_builtin_tests;
 mod validation_lease_tests;
 
-fn create_issue(
-    executor: &jit::commands::CommandExecutor<jit::storage::JsonFileStorage>,
-    title: &str,
-    body: &str,
-) -> jit::domain::identity::IssueId {
-    executor
-        .issues()
-        .create_issue(
-            title.to_string(),
-            body.to_string(),
-            jit::domain::Priority::Normal,
-            vec![],
-            vec![],
-            None,
-            None,
-            false,
-        )
-        .unwrap()
-        .issue
-        .id
-}
-
 /// The package carrying the generic vocabulary these suites address: the type
 /// hierarchy, the label namespaces, and the addressable item kinds an item is
 /// resolved against.

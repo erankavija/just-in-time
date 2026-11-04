@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "13bc0655c3fa54047bd78410e6b66a52aef732fb",
+  "completed_at": "2026-11-04T09:41:34.011498196Z",
+  "duration_ms": 459903,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/format4-cutover.md",
+        "id": "F1",
+        "line": 23,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "External cutover counts and validation results are self-attested without locally recorded evidence."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/format4-cutover.md",
+        "id": "F2",
+        "line": 44,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The reported 3,699 cited-run-id count has no preserved reproducible derivation."
+      }
+    ],
+    "summary": "All hard story criteria are independently verified; two completion-report metrics lack reproducible local evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "735949ef-ad86-4629-bf53-69a6e17ae419",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "db3eee9d-ed1b-4b81-a1dd-f046325a9bcc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:33:54.108380842Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. [Low, advisory] `format4-cutover.md:23`–`27` reports external-repository counts and validations without committed command output or locally available commit evidence.\n\n2. [Low, advisory] `format4-cutover.md:44` claims 3,699 cited run IDs, but no recorded reproducer defines or preserves that count; the committed cutover tree yields different plausible totals.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard story criteria are independently verified; two completion-report metrics lack reproducible local evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"External cutover counts and validation results are self-attested without locally recorded evidence.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/format4-cutover.md\",\"line\":23},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The reported 3,699 cited-run-id count has no preserved reproducible derivation.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/format4-cutover.md\",\"line\":44}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
