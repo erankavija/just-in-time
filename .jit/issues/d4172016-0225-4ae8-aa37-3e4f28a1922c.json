@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T22:24:54.946576604Z",
+  "dependencies": [
+    "0f302914-9ded-47e9-bea8-67af1e0e8452",
+    "933ff852-7cc9-4902-a424-626b882df531",
+    "f35c86de-e4fa-4ce9-bf48-ee1378115355",
+    "fb38bf1f-a4b0-4acf-9b5b-bda244d0ee09"
+  ],
+  "description": "One command method family and its CLI and HTTP adapters converge after the external Git primitives land.\n\n## Background\n\n`DocumentOps` currently has parallel content, history and diff methods; the Git owner supplies version selection and Git primitives.\n\n## Success Criteria\n\n- [hard] REQ-01: CLI and HTTP consume one core content, history and diff method family, removing obsolete parallel methods.\n- [hard] REQ-02: Preserve binary bytes, linked-document validation, working-tree edits for unpinned documents and supported HTTP diff; tests compare selected-version bytes and exercise diff.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d4172016-0225-4ae8-aa37-3e4f28a1922c",
+  "labels": [
+    "type:task",
+    "epic:frontends-share-core",
+    "milestone:v1.0",
+    "story:frontend-server",
+    "satisfies:0f8efc37/REQ-09",
+    "satisfies:c8e79465/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Converge document operation adapters",
+  "updated_at": "2026-11-04T22:25:09.825087424Z"
+}

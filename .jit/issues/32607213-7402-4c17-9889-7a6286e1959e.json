@@ -6,7 +6,14 @@
     "110a4a2f-54fa-4f1a-b055-174b95276675"
   ],
   "description": "Instantiate the reviewed server/web manifest for 0f8efc37 with exact issue and edge fidelity.\n\n## Success Criteria\n\n- [hard] REQ-01: The stored issue graph exactly matches the approved manifest, bracket wiring and external dependencies.\n- [hard] REQ-02: Every active container criterion has coverage and every terminal is one focused implementation/review assignment.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "evidence",
+      "label": "Created issue and edge map",
+      "path": "dev/active/0f8efc37-frontends-share-core/instantiation.json"
+    }
+  ],
   "first_ready_at": "2026-11-04T22:23:52.258524613Z",
   "gates_required": [
     "coverage-preview",
@@ -40,5 +47,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Break down the server and web shared mechanisms",
-  "updated_at": "2026-11-04T22:23:52.258524613Z"
+  "updated_at": "2026-11-04T22:25:27.787063124Z"
 }
