@@ -1,46 +1,18 @@
 //! `jit doc` handlers.
 
-use super::{CommandContext, Outcome};
+use super::{resolve_issue, CommandContext, Outcome};
 use crate::cli::{AssetCommands, DocCommands};
 use crate::commands::{
     AssetListResult, DocumentAddResult, DocumentContentResult, DocumentDiffResult, DocumentHistory,
     DocumentListResult, DocumentRemoveResult, LinkCheckResult,
 };
 use crate::document::DocumentScope;
-use crate::domain::identity::{IssueId, IssueIdPrefix};
-use crate::output::{
-    ArtifactConformanceResponse, ArtifactDirectoryResponse, ErrorCode, OutputContext,
-};
+use crate::domain::identity::IssueId;
+use crate::output::{ArtifactConformanceResponse, ArtifactDirectoryResponse, ErrorCode};
 use crate::storage::{IssueStore, RepositoryStateStore};
 
-fn resolve_issue<S: IssueStore>(ctx: &CommandContext<'_, S>, id: &str) -> anyhow::Result<IssueId> {
-    ctx.executor
-        .storage()
-        .resolve_issue_id(&id.parse::<IssueIdPrefix>()?)
-}
-
-fn success<R>(response: R, message: impl Into<String>) -> Outcome<R> {
-    Outcome::Success {
-        response,
-        message: Some(message.into()),
-    }
-}
-
-fn plain<R>(response: R) -> Outcome<R> {
-    Outcome::Success {
-        response,
-        message: None,
-    }
-}
-
-fn print_warnings<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-    warnings: &[String],
-) -> anyhow::Result<()> {
-    let output = OutputContext::new(ctx.mode.quiet, ctx.mode.json);
-    warnings
-        .iter()
-        .try_for_each(|warning| Ok(output.print_warning(warning)?))
+fn issue<S: IssueStore>(ctx: &CommandContext<'_, S>, id: &str) -> anyhow::Result<IssueId> {
+    resolve_issue(ctx.executor.storage(), id)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -54,17 +26,16 @@ fn add<S: IssueStore + RepositoryStateStore>(
     skip_scan: bool,
 ) -> anyhow::Result<Outcome<DocumentAddResult>> {
     let (result, warnings) = ctx.executor.documents().add_document_reference(
-        &resolve_issue(ctx, id)?,
+        &issue(ctx, id)?,
         path,
         commit,
         label,
         doc_type,
         skip_scan,
     )?;
-    print_warnings(ctx, &warnings)?;
     let verb = if result.updated { "Updated" } else { "Added" };
     let message = format!("{verb} document reference on issue {}", result.issue_id);
-    Ok(success(result, message))
+    Ok(Outcome::success_with(result, message).with_warnings(warnings))
 }
 
 fn list<S: IssueStore>(
@@ -74,9 +45,9 @@ fn list<S: IssueStore>(
     let result = ctx
         .executor
         .documents()
-        .list_document_references(&resolve_issue(ctx, id)?)?;
+        .list_document_references(&issue(ctx, id)?)?;
     let message = format!("{} document(s) attached", result.count());
-    Ok(success(result, message))
+    Ok(Outcome::success_with(result, message))
 }
 
 fn remove<S: IssueStore + RepositoryStateStore>(
@@ -87,13 +58,12 @@ fn remove<S: IssueStore + RepositoryStateStore>(
     let (result, warnings) = ctx
         .executor
         .documents()
-        .remove_document_reference(&resolve_issue(ctx, id)?, path)?;
-    print_warnings(ctx, &warnings)?;
+        .remove_document_reference(&issue(ctx, id)?, path)?;
     let message = format!(
         "Removed document reference {} from issue {}",
         result.path, result.issue_id
     );
-    Ok(success(result, message))
+    Ok(Outcome::success_with(result, message).with_warnings(warnings))
 }
 
 fn show<S: IssueStore>(
@@ -102,11 +72,11 @@ fn show<S: IssueStore>(
     path: &str,
     at: Option<&str>,
 ) -> anyhow::Result<Outcome<DocumentContentResult>> {
-    let result =
-        ctx.executor
-            .documents()
-            .show_document_content(&resolve_issue(ctx, id)?, path, at)?;
-    Ok(success(result, "Document content retrieved"))
+    let result = ctx
+        .executor
+        .documents()
+        .show_document_content(&issue(ctx, id)?, path, at)?;
+    Ok(Outcome::success_with(result, "Document content retrieved"))
 }
 
 fn dir<S: IssueStore>(
@@ -117,14 +87,14 @@ fn dir<S: IssueStore>(
     let directory = ctx
         .executor
         .documents()
-        .resolve_issue_artifact_directory(&resolve_issue(ctx, id)?, area)?;
-    Ok(plain(directory))
+        .resolve_issue_artifact_directory(&issue(ctx, id)?, area)?;
+    Ok(Outcome::success(directory))
 }
 
 fn conformance<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
 ) -> anyhow::Result<Outcome<ArtifactConformanceResponse>> {
-    Ok(plain(
+    Ok(Outcome::success(
         ctx.executor.documents().report_artifact_conformance()?,
     ))
 }
@@ -137,9 +107,9 @@ fn history<S: IssueStore>(
     let result = ctx
         .executor
         .documents()
-        .document_history(&resolve_issue(ctx, id)?, path)?;
+        .document_history(&issue(ctx, id)?, path)?;
     let message = format!("{} commits in history", result.commits.len());
-    Ok(success(result, message))
+    Ok(Outcome::success_with(result, message))
 }
 
 fn diff<S: IssueStore>(
@@ -149,11 +119,11 @@ fn diff<S: IssueStore>(
     from: &str,
     to: Option<&str>,
 ) -> anyhow::Result<Outcome<DocumentDiffResult>> {
-    let result =
-        ctx.executor
-            .documents()
-            .document_diff(&resolve_issue(ctx, id)?, path, from, to)?;
-    Ok(success(result, "Document diff retrieved"))
+    let result = ctx
+        .executor
+        .documents()
+        .document_diff(&issue(ctx, id)?, path, from, to)?;
+    Ok(Outcome::success_with(result, "Document diff retrieved"))
 }
 
 fn assets_list<S: IssueStore + RepositoryStateStore>(
@@ -162,13 +132,13 @@ fn assets_list<S: IssueStore + RepositoryStateStore>(
     path: &str,
     rescan: bool,
 ) -> anyhow::Result<Outcome<AssetListResult>> {
-    let result =
-        ctx.executor
-            .documents()
-            .list_document_assets(&resolve_issue(ctx, id)?, path, rescan)?;
-    print_warnings(ctx, &result.extras.warnings)?;
+    let result = ctx
+        .executor
+        .documents()
+        .list_document_assets(&issue(ctx, id)?, path, rescan)?;
+    let warnings = result.extras.warnings.clone();
     let message = format!("{} assets found", result.extras.summary.total);
-    Ok(success(result, message))
+    Ok(Outcome::success_with(result, message).with_warnings(warnings))
 }
 
 /// Broken links are a findings outcome; warnings alone succeed.
@@ -176,7 +146,7 @@ fn check_links<S: IssueStore + RepositoryStateStore>(
     ctx: &CommandContext<'_, S>,
     scope: &str,
 ) -> anyhow::Result<Outcome<LinkCheckResult>> {
-    let scope = DocumentScope::parse(scope, |id| resolve_issue(ctx, id))?;
+    let scope = DocumentScope::parse(scope, |id| issue(ctx, id))?;
     let result = ctx.executor.documents().check_document_links(&scope)?;
     let summary = &result.summary;
     let message = if summary.errors == 0 && summary.warnings == 0 {
@@ -188,7 +158,7 @@ fn check_links<S: IssueStore + RepositoryStateStore>(
         )
     };
     Ok(if result.valid {
-        success(result, message)
+        Outcome::success_with(result, message)
     } else {
         Outcome::Findings {
             code: ErrorCode::ValidationFailed,

@@ -1,6 +1,6 @@
 //! Human rendering of the `jit doc` responses.
 
-use super::{ArtifactConformanceResponse, ArtifactDirectoryResponse, HumanRender};
+use super::{ArtifactConformanceResponse, ArtifactDirectoryResponse, HumanRender, OutputMode};
 use crate::commands::{
     AssetListResult, DocumentAddResult, DocumentContentResult, DocumentDiffResult, DocumentHistory,
     DocumentListResult, DocumentRemoveResult, LinkCheckResult,
@@ -9,7 +9,7 @@ use crate::document::{Asset, AssetType};
 use std::fmt::Write;
 
 impl HumanRender for DocumentAddResult {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let document = &self.document;
         let mut rendered = format!(
             "{} document reference on issue {}\n  Path: {}\n",
@@ -35,7 +35,7 @@ impl HumanRender for DocumentAddResult {
 }
 
 impl HumanRender for DocumentListResult {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let issue = &self.extras.issue_id;
         if self.items.is_empty() {
             return format!("No document references for issue {issue}\n");
@@ -63,7 +63,7 @@ impl HumanRender for DocumentListResult {
 }
 
 impl HumanRender for DocumentRemoveResult {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!(
             "Removed document reference {} from issue {}\n",
             self.path, self.issue_id
@@ -72,7 +72,7 @@ impl HumanRender for DocumentRemoveResult {
 }
 
 impl HumanRender for DocumentContentResult {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let mut rendered = format!("Document: {}\n", self.path);
         if let Some(label) = &self.label {
             let _ = writeln!(rendered, "Label: {label}");
@@ -88,13 +88,13 @@ impl HumanRender for DocumentContentResult {
 
 /// The bare path, so the command composes into a shell substitution.
 impl HumanRender for ArtifactDirectoryResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!("{}\n", self.directory)
     }
 }
 
 impl HumanRender for ArtifactConformanceResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let areas = &self.extras.areas;
         let mut rendered = format!(
             "Scanned areas: {}\n",
@@ -136,7 +136,7 @@ impl HumanRender for ArtifactConformanceResponse {
 }
 
 impl HumanRender for DocumentHistory {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let mut rendered = format!("History for {}:\n\n", self.path);
         for commit in &self.commits {
             let _ = write!(
@@ -150,13 +150,13 @@ impl HumanRender for DocumentHistory {
 }
 
 impl HumanRender for DocumentDiffResult {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         self.diff.clone()
     }
 }
 
 impl HumanRender for AssetListResult {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let scope = &self.extras;
         let mut rendered = format!(
             "Assets for document {} (issue {}):\n",
@@ -239,7 +239,7 @@ impl HumanRender for AssetListResult {
 }
 
 impl HumanRender for LinkCheckResult {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let summary = &self.summary;
         let mut rendered = format!(
             "Checking {} document(s) in scope '{}'...\n\n",
