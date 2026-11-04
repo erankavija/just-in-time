@@ -1430,6 +1430,12 @@
       "vendor": "Claude Opus",
       "reason": "b697a3f7 track A start (large); after 3f816619",
       "epic": "b697a3f7"
+    },
+    "c517b88b": {
+      "status": "dispatched",
+      "vendor": "Claude Opus",
+      "reason": "b697a3f7 track B; large (plan context, files_published event, both backends); worker checks criteria first",
+      "epic": "b697a3f7"
     }
   },
   "handoff": {
