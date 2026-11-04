@@ -825,23 +825,33 @@ fn test_json_session_opens_beneath_non_utf8_ancestor() {
 type Writer = Box<dyn Fn(&VirtualPath, &[u8])>;
 type WrittenSession = (Box<dyn RepositoryMutationSession>, Writer);
 
-/// A session over `files` on each backend, with its [`Writer`].
-fn sessions_over(files: &[(VirtualPath, &[u8])]) -> (TempDir, [WrittenSession; 2]) {
+/// A store over `files` on each backend, sharing one layout.
+fn stores_over(
+    files: &[(VirtualPath, &[u8])],
+) -> (TempDir, RepositoryLayout, JsonFileStorage, InMemoryStorage) {
     let worktree = TempDir::new().unwrap();
     let data = worktree.path().join(".jit");
     std::fs::create_dir(&data).unwrap();
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    let resolve = layout.clone();
-    let json: Writer =
-        Box::new(move |path, bytes| std::fs::write(resolve.resolve(path).unwrap(), bytes).unwrap());
-    files.iter().for_each(|(path, bytes)| json(path, bytes));
+    files
+        .iter()
+        .for_each(|(path, bytes)| std::fs::write(layout.resolve(path).unwrap(), bytes).unwrap());
     let memory = InMemoryStorage::new();
     seed_memory_existing(&memory, files);
+    (worktree, layout, JsonFileStorage::new(&data), memory)
+}
+
+/// A session over `files` on each backend, with its [`Writer`].
+fn sessions_over(files: &[(VirtualPath, &[u8])]) -> (TempDir, [WrittenSession; 2]) {
+    let (worktree, layout, json, memory) = stores_over(files);
+    let resolve = layout.clone();
     let sessions = [
-        JsonFileStorage::new(&data).open_mutation_session(layout.clone()),
+        json.open_mutation_session(layout.clone()),
         memory.open_mutation_session(layout),
     ]
     .map(Result::unwrap);
+    let json: Writer =
+        Box::new(move |path, bytes| std::fs::write(resolve.resolve(path).unwrap(), bytes).unwrap());
     let memory: Writer =
         Box::new(move |path, bytes| seed_memory_existing(&memory, &[(path.clone(), bytes)]));
     let [json_session, memory_session] = sessions;
@@ -915,17 +925,27 @@ fn test_conformance_tail_capture_holds_length_and_final_line_on_both_backends() 
 }
 
 /// The history read returns the whole log, longer than any tail, or `None`
-/// over an absent one.
+/// over an absent one, through both session kinds.
 #[test]
 fn test_conformance_read_history_log_returns_the_whole_log_on_both_backends() {
     let log = vec![b'x'; EVENT_LOG_TAIL_WINDOW as usize * 3];
-    let (_worktree, sessions) = sessions_over(&[(VirtualPath::EVENTS, &log)]);
-    for (mut session, _) in sessions {
-        assert_eq!(session.read_history_log().unwrap(), Some(log.clone()));
-    }
-    let (_worktree, sessions) = sessions_over(&[]);
-    for (mut session, _) in sessions {
-        assert_eq!(session.read_history_log().unwrap(), None);
+    for (files, expected) in [
+        (
+            &[(VirtualPath::EVENTS, log.as_slice())][..],
+            Some(log.clone()),
+        ),
+        (&[][..], None),
+    ] {
+        let (_worktree, layout, json, memory) = stores_over(files);
+        let sessions: [Box<dyn RepositoryReadSession>; 4] = [
+            json.open_mutation_session(layout.clone()).unwrap(),
+            json.open_read_session(layout.clone()).unwrap(),
+            memory.open_mutation_session(layout.clone()).unwrap(),
+            memory.open_read_session(layout.clone()).unwrap(),
+        ];
+        for mut session in sessions {
+            assert_eq!(session.read_history_log().unwrap(), expected);
+        }
     }
 }
 

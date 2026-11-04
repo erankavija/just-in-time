@@ -16,6 +16,7 @@ mod type_hierarchy_fix_tests;
 mod validate_cli_rule_tests;
 mod validate_document_tests;
 mod validate_drift_builtin_tests;
+mod validate_read_tests;
 mod validation_lease_tests;
 
 /// The package carrying the generic vocabulary these suites address: the type

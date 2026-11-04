@@ -496,6 +496,22 @@ pub fn with_mutation_session<S: crate::storage::RepositoryStateStore, T>(
     })
 }
 
+/// Capture `intent`'s target and finalize its export plan; `None` is a
+/// retryable conflict.
+fn derive_repository_export(
+    session: &mut (dyn crate::storage::RepositoryReadSession + '_),
+    intent: &crate::repository_state::RepositoryExportIntent,
+    budget: crate::repository_state::CaptureBudget,
+    context: &crate::repository_state::MutationContext,
+) -> Result<Option<crate::repository_state::MaterializationPlan>> {
+    capture_or_retry(session.capture(intent.capture_spec(budget)?))?
+        .map(|image| {
+            crate::repository_state::finalize_repository_export(&image, context, intent)
+                .map_err(Into::into)
+        })
+        .transpose()
+}
+
 /// Lock-free attempts a read makes before it takes the operation's mutation
 /// session.
 const READ_OPTIMISTIC_ATTEMPTS: u32 = 4;
@@ -2568,16 +2584,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::finalize_repository_export;
-
         let context = production_mutation_context();
         with_mutation_session(&self.storage, layout, "repository export", |session| {
-            let Some(image) = capture_or_retry(session.capture(intent.capture_spec(budget)?))?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            let plan = finalize_repository_export(&image, &context, intent)?;
-            Ok(SessionStep::Apply(plan, ()))
+            Ok(
+                match derive_repository_export(session, intent, budget, &context)? {
+                    Some(plan) => SessionStep::Apply(plan, ()),
+                    None => SessionStep::Retry,
+                },
+            )
         })
     }
 
@@ -2591,24 +2605,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::finalize_repository_export;
-
-        with_mutation_session(
+        let context = crate::repository_state::MutationContext::preview();
+        with_read_session(
             &self.storage,
             layout,
             "repository export planning",
-            |session| {
-                let Some(image) = capture_or_retry(session.capture(intent.capture_spec(budget)?))?
-                else {
-                    return Ok(SessionStep::Retry);
-                };
-                finalize_repository_export(
-                    &image,
-                    &crate::repository_state::MutationContext::preview(),
-                    intent,
-                )?;
-                Ok(SessionStep::Done(()))
-            },
+            |session| Ok(derive_repository_export(session, intent, budget, &context)?.map(|_| ())),
         )
     }
 

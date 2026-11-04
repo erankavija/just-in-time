@@ -263,6 +263,12 @@ impl jit::storage::RepositoryReadSession for PublicationProbeSession {
         self.captures.lock().unwrap().push(image.clone());
         Ok(image)
     }
+
+    fn read_history_log(
+        &mut self,
+    ) -> Result<Option<Vec<u8>>, jit::storage::RepositoryStateStoreError> {
+        self.inner.read_history_log()
+    }
 }
 
 impl jit::storage::RepositoryMutationSession for PublicationProbeSession {
@@ -314,12 +320,6 @@ impl jit::storage::RepositoryMutationSession for PublicationProbeSession {
             };
         }
         self.inner.apply(plan)
-    }
-
-    fn read_history_log(
-        &mut self,
-    ) -> Result<Option<Vec<u8>>, jit::storage::RepositoryStateStoreError> {
-        self.inner.read_history_log()
     }
 }
 

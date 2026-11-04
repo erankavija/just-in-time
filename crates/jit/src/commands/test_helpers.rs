@@ -95,6 +95,12 @@ impl crate::storage::RepositoryReadSession for LimitedCaptureSession {
     > {
         self.inner.extend(image, self.limit(spec))
     }
+
+    fn read_history_log(
+        &mut self,
+    ) -> std::result::Result<Option<Vec<u8>>, crate::storage::RepositoryStateStoreError> {
+        self.inner.read_history_log()
+    }
 }
 
 impl crate::storage::RepositoryMutationSession for LimitedCaptureSession {
@@ -110,11 +116,40 @@ impl crate::storage::RepositoryMutationSession for LimitedCaptureSession {
     > {
         self.inner.apply(plan)
     }
-    fn read_history_log(
-        &mut self,
-    ) -> std::result::Result<Option<Vec<u8>>, crate::storage::RepositoryStateStoreError> {
-        self.inner.read_history_log()
-    }
+}
+
+/// What `read` returns when it runs while another thread holds a mutation
+/// session over `store`; panics when it has not finished within a bound, as a
+/// read waiting on that writer would not.
+pub(crate) fn read_beside_held_mutation_session<S, T>(
+    store: &S,
+    layout: &crate::repository_state::RepositoryLayout,
+    read: impl FnOnce() -> T + Send,
+) -> T
+where
+    S: crate::storage::RepositoryStateStore + Sync,
+    T: Send,
+{
+    use std::sync::mpsc::channel;
+    let (held, opened) = channel();
+    let (release, released) = channel::<()>();
+    let (finish, finished) = channel();
+    std::thread::scope(|scope| {
+        scope.spawn(move || {
+            let session = store
+                .open_mutation_session(layout.clone())
+                .expect("the writer opens its session");
+            held.send(()).unwrap();
+            // Either a release or the test's end drops the session.
+            let _ = released.recv();
+            drop(session);
+        });
+        opened.recv().expect("the writer holds its session");
+        scope.spawn(move || finish.send(read()));
+        let outcome = finished.recv_timeout(std::time::Duration::from_secs(60));
+        release.send(()).unwrap();
+        outcome.expect("the read finishes while the writer holds its session")
+    })
 }
 
 /// Seed one issue record without invoking a
