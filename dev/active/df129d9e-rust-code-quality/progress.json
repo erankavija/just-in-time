@@ -1109,12 +1109,12 @@
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "1a4f2ebd": {
-      "status": "rework",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
-      "review": "code-review 9dc5bf99: F1 output-owned types (escalated, convention), F2 ITEM_COMMAND_FAILED doc claim stale (1a4f2ebd fixes docs; 0eca332a retires the code) D-01 (fb38bf1f). F2 docs rework to Codex gpt-6-astra; code retirement is 0eca332a. F2 docs rework at defce1739, lead PASS. Landed; code-review 7ad092f6 F1: ITEM_COMMAND_FAILED still declared (REQ-13, canonical-cutover). Rework 2 of 2 to Codex gpt-6-luna: retire the code (moves it out of 0eca332a's scope; steward told). Rework 2 at 0aec56091 (lead ran targeted tests; Codex sandbox could not); landing."
+      "review": "code-review 9dc5bf99: F1 output-owned types (escalated, convention), F2 ITEM_COMMAND_FAILED doc claim stale (1a4f2ebd fixes docs; 0eca332a retires the code) D-01 (fb38bf1f). F2 docs rework to Codex gpt-6-astra; code retirement is 0eca332a. F2 docs rework at defce1739, lead PASS. Landed; code-review 7ad092f6 F1: ITEM_COMMAND_FAILED still declared (REQ-13, canonical-cutover). Rework 2 of 2 to Codex gpt-6-luna: retire the code (moves it out of 0eca332a's scope; steward told). Rework 2 at 0aec56091 (lead ran targeted tests; Codex sandbox could not); landing. Landed; code-review passed; closed."
     },
     "98cc2097": {
       "status": "done",
