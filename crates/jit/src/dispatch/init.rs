@@ -5,17 +5,15 @@ use crate::commands::{
     parse_profile_selectors, parse_profile_variable_assignments, ProfileVariableOptions,
 };
 use crate::output::{InitResponse, OutputContext};
-use crate::storage::{IssueStore, RepositoryStateStore, WorktreePaths};
+use crate::storage::{IssueStore, RepositoryStateStore};
 use std::path::Path;
 
-/// The parsed arguments of `jit init` with the repository the invocation opened.
+/// The parsed arguments of `jit init` from the directory it runs in.
 pub struct Invocation<'a> {
     pub profile: &'a [String],
     pub values_file: Option<&'a Path>,
     pub set: &'a [String],
     pub repository_root: &'a Path,
-    pub data_dir: &'a Path,
-    pub worktree_paths: &'a WorktreePaths,
 }
 
 /// Initialization fills the scaffold through one mutation session; the
@@ -34,14 +32,20 @@ fn init<S: IssueStore + RepositoryStateStore>(
     )?;
     let init_result =
         profiles.initialize_fresh_repository(invocation.repository_root, Some(&selection))?;
-    let (identity, warnings) = profiles.initialize_worktree_identity(invocation.worktree_paths)?;
+    let (identity, warnings) =
+        profiles.initialize_worktree_identity(ctx.executor.require_worktree_paths()?)?;
     let output = OutputContext::new(ctx.mode.quiet, ctx.mode.json);
     warnings
         .iter()
         .try_for_each(|warning| output.print_warning(warning))?;
     let response = InitResponse {
         repository_root: invocation.repository_root.display().to_string(),
-        data_dir: invocation.data_dir.display().to_string(),
+        data_dir: ctx
+            .executor
+            .repository_layout()?
+            .data_root()
+            .display()
+            .to_string(),
         repository_id: identity.map(|identity| identity.worktree_id.to_string()),
         gitattributes_status: init_result.gitattributes,
         created_paths: init_result.created_paths,

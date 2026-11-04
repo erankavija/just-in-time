@@ -1379,8 +1379,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     values_file: values_file.as_deref(),
                     set: &set,
                     repository_root: &current_dir,
-                    data_dir: &jit_dir,
-                    worktree_paths: &worktree_paths,
                 },
                 &ctx,
                 &mut io::stdout(),
