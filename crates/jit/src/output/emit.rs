@@ -33,10 +33,10 @@ impl<T: Serialize + HumanRender> Report for T {
 /// Render `outcome` under `mode` and return the process exit status.
 ///
 /// Success writes the success envelope with the outcome's `message`
-/// (`--json`) or the response's human rendering to `out` and returns [`ExitCode::Success`]. Findings write the
-/// failure envelope with the report as `error.details` (`--json`), or the
-/// report's rendering to `out` and one `Error:` diagnostic to `err`, and return
-/// the code's [`ErrorCode::exit_code`]. A closed pipe yields
+/// (`--json`) or the response's human rendering to `out` and returns
+/// [`ExitCode::Success`]. Findings write the failure envelope with the report
+/// as `error.details` (`--json`), or the report's rendering to `out` and the
+/// outcome's `message` as one unprefixed line to `err`, and return the code's [`ErrorCode::exit_code`]. A closed pipe yields
 /// [`ExitCode::BrokenPipe`]; the caller owns process exit.
 pub fn emit_outcome<R: Response>(
     outcome: &Outcome<R>,
@@ -76,7 +76,7 @@ pub fn emit_outcome<R: Response>(
             report,
         } => (
             out.write_all(report.render_human().as_bytes())
-                .and_then(|()| writeln!(err, "Error: {message}")),
+                .and_then(|()| writeln!(err, "{message}")),
             ErrorCode::exit_code(*code),
         ),
     };
