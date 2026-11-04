@@ -236,7 +236,7 @@ fn assert_exact_bundle_plan(plan: &Value, expected_target_kind: &str) {
     assert_eq!(plan["policy_status"], "configured");
     assert_eq!(plan["eligible"], true);
     assert_eq!(plan["blockers"], serde_json::json!([]));
-    assert_eq!(plan["warnings"], serde_json::json!([]));
+    assert_eq!(plan["plan_warnings"], serde_json::json!([]));
     let (moves, copies, pending_deletions) = if expected_target_kind == "document" {
         (3, 4, 3)
     } else {
@@ -264,7 +264,7 @@ fn assert_exact_bundle_plan(plan: &Value, expected_target_kind: &str) {
                 artifact["action"].as_str().unwrap(),
                 artifact["provenance"].clone(),
                 artifact["blockers"].clone(),
-                artifact["warnings"].clone(),
+                artifact["plan_warnings"].clone(),
             )
         })
         .collect::<Vec<_>>();
@@ -312,7 +312,7 @@ fn assert_human_parity(plan: &Value, human: &str) {
         for blocker in artifact["blockers"].as_array().unwrap() {
             assert!(human.contains(blocker["code"].as_str().unwrap()));
         }
-        for warning in artifact["warnings"].as_array().unwrap() {
+        for warning in artifact["plan_warnings"].as_array().unwrap() {
             assert!(human.contains(warning["code"].as_str().unwrap()));
         }
     }
@@ -347,10 +347,10 @@ fn test_archive_document_cli_json_is_exact_plan_and_blocked_preview_exits_zero_w
             "count",
             "destination_root",
             "eligible",
+            "plan_warnings",
             "policy_status",
             "schema_version",
             "target",
-            "warnings",
         ]
     );
 
@@ -428,7 +428,7 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
     assert!(result["reference_changes"].is_array());
     assert!(result["planned_deletions"].is_array());
     assert!(result["deleted_sources"].is_array());
-    assert!(result["warnings"].is_array());
+    assert!(result["plan_warnings"].is_array());
     assert_eq!(
         result
             .as_object()
@@ -440,13 +440,13 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
             "deleted_sources",
             "destination_root",
             "event_appended",
+            "plan_warnings",
             "planned_deletions",
             "publications",
             "reconciling",
             "reference_changes",
             "schema_version",
             "target",
-            "warnings",
         ]
     );
     assert!(document_cli
@@ -687,10 +687,10 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
                 "count",
                 "destination_root",
                 "eligible",
+                "plan_warnings",
                 "policy_status",
                 "schema_version",
                 "target",
-                "warnings",
             ]
         );
     }
@@ -808,7 +808,7 @@ fn test_archive_candidates_cli_reports_directory_root_but_skips_directory_link_t
         .iter()
         .find(|artifact| artifact["source"] == "dev/index.md")
         .unwrap();
-    assert!(parent_artifact["warnings"]
+    assert!(parent_artifact["plan_warnings"]
         .as_array()
         .unwrap()
         .iter()
@@ -995,7 +995,7 @@ fn citation_warning_paths(plan: &Value, source: &str) -> Vec<String> {
         .unwrap()
         .iter()
         .find(|artifact| artifact["source"] == source)
-        .expect("plan carries the moving artifact")["warnings"]
+        .expect("plan carries the moving artifact")["plan_warnings"]
         .as_array()
         .unwrap()
         .iter()
@@ -1008,7 +1008,7 @@ fn citation_warning_paths(plan: &Value, source: &str) -> Vec<String> {
 /// Plans partition warnings between target and artifact records; executions
 /// flatten that same semantic set into their result envelope.
 fn archive_warning_set(report: &Value) -> BTreeSet<(String, Option<String>)> {
-    report["warnings"]
+    report["plan_warnings"]
         .as_array()
         .into_iter()
         .flatten()
@@ -1017,7 +1017,7 @@ fn archive_warning_set(report: &Value) -> BTreeSet<(String, Option<String>)> {
                 .as_array()
                 .into_iter()
                 .flatten()
-                .flat_map(|artifact| artifact["warnings"].as_array().into_iter().flatten()),
+                .flat_map(|artifact| artifact["plan_warnings"].as_array().into_iter().flatten()),
         )
         .map(|warning| {
             (
@@ -1031,9 +1031,9 @@ fn archive_warning_set(report: &Value) -> BTreeSet<(String, Option<String>)> {
 /// Blank out every warnings collection in `plan`, in place, leaving actions,
 /// blockers, and eligibility as the only remaining variables.
 fn clear_warnings(plan: &mut Value) {
-    plan["warnings"] = serde_json::json!([]);
+    plan["plan_warnings"] = serde_json::json!([]);
     for artifact in plan["artifacts"].as_array_mut().unwrap() {
-        artifact["warnings"] = serde_json::json!([]);
+        artifact["plan_warnings"] = serde_json::json!([]);
     }
 }
 

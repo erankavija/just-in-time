@@ -102,14 +102,31 @@ record.
 
 A command that changes the repository, and `jit recover`, opens a mutation
 session, and a session that opens over a leftover record applies it before
-serving the command. A read-only command opens no mutation session: it reads the
-files as they stand, which until the record is applied may be the state before
-the mutation or partly applied. Application is idempotent, so an interrupted application converges on
-the same state when repeated. A leftover record that does not parse, including
-one whose own write was interrupted, is refused: the session open fails with an
-error naming the record. Repository discovery recognizes a pending record as
-well as an initialized `index.json`, so a repository whose index a crash left
-unwritten still reaches that session open.
+serving the command. `jit snapshot export` publishes, so it reads under that
+session's lock. Application is idempotent, so an interrupted application
+converges on the same state when repeated. A leftover record that does not
+parse, including one whose own write was interrupted, is refused: the session
+open fails with an error naming the record. Repository discovery recognizes a
+pending record as well as an initialized `index.json`, so a repository whose
+index a crash left unwritten still reaches that session open.
+
+A read through the read driver takes no lock (`@/charter/D-22`). It counts
+only when no redo record was present and the event log did not grow between its
+open and the end of its reads; otherwise it reads again. After a few such
+attempts it reads once under a mutation session, whose open applies a leftover
+record; a record that open cannot apply fails the read with `recovery_failed`,
+naming `jit recover`. These commands read through the driver:
+
+- `jit validate`, except `--fix` without `--dry-run`, `--branch-drift` and
+  `--leases`
+- `jit doc check-links`
+- `jit invariant check`
+- `jit profile apply --dry-run` and `jit profile diff`
+- `jit profile add --dry-run` and `jit profile pack --dry-run`
+
+Every other read-only command opens no session: it reads the files as they
+stand, which until the record is applied may be the state before the mutation
+or partly applied.
 
 ## Issue JSON Schema
 
@@ -219,8 +236,8 @@ So reading `gates_required` from `jit issue show --json` finds nothing. `jit
 `first_ready_at`, `claimed_at`, and `done_at` record when an issue first passed
 each lifecycle milestone. They are written **once**, at the transition:
 
-- `first_ready_at` — set the first time the issue enters `ready`, including the
-  auto-promotion of a dependency-free issue at creation.
+- `first_ready_at` — set the first time the issue enters `ready`, including
+  creation in `ready`.
 - `claimed_at` — set at the first claim or assignment.
 - `done_at` — set the first time the issue reaches `done`. **Re-opening and
   re-completing does not overwrite it** ("first occurrence" semantics apply to

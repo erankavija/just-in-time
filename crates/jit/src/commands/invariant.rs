@@ -23,31 +23,35 @@ impl InvariantCheckResult {
     }
 }
 
-impl<S: IssueStore> ItemOps<'_, S> {
-    /// Load declarations once without a writer session; unloadable rules remain drift.
+impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
+    /// Check the declarations of one lock-free capture; unloadable rules remain
+    /// drift.
     pub fn check_invariants(&self) -> Result<InvariantCheckResult> {
         use crate::validation::drift::{enforcement_drift, SourceState};
         use std::collections::BTreeSet;
 
-        let config = self.exec.cached_config()?;
-        let rules = self.exec.effective_rules().ok();
-        let rule_names: Option<BTreeSet<&str>> =
-            rules.map(|set| set.rules.iter().map(|rule| rule.name.as_str()).collect());
+        let layout = self.exec.require_layout()?;
+        let image =
+            with_read_session(self.exec.storage(), &layout, "invariant check", |session| {
+                self.exec.validation().capture_repair_base(session)
+            })?;
+        let declarations = crate::repository_state::validation_declarations_from_image(&image)?;
+        let rule_names: Option<BTreeSet<&str>> = declarations.rules_loaded().then(|| {
+            declarations
+                .rules()
+                .rules
+                .iter()
+                .map(|rule| rule.name.as_str())
+                .collect()
+        });
         let rules_state = match &rule_names {
             Some(names) => SourceState::Loaded(names),
             None => SourceState::Unloadable,
         };
-        let gates = self
-            .exec
-            .storage
-            .load_gate_registry()
-            .context("failed to load .jit/gates.toml")?
-            .gates
-            .into_keys()
-            .collect();
+        let gates = declarations.gates().gates.keys().cloned().collect();
 
         Ok(InvariantCheckResult::new(enforcement_drift(
-            &config.invariants.invariants,
+            &declarations.config().invariants.invariants,
             rules_state,
             &gates,
         )))

@@ -228,7 +228,9 @@ short IDs. JSON retains full durable IDs in owner and target records.
 For a preview, `--json` prints the schema-version-1 artifact-plan object directly. Its top-level
 fields are `schema_version`, `target`, `destination_root`, `eligible`,
 `policy_status`, `action_counts`, `count`, `artifacts`, `blockers`, and
-`warnings`; it does not add a `message` field. Artifact order is deterministic
+`plan_warnings`; each artifact entry also names its structured diagnostics
+`plan_warnings`. Execution results use the same field name. A preview does not
+add a `message` field. Artifact order is deterministic
 by normalized source path and version. Each blocker carries `code` and `path`;
 a blocker caused by lifecycle state (`non-terminal-target`,
 `document-non-terminal-owner`) additionally carries a `guidance` string naming
@@ -249,9 +251,11 @@ carry no action and no blocker, so eligibility, `--execute`, and issue
 transitions all behave as they would with no citation present. Execution
 relocates bytes and relinks document records while rewriting no document
 content, so a citing file survives byte for byte and keeps a stale citation
-until an adopter edits it. Its JSON `warnings` array and human `warning:` lines
+until an adopter edits it. Its JSON `plan_warnings` array and human `warning:` lines
 include the same warning set that a preview computed immediately before the
 unchanged run, so either command reports the stale citations the run leaves.
+The structured JSON field is `plan_warnings` on both preview and execution
+results; human output continues to label them as warnings.
 
 `jit archive candidates` is the read-only container report. It lists every
 effectively terminal issue — `Done`, `Rejected`, or `Archived` from one of those
@@ -269,8 +273,9 @@ The JSON shape is exactly
 `candidates` is the complete schema-version-1 target-plan object described
 above, not a summary: policy status, ownership, action counts, artifacts,
 evidence, warnings, and all blockers (including destination conflicts) remain
-available. Human output renders the identical evaluated list and retains the
-reasons an entry is ineligible. Candidate order is deterministic by full target
+available. The structured diagnostic list is named `plan_warnings` on each
+plan and artifact entry. Human output renders the identical evaluated list and
+retains the reasons an entry is ineligible. Candidate order is deterministic by full target
 ID, while the human view identifies targets by short ID.
 
 An issue-linked path that exists but is not a regular file or symbolic link
@@ -1053,8 +1058,8 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 ```
 
 **Bulk operation semantics:**
-- **Literal updates:** Sets exactly what you specify (no auto-transitions)
-- **Atomic per-issue:** Each issue update publishes its own redo record
+- **Literal updates:** Sets exactly what you specify on each matched issue
+- **Atomic per-issue:** Each issue update publishes its own redo record, with its dependents' [readiness corrections](../concepts/core-model.md#issue-lifecycle)
 - **Predictable:** Safer for large-scale changes
 - **Clear reporting:** Shows modified/skipped/error counts
 
@@ -1970,7 +1975,7 @@ jit gate evaluate abc123 --gate tests --force
 - For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required.
 - A checker executes at most once per evaluation. Its verdict is recorded even when the repository changes while it runs.
 - The gate-run record and `--json` gate-run output report `evaluation_stability` as `stable` or `inputs_moved`.
-- A pass that clears the last unpassed gate of a `gated` issue moves it to `done` and promotes its dependents; an enforcing `done` rule that blocks the move is reported and leaves it `gated`. A failed gate, or a pass on an issue in any other state, leaves the state unchanged.
+- A pass that clears the last unpassed gate of a `gated` issue moves it to `done`, with its dependents' [readiness corrections](../concepts/core-model.md#issue-lifecycle); an enforcing `done` rule that blocks the move is reported and leaves it `gated`. A failed gate, or a pass on an issue in any other state, leaves the state unchanged.
 - `jit issue update <id> --state done` completes an `in_progress` issue whose required gates have passed, and succeeds without change on an issue already `done`.
 
 **Verdict reuse over unchanged declared inputs:**
@@ -3337,7 +3342,7 @@ a whole-repository rule failure reports:
     "details": {
       "valid": false,
       "integrity_error": null,
-      "warnings": [
+      "validation_warnings": [
         { "type": "rule_warning", "issue_id": "...", "rule": "orphan-leaf", "message": "..." }
       ],
       "warning_count": 1,

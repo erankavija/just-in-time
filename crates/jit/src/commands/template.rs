@@ -980,12 +980,6 @@ fn derive_fresh_template(
                     .join(", ")
             )
         })?;
-        validate_captured_issue_write(&issue, config, rules).map_err(|_| {
-            crate::errors::InvalidArgumentError::new(format!(
-                "template '{}' node '{}' would create an invalid issue",
-                template.name, planned.role
-            ))
-        })?;
         candidate.insert(id.clone(), issue);
     }
 
@@ -1030,6 +1024,23 @@ fn derive_fresh_template(
                     .collect::<Vec<_>>()
                     .join(", ")
             )
+        })?;
+    }
+    // Local rules see each node's created state, so readiness precedes validation.
+    let promoted =
+        super::derive_draft_promotions(issues, &candidate.values().cloned().collect::<Vec<_>>());
+    for (planned, id) in delta.creates.iter().zip(&created_order) {
+        let issue = candidate
+            .get_mut(id)
+            .ok_or_else(|| anyhow!("internal error: missing template node {id}"))?;
+        if promoted.contains(id) {
+            issue.state = State::Ready;
+        }
+        validate_captured_issue_write(issue, config, rules).map_err(|_| {
+            crate::errors::InvalidArgumentError::new(format!(
+                "template '{}' node '{}' would create an invalid issue",
+                template.name, planned.role
+            ))
         })?;
     }
     let readiness = super::derive_readiness_intents(
@@ -1269,18 +1280,11 @@ fn resolve_endpoint(
     }
 }
 
-/// Build the FINAL persisted [`Issue`] shape a planned node's `create_issue` would
-/// produce, for read-only pre-validation. Mirrors `create_issue`'s construction
-/// for a node that always carries a `type:` label and has no dependencies at
-/// creation: fields set, then auto-promoted to [`State::Ready`] (so a state-keyed
-/// rule sees the persisted shape).
+/// The `Backlog` draft of a planned node, before its edges and derived readiness.
 fn project_planned_issue(planned: &PlannedNode, id: IssueId) -> Issue {
     let mut issue = Issue::draft(id, planned.title.clone(), planned.description.clone());
     issue.priority = planned.priority;
     issue.labels = planned.labels.clone();
-    // A freshly-created issue with no dependencies is auto-promoted to Ready
-    // by `create_issue`; replicate so state-keyed rules see the same shape.
-    issue.state = State::Ready;
     issue
 }
 
@@ -1609,7 +1613,7 @@ mod tests {
         let projected = project_planned_issue(&planned, crate::test_utils::issue_id(1));
         assert_eq!(projected.title, "planning: Epic");
         assert_eq!(projected.priority, Priority::High);
-        assert_eq!(projected.state, State::Ready);
+        assert_eq!(projected.state, State::Backlog);
         assert!(projected.dependencies.is_empty());
     }
 

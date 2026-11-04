@@ -228,7 +228,7 @@ fn validate<S: HandlerStore>(
         valid: !validation_failed,
         integrity_error: integrity_message,
         warning_count: warnings.len(),
-        warnings,
+        validation_warnings: warnings,
         membership_divergences: divergence_report.items,
         divergence_count,
         rule_findings: rule_report.findings,

@@ -1415,7 +1415,7 @@ mod tests {
         assert_eq!(before.planned_deletions, first.planned_deletions);
         assert!(before.deleted_sources.is_empty());
         assert!(before
-            .warnings
+            .plan_warnings
             .iter()
             .any(|warning| warning.code == WarningCode::DeletionFailed));
 
@@ -1488,7 +1488,7 @@ mod tests {
             preview
                 .artifacts()
                 .iter()
-                .flat_map(|artifact| artifact.warnings().iter().cloned())
+                .flat_map(|artifact| artifact.plan_warnings().iter().cloned())
                 .collect(),
         );
         assert!(!previewed.is_empty(), "the fixture cites the moving source");
@@ -1496,7 +1496,7 @@ mod tests {
             .archive()
             .execute_archive_document("fixtures/root.md")
             .unwrap();
-        assert_eq!(citations(executed.warnings), previewed);
+        assert_eq!(citations(executed.plan_warnings), previewed);
     }
 
     #[test]
@@ -1787,7 +1787,7 @@ mod tests {
             .execute_archive_document("fixtures/root.md")
             .unwrap();
         assert!(result
-            .warnings
+            .plan_warnings
             .iter()
             .any(|warning| warning.code == WarningCode::NoOwner));
         assert!(repo.path().join("archive/fixtures/root.md").exists());
@@ -2707,7 +2707,7 @@ mod tests {
                 && publication.adopted
         }));
         assert!(result
-            .warnings
+            .plan_warnings
             .iter()
             .any(|warning| warning.code == WarningCode::DeletionFailed));
         assert_eq!(

@@ -1748,6 +1748,73 @@ mod tests {
         );
     }
 
+    /// Pass the only manual gate of a `Gated` issue, optionally blocking a
+    /// `Backlog` dependent; returns the session opens the pass took, the
+    /// issue's state, and the dependent's state.
+    fn pass_last_gate_of_gated_issue(with_dependent: bool) -> (usize, State, Option<State>) {
+        use crate::commands::test_helpers::{memory_executor, SessionOpenCounter};
+
+        let counter = SessionOpenCounter::new();
+        let executor = memory_executor(
+            InMemoryStorage::new().with_mutation_interruption_view(counter.clone()),
+        );
+        let key: GateKey = "review".parse().unwrap();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            key.clone(),
+            GateDefinition {
+                version: 1,
+                key: key.clone(),
+                title: "Review".to_string(),
+                description: String::new(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+                inputs: None,
+                priority: 100,
+                reserved: HashMap::new(),
+            },
+        );
+        seed_gate_registry(executor.storage(), &registry);
+        let mut gated = crate::test_utils::fixture_issue("Gated".into(), String::new());
+        gated.state = State::Gated;
+        gated.gates_required = vec![key.clone()];
+        let gated_id = gated.id.clone();
+        seed_issue(executor.storage(), gated);
+        let dependent_id = with_dependent.then(|| {
+            let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
+            dependent.dependencies = vec![gated_id.clone()];
+            let id = dependent.id.clone();
+            seed_issue(executor.storage(), dependent);
+            id
+        });
+        let opened = counter.count();
+
+        executor
+            .gates()
+            .pass_gate(&gated_id, &key, Some("human:reviewer".to_string()), false)
+            .unwrap();
+
+        (
+            counter.count() - opened,
+            executor.storage.load_issue(&gated_id).unwrap().state,
+            dependent_id.map(|id| executor.storage.load_issue(&id).unwrap().state),
+        )
+    }
+
+    #[test]
+    fn test_pass_gate_completing_an_issue_promotes_its_dependent_in_the_same_publication() {
+        let (baseline, _, _) = pass_last_gate_of_gated_issue(false);
+        let (sessions, state, dependent) = pass_last_gate_of_gated_issue(true);
+
+        assert_eq!(state, State::Done);
+        assert_eq!(dependent, Some(State::Ready));
+        assert_eq!(
+            sessions, baseline,
+            "the dependent's promotion must add no session to the automatic completion"
+        );
+    }
+
     #[test]
     fn test_manual_pass_of_manual_gate_should_succeed() {
         let executor = setup();
