@@ -210,7 +210,7 @@ flowchart LR
     subgraph Secondary["Secondary worktree"]
         SI[".jit/issues/ (reads from main)"]
     end
-    CP[".git/jit/<br/>claims.jsonl<br/>claims.index.json"]
+    CP[".git/jit/<br/>leases/<br/>claims.jsonl"]
     MI -->|shared| CP
     SI -->|shared| CP
 ```

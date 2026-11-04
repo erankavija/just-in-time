@@ -2171,7 +2171,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
 
     /// Validate all active leases are consistent and not stale.
     ///
-    /// Checks claims.index.json for:
+    /// Checks every lease record for:
     /// - Expired leases (TTL exceeded)
     /// - Leases referencing non-existent worktrees
     /// - Leases referencing non-existent issues

@@ -2834,7 +2834,7 @@ pub struct LabelValuesScope {
 }
 
 /// Response for `claim status` and `claim list`.
-pub type LeaseListResponse = ListEnvelope<LeasesKey, crate::storage::claim_coordinator::Lease>;
+pub type LeaseListResponse = ListEnvelope<LeasesKey, crate::commands::claim::ListedLease>;
 
 /// Response for `worktree list` command
 pub type WorktreeListResponse =
@@ -3923,9 +3923,12 @@ mod tests {
             acquired_at: now,
             expires_at: None,
             last_beat: now,
+        };
+        let listed = crate::commands::claim::ListedLease {
+            lease,
             stale: false,
         };
-        let value = serde_json::to_value(LeaseListResponse::new(vec![lease])).unwrap();
+        let value = serde_json::to_value(LeaseListResponse::new(vec![listed])).unwrap();
         assert_envelope_value(&value, "leases", 1);
         assert!(value["leases"][0]["expires_at"].is_null());
         assert!(value["leases"][0]["branch"].is_null());
