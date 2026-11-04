@@ -27,7 +27,7 @@
     "satisfies:df129d9e/REQ-05"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Derive output schemas from the handler registry",
-  "updated_at": "2026-11-04T16:19:47.070038265Z"
+  "updated_at": "2026-11-04T16:44:17.009851633Z"
 }
