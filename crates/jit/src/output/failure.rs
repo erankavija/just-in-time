@@ -79,6 +79,9 @@ fn derive_guidance(error: &anyhow::Error) -> Guidance {
             ],
         };
     }
+    if let Some(failed) = error.downcast_ref::<crate::commands::serve::ServeActionFailed>() {
+        return derive_guidance(&failed.cause);
+    }
     if let Some(exited) = error.downcast_ref::<crate::commands::serve::ForegroundServerExited>() {
         return Guidance {
             details: Some(serde_json::json!({
@@ -223,6 +226,9 @@ pub(super) fn id_resolution_error(error: &anyhow::Error) -> Option<JsonError> {
 /// The registered code of a failure. Human message text is deliberately absent
 /// from this cascade, and its order is semantic.
 fn classify_code(error: &anyhow::Error) -> ErrorCode {
+    if let Some(failed) = error.downcast_ref::<crate::commands::serve::ServeActionFailed>() {
+        return classify_code(&failed.cause);
+    }
     // A rejected `jit dep add` batch (jit:c8518f2a) wraps every rejected edge's
     // own typed error; classify by the batch's dominant edge rather than this
     // wrapper itself, so a mixed batch still maps to the right exit code.

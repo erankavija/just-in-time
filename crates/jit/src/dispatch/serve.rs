@@ -4,8 +4,8 @@ use super::{CommandContext, Outcome};
 use crate::cli::ServeArgs;
 use crate::commands::serve::{
     find_web_dir, run_foreground, server_status, start_server, stop_server, ForegroundOptions,
-    ForegroundOutcome, ForegroundServerExited, ServeOptions, ServeOutcome, StartupWatch,
-    StopOutcome,
+    ForegroundOutcome, ForegroundServerExited, ServeActionFailed, ServeOptions, ServeOutcome,
+    StartupWatch, StopOutcome,
 };
 use crate::output::{ServeResponse, WebUiSource};
 use crate::storage::IssueStore;
@@ -37,18 +37,20 @@ fn serve<S: IssueStore>(
         .web_dir
         .map(|dir| data_root.parent().unwrap_or(data_root).join(dir));
     let response = if args.stop {
-        match stop_server(layout)? {
+        match stop_server(layout).map_err(ServeActionFailed::during("stopping server"))? {
             StopOutcome::Stopped { pid, port } => ServeResponse::Stopped { pid, port },
             StopOutcome::NotRunning => ServeResponse::NotRunning,
         }
     } else if args.status {
-        server_status(layout)?.map_or(ServeResponse::NotRunning, |pf| ServeResponse::Running {
-            pid: pf.pid,
-            port: pf.port,
-            url: url(pf.port),
-            log_file: Some(pf.log_file),
-            started_at: Some(pf.started_at),
-        })
+        server_status(layout)
+            .map_err(ServeActionFailed::during("checking server status"))?
+            .map_or(ServeResponse::NotRunning, |pf| ServeResponse::Running {
+                pid: pf.pid,
+                port: pf.port,
+                url: url(pf.port),
+                log_file: Some(pf.log_file),
+                started_at: Some(pf.started_at),
+            })
     } else if args.fg {
         let opts = ForegroundOptions {
             layout: layout.clone(),
@@ -57,6 +59,7 @@ fn serve<S: IssueStore>(
             server_binary: None,
         };
         match run_foreground(opts, |launch| {
+            // Named exception D-02: banner streams before the child runs.
             if !ctx.mode.json {
                 let url = url(launch.port);
                 println!("Starting server on {url} (foreground, Ctrl+C to stop)");
@@ -91,7 +94,9 @@ fn serve<S: IssueStore>(
             web_dir,
             server_binary: None,
         };
-        match start_server(opts, StartupWatch::for_live_server())? {
+        match start_server(opts, StartupWatch::for_live_server())
+            .map_err(ServeActionFailed::during("starting server"))?
+        {
             ServeOutcome::Started {
                 pid,
                 port,

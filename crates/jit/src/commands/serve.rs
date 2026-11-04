@@ -93,6 +93,20 @@ pub struct ForegroundServerExited {
     pub status: std::process::ExitStatus,
 }
 
+/// A stop, status or daemon-start failure, naming the action in its message.
+#[derive(Debug, thiserror::Error)]
+#[error("{action}: {cause}")]
+pub struct ServeActionFailed {
+    pub action: &'static str,
+    pub cause: anyhow::Error,
+}
+
+impl ServeActionFailed {
+    pub fn during(action: &'static str) -> impl FnOnce(anyhow::Error) -> Self {
+        move |cause| Self { action, cause }
+    }
+}
+
 /// Outcome of `jit serve --stop`.
 #[derive(Debug, PartialEq)]
 pub enum StopOutcome {
