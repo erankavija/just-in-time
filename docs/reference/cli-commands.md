@@ -3348,9 +3348,10 @@ Like every mutating command, apply a leftover redo record when the session
 opens ([Publication and Recovery](storage-format.md#publication-and-recovery)),
 then run the repair routines in sequence: repair declaration-derived state
 through the `jit validate --fix` path; in a Git repository, clear claim locks
-left by dead processes (checked by PID), evict expired leases, and reclaim indefinite leases whose
-heartbeat is [stale](claim.md#staleness); and remove orphaned `*.tmp` files
-under `.jit/` older than the [cleanup threshold](runtime-defaults.md).
+left by dead processes (checked by PID), evict expired leases, reclaim indefinite leases whose
+heartbeat is [stale](claim.md#staleness), and remove interrupted lease
+operations' stage files; and remove orphaned `*.tmp` files under `.jit/` and
+under `.git/jit/leases/` older than the [cleanup threshold](runtime-defaults.md).
 
 ```bash
 jit recover [--json]
