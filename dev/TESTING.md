@@ -512,9 +512,7 @@ repair correctness across every owned class of a real profile package.
 
 `test_concurrent_fresh_profile_init_publishes_one_coherent_repository` races real threads
 through real initialization; `test_concurrent_writer_observes_failed_apply_preimage_then_publishes`
-does the same across a real write barrier. `test_rebuild_index_filters_expired_leases`
-acquires a lease with a real 1s TTL and sleeps 1.1s past it, because expiry is a real clock
-property, not a mocked one. `test_start_watching_ignores_events_jsonl` starts a real
+does the same across a real write barrier. `test_start_watching_ignores_events_jsonl` starts a real
 filesystem watcher and sleeps past its own real debounce window; it is compiled once into
 the `jit-server` crate's library test target and once into its binary target, so it runs —
 and is measured — twice.
