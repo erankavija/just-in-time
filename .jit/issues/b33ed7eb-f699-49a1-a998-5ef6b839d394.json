@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T00:35:36.022021982Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
@@ -8,6 +9,7 @@
   ],
   "description": "Write, with each run that holds a reusable verdict, a record keyed by its gate and inputs digest that names the run, so reuse can later read one record.\n\n## Background\n\nRuns are written by the finalizer's gate-run pass (`crates/jit/src/repository_state/mutation.rs`). `GateRunResult::is_reusable_for` (`domain/types.rs`) states what makes a run a reuse source: it executed its own checker, carries an inputs digest and passed or failed. Only `check_gate_with` sets a digest. Gate keys are lowercase-kebab and digests 64 lowercase hex, so both are safe path components. Everything under `gate-runs/` is already excluded from input digests (`RepositoryLayout::tracker_written_paths`, `repository_state/path.rs`). The evaluation's record attempt captures its image in a second session (`commands/gate_check.rs`), after the digest is known. Whole-repository validation's fidelity pass (`validation/record_fidelity.rs`) is the guard that stored records reproduce, and it covers issues, the index, gate runs and the event log.\n\n## Success Criteria\n\n- [hard] REQ-01: When a recorded run executed its checker, carries an inputs digest and passed or failed, the same redo record that writes the run writes `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` naming the run's issue and run id, built by one `VirtualPath` constructor. A later such run over the same key replaces the record. The record type derives `JsonSchema`.\n- [hard] REQ-02: The record attempt captures the verdict record's path together with `gate-runs/verdicts` and `gate-runs/verdicts/<gate-key>`, which decide its directory creates, so two evaluations racing to replace one record get a retryable conflict, not a lost write.\n- [hard] REQ-03: Finalizer unit tests show which runs write or replace a verdict record and which write none.\n- [hard] REQ-04: `record_drift` reports a verdict record that does not reproduce, and the run enumeration of the fidelity pass skips `verdicts/`.\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T00:35:05.408161753Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -27,7 +29,7 @@
     "satisfies:f8a6b298/REQ-03"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Recorded runs write their per-key verdict record",
-  "updated_at": "2026-11-02T23:39:45.894146140Z"
+  "updated_at": "2026-11-04T00:35:36.022021982Z"
 }
