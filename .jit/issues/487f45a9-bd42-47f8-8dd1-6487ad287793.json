@@ -21,9 +21,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "06b00e72-a312-4d9a-b837-1b45f6917ba8",
+      "run_id": "c0c56b7d-20da-444e-b777-5dfd6c07dd64",
       "status": "failed",
-      "updated_at": "2026-11-04T22:15:44.194759071Z",
+      "updated_at": "2026-11-04T22:55:23.921970447Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "One requires-Git error for every command family",
-  "updated_at": "2026-11-04T22:15:44.194759071Z"
+  "updated_at": "2026-11-04T22:55:23.921970447Z"
 }
