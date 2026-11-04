@@ -15,6 +15,8 @@ from pathlib import Path
 SPEC = importlib.util.spec_from_file_location("rewrite", Path(__file__).with_name("format4-rewrite.py"))
 rewrite = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(rewrite)
+# Scratch checkouts live in the worktree's target/, never the system temp directory.
+SCRATCH = Path(__file__).resolve().parents[3] / "target" / "format4-rewrite-test"
 
 NOW = rewrite.instant("2026-11-04T00:00:00Z", "test")
 ISSUE_A = "aaaaaaaa-0000-4000-8000-000000000001"
@@ -188,7 +190,8 @@ def snapshot(root):
 
 class RewriteTest(unittest.TestCase):
     def setUp(self):
-        self.root = Path(tempfile.mkdtemp())
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        self.root = Path(tempfile.mkdtemp(dir=SCRATCH))
         self.runs, self.events = build_checkout(self.root)
         self.store, self.shared = self.root / ".jit", self.root / ".git" / "jit"
 
