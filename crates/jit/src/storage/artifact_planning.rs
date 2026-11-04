@@ -14,9 +14,11 @@ use crate::domain::artifact_plan::{
 };
 use crate::domain::identity::IssueId;
 use crate::domain::relative_path::RootRelativePath;
+use crate::storage::capability_fs::{
+    open_absolute_dir_nofollow, open_child_dir_nofollow, open_regular_file_nofollow,
+};
 use crate::storage::repository_state_store::{
-    is_advisory_permission_denied, open_absolute_dir_nofollow, open_child_dir_nofollow,
-    open_regular_file_nofollow, RepositoryStateStoreError,
+    is_advisory_permission_denied, RepositoryStateStoreError,
 };
 use crate::storage::{validate_repo_relative_path, IssueStore, PathReadError};
 use anyhow::{anyhow, Result};

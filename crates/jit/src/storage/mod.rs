@@ -13,6 +13,7 @@ use anyhow::Result;
 pub mod artifact_discovery;
 pub mod artifact_planning;
 pub(crate) mod atomic_write;
+pub(crate) mod capability_fs;
 pub mod claim_coordinator;
 pub mod clock;
 #[cfg(test)]
