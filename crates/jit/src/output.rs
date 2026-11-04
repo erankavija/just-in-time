@@ -13,6 +13,7 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use thiserror::Error;
 
+pub mod config;
 mod emit;
 pub mod failure;
 mod invariant;

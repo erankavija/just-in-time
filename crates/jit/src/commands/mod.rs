@@ -79,6 +79,7 @@ pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use claim::ClaimOps;
 pub use config::{
     resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigOps, ConfigSetOutcome,
+    ConfigValidationReport,
 };
 pub use document::DocumentOps;
 pub use gate::{

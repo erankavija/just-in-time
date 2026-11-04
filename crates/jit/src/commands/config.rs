@@ -16,7 +16,7 @@
 //! [`ConfigSetOutcome`] / [`ConfigGetOutcome`].
 
 use super::*;
-use crate::config::EffectiveConfig;
+use crate::config::{EffectiveConfig, JitConfig};
 use crate::errors::InvalidArgumentError;
 use std::path::PathBuf;
 
@@ -46,6 +46,14 @@ pub struct ConfigGetOutcome {
     pub key: String,
     /// The resolved value.
     pub value: serde_json::Value,
+}
+
+/// Result of `jit config validate`: one message per invalid configuration
+/// source. Empty when every source loads and carries valid values.
+#[derive(Debug, Default)]
+pub struct ConfigValidationReport {
+    /// One message per failing source, in check order.
+    pub errors: Vec<String>,
 }
 
 /// Error resolving a dotted `jit config get` key against an assembled
@@ -318,6 +326,35 @@ impl<S: IssueStore> ConfigOps<'_, S> {
     /// [`crate::config`].
     pub fn effective_config_snapshot(&self) -> Result<serde_json::Value> {
         EffectiveConfig::load(self.exec.repository_layout()?)?.full_snapshot()
+    }
+
+    /// Check the repository `config.toml` (when present) and the invocation write
+    /// override, reporting every failing source.
+    ///
+    /// Invalid enforcement and write-policy tokens fail at TOML parse time, so a
+    /// successful load implies valid values.
+    pub fn validate(&self) -> Result<ConfigValidationReport> {
+        let mut errors = Vec::new();
+        let layout = self.exec.storage().repository_layout()?;
+        if layout
+            .resolve(&crate::repository_state::VirtualPath::CONFIG)?
+            .exists()
+        {
+            if let Err(e) = JitConfig::load(&layout) {
+                errors.push(format!("repo config: {e}"));
+            }
+        }
+        if let Err(e) = crate::config_manager::ConfigManager::invocation_write_override() {
+            errors.push(e.to_string());
+        }
+        Ok(ConfigValidationReport { errors })
+    }
+
+    /// The type hierarchy declared by the repository's namespace configuration.
+    pub fn declared_type_hierarchy(&self) -> Result<std::collections::HashMap<String, u8>> {
+        let layout = self.exec.storage().repository_layout()?;
+        let namespaces = crate::config_manager::ConfigManager::new(layout).get_namespaces()?;
+        Ok(namespaces.declared_type_hierarchy())
     }
 
     /// Resolve a dotted `section[.field[.subfield...]]` key against the WHOLE
