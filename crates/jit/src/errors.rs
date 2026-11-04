@@ -244,6 +244,7 @@ impl AlreadyExistsError {
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("{message}")]
 pub struct DeletionNotConfirmedError {
+    issue_id: IssueId,
     message: String,
 }
 
@@ -261,8 +262,14 @@ impl DeletionNotConfirmedError {
         ))
         .with_remedy("Consider closing issues instead of deleting them");
         Self {
+            issue_id,
             message: actionable.to_error_message(),
         }
+    }
+
+    /// The issue whose deletion was refused.
+    pub fn issue_id(&self) -> &IssueId {
+        &self.issue_id
     }
 
     /// The fully-rendered, user-facing refusal message.
