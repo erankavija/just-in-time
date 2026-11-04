@@ -625,7 +625,7 @@ fn resolve_labels(
         .iter()
         .map(|label| {
             crate::domain::key_reference::resolve_key_reference(label, credit, &issue_id_of)
-                .map_err(|missing| (label.clone(), missing))
+                .map_err(|missing| (label.clone(), missing.0))
         })
         .partition(std::result::Result::is_ok);
     if unknown.is_empty() {

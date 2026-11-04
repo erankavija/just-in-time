@@ -95,22 +95,25 @@ impl DeclaredRoot {
     }
 }
 
+/// A string that is not `.` or a relative repository path.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid root '{0}'; expected `.` or a relative repository path")]
+pub struct DeclaredRootError(pub String);
+
 impl TryFrom<&str> for DeclaredRoot {
-    type Error = String;
+    type Error = DeclaredRootError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if value == WORKTREE_ROOT || is_safe_relative_path(value) {
             Ok(Self(value.to_string()))
         } else {
-            Err(format!(
-                "invalid root '{value}'; expected `.` or a relative repository path"
-            ))
+            Err(DeclaredRootError(value.to_string()))
         }
     }
 }
 
 impl TryFrom<String> for DeclaredRoot {
-    type Error = String;
+    type Error = DeclaredRootError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())
@@ -193,23 +196,35 @@ impl JsonSchema for ExclusionPattern {
     }
 }
 
+/// A string that is not a compilable relative path pattern.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ExclusionPatternError {
+    /// The pattern is absolute or climbs out of the repository.
+    #[error("invalid exclusion pattern '{0}'; expected a relative path pattern")]
+    NotRelative(String),
+    /// The pattern does not compile.
+    #[error("invalid exclusion pattern '{pattern}': {reason}")]
+    Uncompilable { pattern: String, reason: String },
+}
+
 impl TryFrom<&str> for ExclusionPattern {
-    type Error = String;
+    type Error = ExclusionPatternError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if !is_relative_pattern_shape(value) {
-            return Err(format!(
-                "invalid exclusion pattern '{value}'; expected a relative path pattern"
-            ));
+            return Err(ExclusionPatternError::NotRelative(value.to_string()));
         }
         glob::Pattern::new(value)
             .map(Self)
-            .map_err(|error| format!("invalid exclusion pattern '{value}': {error}"))
+            .map_err(|error| ExclusionPatternError::Uncompilable {
+                pattern: value.to_string(),
+                reason: error.to_string(),
+            })
     }
 }
 
 impl TryFrom<String> for ExclusionPattern {
-    type Error = String;
+    type Error = ExclusionPatternError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())
@@ -256,14 +271,26 @@ pub struct RepositoryInputs {
     exclude: Vec<ExclusionPattern>,
 }
 
+/// A declaration that cannot form a [`RepositoryInputs`].
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum RepositoryInputsError {
+    /// No root was declared.
+    #[error("a repository input set must declare at least one root")]
+    NoRoots,
+    #[error(transparent)]
+    Root(#[from] DeclaredRootError),
+    #[error(transparent)]
+    Pattern(#[from] ExclusionPatternError),
+}
+
 impl RepositoryInputs {
     /// Build a set from authored root and pattern text.
     ///
     /// # Errors
     ///
-    /// Returns a message naming the offending value when `roots` is empty, a
-    /// root is not a relative repository path, or a pattern does not compile.
-    pub fn parse(roots: &[&str], exclude: &[&str]) -> Result<Self, String> {
+    /// Fails naming the offending value when `roots` is empty, a root is not a
+    /// relative repository path, or a pattern does not compile.
+    pub fn parse(roots: &[&str], exclude: &[&str]) -> Result<Self, RepositoryInputsError> {
         let roots = roots
             .iter()
             .map(|root| DeclaredRoot::try_from(*root))
@@ -279,10 +306,13 @@ impl RepositoryInputs {
     ///
     /// # Errors
     ///
-    /// Returns a message when `roots` is empty.
-    pub fn new(roots: Vec<DeclaredRoot>, exclude: Vec<ExclusionPattern>) -> Result<Self, String> {
+    /// Fails when `roots` is empty.
+    pub fn new(
+        roots: Vec<DeclaredRoot>,
+        exclude: Vec<ExclusionPattern>,
+    ) -> Result<Self, RepositoryInputsError> {
         if roots.is_empty() {
-            return Err("a repository input set must declare at least one root".to_string());
+            return Err(RepositoryInputsError::NoRoots);
         }
         Ok(Self { roots, exclude })
     }
@@ -372,8 +402,13 @@ impl InputsDigest {
     }
 }
 
+/// A string that is not 64 lowercase hex characters.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid input digest '{0}'; expected 64 lowercase hex characters")]
+pub struct InputsDigestError(pub String);
+
 impl TryFrom<&str> for InputsDigest {
-    type Error = String;
+    type Error = InputsDigestError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if value.len() == 64
@@ -383,15 +418,13 @@ impl TryFrom<&str> for InputsDigest {
         {
             Ok(Self(value.to_string()))
         } else {
-            Err(format!(
-                "invalid input digest '{value}'; expected 64 lowercase hex characters"
-            ))
+            Err(InputsDigestError(value.to_string()))
         }
     }
 }
 
 impl TryFrom<String> for InputsDigest {
-    type Error = String;
+    type Error = InputsDigestError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())
@@ -581,8 +614,9 @@ mod tests {
             "",
             "a//b",
         ] {
-            assert!(
-                DeclaredRoot::try_from(rejected).is_err(),
+            assert_eq!(
+                DeclaredRoot::try_from(rejected),
+                Err(DeclaredRootError(rejected.to_string())),
                 "{rejected} must not parse as a root"
             );
         }
@@ -653,9 +687,32 @@ mod tests {
 
     #[test]
     fn test_repository_inputs_rejects_a_declaration_covering_nothing() {
-        assert!(RepositoryInputs::parse(&[], &[]).is_err());
-        assert!(RepositoryInputs::parse(&["crates"], &["["]).is_err());
-        assert!(RepositoryInputs::parse(&["/etc"], &[]).is_err());
+        assert_eq!(
+            RepositoryInputs::parse(&[], &[]),
+            Err(RepositoryInputsError::NoRoots)
+        );
+        assert!(matches!(
+            RepositoryInputs::parse(&["crates"], &["["]),
+            Err(RepositoryInputsError::Pattern(_))
+        ));
+        assert_eq!(
+            RepositoryInputs::parse(&["/etc"], &[]),
+            Err(RepositoryInputsError::Root(DeclaredRootError(
+                "/etc".to_string()
+            )))
+        );
+    }
+
+    #[test]
+    fn test_exclusion_pattern_rejects_non_relative_and_uncompilable_patterns() {
+        assert_eq!(
+            ExclusionPattern::try_from("/abs"),
+            Err(ExclusionPatternError::NotRelative("/abs".to_string()))
+        );
+        assert!(matches!(
+            ExclusionPattern::try_from("["),
+            Err(ExclusionPatternError::Uncompilable { ref pattern, .. }) if pattern == "["
+        ));
     }
 
     #[test]
@@ -727,7 +784,10 @@ mod tests {
     fn test_inputs_digest_parse_rejects_values_this_crate_cannot_have_produced() {
         let produced = digest_of(&[("a.rs", b"one")]);
         assert!(InputsDigest::try_from(produced.as_str()).is_ok());
-        assert!(InputsDigest::try_from("not-a-digest").is_err());
+        assert_eq!(
+            InputsDigest::try_from("not-a-digest"),
+            Err(InputsDigestError("not-a-digest".to_string()))
+        );
         assert!(InputsDigest::try_from(produced.as_str().to_uppercase().as_str()).is_err());
     }
 }
