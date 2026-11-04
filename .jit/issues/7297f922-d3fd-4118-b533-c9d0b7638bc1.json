@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "75648818-5b22-4b6b-b7a0-e82533f5f632",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:56:07.935230875Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8b7dabdb-92eb-4b0f-a06c-e40d616940b1",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:58:15.202051028Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7297f922-d3fd-4118-b533-c9d0b7638bc1",
   "labels": [
     "type:task",
@@ -30,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "CLI test bounds the git processes of issue reads",
-  "updated_at": "2026-11-04T22:32:48.875911295Z"
+  "updated_at": "2026-11-04T22:58:15.202051028Z"
 }
