@@ -875,10 +875,13 @@
     "e5d618ee": 2,
     "153c9851": 1,
     "98cc2097": 2,
-    "20fc3b92": 1,
+    "20fc3b92": 2,
     "10751360": 1,
     "8a14e8e9": 2,
-    "9529b9ac": 1
+    "9529b9ac": 1,
+    "06ee9b67": 1,
+    "71f5296c": 1,
+    "66790c84": 1
   },
   "surfaced_pitfalls": [
     {
@@ -960,7 +963,7 @@
     "note": "12c0f3fb added +233 (forms); handler moves must pay back"
   },
   "wave_notes": {
-    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line)."
+    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line). Session 12 (lead 7c): one Claude Opus integrator on w7batch fixes the three cli_issue failures as per-issue fix commits (06ee9b67, 71f5296c, 20fc3b92) and merges main with the 614a6f97 claim port (66790c84); per-branch main merges conflict on registration lines, so fixes go on the batch. Each counts as one rework."
   },
   "post_release_followups": [
     "Implement 8c67b21a after wave 7 settles, then delete the private dispatch.sh copy."
@@ -1144,6 +1147,16 @@
       "vendor": "Claude Sonnet",
       "reason": "ENOSPC classification (D-47)",
       "note": "follow-up landed 1e2d11ebf; code-review F1 (round 2): same-test assertion plus ENOSPC elsewhere in block exits 75; rework 2 of 2: ENOSPC must be in the panic message"
+    },
+    "d952d057": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "script change with self-test; steward priority"
+    },
+    "b51291e4": {
+      "status": "dispatched",
+      "vendor": "Codex gpt-6-luna (xhigh)",
+      "reason": "self-contained script change without sockets; alternation"
     }
   },
   "handoff": {
@@ -1151,5 +1164,6 @@
     "from": "session c12148f1",
     "to": "just-in-time-7c",
     "date": "2026-11-04"
-  }
+  },
+  "lead": "just-in-time-7c (session 12)"
 }
