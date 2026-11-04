@@ -295,8 +295,8 @@ pub struct LeafCodes {
     pub path: &'static str,
     /// Typed codes the leaf raises through the shared classifier.
     pub raises: &'static [ErrorCode],
-    /// Each code the leaf's findings outcome reports under, with its condition.
-    pub findings: &'static [(ErrorCode, &'static str)],
+    /// Sets of codes the findings outcome reports under, with their conditions.
+    pub findings: &'static [(&'static [ErrorCode], &'static str)],
 }
 
 impl LeafCodes {
@@ -309,7 +309,10 @@ impl LeafCodes {
     pub fn admit<R>(&self, outcome: Outcome<R>) -> anyhow::Result<Outcome<R>> {
         match &outcome {
             Outcome::Findings { code, .. }
-                if !self.findings.iter().any(|(declared, _)| declared == code) =>
+                if !self
+                    .findings
+                    .iter()
+                    .any(|(declared, _)| declared.contains(code)) =>
             {
                 Err(anyhow!(
                     "`{}` reported findings under undeclared code {}",
@@ -399,7 +402,8 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 /// After the handler call, a leaf may declare `raises [Code, ...]`, the
 /// non-universal [`ErrorCode`]s its typed failures classify to, and
 /// one `findings Code "condition"` per code its findings outcome reports
-/// under. The exit-code projection derives the leaf's rows from these, and
+/// under, or `findings [ErrorCode::ALL] "condition"` for classified batch
+/// failures. The exit-code projection derives the leaf's rows from these, and
 /// `dispatch` refuses a findings outcome under an undeclared code
 /// ([`LeafCodes::admit`]).
 ///
@@ -464,7 +468,7 @@ macro_rules! command_group {
             $(
                 $path:literal => $pattern:pat => $handler:ident ( $($arg:expr),* $(,)? )
                     $(raises [$($raised:ident),+ $(,)?])?
-                    $(findings $finding:ident $condition:literal)*
+                    $(findings $finding:tt $condition:literal)*
                     -> $response:ty
                     $(as union [$($member:ty),+ $(,)?] $description:expr)?
             ),+ $(,)?
@@ -502,13 +506,15 @@ macro_rules! command_group {
             leaves: &[$(command_group!(@codes $path [$($($raised),+)?] $($finding $condition)*)),+],
         };
     };
-    (@codes $path:literal [$($raised:ident),*] $($finding:ident $condition:literal)*) => {
+    (@codes $path:literal [$($raised:ident),*] $($finding:tt $condition:literal)*) => {
         $crate::dispatch::LeafCodes {
             path: $path,
             raises: &[$($crate::output::ErrorCode::$raised),*],
-            findings: &[$(($crate::output::ErrorCode::$finding, $condition)),*],
+            findings: &[$((command_group!(@findings $finding), $condition)),*],
         }
     };
+    (@findings $code:ident) => { &[$crate::output::ErrorCode::$code] };
+    (@findings [$codes:expr]) => { &$codes };
     (@call $handler:ident [$($handler_args:tt)*] ($($arg:expr),*)) => {
         $handler($($handler_args)* $($arg),*)
     };
