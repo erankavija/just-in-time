@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "27a86fdf-1e38-431b-af12-5b1f43b9c1ec",
+      "status": "passed",
+      "updated_at": "2026-11-04T18:33:37.037486400Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "33566295-76e7-49dc-8785-32b42da6b683",
+      "status": "failed",
+      "updated_at": "2026-11-04T18:39:12.989825358Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "635f23c7-cff1-47bb-8302-4231c73ad276",
   "labels": [
     "type:task",
@@ -34,5 +47,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Every state-changing plan carries its readiness corrections and creation takes initial readiness from the derivation",
-  "updated_at": "2026-11-04T17:51:44.437866996Z"
+  "updated_at": "2026-11-04T18:39:12.989825358Z"
 }
