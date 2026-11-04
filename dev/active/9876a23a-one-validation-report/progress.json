@@ -207,21 +207,21 @@
         {
           "short_id": "2c8c13b2",
           "classification": "implementation",
-          "status": "dispatching",
+          "status": "landing (eae1c56a2, -166)",
           "worker": "claude opus",
           "worker_reason": "adds the shared capture-and-report function; DEC-19"
         },
         {
           "short_id": "728ecfb0",
           "classification": "implementation",
-          "status": "dispatching",
+          "status": "reviewed d9ff90562; landing after pipeline edit",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "property test with independent oracle"
         },
         {
           "short_id": "1f24e3e9",
           "classification": "implementation",
-          "status": "dispatching",
+          "status": "rework 2 (duplicate config load; accumulator growth: r1 +67, cumulative -42)",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "multi-file fix derivation over one capture"
         }
@@ -381,7 +381,8 @@
     "6ba4f623": 1,
     "2b5f452c": 3,
     "3acaa5a3": 2,
-    "612ee9d4": 1
+    "612ee9d4": 1,
+    "1f24e3e9": 2
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",

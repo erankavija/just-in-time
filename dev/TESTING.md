@@ -322,10 +322,12 @@ harness that produces both.
   instead of the workspace, at no cost to a cold run. What it costs is disk, which the reclaim
   path in the worktree dispatch protocol prunes. The measurements are under "Provenance" in
   [dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md).
-- **Shared compiler cache** — when `sccache` is on `PATH`, `scripts/cargo-ci.sh` exports it as
-  `RUSTC_WRAPPER` unless a wrapper is already set. Set `CARGO_CI_NO_SCCACHE=1` for a diagnostic
-  run that must bypass the cache. Opting an existing target directory into a wrapper changes
-  Cargo fingerprints, so remove its stale artifacts first if disk headroom is limited.
+- **Shared compiler cache** — when `sccache` is on `PATH` and no wrapper is set,
+  `scripts/cargo-ci.sh` selects it as `RUSTC_WRAPPER`. Every wrapper the run uses, selected or
+  explicit, runs through `scripts/caller-tmpdir-wrapper.sh`, which restores the caller's `TMPDIR`
+  so a daemon it starts outlives the run's temporary directory. Set `CARGO_CI_NO_SCCACHE=1` for a
+  diagnostic run that must bypass the cache. Opting an existing target directory into a wrapper
+  changes Cargo fingerprints, so remove its stale artifacts first if disk headroom is limited.
 - **Host-wide serialization** — gate and benchmark builds default to the shared
   `${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock`, allowing Cargo-heavy work in adjacent repositories
   to queue instead of competing for CPU and causing timeout-sensitive tests to become noisy.
