@@ -11,6 +11,7 @@
 //! the GATED target state (done-keyed rules do not fire; gated-keyed rules
 //! block the diversion).
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
 use jit::domain::identity::IssueId;

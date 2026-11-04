@@ -248,9 +248,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     if let Some(batch) = error.downcast_ref::<crate::errors::DependencyBatchRejectedError>() {
         return dependency_batch_error_code(batch);
     }
-    // `jit recover` failing to apply the leftover redo record or run its
-    // repairs is `recovery_failed`, unless it was contention.
-    if let Some(failure) = error.downcast_ref::<crate::commands::RecoveryFailedError>() {
+    // A leftover redo record that `jit recover` or a read cannot apply, or
+    // recovery's failed repairs, is `recovery_failed`, unless it was contention.
+    if let Some(failure) = error.downcast_ref::<crate::errors::RecoveryFailedError>() {
         return if crate::storage::is_lock_timeout(&failure.0) {
             ErrorCode::LockTimeout
         } else {
@@ -1278,7 +1278,7 @@ mod lock_timeout_classification_tests {
 
     #[test]
     fn test_classify_recovery_failed_error_is_recovery_failed_unless_contention() {
-        use crate::commands::RecoveryFailedError;
+        use crate::errors::RecoveryFailedError;
         let failed = RecoveryFailedError(anyhow::anyhow!("redo record"));
         let contended = RecoveryFailedError(session_lock_timeout());
 

@@ -4,6 +4,7 @@
 //! these cases exercise capturing one, listing it, showing it, and applying it,
 //! and the audit events an application that writes the gate registry appends.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::declarations::{GateMode, GateStage};
 use jit::domain::Priority;
 use jit::storage::{IssueStore, JsonFileStorage};

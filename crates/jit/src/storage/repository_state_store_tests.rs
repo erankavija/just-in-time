@@ -1,3 +1,4 @@
+use super::test_fixtures::*;
 use super::*;
 use crate::domain::EventBody;
 use crate::repository_state::{
@@ -6,16 +7,11 @@ use crate::repository_state::{
 };
 #[cfg(windows)]
 use crate::storage::capability_fs::capability_metadata_identity;
-use crate::storage::capability_fs::DataRoot;
 use crate::storage::capability_fs::{
     open_regular_file_nofollow, CapabilityFsError, CapabilityRoots,
 };
-use crate::storage::memory::test_fixtures as memory_fixtures;
-use crate::storage::redo_apply::test_fixtures::{
-    data_root as redo_root, record_relative_path, record_scratch_relative_path,
-    repository as redo_repository, seed_repository, snapshot, SnapshotEntry, CAPTURED_LOG,
-};
-use crate::storage::{EventAppend, PutFile, RedoPoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
+use crate::storage::redo_apply::test_fixtures::snapshot;
+use crate::storage::{EventAppend, RedoPoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
 use crate::test_harness::git::GitStandIn;
 use cap_std::ambient_authority;
 use std::collections::{BTreeMap, BTreeSet};
@@ -1959,26 +1955,6 @@ impl WriteSetFixture {
     }
 }
 
-fn data_path(relative: &str) -> VirtualPath {
-    VirtualPath::data(relative).unwrap()
-}
-
-fn put_file(path: VirtualPath, bytes: &[u8]) -> PutFile {
-    PutFile {
-        path,
-        bytes: bytes.to_vec(),
-        mode: FileMode::Regular,
-    }
-}
-
-/// An append at `offset`, the log's committed length when the mutation read it.
-fn event_append(offset: u64) -> Option<EventAppend> {
-    Some(EventAppend {
-        offset,
-        bytes: b"{\"tag\":\"issue_created\"}\n".to_vec(),
-    })
-}
-
 /// Whether `error` is the retryable conflict naming `path`.
 fn names_moved_path(error: &RepositoryStateStoreError, path: &VirtualPath) -> bool {
     matches!(
@@ -2357,184 +2333,6 @@ fn long_log() -> Vec<u8> {
         .cycle()
         .take((EVENT_LOG_TAIL_WINDOW as usize) + line.len() * 2)
         .collect()
-}
-
-/// One contract, run on both backends, because applying a leftover record is
-/// the session's behaviour rather than either backend's
-/// (`@/inv/shared-test-contracts`).
-trait SessionRecordBackend: Sized {
-    /// What a record publishes, compared between two opens.
-    type Published: std::fmt::Debug + PartialEq;
-
-    /// Its event log holds [`CAPTURED_LOG`], the offset [`leftover_record`]
-    /// appends at.
-    fn seeded() -> Self;
-    fn commit(&self, record: &RedoRecord);
-    fn open(&self) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
-    /// Open a session whose publication is interrupted at `point`, over the
-    /// same repository every other method reads.
-    fn open_interrupted(
-        &self,
-        point: MutationPoint,
-    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
-    fn published(&self) -> Self::Published;
-    /// Whether a record is still waiting for an open to carry it forward.
-    fn holds_record(&self) -> bool;
-    fn bytes_at(&self, path: &VirtualPath) -> Option<Vec<u8>>;
-}
-
-struct FileSessionBackend {
-    worktree: TempDir,
-    storage: JsonFileStorage,
-    layout: RepositoryLayout,
-}
-
-impl FileSessionBackend {
-    fn record_path(&self) -> PathBuf {
-        self.worktree.path().join(record_relative_path())
-    }
-
-    fn scratch_path(&self) -> PathBuf {
-        redo_root(&self.worktree).join(RECORD_SCRATCH_DIR)
-    }
-}
-
-impl SessionRecordBackend for FileSessionBackend {
-    type Published = BTreeMap<PathBuf, SnapshotEntry>;
-
-    fn seeded() -> Self {
-        let (worktree, _roots) = redo_repository();
-        seed_repository(&worktree, &[], false);
-        let data = redo_root(&worktree);
-        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-        let storage = JsonFileStorage::new(&data);
-        Self {
-            worktree,
-            storage,
-            layout,
-        }
-    }
-
-    fn commit(&self, record: &RedoRecord) {
-        commit_redo_record(&DataRoot::open(&redo_root(&self.worktree)).unwrap(), record).unwrap();
-    }
-
-    fn open(&self) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
-        self.storage.open_mutation_session(self.layout.clone())
-    }
-
-    fn open_interrupted(
-        &self,
-        point: MutationPoint,
-    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
-        JsonFileStorage::with_mutation_interruptions(
-            redo_root(&self.worktree),
-            InterruptAtMoment::new(point),
-        )
-        .open_mutation_session(self.layout.clone())
-    }
-
-    fn published(&self) -> Self::Published {
-        let mut entries = snapshot(self.worktree.path());
-        entries.remove(&record_relative_path());
-        entries.remove(&record_scratch_relative_path());
-        entries
-    }
-
-    fn holds_record(&self) -> bool {
-        self.record_path().exists()
-    }
-
-    fn bytes_at(&self, path: &VirtualPath) -> Option<Vec<u8>> {
-        let root = match path.root_class() {
-            RepositoryRootClass::Data => redo_root(&self.worktree),
-            RepositoryRootClass::Worktree => self.worktree.path().to_path_buf(),
-        };
-        std::fs::read(root.join(path.relative().as_path())).ok()
-    }
-}
-
-struct MemorySessionBackend(InMemoryStorage);
-
-impl SessionRecordBackend for MemorySessionBackend {
-    type Published = BTreeMap<VirtualPath, RepositoryEntry>;
-
-    fn seeded() -> Self {
-        Self(memory_fixtures::seeded(&[], false))
-    }
-
-    fn commit(&self, record: &RedoRecord) {
-        self.0.commit_record(record).unwrap();
-    }
-
-    fn open(&self) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
-        self.0.open_mutation_session(self.0.repository_layout())
-    }
-
-    fn open_interrupted(
-        &self,
-        point: MutationPoint,
-    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
-        self.0
-            .with_mutation_interruption_view(InterruptAtMoment::new(point))
-            .open_mutation_session(self.0.repository_layout())
-    }
-
-    fn published(&self) -> Self::Published {
-        memory_fixtures::semantic_state(&self.0).0
-    }
-
-    fn holds_record(&self) -> bool {
-        memory_fixtures::semantic_state(&self.0).2.is_some()
-    }
-
-    fn bytes_at(&self, path: &VirtualPath) -> Option<Vec<u8>> {
-        match memory_fixtures::semantic_state(&self.0).0.get(path) {
-            Some(RepositoryEntry::File { content, .. }) => Some(content.bytes().to_vec()),
-            _ => None,
-        }
-    }
-}
-
-/// Interrupts a session at one named moment, so exactly the steps before it
-/// ran.
-struct InterruptAtMoment(MutationPoint);
-
-impl InterruptAtMoment {
-    fn new(point: MutationPoint) -> Arc<Self> {
-        Arc::new(Self(point))
-    }
-}
-
-impl crate::storage::MutationInterruptionInjector for InterruptAtMoment {
-    fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
-        match *point == self.0 {
-            true => Err(std::io::Error::other(format!("interrupted at {point:?}"))),
-            false => Ok(()),
-        }
-    }
-}
-
-/// One data file published and one event appended at the committed length the
-/// interrupted mutation captured.
-fn leftover_record() -> RedoRecord {
-    RedoRecord::new(
-        Vec::new(),
-        vec![put_file(leftover_target(), LEFTOVER_BYTES)],
-        Vec::new(),
-        event_append(CAPTURED_LOG.len() as u64),
-    )
-    .unwrap()
-}
-
-fn leftover_target() -> VirtualPath {
-    data_path("records/left.json")
-}
-
-const LEFTOVER_BYTES: &[u8] = b"{\"value\":\"left\"}";
-
-fn appended_log() -> Vec<u8> {
-    [CAPTURED_LOG, &event_append(0).unwrap().bytes].concat()
 }
 
 /// REQ-01, observed through the session's own first capture: nothing else can
@@ -3051,4 +2849,164 @@ fn test_redo_record_for_finalized_gate_run_precedes_issue_naming_it() {
             .unwrap()
     };
     assert!(position(&run_path) < position(&issue_path));
+}
+
+/// The file [`publish_every_operation`] deletes, published by
+/// [`publish_doomed`] first.
+fn doomed() -> VirtualPath {
+    data_path("records/doomed.json")
+}
+
+fn made_directory() -> VirtualPath {
+    data_path("made")
+}
+
+/// One complete publication: [`doomed`] is written, with the event its plan
+/// composes.
+fn publish_doomed(session: &mut dyn RepositoryMutationSession) {
+    let image = session.capture(publishing_spec([doomed()])).unwrap();
+    let delta = RepositoryDelta::new(
+        session.layout(),
+        vec![RepositoryAction::write_file(
+            doomed(),
+            RepositoryActionOwner::RepositoryStateMutation,
+            ExpectedPreimage::Absent,
+            b"doomed".to_vec(),
+            FileMode::Regular,
+        )],
+    )
+    .unwrap();
+    session.apply(&test_plan(&image, &delta)).unwrap();
+}
+
+/// A publication whose record makes a directory, puts a file, deletes
+/// [`doomed`] and appends an event, so it crosses every [`RedoPoint`].
+fn publish_every_operation(
+    session: &mut dyn RepositoryMutationSession,
+) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
+    let image = session.capture(publishing_spec([
+        made_directory(),
+        leftover_target(),
+        doomed(),
+    ]))?;
+    let owner = RepositoryActionOwner::RepositoryStateMutation;
+    let delta = RepositoryDelta::new(
+        session.layout(),
+        vec![
+            RepositoryAction::create_directory(made_directory(), owner, ExpectedPreimage::Absent),
+            RepositoryAction::write_file(
+                leftover_target(),
+                owner,
+                ExpectedPreimage::Absent,
+                LEFTOVER_BYTES.to_vec(),
+                FileMode::Regular,
+            ),
+            RepositoryAction::delete_file(
+                doomed(),
+                owner,
+                ExpectedPreimage::of(image.entry(&doomed()).unwrap()),
+            ),
+        ],
+    )
+    .unwrap();
+    session.apply(&test_plan(&image, &delta))
+}
+
+fn assert_admission_grants_a_capture_nothing_crossed<B: SessionRecordBackend>() {
+    let backend = B::seeded();
+    let mut read = backend.open_read().unwrap();
+    let image = read.capture(publishing_spec([doomed()])).unwrap();
+    read.extend(image, publishing_spec([doomed(), leftover_target()]))
+        .unwrap();
+
+    assert_eq!(read.admit().unwrap(), ReadAdmission::Granted);
+}
+
+fn assert_admission_refuses_a_mutation_between_capture_and_extend<B: SessionRecordBackend>() {
+    let backend = B::seeded();
+    let mut read = backend.open_read().unwrap();
+    let image = read.capture(publishing_spec([doomed()])).unwrap();
+    publish_doomed(backend.open().unwrap().as_mut());
+    read.extend(image, publishing_spec([doomed(), leftover_target()]))
+        .unwrap();
+
+    assert_eq!(read.admit().unwrap(), ReadAdmission::Moved);
+}
+
+/// A record left at any point before [`RedoPoint::AfterApply`] is present at
+/// admission, and at the next open; past it the record is gone and the log
+/// grew.
+fn assert_admission_names_an_interrupted_publication<B: SessionRecordBackend>() {
+    let points = [
+        RedoPoint::BeforeApply,
+        RedoPoint::BeforeMakeDirectory { index: 0 },
+        RedoPoint::BeforePut { index: 0 },
+        RedoPoint::BeforeDelete { index: 0 },
+        RedoPoint::BeforeEventAppend,
+        RedoPoint::BeforeRecordRemoval,
+        RedoPoint::AfterApply,
+    ];
+    points.into_iter().for_each(|point| {
+        let backend = B::seeded();
+        publish_doomed(backend.open().unwrap().as_mut());
+        let mut read = backend.open_read().unwrap();
+        read.capture(publishing_spec([doomed()])).unwrap();
+        let mut writer = backend
+            .open_interrupted(MutationPoint::Redo(point.clone()))
+            .unwrap();
+        assert!(
+            publish_every_operation(writer.as_mut()).is_err(),
+            "interrupted at {point:?}"
+        );
+        drop(writer);
+
+        let (expected, at_open) = match point {
+            RedoPoint::AfterApply => (ReadAdmission::Moved, ReadAdmission::Granted),
+            _ => (ReadAdmission::Busy, ReadAdmission::Busy),
+        };
+        assert_eq!(read.admit().unwrap(), expected, "at {point:?}");
+        assert_eq!(
+            backend.open_read().unwrap().admit().unwrap(),
+            at_open,
+            "a read opened after an interruption at {point:?}"
+        );
+    });
+}
+
+#[test]
+fn test_read_admission_grants_a_capture_nothing_crossed_on_both_backends() {
+    assert_admission_grants_a_capture_nothing_crossed::<FileSessionBackend>();
+    assert_admission_grants_a_capture_nothing_crossed::<MemorySessionBackend>();
+}
+
+#[test]
+fn test_read_admission_refuses_a_mutation_between_capture_and_extend_on_both_backends() {
+    assert_admission_refuses_a_mutation_between_capture_and_extend::<FileSessionBackend>();
+    assert_admission_refuses_a_mutation_between_capture_and_extend::<MemorySessionBackend>();
+}
+
+#[test]
+fn test_read_admission_is_busy_until_a_record_is_removed_on_both_backends() {
+    assert_admission_names_an_interrupted_publication::<FileSessionBackend>();
+    assert_admission_names_an_interrupted_publication::<MemorySessionBackend>();
+}
+
+#[test]
+fn test_json_read_admission_refuses_a_capture_over_a_root_initialization_published() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let storage = JsonFileStorage::new(&data);
+    let mut read = storage.open_read_session(layout.clone()).unwrap();
+    read.capture(initial_spec()).unwrap();
+
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let image = session.capture(initial_spec()).unwrap();
+    session
+        .apply(&test_plan(&image, &initialization_delta(&layout)))
+        .unwrap();
+    drop(session);
+
+    assert!(data.exists(), "initialization published the root");
+    assert_eq!(read.admit().unwrap(), ReadAdmission::Moved);
 }
