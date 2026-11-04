@@ -876,7 +876,9 @@
     "153c9851": 1,
     "98cc2097": 2,
     "20fc3b92": 1,
-    "10751360": 1
+    "10751360": 1,
+    "8a14e8e9": 2,
+    "9529b9ac": 1
   },
   "surfaced_pitfalls": [
     {
@@ -954,7 +956,7 @@
     "epic_total": -239,
     "head_lines": 9111,
     "head_rev": "b5bd434e8",
-    "head": 9214,
+    "head": 9220,
     "note": "12c0f3fb added +233 (forms); handler moves must pay back"
   },
   "wave_notes": {
@@ -1013,7 +1015,7 @@
       "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "e5d618ee": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
       "note": "on main (4ec8f06cc, fix d735276b5); code-review F1: GateRunId path extractor rejects before classify (REQ-02); rework 2 of 2"
@@ -1025,7 +1027,7 @@
       "note": "lead review: top-level rdeps left in legacy table (REQ-01/02); batch boundary-edge human text changed (REQ-06); +162 lines"
     },
     "153c9851": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "lead review: non-UTF-8 config path no longer serializes under --json (REQ-06)"
@@ -1115,12 +1117,19 @@
       "reason": "shared handler contract forms (D-38..D-41); one worker, lands before its dependents"
     },
     "9529b9ac": {
-      "status": "in_progress",
+      "status": "rework",
       "vendor": "Claude Sonnet",
-      "reason": "emitter-level JSON success warnings (D-42); 182f4c03 and cd8e04cc depend on it"
+      "reason": "emitter-level JSON success warnings (D-42); 182f4c03 and cd8e04cc depend on it",
+      "note": "on main f1e434642; code-review F1/F2; rework 1 drops AssetListScope.warnings and the exemption list (D-49)"
     },
     "4a01ccba": {
       "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43)."
+    },
+    "8a14e8e9": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "ENOSPC classification (D-47)",
+      "note": "follow-up landed 1e2d11ebf; code-review F1 (round 2): same-test assertion plus ENOSPC elsewhere in block exits 75; rework 2 of 2: ENOSPC must be in the panic message"
     }
   }
 }

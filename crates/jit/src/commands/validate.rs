@@ -2150,11 +2150,11 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             // Check if worktree still exists
             if !recorded_worktrees.contains(&lease.worktree_id) {
                 invalid_leases.push(format!(
-                    "Lease {} (Issue {}): Worktree {} no longer exists\n  Fix: jit claim force-evict {}",
+                    "Lease {} (Issue {}): Worktree {} no longer exists\n  Fix: {}",
                     lease.lease_id,
                     lease.issue_id.short_id(),
                     lease.worktree_id,
-                    lease.lease_id
+                    force_evict_remedy(lease)
                 ));
                 continue;
             }
@@ -2162,16 +2162,25 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             // Check if issue still exists (use storage layer for proper resolution)
             if self.exec.storage.load_issue(&lease.issue_id).is_err() {
                 invalid_leases.push(format!(
-                    "Lease {} (Issue {}): Issue no longer exists\n  Fix: jit claim release {}",
+                    "Lease {} (Issue {}): Issue no longer exists\n  Fix: {}",
                     lease.lease_id,
                     lease.issue_id.short_id(),
-                    lease.issue_id.short_id()
+                    force_evict_remedy(lease)
                 ));
             }
         }
 
         Ok(invalid_leases)
     }
+}
+
+/// The command that evicts `lease`; it resolves the issue among stored leases,
+/// so it also reaches a lease whose issue was deleted.
+fn force_evict_remedy(lease: &crate::storage::claim_coordinator::Lease) -> String {
+    format!(
+        "jit claim force-evict {} --reason \"<reason>\"",
+        lease.issue_id.short_id()
+    )
 }
 
 /// Format duration in human-readable form

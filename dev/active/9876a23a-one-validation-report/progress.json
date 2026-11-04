@@ -171,40 +171,38 @@
       "issues": [
         {
           "short_id": "612ee9d4",
-          "status": "rework 1 + merge c4a8c14d6 reviewed; landing pending",
+          "status": "landing (chain-w7b)",
           "worker": "claude opus",
           "worker_reason": "report-selection contract"
         },
         {
           "short_id": "2b5f452c",
-          "status": "rework 3 240ff34d0 accepted by steward (D-01); landing + held code-review pending",
+          "status": "done (merges d712d8b17, 6d4a8b704, 88ce303a1, c6c3cceb8; reworks 3 + steward D-01, D-02)",
           "worker": "claude opus",
           "worker_reason": "fidelity on parsed records (REQ-10)"
         },
         {
           "short_id": "3acaa5a3",
-          "status": "rework 2 a91e3b5cb reviewed; landing pending",
+          "status": "done (merges 7b2cfcdef, 1077419b1, f70dcdf40; reworks 2)",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "drift through report function"
         },
         {
           "short_id": "c1af05ac",
-          "status": "report tests pass after e2082ba9 (merge 4d48054e6); landing pending",
+          "status": "landing (chain-w7b)",
           "worker": "codex gpt-6-luna xhigh",
           "worker_reason": "test relocation"
         },
         {
           "short_id": "e2082ba9",
-          "status": "landed b67342fec; code-review passed; cargo-ci gate error (load) - rerun pending",
+          "status": "done b67342fec",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "bug found by c1af05ac; regression from 001a9c46"
         }
       ]
     }
   ],
-  "held": {
-    "wave7_landing_chain": "paused: main has a failing server test (1630015d x e5d618ee conflict); restart scratchpad land-pipeline.zsh chain 3acaa5a3, 2b5f452c, 612ee9d4, c1af05ac, then e2082ba9 cargo-ci gate, when just-in-time-88 reports the fix"
-  },
+  "held": {},
   "line_target": {
     "goal": "net production-line reduction",
     "baseline_rev": "120402067",
@@ -264,6 +262,16 @@
         "test_support_as_test": -32,
         "by_issue": {
           "6ba4f623": -32
+        }
+      },
+      {
+        "wave": 7,
+        "partial": true,
+        "test_support_as_test": 178,
+        "by_issue": {
+          "2b5f452c": 149,
+          "3acaa5a3": 9,
+          "e2082ba9": 20
         }
       }
     ]
@@ -362,7 +370,10 @@
     "dispatch-worker-worktree.sh refuses whenever main's checkout has any tracked change, including other leads' tracker files: commit a tracker sync immediately before dispatching, and check the [ok] line before writing briefs (03c59566, wave 7).",
     "Pipelines wait at most 30 min for load<4, then run CI (user ruling); exit 75 suite-budget faults are known environment faults until 88's f487aeef. Never launch a pipeline with & inside a foreground Bash call; use run_in_background.",
     "A nextest TIMEOUT on a normally millisecond test is a host artifact (cargo-pool-run waits for a jobserver token inside nextest's timer): rerun, never rework. Host measures: TMPDIR=/mnt/nvme/jit/tmp/9876-lead, CARGO_INCREMENTAL=0; reclaim worktrees as issues land; never touch the cache pool.",
-    "Codex workers never merge main or run any git write (read-only metadata leaves half-merges or copies main's uncommitted .jit lines); the lead merges main into Codex branches and commits their diffs with git add -A crates."
+    "Codex workers never merge main or run any git write (read-only metadata leaves half-merges or copies main's uncommitted .jit lines); the lead merges main into Codex branches and commits their diffs with git add -A crates.",
+    "A cargo-ci gate run that fails instantly with exit_code null and empty output was REUSED from a prior failed run with the same inputs digest (origin.derivation=reused). After an environment-faulted failure, re-evaluate with `jit gate evaluate <id> cargo-ci --force`.",
+    "Do not set TMPDIR to /mnt/nvme for tests: ext4 directory order breaks a drift test (3e's bug, fix with 944edb32) and fsync-heavy tests time out. ENOSPC under /tmp is a host fault: rerun.",
+    "/tmp ENOSPC was inode exhaustion (1.0M inodes; ~473K in leaked /tmp/.tmp* test dirs). Authoritative runs (branch CI, cargo-ci gates) use TMPDIR=/dev/shm/jit-ci/9876a23a under the full-CI lock, created before and removed after each run; workers use /mnt/nvme/jit/tmp/9876-workers (steward rule)."
   ],
   "plan_reviews": {
     "plan-review 2df01664": "passed after amendment (0 findings)",

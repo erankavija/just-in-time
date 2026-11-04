@@ -31,14 +31,23 @@ impl<T: Serialize + HumanRender> Report for T {
     }
 }
 
+/// One `Warning: <w>` line per warning to `err`, none under `-q`.
+fn write_warnings(err: &mut dyn Write, warnings: &[String], mode: OutputMode) -> io::Result<()> {
+    warnings
+        .iter()
+        .filter(|_| !mode.quiet)
+        .try_for_each(|warning| writeln!(err, "Warning: {warning}"))
+}
+
 /// Render `outcome` under `mode` and return the process exit status.
 ///
-/// Success writes the success envelope with the outcome's `message`
-/// (`--json`) or the response's human rendering to `out`, then, in human
+/// Success writes the success envelope with the outcome's `message` and
+/// non-empty `warnings` (`--json`) or the response's human rendering to `out`, then, in human
 /// non-quiet mode, one `Warning: <w>` line per outcome warning to `err`, and
 /// returns [`ExitCode::Success`]. Findings write the failure envelope with the report
-/// as `error.details` (`--json`), or the report's rendering to `out` and the
-/// outcome's `message` as one unprefixed line to `err`, and return the code's [`ErrorCode::exit_code`]. A closed pipe yields
+/// as `error.details` and non-empty `warnings` beside `error` (`--json`), or the
+/// report's rendering to `out`, the outcome's `message` as one unprefixed line
+/// and the `Warning:` lines to `err`, and return the code's [`ErrorCode::exit_code`]. A closed pipe yields
 /// [`ExitCode::BrokenPipe`]; the caller owns process exit.
 pub fn emit_outcome<R: Response>(
     outcome: &Outcome<R>,
@@ -48,11 +57,14 @@ pub fn emit_outcome<R: Response>(
 ) -> anyhow::Result<ExitCode> {
     let (written, status) = match outcome {
         Outcome::Success {
-            response, message, ..
+            response,
+            message,
+            warnings,
         } if mode.json => {
             let envelope = JsonOutput {
                 data: response,
                 message: message.clone(),
+                warnings: warnings.clone(),
             };
             (
                 writeln!(out, "{}", envelope.to_json_string()?),
@@ -63,20 +75,18 @@ pub fn emit_outcome<R: Response>(
             response, warnings, ..
         } => (
             out.write_all(response.render_human(mode).as_bytes())
-                .and_then(|()| {
-                    warnings
-                        .iter()
-                        .filter(|_| !mode.quiet)
-                        .try_for_each(|warning| writeln!(err, "Warning: {warning}"))
-                }),
+                .and_then(|()| write_warnings(err, warnings, mode)),
             ExitCode::Success,
         ),
         Outcome::Findings {
             code,
             message,
             report,
+            warnings,
         } if mode.json => {
-            let envelope = JsonError::new(*code, message.as_str()).with_details(report.details()?);
+            let envelope = JsonError::new(*code, message.as_str())
+                .with_details(report.details()?)
+                .with_warnings(warnings.clone());
             (
                 writeln!(out, "{}", envelope.to_json_string()?),
                 envelope.exit_code(),
@@ -86,9 +96,11 @@ pub fn emit_outcome<R: Response>(
             code,
             message,
             report,
+            warnings,
         } => (
             out.write_all(report.render_human(mode).as_bytes())
-                .and_then(|()| writeln!(err, "{message}")),
+                .and_then(|()| writeln!(err, "{message}"))
+                .and_then(|()| write_warnings(err, warnings, mode)),
             ErrorCode::exit_code(*code),
         ),
     };
@@ -153,6 +165,41 @@ mod tests {
     }
 
     #[test]
+    fn test_emit_outcome_json_lists_warnings_beside_either_variant_only_when_present() {
+        #[derive(Serialize, JsonSchema)]
+        struct Object {}
+        impl HumanRender for Object {
+            fn render_human(&self, _: OutputMode) -> String {
+                String::new()
+            }
+        }
+        let json = OutputMode {
+            json: true,
+            quiet: false,
+        };
+        let printed = |outcome: &Outcome<Object>| {
+            let mut out = Vec::new();
+            emit_outcome(outcome, json, &mut out, &mut io::sink()).unwrap();
+            serde_json::from_slice::<serde_json::Value>(&out).unwrap()
+        };
+        let findings = || Outcome::findings(ErrorCode::ValidationFailed, "failed", Object {});
+
+        let warned = [
+            printed(&Outcome::success(Object {}).with_warnings(["a", "b"])),
+            printed(&findings().with_warnings(["a", "b"])),
+        ];
+        let clean = [printed(&Outcome::success(Object {})), printed(&findings())];
+
+        assert!(warned
+            .iter()
+            .all(|envelope| envelope["warnings"] == serde_json::json!(["a", "b"])));
+        assert!(clean
+            .iter()
+            .all(|envelope| envelope.get("warnings").is_none()));
+        assert!(warned[1].get("error").is_some());
+    }
+
+    #[test]
     fn test_emit_outcome_closed_pipe_returns_broken_pipe_status() {
         let status = emit_outcome(
             &Outcome::success(Unit),
@@ -214,7 +261,7 @@ mod tests {
             },
             &outcome,
         );
-        let (json_out, json_err) = rendered(
+        let (_, json_err) = rendered(
             OutputMode {
                 json: true,
                 ..human
@@ -224,6 +271,23 @@ mod tests {
 
         assert_eq!(loud, "Warning: first\nWarning: second\n");
         assert!(quiet.is_empty() && json_err.is_empty());
-        assert!(!json_out.contains("first"));
+    }
+
+    #[test]
+    fn test_emit_outcome_findings_warnings_follow_the_message_line_on_stderr() {
+        let outcome =
+            Outcome::findings(ErrorCode::ValidationFailed, "failed", Framed).with_warnings(["w"]);
+
+        let (_, loud) = rendered(OutputMode::default(), &outcome);
+        let (_, quiet) = rendered(
+            OutputMode {
+                quiet: true,
+                ..OutputMode::default()
+            },
+            &outcome,
+        );
+
+        assert_eq!(loud, "failed\nWarning: w\n");
+        assert_eq!(quiet, "failed\n");
     }
 }

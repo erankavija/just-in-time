@@ -427,6 +427,10 @@
     {
       "item": "dd53527f code-review fail 4: claim list text output lacks STALE marker",
       "status": "resolved: rework 2 passed, done"
+    },
+    {
+      "item": "format-4 window bracket.sh denied by permission check",
+      "status": "pending with user directly"
     }
   ],
   "rework_counts": {
@@ -435,7 +439,8 @@
     "dd53527f": 2,
     "2117739f": 1,
     "2f563673": 1,
-    "0851fae4": 1
+    "0851fae4": 1,
+    "944edb32": 2
   },
   "surfaced_pitfalls": [
     {
@@ -676,6 +681,43 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "format-4 rewrite tooling; reads five repos read-only, scratch copies"
+    },
+    {
+      "id": "944edb32-r1",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "code-review F1 install must prove green cargo-ci; F2 test scratch under target/, reproducible five-repo dry run + completion note"
+    },
+    {
+      "id": "944edb32-r2",
+      "vendor": "lead",
+      "reason": "code-review F1: dry-run driver resolves <common-dir>/jit; dry run re-verified on five repos"
+    },
+    {
+      "id": "614a6f97",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "issue-addressed lease ops; removes lease-id-scan-bridge"
+    },
+    {
+      "id": "725af076",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "capture refuses whole event log; shared test builder"
+    },
+    {
+      "id": "09ca911e",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "storage-record reference docs"
+    },
+    {
+      "id": "ba4c6054",
+      "vendor": "claude",
+      "model": "sonnet",
+      "reason": "gate/search docs"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
@@ -694,6 +736,8 @@
     "User ruling: reorder toward 944edb32 (format rewrite tooling); defer tasks off its path.",
     "a7314585 added LeaseChange::Reclaim and edited the lease-sequence contract in plan.md; batch a plan-review rerun after the wave.",
     "gf2 quiet window 03:52-04:09 held the full-CI lock; released by 6a.",
-    "Window bracket (6a): give 6a 15 min warning; 6a stops all tracker writers (88, a4, gf2-4e) and confirms; then rewrite all five, reinstall jit once, verify each with jit validate, report to 6a who releases everyone and lifts the install freeze. Stop and report before reinstalling if any rewrite or validation fails."
+    "Window bracket (6a): give 6a 15 min warning; 6a stops all tracker writers (88, a4, gf2-4e) and confirms; then rewrite all five, reinstall jit once, verify each with jit validate, report to 6a who releases everyone and lifts the install freeze. Stop and report before reinstalling if any rewrite or validation fails.",
+    "Window blocked 07:3x by Claude Code permission (Modify Shared Resources); awaiting user. 6a released writers; repeat stop sequence after user allows. Bracket script: scratchpad/f8a6-lead/bracket.sh; re-verify green sha before rerun.",
+    "Session paused at usage limit 07:35; see handoff.md."
   ]
 }

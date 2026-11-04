@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "59257f573421192c27676a4cb5c260f659904816",
+  "completed_at": "2026-11-04T04:43:02.729906106Z",
+  "duration_ms": 261175,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/cargo-ci.sh",
+        "id": "F1",
+        "line": 103,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/cargo-ci",
+          "@/issue/8a14e8e9/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "Non-test steps containing both ENOSPC and a content failure are classified as exit 75 rather than exit 1."
+      }
+    ],
+    "summary": "A mixed non-test failure containing ENOSPC is misclassified as retryable.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8a14e8e9-689d-4d78-ac1e-d9b312966faa",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e154ca06-f97b-4743-aa86-5fbc9169fa63",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T04:38:41.554739261Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6296 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a4da-26cd-7392-8e63-3476a3e1d09c\n--------\nuser\n--- 6283 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: tagged commits cfc223f90, 561d99d21, 3923daf09, d0a24ddd8\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci and @/gate/cargo-ci-selftest (.jit/gates.toml, registry-first); @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/single-source-prose (.jit/invariants.toml, registry-first); @/charter/D-2 (dev/vision/9db27a3a-charter.md, markdown-first); @/issue/8a14e8e9/requirement/REQ-01–REQ-04 (.jit/issues/8a14e8e9-689d-4d78-ac1e-d9b312966faa.json, markdown-first)\nGate evidence: cargo-ci passed (exit 0); cargo-ci-selftest passed (exit 0); code-review is this review\nTruncation recovery: recovered individual bounded patches and current script, registry, projection, nextest-config, and budget-tool reads after truncated broad output\n\n1. [blocking; issue-impact] `scripts/cargo-ci.sh:103` treats every non-`test` step containing ENOSPC as ENOSPC-only. Thus a `clippy`, `doctest`, or `budget` output containing both ENOSPC and a content failure exits 75 instead of 1, violating REQ-02. The self-test covers a separate failing budget step, not a mixed non-test output. [@/gate/cargo-ci, @/issue/8a14e8e9/requirement/REQ-02]\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A mixed non-test failure containing ENOSPC is misclassified as retryable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Non-test steps containing both ENOSPC and a content failure are classified as exit 75 rather than exit 1.\",\"file\":\"scripts/cargo-ci.sh\",\"line\":103,\"references\":[\"@/gate/cargo-ci\",\"@/issue/8a14e8e9/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

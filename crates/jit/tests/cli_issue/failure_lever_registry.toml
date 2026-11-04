@@ -44,19 +44,19 @@ confirmation = "invoked"
 
 [[arms]]
 path = "claim renew"
-argv = ["claim", "renew", "00000000-0000-0000-0000-000000000000", "--json"]
-setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:active-lease"]
-setup_notes = "claim:active-lease seeds one valid issue and acquires a finite lease for it, creating its lease record and the claims lock before the missing lease lookup."
-expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
+argv = ["claim", "renew", "deadbeef", "--json"]
+setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:active-lease", "seed-issue:deadbeef"]
+setup_notes = "claim:active-lease leases another issue, creating the lease directory and the claims lock; seed-issue:deadbeef seeds the addressed issue without a lease."
+expected_failure = "ISSUE_NOT_FOUND: Issue deadbeef-0000-0000-0000-000000000000 has no active lease (not found)"
 expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
 
 [[arms]]
 path = "claim heartbeat"
-argv = ["claim", "heartbeat", "00000000-0000-0000-0000-000000000000", "--json"]
-setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:active-lease"]
-setup_notes = "claim:active-lease seeds one valid issue and acquires a finite lease for it, creating its lease record and the claims lock before the missing lease lookup."
-expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
+argv = ["claim", "heartbeat", "deadbeef", "--json"]
+setup = ["init", "git:repository-with-head", "env:JIT_AGENT_ID=agent:probe", "claim:active-lease", "seed-issue:deadbeef"]
+setup_notes = "claim:active-lease leases another issue, creating the lease directory and the claims lock; seed-issue:deadbeef seeds the addressed issue without a lease."
+expected_failure = "ISSUE_NOT_FOUND: Issue deadbeef-0000-0000-0000-000000000000 has no active lease (not found)"
 expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
 
@@ -80,10 +80,10 @@ confirmation = "invoked"
 
 [[arms]]
 path = "claim force-evict"
-argv = ["claim", "force-evict", "00000000-0000-0000-0000-000000000000", "--reason", "probe", "--json"]
+argv = ["claim", "force-evict", "deadbeef", "--reason", "probe", "--json"]
 setup = ["init", "git:repository-with-head", "claim:active-lease"]
-setup_notes = "claim:active-lease seeds one valid issue and acquires a finite lease for it, creating its lease record and the claims lock before the missing lease lookup."
-expected_failure = "ISSUE_NOT_FOUND: Lease 00000000-0000-0000-0000-000000000000 not found"
+setup_notes = "claim:active-lease leases another issue, creating the lease directory and the claims lock; no lease record's name matches the addressed prefix."
+expected_failure = "ISSUE_NOT_FOUND: Issue deadbeef has no active lease (not found)"
 expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
 
@@ -117,7 +117,7 @@ path = "config validate"
 argv = ["config", "validate", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Overwrite .jit/config.toml with malformed TOML after initialization so validation reaches a reproducible post-dispatch finding."
-expected_failure = "Validation failed: 1 error(s)"
+expected_failure = "Configuration validation failed with 1 error(s)"
 expected_code = "VALIDATION_FAILED"
 confirmation = "invoked"
 
