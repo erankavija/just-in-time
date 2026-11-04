@@ -167,35 +167,14 @@ impl HumanRender for AssetListResult {
             rendered.push_str("  No assets found for this document\n");
             return rendered;
         }
-        let exists = |asset: &Asset| {
-            asset
+        let located = |asset: &Asset, with_mime: bool| {
+            let exists = asset
                 .resolved_path
                 .as_ref()
-                .is_some_and(|path| scope.worktree_root.join(path).exists())
-        };
-        let section = |rendered: &mut String,
-                       heading: &str,
-                       assets: Vec<&Asset>,
-                       line: &dyn Fn(&Asset) -> String| {
-            if !assets.is_empty() {
-                let _ = writeln!(rendered, "\n{heading}:");
-                assets
-                    .into_iter()
-                    .for_each(|asset| rendered.push_str(&line(asset)));
-            }
-        };
-        let of = |local: Option<bool>, asset_type: AssetType| {
-            self.items
-                .iter()
-                .filter(|a| {
-                    a.asset_type == asset_type && local.is_none_or(|shared| a.is_shared == shared)
-                })
-                .collect::<Vec<_>>()
-        };
-        let located = |asset: &Asset, with_mime: bool| {
+                .is_some_and(|path| scope.worktree_root.join(path).exists());
             let mut line = format!(
                 "  {} {}\n",
-                if exists(asset) { "ok" } else { "missing" },
+                if exists { "ok" } else { "missing" },
                 asset.original_path
             );
             if let Some(resolved) = &asset.resolved_path {
@@ -206,36 +185,49 @@ impl HumanRender for AssetListResult {
             }
             line
         };
-        section(
-            &mut rendered,
-            "Per-document assets",
-            of(Some(false), AssetType::Local),
-            &|a| located(a, true),
-        );
-        section(
-            &mut rendered,
-            "Shared assets",
-            of(Some(true), AssetType::Local),
-            &|a| located(a, false),
-        );
-        section(
-            &mut rendered,
-            "External URLs",
-            of(None, AssetType::External),
-            &|a| format!("  remote {}\n", a.original_path),
-        );
-        section(
-            &mut rendered,
-            "Missing assets",
-            of(None, AssetType::Missing),
-            &|a| {
-                let mut line = format!("  missing {}\n", a.original_path);
-                if let Some(resolved) = &a.resolved_path {
-                    let _ = writeln!(line, "     Expected at: {}", resolved.display());
-                }
-                line
-            },
-        );
+        let of = |asset_type: AssetType, shared: bool| {
+            self.items
+                .iter()
+                .filter(move |a| a.asset_type == asset_type && a.is_shared == shared)
+        };
+        let sections = [
+            (
+                "Per-document assets",
+                of(AssetType::Local, false)
+                    .map(|a| located(a, true))
+                    .collect::<String>(),
+            ),
+            (
+                "Shared assets",
+                of(AssetType::Local, true)
+                    .map(|a| located(a, false))
+                    .collect(),
+            ),
+            (
+                "External URLs",
+                self.items
+                    .iter()
+                    .filter(|a| a.asset_type == AssetType::External)
+                    .map(|a| format!("  remote {}\n", a.original_path))
+                    .collect(),
+            ),
+            (
+                "Missing assets",
+                self.items
+                    .iter()
+                    .filter(|a| a.asset_type == AssetType::Missing)
+                    .map(|a| {
+                        let expected = a.resolved_path.as_ref().map_or(String::new(), |path| {
+                            format!("     Expected at: {}\n", path.display())
+                        });
+                        format!("  missing {}\n{expected}", a.original_path)
+                    })
+                    .collect(),
+            ),
+        ];
+        for (heading, lines) in sections.iter().filter(|(_, lines)| !lines.is_empty()) {
+            let _ = write!(rendered, "\n{heading}:\n{lines}");
+        }
         let summary = &scope.summary;
         let _ = writeln!(
             rendered,

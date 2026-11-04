@@ -26,6 +26,13 @@ fn success<R>(response: R, message: impl Into<String>) -> Outcome<R> {
     }
 }
 
+fn plain<R>(response: R) -> Outcome<R> {
+    Outcome::Success {
+        response,
+        message: None,
+    }
+}
+
 fn print_warnings<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     warnings: &[String],
@@ -107,23 +114,19 @@ fn dir<S: IssueStore>(
     id: &str,
     area: &str,
 ) -> anyhow::Result<Outcome<ArtifactDirectoryResponse>> {
-    let response = ctx
+    let directory = ctx
         .executor
         .documents()
         .resolve_issue_artifact_directory(&resolve_issue(ctx, id)?, area)?;
-    Ok(Outcome::Success {
-        response,
-        message: None,
-    })
+    Ok(plain(directory))
 }
 
 fn conformance<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
 ) -> anyhow::Result<Outcome<ArtifactConformanceResponse>> {
-    Ok(Outcome::Success {
-        response: ctx.executor.documents().report_artifact_conformance()?,
-        message: None,
-    })
+    Ok(plain(
+        ctx.executor.documents().report_artifact_conformance()?,
+    ))
 }
 
 fn history<S: IssueStore>(
