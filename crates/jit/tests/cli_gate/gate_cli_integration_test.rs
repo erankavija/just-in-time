@@ -298,6 +298,46 @@ fn test_gate_update_json_success_suppresses_human_lease_warnings() {
 }
 
 #[test]
+fn test_gate_preset_apply_partial_batch_retains_lease_warnings_in_both_modes() {
+    let temp = JitCli::initialised().unwrap();
+    let source = add_auto_gate_issue(&temp, "test-gate", "exit 0");
+    temp.run(["gate", "preset", "create", &source, "team"])
+        .unwrap();
+    let target = crate::create_titled_issue(&temp, "Target");
+    enable_warn_leases(&temp);
+    lease_to_another_agent(&temp, &target);
+
+    for json in [false, true] {
+        let mut args = vec!["gate", "preset", "apply", "team", &target, "00000000"];
+        if json {
+            args.push("--json");
+        }
+        let output = temp
+            .command_with_env(args, [("JIT_AGENT_ID", "agent:editor")])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(3));
+        if json {
+            assert!(output.stderr.is_empty(), "{output:?}");
+            let response: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert!(response["warnings"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|warning| { warning.as_str().is_some_and(|text| text.contains(&target)) }));
+            assert!(response["error"]["details"]["success"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|entry| entry["issue_id"] == target));
+        } else {
+            assert!(String::from_utf8_lossy(&output.stderr).contains("Warning:"));
+            assert!(String::from_utf8_lossy(&output.stdout).contains("Errors (1)"));
+        }
+    }
+}
+
+#[test]
 fn test_gate_evaluate_json_failure_includes_lease_warnings() {
     let temp = JitCli::initialised().unwrap();
     let issue_id = add_auto_gate_issue(&temp, "test-gate", "exit 1");

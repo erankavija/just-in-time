@@ -529,6 +529,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
             .downcast_ref::<crate::domain::identity::InvalidGateKeyError>()
             .is_some()
         || error
+            .downcast_ref::<crate::domain::identity::InvalidGateRunIdError>()
+            .is_some()
+        || error
             .downcast_ref::<crate::domain::AssigneeParseError>()
             .is_some()
         || error
@@ -1951,5 +1954,32 @@ mod path_read_classification_tests {
         .code;
         assert_eq!(code_of(PathReadError::Other(inner.into())), expected);
         assert_eq!(expected, ErrorCode::PermissionDenied);
+    }
+}
+
+#[cfg(test)]
+mod malformed_identity_classification_tests {
+    //! A malformed gate key or gate-run id is an invalid argument.
+
+    use super::classify;
+    use crate::domain::identity::{GateKey, GateRunId};
+    use crate::output::ErrorCode;
+
+    #[test]
+    fn test_classify_malformed_gate_run_id_is_invalid_argument() {
+        let error = "not-a-run-id".parse::<GateRunId>().unwrap_err();
+        assert_eq!(
+            classify(&error.into()).error.code,
+            ErrorCode::InvalidArgument
+        );
+    }
+
+    #[test]
+    fn test_classify_malformed_gate_key_is_invalid_argument() {
+        let error = "Bad_Key".parse::<GateKey>().unwrap_err();
+        assert_eq!(
+            classify(&error.into()).error.code,
+            ErrorCode::InvalidArgument
+        );
     }
 }

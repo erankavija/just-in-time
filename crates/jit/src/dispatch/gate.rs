@@ -295,19 +295,19 @@ fn preset_apply<S: IssueStore + RepositoryStateStore>(
         );
         Outcome::success_with(report, message)
     } else {
-        Outcome::Findings {
-            code: if lock_timed_out {
+        Outcome::findings(
+            if lock_timed_out {
                 ErrorCode::LockTimeout
             } else {
                 ErrorCode::PresetError
             },
-            message: format!(
+            format!(
                 "Failed to apply preset '{}' to {} issue(s)",
                 report.preset,
                 report.errors.len()
             ),
-            report: Box::new(report),
-        }
+            report,
+        )
     };
     Ok(outcome.with_warnings(warnings))
 }

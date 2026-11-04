@@ -23,7 +23,7 @@ use jit::cli::{
 use jit::commands::{
     parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
 };
-use jit::dispatch::{invariant, resolve_issue, resolve_issue_filter, CommandContext};
+use jit::dispatch::{config, invariant, resolve_issue, resolve_issue_filter, CommandContext};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -4027,18 +4027,19 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
 
                     let output_ctx = OutputContext::new(quiet, json);
                     let id = resolve_issue(&storage, &id)?;
-                    let result = executor
+                    let (result, warnings) = executor
                         .documents()
                         .list_document_assets(&id, &path, rescan)?;
 
-                    // Print warnings first if any
-                    for warning in &result.extras.warnings {
+                    for warning in &warnings {
                         output_ctx.print_warning(warning)?;
                     }
 
                     if json {
                         let msg = format!("{} assets found", result.extras.summary.total);
-                        let output = JsonOutput::success(&result).with_message(msg);
+                        let output = JsonOutput::success(&result)
+                            .with_message(msg)
+                            .with_warnings(warnings);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let repo_root = executor_layout.worktree_root();
@@ -4556,187 +4557,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         },
-        Commands::Config(config_cmd) => match config_cmd {
-            jit::cli::ConfigCommands::Show => {
-                use jit::output::JsonOutput;
-
-                let snapshot = executor.config().effective_config_snapshot()?;
-
-                if json {
-                    println!(
-                        "{}",
-                        JsonOutput::success(snapshot)
-                            .with_message("Effective configuration")
-                            .to_json_string()?
-                    );
-                } else {
-                    println!("Effective Configuration:\n");
-                    print!("{}", jit::output::render_config_snapshot(&snapshot));
-                }
-            }
-            jit::cli::ConfigCommands::Get { key } => {
-                use jit::output::{render_config_get_value, ErrorCode, JsonOutput};
-                use serde_json::json;
-
-                match executor.config().get_config(&key) {
-                    Ok(outcome) => {
-                        if json {
-                            println!(
-                                "{}",
-                                JsonOutput::success(
-                                    json!({"key": outcome.key, "value": outcome.value})
-                                )
-                                .to_json_string()?
-                            );
-                        } else {
-                            println!("{}", render_config_get_value(&outcome.value));
-                        }
-                    }
-                    Err(e) => {
-                        // Only an unknown/missing dotted key (the typed,
-                        // shared `InvalidArgumentError` `get_config` converts
-                        // `ConfigKeyError` into) is an argument error. A
-                        // load/parse/filesystem failure (e.g. a malformed
-                        // `config.toml`) is NOT downcastable to it, so it
-                        // falls through to the normal error path and is
-                        // classified the same way every other config-load
-                        // failure in this codebase is — never misreported as
-                        // a bad CLI argument.
-                        if e.downcast_ref::<jit::errors::InvalidArgumentError>()
-                            .is_some()
-                        {
-                            handle_json_error!(
-                                json,
-                                e,
-                                command_json_error(&e, ErrorCode::InvalidArgument)
-                            );
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-            jit::cli::ConfigCommands::Set { key, value } => {
-                use jit::output::JsonOutput;
-                use serde_json::json;
-
-                let outcome = executor.config().set_config(&key, &value)?;
-
-                if json {
-                    println!(
-                        "{}",
-                        JsonOutput::success(json!({
-                            "key": outcome.key,
-                            "value": outcome.value,
-                            "file": outcome.file.display().to_string()
-                        }))
-                        .to_json_string()?
-                    );
-                } else {
-                    println!(
-                        "Set {} = {} in {}",
-                        outcome.key,
-                        outcome.value,
-                        outcome.file.display()
-                    );
-                }
-            }
-            jit::cli::ConfigCommands::Validate => {
-                use jit::config::JitConfig;
-                use serde_json::json;
-
-                #[derive(Default)]
-                struct ValidationResult {
-                    errors: Vec<String>,
-                }
-
-                let mut result = ValidationResult::default();
-
-                // Check repo config — invalid enforcement and write-policy tokens are
-                // caught at TOML parse time, so a successful load implies valid values.
-                let repo_config_path = executor
-                    .storage()
-                    .repository_layout()?
-                    .resolve(&VirtualPath::CONFIG)?;
-                if repo_config_path.exists() {
-                    if let Err(e) = JitConfig::load(&executor.storage().repository_layout()?) {
-                        result.errors.push(format!("repo config: {}", e));
-                    }
-                }
-
-                if let Err(e) = jit::config_manager::ConfigManager::invocation_write_override() {
-                    result.errors.push(format!("{e}"));
-                }
-
-                let has_errors = !result.errors.is_empty();
-
-                if json {
-                    let details = json!({
-                        "valid": !has_errors,
-                        "errors": result.errors,
-                    });
-                    let message = if has_errors {
-                        format!("Validation failed: {} error(s)", result.errors.len())
-                    } else {
-                        "Configuration is valid".to_string()
-                    };
-                    render_validation_json(
-                        details,
-                        message,
-                        has_errors.then_some(ErrorCode::ValidationFailed),
-                    )?;
-                } else {
-                    let findings: Vec<_> = result
-                        .errors
-                        .iter()
-                        .map(|message| jit::validation::report::ReportedFinding {
-                            issue_id: None,
-                            rule: "config".to_string(),
-                            severity: jit::declarations::rules::Severity::Error,
-                            message: message.clone(),
-                        })
-                        .collect();
-                    jit::output::render_validation_findings(
-                        &findings,
-                        Some(jit::output::FindingsSummary {
-                            pass: "Configuration is valid",
-                            failure: "Configuration validation failed",
-                        }),
-                    )
-                    .print();
-                }
-
-                // A source that failed to load or carried an invalid value is a
-                // registered validation failure. There is no warning outcome.
-                if has_errors {
-                    std::process::exit(ErrorCode::ValidationFailed.exit_code().code());
-                }
-            }
-            jit::cli::ConfigCommands::ShowHierarchy => {
-                let output_ctx = OutputContext::new(quiet, json);
-                use jit::config_manager::ConfigManager;
-                let config_mgr = ConfigManager::new(executor.storage().repository_layout()?);
-                let namespaces = config_mgr.get_namespaces()?;
-                let hierarchy = namespaces.declared_type_hierarchy();
-
-                if json {
-                    use jit::output::JsonOutput;
-                    println!(
-                        "{}",
-                        JsonOutput::success(hierarchy)
-                            .with_message("Type hierarchy")
-                            .to_json_string()?
-                    );
-                } else {
-                    let _ = output_ctx.print_info("Type Hierarchy:\n");
-                    let mut sorted: Vec<_> = hierarchy.iter().collect();
-                    sorted.sort_by_key(|(_, level)| *level);
-                    for (type_name, level) in sorted {
-                        println!("  {} → Level {}", type_name, level);
-                    }
-                }
-            }
-        },
+        Commands::Config(command) => {
+            return config::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
         Commands::Hooks(hooks_cmd) => match hooks_cmd {
             jit::cli::HooksCommands::Install => {
                 use jit::commands::hooks::install_hooks;
@@ -5824,23 +5647,28 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
             ClaimCommands::Renew {
-                lease_id,
+                issue_id,
                 extension,
             } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match executor.claims().renew(&lease_id, extension) {
+                match resolve_issue(&storage, &issue_id)
+                    .and_then(|full_id| executor.claims().renew(&full_id, extension))
+                {
                     Ok((renewed_lease, warnings)) => {
                         if json {
                             let response = serde_json::json!({
+                                "message": format!(
+                                    "Renewed lease {} by {} seconds",
+                                    renewed_lease.lease_id, extension
+                                ),
                                 "lease": renewed_lease,
                                 "warnings": warnings,
-                                "message": format!("Renewed lease {} by {} seconds", lease_id, extension),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Renewed lease: {}", lease_id);
+                            println!("Renewed lease: {}", renewed_lease.lease_id);
                             println!("  Issue: {}", renewed_lease.issue_id);
                             println!("  Extended by: {} seconds", extension);
                             if let Some(expires_at) = renewed_lease.expires_at {
@@ -5863,21 +5691,25 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     }
                 }
             }
-            ClaimCommands::Heartbeat { lease_id } => {
+            ClaimCommands::Heartbeat { issue_id } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match executor.claims().heartbeat(&lease_id) {
-                    Ok(warnings) => {
+                match resolve_issue(&storage, &issue_id)
+                    .and_then(|full_id| executor.claims().heartbeat(&full_id))
+                {
+                    Ok((lease, warnings)) => {
                         if json {
                             let response = serde_json::json!({
-                                "lease_id": lease_id,
+                                "lease_id": lease.lease_id,
+                                "issue_id": lease.issue_id,
                                 "warnings": warnings,
-                                "message": format!("Heartbeat sent for lease {}", lease_id),
+                                "message": format!("Heartbeat sent for lease {}", lease.lease_id),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Heartbeat sent: {}", lease_id);
+                            println!("Heartbeat sent: {}", lease.lease_id);
+                            println!("  Issue: {}", lease.issue_id);
                             let output_ctx = OutputContext::new(quiet, json);
                             for warning in &warnings {
                                 output_ctx.print_warning(warning)?;
@@ -5959,22 +5791,30 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     }
                 }
             }
-            ClaimCommands::ForceEvict { lease_id, reason } => {
+            ClaimCommands::ForceEvict { issue_id, reason } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match executor.claims().force_evict(&lease_id, &reason) {
-                    Ok(warnings) => {
+                // Matched against stored leases, not issues, so a lease on a
+                // deleted issue stays evictable.
+                match issue_id
+                    .parse::<jit::domain::identity::IssueIdPrefix>()
+                    .map_err(anyhow::Error::from)
+                    .and_then(|prefix| executor.claims().force_evict(&prefix, &reason))
+                {
+                    Ok((evicted, warnings)) => {
                         if json {
                             let response = serde_json::json!({
-                                "lease_id": lease_id,
+                                "lease_id": evicted.lease_id,
+                                "issue_id": evicted.issue_id,
                                 "reason": reason,
                                 "warnings": warnings,
-                                "message": format!("Force-evicted lease {}", lease_id),
+                                "message": format!("Force-evicted lease {}", evicted.lease_id),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Force-evicted lease: {}", lease_id);
+                            println!("Force-evicted lease: {}", evicted.lease_id);
+                            println!("  Issue: {}", evicted.issue_id);
                             println!("  Reason: {}", reason);
                             let output_ctx = OutputContext::new(quiet, json);
                             for warning in &warnings {
@@ -6270,7 +6110,7 @@ fn print_lease(listed: &jit::commands::claim::ListedLease) {
             );
             println!(
                 "     Use 'jit claim heartbeat {}' to refresh",
-                lease.lease_id
+                lease.issue_id.short_id()
             );
         }
     }

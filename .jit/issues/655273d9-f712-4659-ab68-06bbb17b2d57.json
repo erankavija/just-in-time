@@ -26,7 +26,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Five repositories move to repository format 4 in one window",
-  "updated_at": "2026-11-02T23:40:56.991478200Z"
+  "updated_at": "2026-11-04T05:10:56.655517666Z"
 }

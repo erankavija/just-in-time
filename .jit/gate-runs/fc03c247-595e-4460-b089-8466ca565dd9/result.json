@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "214d3d32e6073d0447212e0db7200dc1c7a80a11",
+  "completed_at": "2026-11-04T04:51:42.479040410Z",
+  "duration_ms": 197912,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/cargo-ci.sh",
+        "id": "F1",
+        "line": 104,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/cargo-ci",
+          "@/issue/8a14e8e9/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "A same-test assertion failure plus ENOSPC is classified as exit 75 instead of exit 1."
+      }
+    ],
+    "summary": "A genuine test failure sharing an ENOSPC nextest block is misclassified as retryable.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8a14e8e9-689d-4d78-ac1e-d9b312966faa",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fc03c247-595e-4460-b089-8466ca565dd9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T04:48:24.566341308Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4411 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a4e3-08d8-74c3-8fd9-9d1d5ec2fb81\n--------\nuser\n--- 4398 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:8a14e8e9` commits cfc223f90, 561d99d21, 3923daf09, d0a24ddd8, 09680360b\nPolicy sources: `AGENTS.md`\nResolved items: `@/gate/cargo-ci` (`.jit/gates.toml`); `@/invariant/essential-code-prose`, `@/invariant/orthogonal-tests`, `@/invariant/single-source-prose` (`.jit/invariants.toml`); `@/issue/8a14e8e9/requirement/REQ-01` through `REQ-04` (issue Markdown)\nGate evidence: cargo-ci passed (exit 0); cargo-ci-selftest passed (exit 0); prior code-review failed (exit 1), with its non-test mixed-failure finding addressed by 09680360b\nTruncation recovery: re-read truncated evidence as individual per-commit patches and bounded current-file/configuration ranges\n\n1. **[blocking][issue-impact][high]** A genuine failure in the same nextest test block as ENOSPC is ignored. `count_non_enospc_failures` skips all non-ENOSPC lines while `cur` is set, so `FAIL …`, `thread panicked: assertion failed`, and `No space left on device` yields zero non-ENOSPC failures and exits 75. The self-test places its assertion only after a second `FAIL` block, so it misses this case. This violates REQ-02. (`scripts/cargo-ci.sh:104`, `scripts/cargo-ci-selftest.sh:1018`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A genuine test failure sharing an ENOSPC nextest block is misclassified as retryable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A same-test assertion failure plus ENOSPC is classified as exit 75 instead of exit 1.\",\"file\":\"scripts/cargo-ci.sh\",\"line\":104,\"references\":[\"@/gate/cargo-ci\",\"@/issue/8a14e8e9/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

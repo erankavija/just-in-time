@@ -3,7 +3,7 @@
 use super::{CaptureError, VirtualPath};
 use crate::domain::identity::IssueId;
 use crate::domain::Issue;
-use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
+use serde::de::{Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use thiserror::Error;
@@ -36,8 +36,10 @@ pub fn decode_issue_record(
 /// Decode the record at `path` to its JSON value, and the issue from that value.
 ///
 /// Record fidelity compares the value with the issue's serialization, so the
-/// value is the one decode. It rejects a repeated key as the typed decode
-/// does; a typed decode of the bytes runs only to locate a failed issue decode.
+/// value is the one decode. Only when a key repeats, or the issue does not
+/// decode from the value, does a typed decode of the bytes run: it rejects a
+/// repeated issue field at its position, as the typed decode always has, and
+/// locates a mistyped field.
 fn decode_issue_value(
     path: &VirtualPath,
     bytes: &[u8],
@@ -46,7 +48,10 @@ fn decode_issue_value(
         path: path.relative().as_str().to_string(),
         source,
     };
-    let UniqueKeys(value) = serde_json::from_slice(bytes).map_err(malformed)?;
+    let KeyedValue { value, repeated } = serde_json::from_slice(bytes).map_err(malformed)?;
+    if repeated {
+        serde_json::from_slice::<Issue>(bytes).map_err(malformed)?;
+    }
     let issue = Issue::deserialize(&value).map_err(|error| {
         malformed(
             serde_json::from_slice::<Issue>(bytes)
@@ -57,71 +62,95 @@ fn decode_issue_value(
     Ok((issue, value))
 }
 
-/// A JSON value whose objects reject a repeated key at its position.
-struct UniqueKeys(Value);
+/// A JSON value and whether any of its objects repeats a key.
+struct KeyedValue {
+    value: Value,
+    repeated: bool,
+}
 
-impl<'de> Deserialize<'de> for UniqueKeys {
+impl<'de> Deserialize<'de> for KeyedValue {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer
-            .deserialize_any(UniqueKeysVisitor)
-            .map(UniqueKeys)
+        deserializer.deserialize_any(KeyedValueVisitor)
     }
 }
 
-struct UniqueKeysVisitor;
+struct KeyedValueVisitor;
 
-impl<'de> Visitor<'de> for UniqueKeysVisitor {
-    type Value = Value;
+impl KeyedValue {
+    fn leaf(value: impl Into<Value>) -> Self {
+        Self {
+            value: value.into(),
+            repeated: false,
+        }
+    }
+}
+
+impl<'de> Visitor<'de> for KeyedValueVisitor {
+    type Value = KeyedValue;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("a JSON value")
     }
 
-    fn visit_bool<E>(self, value: bool) -> Result<Value, E> {
-        Ok(value.into())
+    fn visit_bool<E>(self, value: bool) -> Result<KeyedValue, E> {
+        Ok(KeyedValue::leaf(value))
     }
 
-    fn visit_i64<E>(self, value: i64) -> Result<Value, E> {
-        Ok(value.into())
+    fn visit_i64<E>(self, value: i64) -> Result<KeyedValue, E> {
+        Ok(KeyedValue::leaf(value))
     }
 
-    fn visit_u64<E>(self, value: u64) -> Result<Value, E> {
-        Ok(value.into())
+    fn visit_u64<E>(self, value: u64) -> Result<KeyedValue, E> {
+        Ok(KeyedValue::leaf(value))
     }
 
-    fn visit_f64<E>(self, value: f64) -> Result<Value, E> {
-        Ok(value.into())
+    fn visit_f64<E>(self, value: f64) -> Result<KeyedValue, E> {
+        Ok(KeyedValue::leaf(value))
     }
 
-    fn visit_str<E>(self, value: &str) -> Result<Value, E> {
-        Ok(value.into())
+    fn visit_str<E>(self, value: &str) -> Result<KeyedValue, E> {
+        Ok(KeyedValue::leaf(value))
     }
 
-    fn visit_string<E>(self, value: String) -> Result<Value, E> {
-        Ok(value.into())
+    fn visit_string<E>(self, value: String) -> Result<KeyedValue, E> {
+        Ok(KeyedValue::leaf(value))
     }
 
-    fn visit_unit<E>(self) -> Result<Value, E> {
-        Ok(Value::Null)
+    fn visit_unit<E>(self) -> Result<KeyedValue, E> {
+        Ok(KeyedValue::leaf(Value::Null))
     }
 
-    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Value, A::Error> {
-        std::iter::from_fn(|| seq.next_element::<UniqueKeys>().transpose())
-            .map(|element| element.map(|UniqueKeys(value)| value))
-            .collect::<Result<_, _>>()
-            .map(Value::Array)
-    }
-
-    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Value, A::Error> {
-        let mut object = Map::new();
-        while let Some(key) = map.next_key::<String>()? {
-            if object.contains_key(&key) {
-                return Err(de::Error::custom(format_args!("duplicate key `{key}`")));
-            }
-            let UniqueKeys(value) = map.next_value()?;
-            object.insert(key, value);
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<KeyedValue, A::Error> {
+        let mut items = Vec::new();
+        let mut repeated = false;
+        while let Some(KeyedValue {
+            value,
+            repeated: inner,
+        }) = seq.next_element()?
+        {
+            repeated |= inner;
+            items.push(value);
         }
-        Ok(Value::Object(object))
+        Ok(KeyedValue {
+            value: Value::Array(items),
+            repeated,
+        })
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<KeyedValue, A::Error> {
+        let mut object = Map::new();
+        let mut repeated = false;
+        while let Some(key) = map.next_key::<String>()? {
+            let KeyedValue {
+                value,
+                repeated: inner,
+            } = map.next_value()?;
+            repeated |= inner | object.insert(key, value).is_some();
+        }
+        Ok(KeyedValue {
+            value: Value::Object(object),
+            repeated,
+        })
     }
 }
 
@@ -252,6 +281,17 @@ mod tests {
 
         assert!(error.to_string().contains("title"), "{error}");
         assert_eq!((error.line(), error.column()), (2, 7), "{error}");
+    }
+
+    #[test]
+    fn test_decode_issue_record_accepts_a_repeated_unknown_key_as_before() {
+        let path = VirtualPath::issue_record(&issue_id(1));
+        let record = String::from_utf8(record_bytes(&issue_id(1))).unwrap();
+        let repeated = record.replacen('{', "{\"unknown\":1,\"unknown\":2,", 1);
+
+        let issue = decode_issue_record(&path, repeated.as_bytes()).unwrap();
+
+        assert_eq!(issue.id, issue_id(1));
     }
 
     #[test]

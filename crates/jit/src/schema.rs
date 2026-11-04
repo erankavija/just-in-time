@@ -119,6 +119,31 @@ pub struct OutputSchema {
 }
 
 impl OutputSchema {
+    /// This schema with the optional `warnings` property every success
+    /// envelope may carry, declared here once for all commands.
+    fn with_warnings(mut self) -> Self {
+        if let Some(Value::Object(schema)) = &mut self.success_schema {
+            if let Value::Object(properties) = schema
+                .entry("properties")
+                .or_insert_with(|| Value::Object(Default::default()))
+            {
+                properties
+                    .entry(crate::output::WARNINGS_FIELD)
+                    .or_insert_with(Self::warnings_property);
+            }
+        }
+        self
+    }
+
+    /// The optional `warnings` property of success and failure envelopes.
+    fn warnings_property() -> Value {
+        json!({
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Warnings the command reported; present only when non-empty."
+        })
+    }
+
     /// The output schema of a command whose success response is `T`.
     pub fn of<T: JsonSchema>() -> Self {
         Self {
@@ -394,7 +419,7 @@ impl CommandSchema {
             subcommands,
             args,
             flags,
-            output: Self::resolve_output_schema(cmd_path),
+            output: Self::resolve_output_schema(cmd_path).map(OutputSchema::with_warnings),
         }
     }
 
@@ -902,6 +927,7 @@ impl CommandSchema {
                 "type": "object",
                 "properties": {
                     "success": { "type": "boolean", "const": false },
+                    "warnings": OutputSchema::warnings_property(),
                     "error": {
                         "type": "object",
                         "properties": {
@@ -1677,6 +1703,83 @@ mod tests {
             "gate evaluate must expose its `eval` alias; found {:?}",
             evaluate.aliases
         );
+    }
+
+    #[test]
+    fn test_output_schema_with_warnings_declares_optional_string_array_for_any_shape() {
+        #[derive(JsonSchema)]
+        struct Plain {
+            _name: String,
+        }
+        let union = OutputSchema::union_of(vec![UnionMember::of::<Plain>()], "either");
+
+        for schema in [OutputSchema::of::<Plain>(), union] {
+            let schema = schema.with_warnings().success_schema.unwrap();
+            let warnings = &schema["properties"][crate::output::WARNINGS_FIELD];
+            assert_eq!(warnings["type"], "array");
+            assert_eq!(warnings["items"]["type"], "string");
+            assert!(!schema
+                .get("required")
+                .and_then(Value::as_array)
+                .is_some_and(|r| r.iter().any(|f| f == crate::output::WARNINGS_FIELD)));
+        }
+    }
+
+    #[test]
+    fn test_command_schema_generate_adds_only_the_optional_warnings_property_to_each_success_schema(
+    ) {
+        fn walk(commands: &HashMap<String, Command>, path: &str, mismatched: &mut Vec<String>) {
+            for (name, command) in commands {
+                let path = if path.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{path}_{name}")
+                };
+                let generated = command
+                    .output
+                    .as_ref()
+                    .and_then(|output| output.success_schema.clone());
+                let mut raw = CommandSchema::resolve_output_schema(&path)
+                    .and_then(|output| output.success_schema);
+                if raw
+                    .as_ref()
+                    .and_then(|r| r.pointer("/properties/warnings"))
+                    .is_some()
+                {
+                    mismatched.push(format!("{path}: declares its own warnings"));
+                }
+                if let Some(Value::Object(schema)) = &mut raw {
+                    let properties = schema
+                        .entry("properties")
+                        .or_insert_with(|| json!({}))
+                        .as_object_mut()
+                        .unwrap();
+                    properties.insert(
+                        crate::output::WARNINGS_FIELD.to_string(),
+                        generated
+                            .as_ref()
+                            .and_then(|g| g.pointer("/properties/warnings").cloned())
+                            .unwrap_or(Value::Null),
+                    );
+                }
+                if generated != raw
+                    || generated.as_ref().is_some_and(|g| {
+                        g.pointer("/properties/warnings")
+                            .is_none_or(|w| w["type"] != "array")
+                    })
+                {
+                    mismatched.push(path.clone());
+                }
+                if let Some(subcommands) = &command.subcommands {
+                    walk(subcommands, &path, mismatched);
+                }
+            }
+        }
+        let mut mismatched = Vec::new();
+
+        walk(&CommandSchema::generate().commands, "", &mut mismatched);
+
+        assert!(mismatched.is_empty(), "mismatched: {mismatched:?}");
     }
 
     #[test]

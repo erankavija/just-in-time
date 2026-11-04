@@ -16,22 +16,34 @@
 //! [`ConfigSetOutcome`] / [`ConfigGetOutcome`].
 
 use super::*;
-use crate::config::EffectiveConfig;
+use crate::config::{EffectiveConfig, JitConfig};
 use crate::errors::InvalidArgumentError;
+use schemars::JsonSchema;
 use std::path::PathBuf;
 
 /// Result of a `jit config set` write, carrying what the CLI needs to print.
 ///
 /// Returned by [`ConfigOps::set_config`]. `file` is the config file that
 /// was written.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ConfigSetOutcome {
     /// The `section.field` key that was set.
     pub key: String,
     /// The value as written (the raw string the user supplied).
     pub value: String,
-    /// The config file that was written.
+    /// The config file that was written, rendered as its display text so a
+    /// non-UTF-8 path serializes as the same lossy string the human output prints.
+    #[serde(serialize_with = "serialize_path_display")]
+    #[schemars(with = "String")]
     pub file: PathBuf,
+}
+
+/// Serialize a path as its [`Path::display`](std::path::Path::display) text.
+fn serialize_path_display<S: serde::Serializer>(
+    path: &std::path::Path,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    serializer.collect_str(&path.display())
 }
 
 /// Result of a `jit config get` lookup, carrying what the CLI needs to print.
@@ -40,12 +52,32 @@ pub struct ConfigSetOutcome {
 /// [`serde_json::Value`] resolved at `key` — a scalar for a leaf, or an
 /// object/array for an intermediate key (`jit config get documentation`
 /// returns the whole section).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ConfigGetOutcome {
     /// The dotted key that was resolved.
     pub key: String,
     /// The resolved value.
     pub value: serde_json::Value,
+}
+
+/// Result of `jit config validate`: one message per invalid configuration
+/// source. Valid when no source failed.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ConfigValidationReport {
+    /// Whether every configuration source loaded with valid values.
+    pub valid: bool,
+    /// One message per failing source, in check order.
+    pub errors: Vec<String>,
+}
+
+impl ConfigValidationReport {
+    /// Build the report from the failing sources' messages.
+    pub fn new(errors: Vec<String>) -> Self {
+        Self {
+            valid: errors.is_empty(),
+            errors,
+        }
+    }
 }
 
 /// Error resolving a dotted `jit config get` key against an assembled
@@ -318,6 +350,35 @@ impl<S: IssueStore> ConfigOps<'_, S> {
     /// [`crate::config`].
     pub fn effective_config_snapshot(&self) -> Result<serde_json::Value> {
         EffectiveConfig::load(self.exec.repository_layout()?)?.full_snapshot()
+    }
+
+    /// Check the repository `config.toml` (when present) and the invocation write
+    /// override, reporting every failing source.
+    ///
+    /// Invalid enforcement and write-policy tokens fail at TOML parse time, so a
+    /// successful load implies valid values.
+    pub fn validate(&self) -> Result<ConfigValidationReport> {
+        let mut errors = Vec::new();
+        let layout = self.exec.storage().repository_layout()?;
+        if layout
+            .resolve(&crate::repository_state::VirtualPath::CONFIG)?
+            .exists()
+        {
+            if let Err(e) = JitConfig::load(&layout) {
+                errors.push(format!("repo config: {e}"));
+            }
+        }
+        if let Err(e) = crate::config_manager::ConfigManager::invocation_write_override() {
+            errors.push(e.to_string());
+        }
+        Ok(ConfigValidationReport::new(errors))
+    }
+
+    /// The type hierarchy declared by the repository's namespace configuration.
+    pub fn declared_type_hierarchy(&self) -> Result<std::collections::HashMap<String, u8>> {
+        let layout = self.exec.storage().repository_layout()?;
+        let namespaces = crate::config_manager::ConfigManager::new(layout).get_namespaces()?;
+        Ok(namespaces.declared_type_hierarchy())
     }
 
     /// Resolve a dotted `section[.field[.subfield...]]` key against the WHOLE
@@ -629,5 +690,21 @@ schema = 1
         let err = executor.config().get_config("bogus_section").unwrap_err();
         assert!(err.downcast_ref::<InvalidArgumentError>().is_some());
         assert!(err.to_string().contains("valid top-level sections"));
+    }
+
+    #[test]
+    fn test_config_set_outcome_serializes_file_as_display_text_for_non_utf8_path() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let path = PathBuf::from(std::ffi::OsString::from_vec(b"config-\xff.toml".to_vec()));
+        let outcome = ConfigSetOutcome {
+            key: "project.name".to_string(),
+            value: "demo".to_string(),
+            file: path.clone(),
+        };
+
+        let serialized = serde_json::to_value(&outcome).unwrap();
+
+        assert_eq!(serialized["file"], path.display().to_string());
     }
 }

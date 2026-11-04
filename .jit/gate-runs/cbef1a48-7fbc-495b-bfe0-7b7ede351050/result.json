@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "aa6ea4aa06b509fa70a2b800c1c63a87a7a0278e",
+  "completed_at": "2026-11-04T05:50:12.271932671Z",
+  "duration_ms": 274266,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable report tests cover the executor-pass cases through the shared closed-image builder; recorded Rust CI passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c1af05ac-cacb-46e5-895c-840276c0e9a6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cbef1a48-7fbc-495b-bfe0-7b7ede351050",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T05:45:38.005875742Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a961a0d8f (`jit:c1af05ac`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/9876a23a/requirement/REQ-05; @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T05:45:16Z)\nTruncation recovery: recovered bounded patch and targeted current report, executor, collector, and shared-image-builder reads\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable report tests cover the executor-pass cases through the shared closed-image builder; recorded Rust CI passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
