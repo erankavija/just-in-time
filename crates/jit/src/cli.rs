@@ -81,6 +81,33 @@ impl IssueFilterArgs {
     }
 }
 
+/// Arguments of the top-level `search` command.
+#[derive(clap::Args)]
+pub struct SearchArgs {
+    /// Search query string
+    pub query: String,
+
+    /// Use regex pattern matching
+    #[arg(short, long)]
+    pub regex: bool,
+
+    /// Case sensitive search
+    #[arg(short = 'C', long)]
+    pub case_sensitive: bool,
+
+    /// Show N lines of context
+    #[arg(short = 'c', long, default_value = "0")]
+    pub context: usize,
+
+    /// Maximum results to return
+    #[arg(short = 'n', long)]
+    pub limit: Option<usize>,
+
+    /// Search only in specific files (glob pattern, e.g., "*.json" or "*.md")
+    #[arg(short = 'g', long)]
+    pub glob: Option<String>,
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize through one recoverable publication; an absent data root is
@@ -317,28 +344,8 @@ pub enum Commands {
     ///
     /// JSON output uses the list envelope `{"count": N, "results": [...]}`.
     Search {
-        /// Search query string
-        query: String,
-
-        /// Use regex pattern matching
-        #[arg(short, long)]
-        regex: bool,
-
-        /// Case sensitive search
-        #[arg(short = 'C', long)]
-        case_sensitive: bool,
-
-        /// Show N lines of context
-        #[arg(short = 'c', long, default_value = "0")]
-        context: usize,
-
-        /// Maximum results to return
-        #[arg(short = 'n', long)]
-        limit: Option<usize>,
-
-        /// Search only in specific files (glob pattern, e.g., "*.json" or "*.md")
-        #[arg(short = 'g', long)]
-        glob: Option<String>,
+        #[command(flatten)]
+        args: SearchArgs,
     },
 
     /// Show CLI version and build metadata

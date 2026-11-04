@@ -32,6 +32,8 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `*` | `5` | A filesystem operation was denied. |  |
 | `*` | `10` | The repository's on-disk format is not the one this binary accepts, or a filesystem/subprocess I/O operation failed. |  |
 | `*` | `11` | A lock wait expired while another jit process held the lock (`JIT_LOCK_TIMEOUT`); the command changed nothing and may be retried. |  |
+| `search` | `1` | ripgrep is not installed (RIPGREP_NOT_FOUND) or ran and failed (SEARCH_FAILED). |  |
+| `search` | `10` | ripgrep could not be spawned or the search root could not be resolved (I/O failure). |  |
 | `any command that writes an issue` | `4` | An enforcing validation rule rejected the write (the shared write-validation path blocks on rule findings). |  |
 | `dep add` | `4` | The edge would create a cycle, or a redundant (transitively-implied) edge was rejected. |  |
 | `apply` | `4` | The template delta would close a dependency cycle through existing issues; the apply is rejected before any node is created. |  |

@@ -22,6 +22,29 @@ fn assert_json_error_reports_code(output: Output, expected_code: ErrorCode) {
 }
 
 #[test]
+fn test_search_missing_ripgrep_reports_same_exit_on_json_and_human_paths() {
+    let repo = JitCli::initialised().unwrap();
+    let empty_path = TempDir::new().expect("empty PATH directory should be created");
+    let run = |extra: &[&str]| {
+        repo.command_with_env(
+            ["search", "needle"]
+                .into_iter()
+                .chain(extra.iter().copied()),
+            [("PATH", empty_path.path().as_os_str())],
+        )
+        .output()
+        .expect("search should run")
+    };
+
+    let json = run(&["--json"]);
+    let human = run(&[]);
+
+    let expected = ErrorCode::RipgrepNotFound.exit_code().code();
+    assert_eq!(json.status.code(), Some(expected));
+    assert_eq!(human.status.code(), Some(expected));
+}
+
+#[test]
 fn test_search_json_missing_ripgrep_reports_ripgrep_not_found() {
     let repo = JitCli::initialised().unwrap();
     let empty_path = TempDir::new().expect("empty PATH directory should be created");

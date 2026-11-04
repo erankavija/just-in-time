@@ -127,6 +127,7 @@ pub fn resolve_issue_filter<S: IssueStore>(
 /// also register the test-only groups, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     invariant::output_schema,
+    search::output_schema,
     #[cfg(test)]
     test_group::output_schema,
     #[cfg(test)]
@@ -313,6 +314,7 @@ macro_rules! command_group {
 }
 
 pub mod invariant;
+pub mod search;
 #[cfg(test)]
 mod test_forms;
 #[cfg(test)]

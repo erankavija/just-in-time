@@ -1,5 +1,6 @@
 //! Response and human rendering of the top-level `jit search` command.
 
+use super::{HumanRender, OutputMode};
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::search::SearchResult;
 use schemars::JsonSchema;
@@ -33,10 +34,10 @@ pub struct SearchQuery {
     pub query: String,
 }
 
-impl SearchResponse {
-    /// The human rendering; `quiet` drops the header and the no-match line,
-    /// as `-q` did before the handler moved.
-    pub fn render_text(&self, quiet: bool) -> String {
+impl HumanRender for SearchResponse {
+    /// Quiet mode drops the header and the no-match line; the matches stay.
+    fn render_human(&self, mode: OutputMode) -> String {
+        let quiet = mode.quiet;
         let query = &self.extras.query;
         if self.items.is_empty() {
             return if quiet {
