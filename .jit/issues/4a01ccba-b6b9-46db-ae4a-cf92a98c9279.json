@@ -23,15 +23,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "58ba2de1-59c4-4a48-9f5c-6f85840fae61",
+      "run_id": "8ed62ba2-d132-4c3c-9b15-220d8c5268a1",
       "status": "passed",
-      "updated_at": "2026-11-04T12:55:25.454100899Z",
+      "updated_at": "2026-11-04T13:31:28.769916902Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "13b970de-e0b7-4e13-93e1-a6dd6280c110",
+      "run_id": "2a14530e-209d-4de4-b433-0a5a58bff2a1",
       "status": "failed",
-      "updated_at": "2026-11-04T12:58:55.145588454Z",
+      "updated_at": "2026-11-04T13:36:40.567562964Z",
       "updated_by": "auto:executor"
     }
   },
@@ -46,5 +46,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Refactor every test over the per-test limit",
-  "updated_at": "2026-11-04T12:58:55.145588454Z"
+  "updated_at": "2026-11-04T13:36:40.567562964Z"
 }
