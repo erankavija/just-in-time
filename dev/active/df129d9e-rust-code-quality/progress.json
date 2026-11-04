@@ -1047,8 +1047,12 @@
         "derive generate_command_exit_codes (329 lines)",
         "survey commands/storage/repository_state"
       ],
-      "status": "sent to 6a; nothing dispatched"
-    }
+      "status": "sent to 6a for rulings (N6-N9 proposed)",
+      "exit_code_derivation": "scoped -90..-160 (48 rows: 8 universal, 15 restating, 16 typed, 9 findings); after handler moves and 5687e281",
+      "survey_commands_storage_repo": "high -280 (dead bulk preview chain -215, test-only wrappers -64), speculative -190 (archive plan computed twice -150 D-20, coordinator typing -30, doc prologue), contract -60",
+      "revised_projection": "central ~+75 (-100..+450); with archive/coordinator ~-105"
+    },
+    "req10_ceiling_draft": "+375 (measured +1..+736); sent to 6a for confirmation vs +290"
   },
   "wave_notes": {
     "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line). Session 12 (lead 7c): one Claude Opus integrator on w7batch fixes the three cli_issue failures as per-issue fix commits (06ee9b67, 71f5296c, 20fc3b92) and merges main with the 614a6f97 claim port (66790c84); per-branch main merges conflict on registration lines, so fixes go on the batch. Each counts as one rework. Integrator (Opus) finished at 4ad4175c1: fix commits e21e28fe8 (06ee9b67), 287c3bbd9 (71f5296c, interim INVALID_ARGUMENT per steward; 487f45a9 ends it), 9160ec574 (20fc3b92), merge 1f50f71c5 (66790c84 claim port), dccad565d (06ee9b67), 4ad4175c1 (66790c84). Lead review PASS; batch merges cleanly with main. REQ-10: batch takes main+dispatch+output from 9248 to 9503 (+255). Landing queue after batch gating: 182f4c03, 10751360, cd8e04cc, 1ac651c7, cc4ea8a9 (all lead-reviewed; Claude workers could not run whole-tree suites under the shared lock, branch CI is the evidence)."
@@ -1260,6 +1264,16 @@
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained script change without sockets; alternation",
       "review": "lead R1 PASS; landed f0ed97f2e; worktree-cache-test passed; code-review R1 failed (run efb94dd6): F1 self-test leaks default-root temp dirs. Rework 1 to Claude Haiku. Rework 1 (64a2866c4) passed lead review; re-landing. Re-landed 2283280fa; worktree-cache-test passed; code-review R2 failed (run 19301ebb): new F1, protocol.md:176 hand-maintained config list omits LEAD_WORKTREE_TMP_ROOT (@/inv/single-source-prose); R1 F1 closed. Rework 2 of 2 to Codex gpt-6-astra. Re-landed dbbb1cb8b; code-review R3 passed; closed 35d88652d. Dispatch now makes per-worktree TMPDIRs: this host passes LEAD_WORKTREE_TMP_ROOT=/mnt/nvme/jit/tmp to dispatch and reclaim (steward worker-TMPDIR rule)."
+    },
+    "9be5b0de": {
+      "status": "dispatched",
+      "vendor": "Codex gpt-6-luna (high)",
+      "reason": "mechanical renderer dedup"
+    },
+    "f82a2e4a": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "classifier routing with contract tests"
     }
   },
   "handoff": {
@@ -1268,5 +1282,41 @@
     "to": "just-in-time-7c",
     "date": "2026-11-04"
   },
-  "lead": "just-in-time-7c (session 12)"
+  "lead": "just-in-time-7c (session 12)",
+  "b697a3f7_execution": {
+    "ruling": "user via 6a 2026-11-04: lead executes 693a2fdd, 65aafaba, c0775a83, 19404174 and their b697a3f7 deps as b697a3f7 issues; separate ledger",
+    "track_A_bulk": [
+      "945f9181",
+      "b674382e",
+      "635f23c7",
+      "c2b3cefa",
+      "d2acb105",
+      "fe9147fa",
+      "693a2fdd"
+    ],
+    "track_B_infra": {
+      "parallel_ready": [
+        "1ade3e6f",
+        "f7a59f5f",
+        "f56bad8d"
+      ],
+      "chain": [
+        "ceaaf0ab",
+        "5d09e74b",
+        "d58f80c9",
+        "01a88d32",
+        "c517b88b",
+        "eaca3f52",
+        "578ed10d"
+      ]
+    },
+    "external_blockers": {
+      "4575a03d": "v1-release bug (ceaaf0ab)",
+      "git-cli-module": [
+        "d9ba0029 (65aafaba)",
+        "7cd27db8 (30334066)"
+      ]
+    },
+    "status": "awaiting 6a confirmation; nothing claimed"
+  }
 }

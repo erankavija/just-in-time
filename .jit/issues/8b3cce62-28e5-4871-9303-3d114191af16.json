@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T12:32:05.407284708Z",
+  "dependencies": [
+    "5687e281-d504-4b85-ab4f-c84e603c37e2",
+    "da30b92a-f0b8-41f3-bbc5-605ed0f739fb"
+  ],
+  "description": "Each leaf's handler registration declares the codes it raises and its findings code, and the per-command rows of the exit-code projection are derived from those declarations instead of being kept by hand beside the classifier.\n\n## Background\n\n`CommandSchema::generate_command_exit_codes` in `crates/jit/src/schema.rs` holds 48 hand-written `row(command, code, condition, exception)` entries, projected into `docs/reference/exit-codes.md` and the `command_exit_codes` field of `jit --schema`. Of these, 8 are universal rows; 15 only restate what the shared classifier and the universal rows already imply; 16 state a typed error only some leaves raise; and 9 state the code a findings outcome emits. The `exception` flag is set inconsistently (`config validate` findings are unflagged). Handlers register per leaf through `command_group!` in `crates/jit/src/dispatch/mod.rs`, and `ErrorCode` in `crates/jit/src/output.rs` already carries each code's exit status and description. A subprocess binding test in `crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs` proves each row.\n\n## Success Criteria\n\n- [hard] REQ-01: Every non-universal row of `command_exit_codes` is computed from per-leaf or per-group declarations in `command_group!` registrations: its code from `ErrorCode::exit_code`, its condition from `ErrorCode::description` or the leaf's declared findings condition. The hand-written list holds only the universal `*` rows.\n- [hard] REQ-02: No row restates a code that a universal row and the shared classifier already imply for that command.\n- [hard] REQ-03: A row is marked `exception` exactly when it is a declared findings code or the broken-pipe row.\n- [hard] REQ-04: A test fails when a leaf returns a findings outcome whose code differs from its declaration, and the completeness guard fails unless every derived row has exactly one subprocess binding case asserting its exit status in human and `--json` forms.\n- [hard] REQ-05: `docs/reference/exit-codes.md` is regenerated and equals the projection. No command's exit status changes, and MCP tool generation and its tests pass against the regenerated schema.\n- [hard] REQ-06: The crate's production lines (`scripts/production-lines.py`, default mode) fall by at least 90.\n\n## Decisions\n\n- D-01: The steward accepts these content changes in the exit-code reference: the restating rows are removed, typed-error conditions take the `ErrorCode` descriptions (so the issue-delete row no longer names its environment variable), rows are merged by code, and the exception flag changes for `config validate` and `gate evaluate` (steward ruling, 2026-11-04).\n\n## Notes\n\nMerit: one source for each exit-code fact (`@/inv/single-source-prose`, `@/charter/D-20`). Lands after the remaining handler moves and the main.rs reduction, so every leaf is registered and the macro is edited once; its declarations then serve as the census of live codes for retiring unproduced ones.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T12:32:05.407284708Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "8b3cce62-28e5-4871-9303-3d114191af16",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:output-contract",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Derive per-command exit-code rows from the handler registry",
+  "updated_at": "2026-11-04T12:32:06.114176500Z"
+}
