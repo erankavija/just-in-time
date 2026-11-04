@@ -966,7 +966,7 @@
     "01a88d32": 1,
     "b674382e": 1,
     "c517b88b": 1,
-    "6acd7a05": 1,
+    "6acd7a05": 2,
     "8b3cce62": 1,
     "635f23c7": 1,
     "578ed10d": 1
@@ -1498,8 +1498,9 @@
       "vendor": "Codex gpt-6.1-sol"
     },
     "6acd7a05": {
-      "status": "dispatched",
-      "vendor": "Codex gpt-6-luna"
+      "status": "rework 2 (lead doc fix)",
+      "vendor": "Codex gpt-6-luna",
+      "note": "merged fad481d3e; code-review F1 stale archive execution field in cli-commands.md:417; lead fixed"
     },
     "fb38bf1f": {
       "status": "ready",
