@@ -165,6 +165,7 @@ pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     serve::output_schema,
     validate::output_schema,
     version::output_schema,
+    worktree::output_schema,
     #[cfg(test)]
     test_group::output_schema,
     #[cfg(test)]
@@ -374,3 +375,4 @@ mod test_forms;
 mod test_group;
 pub mod validate;
 pub mod version;
+pub mod worktree;

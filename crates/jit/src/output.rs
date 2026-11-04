@@ -34,6 +34,7 @@ mod serve;
 pub mod snapshot;
 mod validate;
 mod version;
+mod worktree;
 
 pub use validate::*;
 
@@ -1451,7 +1452,8 @@ collection_keys! {
     NamespacesKey = "namespaces" as "NamespacesResponse";
     /// Collection key of [`LabelValuesResponse`].
     ValuesKey = "values" as "LabelValuesResponse";
-    WorktreesKey = "worktrees";
+    /// Collection key of [`WorktreeListResponse`].
+    WorktreesKey = "worktrees" as "WorktreeListResponse";
     PresetsKey = "presets";
 }
 

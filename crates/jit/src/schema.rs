@@ -661,14 +661,6 @@ impl CommandSchema {
                 Some(schema_to_value::<GatePresetListResponse>()),
                 "GatePresetListResponse",
             ),
-            "worktree_list" => (
-                Some(schema_to_value::<WorktreeListResponse>()),
-                "WorktreeListResponse",
-            ),
-            "worktree_store-divergence" => (
-                Some(schema_to_value::<WorktreeStoreDivergenceResponse>()),
-                "WorktreeStoreDivergenceResponse",
-            ),
             // Default: no specific schema
             _ => (None, "CommandResponse"),
         };
@@ -800,6 +792,24 @@ impl CommandSchema {
             exception,
         };
         vec![
+            row(
+                "worktree info, worktree list",
+                3,
+                "A required filesystem path was not found.",
+                false,
+            ),
+            row(
+                "worktree info, worktree list",
+                5,
+                "A filesystem operation was denied.",
+                false,
+            ),
+            row(
+                "worktree info, worktree list",
+                10,
+                "An I/O failure prevented worktree inspection.",
+                false,
+            ),
             // Universal: any command reaches these — `0` on successful completion,
             // the failure codes through the shared classifier.
             row("*", 0, "Command completed successfully.", false),
