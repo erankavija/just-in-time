@@ -38,6 +38,13 @@ pub struct ArchiveExecution {
     pub reconciling: bool,
 }
 
+/// Ordered execution evidence for one archive target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ArchiveEvidenceRecord {
+    pub target: PlanTarget,
+    pub executions: Vec<ArchiveExecution>,
+}
+
 /// The archive executions among `events`, in log order.
 pub fn archive_executions(events: &[Event]) -> Vec<ArchiveExecution> {
     events

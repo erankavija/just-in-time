@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d08581d3-5a8c-4e03-9d7c-706f2cf93662",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:46:20.629748776Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "db9bcf12-6308-430f-ad01-9cf5904aea98",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Archive executions write a per-target evidence record",
-  "updated_at": "2026-11-04T00:02:41.619771368Z"
+  "updated_at": "2026-11-04T00:46:20.629748776Z"
 }

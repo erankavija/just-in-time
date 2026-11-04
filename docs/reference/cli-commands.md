@@ -925,7 +925,6 @@ jit issue create --title <TITLE> [OPTIONS]
 | `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable. |
 | `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to the default content format in [Runtime Defaults](runtime-defaults.md). `html`/`xml` require the matching cargo feature. |
 | `--force` | Bypass blocking (`enforce = true`) rule failures and record each bypass as an event. Warnings never block, so they are unaffected. |
-| `--orphan` | Suppress the workflow profile's `orphan-leaf` hint for an issue deliberately created without a container. |
 | `--json` | Emit the created issue as the `issue show` object, plus a `message` field. |
 
 ```bash
@@ -1972,8 +1971,8 @@ jit gate evaluate abc123 --gate tests --force
   checker's verdict is available to every issue evaluated over that content.
 - `jit gate status <id> <gate> --json` reports the run's `inputs_digest` and an
   `origin` of `{"derivation": "executed"}` or
-  `{"derivation": "reused", "source_run": "<run-id>"}`, so a reused verdict is
-  never counted as an independent verification.
+  `{"derivation": "reused", "source_issue": "<issue-id>", "source_run": "<run-id>"}`,
+  so a reused verdict is never counted as an independent verification.
 - A gate declaring no inputs executes its checker on every evaluation.
 - `--force` executes the checker unconditionally.
 
@@ -3850,7 +3849,7 @@ Use `--quiet` to suppress non-essential output:
 
 ```bash
 # Create issue and capture ID
-ISSUE_ID=$(jit issue create --title "Fix login bug" --orphan --quiet)
+ISSUE_ID=$(jit issue create --title "Fix login bug" --quiet)
 echo "Created issue: $ISSUE_ID"
 
 # Update without confirmation messages
@@ -3870,7 +3869,7 @@ Combine `--quiet` with `--json` for machine-readable output:
 
 ```bash
 # Parse with jq
-ISSUE_ID=$(jit issue create --title "Add feature" --orphan --quiet --json | jq -r '.id')
+ISSUE_ID=$(jit issue create --title "Add feature" --quiet --json | jq -r '.id')
 
 # Extract specific fields
 jit issue show $ISSUE_ID --json --quiet | jq -r '.title'
@@ -3968,7 +3967,6 @@ while IFS=',' read -r title priority component; do
     --title "$title" \
     --priority "$priority" \
     --label "component:$component" \
-    --orphan \
     --quiet)
   echo "Created: $ID - $title"
 done < issues.csv

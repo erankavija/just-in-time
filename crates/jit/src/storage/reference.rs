@@ -259,10 +259,12 @@ impl GateRunField {
             }
             GateRunField::Origin => {
                 "Where the verdict came from. `{\"derivation\": \"executed\"}` means this run \
-                 ran the checker; `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}` \
+                 ran the checker; `{\"derivation\": \"reused\", \"source_issue\": \"<issue-id>\", \
+                 \"source_run\": \"<run-id>\"}` \
                  means it carries the named earlier run's verdict, whose `inputs_digest` \
                  matched, without the checker running again. The report text behind a reused \
-                 verdict lives at the named run. `{\"derivation\": \"attested\"}` means the \
+                 verdict lives at the run addressed by `source_issue` and `source_run`. \
+                 `{\"derivation\": \"attested\"}` means the \
                  run records a manual gate's attestation: `by` names the attestor and \
                  `started_at` the time."
                     .to_string()
@@ -376,9 +378,14 @@ fn sample_gate_run() -> GateRunResult {
             builder.push_file("crates/jit/src/lib.rs", b"pub mod domain;\n");
             builder.finish()
         }),
-        origin: crate::domain::GateVerdictOrigin::Reused(GateRunId::from_uuid(
-            uuid::Uuid::from_u128(0x1c4e8a90_3d2b_4f61_9a07_5b8c2d1e6f34),
-        )),
+        origin: crate::domain::GateVerdictOrigin::Reused {
+            source_issue: crate::domain::identity::IssueId::from_uuid(uuid::Uuid::from_u128(
+                0x6a2b8c40_9d15_4f37_8e62_0b3c7d5e1f90,
+            )),
+            source_run: GateRunId::from_uuid(uuid::Uuid::from_u128(
+                0x1c4e8a90_3d2b_4f61_9a07_5b8c2d1e6f34,
+            )),
+        },
         evaluation_stability: crate::domain::GateEvaluationStability::InputsMoved,
     }
 }

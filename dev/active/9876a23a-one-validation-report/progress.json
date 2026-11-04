@@ -1,7 +1,7 @@
 {
   "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
   "epic_short_id": "9876a23a",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -119,21 +119,37 @@
       "issues": [
         {
           "short_id": "5d5a1794",
-          "status": "dispatched",
+          "status": "done 308aa9485, 7487595a9, 9f219fcdf (rework 2; REQ-02 amended; .gates.lock removed with f8a6b298 agreement; --orphan removed per steward D-01)",
           "worker": "claude opus",
           "worker_reason": "produces creation-findings; shared helper over five copies"
         },
         {
           "short_id": "8b56c215",
-          "status": "dispatched",
+          "status": "done 3e5bfcbe7",
           "worker": "codex gpt-6-luna xhigh",
           "worker_reason": "mechanical vocabulary"
         },
         {
           "short_id": "ccd6e1fb",
-          "status": "dispatched",
+          "status": "done 9da1c873a",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "multi-file evaluation change"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "short_id": "001a9c46",
+          "status": "dispatched",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "address index over existing set"
+        },
+        {
+          "short_id": "03c59566",
+          "status": "dispatched 02:49 (first dispatch failed on dirty main)",
+          "worker": "codex gpt-6-luna xhigh"
         }
       ]
     }
@@ -175,6 +191,15 @@
           "f968dfe1": -46,
           "ea843d26": 4
         }
+      },
+      {
+        "wave": 4,
+        "test_support_as_test": 35,
+        "by_issue": {
+          "ccd6e1fb": 12,
+          "5d5a1794": 5,
+          "8b56c215": 18
+        }
       }
     ]
   },
@@ -186,6 +211,10 @@
     {
       "short_id": "14f49a28",
       "note": "standalone, user ruling: M8 package-content check assembles outside the repo (docs-mechanical was broken by the target/ symlink); landed 7f255bf7a, docs-mechanical passed"
+    },
+    {
+      "short_id": "f368ce3d",
+      "note": "cross-epic: REQ-03 (--orphan) and its Background bullet removed per steward ruling"
     }
   ],
   "escalations": [
@@ -223,12 +252,15 @@
   "rework_counts": {
     "c92f4011": 2,
     "ea843d26": 1,
-    "f968dfe1": 1
+    "f968dfe1": 1,
+    "5d5a1794": 2
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
     "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566",
-    "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch"
+    "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch",
+    "jit-server graceful_shutdown_tests::test_the_drain_assertion_rejects_a_server_that_force_closes_early failed once under load ~10 (5d5a1794 CI); passes alone",
+    "f8a6b298: 53d19851 merged into 2f563673, which deletes the claims-index check; after it lands drop plan contract claims-index-input and correct 6ba4f623 Background/Note (REQ-02 clause is conditional, no criteria change)"
   ],
   "started_at": "2026-11-03T23:40:00+02:00",
   "rejected": [

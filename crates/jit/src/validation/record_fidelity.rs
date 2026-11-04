@@ -6,6 +6,7 @@
 //! An unparseable log is one finding naming the line; a parseable one reports
 //! every line that does not reproduce and each event id on more than one line.
 
+use crate::domain::artifact_execution::ArchiveEvidenceRecord;
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::GateRunId;
 use crate::domain::{Event, GateRunResult, Issue};
@@ -18,10 +19,10 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 /// One message per stored record that does not decode or reproduce, over
-/// `image`'s records, `gate_runs`' runs and the event log's whole `events`.
+/// `image`'s records, `records`' runs and archive evidence, and the whole `events`.
 pub(crate) fn record_drift(
     image: &RepositoryImage,
-    gate_runs: &RepositoryImage,
+    records: &RepositoryImage,
     events: Option<&[u8]>,
 ) -> Result<Vec<String>> {
     let report = |path: &VirtualPath, check: Result<Option<String>>| {
@@ -40,22 +41,46 @@ pub(crate) fn record_drift(
                 .and_then(|bytes| report(&path, issue_drift(bytes))))
         })
         .collect::<Result<Vec<_>>>()?;
-    let runs = captured_gate_run_ids(gate_runs)
+    let runs = captured_gate_run_ids(records)
         .unwrap_or_default()
         .iter()
         .map(|id| {
             let path = VirtualPath::gate_run_record(id);
-            let check = match gate_runs.file_bytes(&path)? {
+            let check = match records.file_bytes(&path)? {
                 Some(bytes) => gate_run_drift(id, bytes),
                 None => Ok(Some("missing".to_string())),
             };
             Ok(report(&path, check))
         })
         .collect::<Result<Vec<_>>>()?;
+    let evidence = records
+        .entries()
+        .keys()
+        .filter(|path| {
+            path.root_class() == VirtualPath::ARCHIVE_EVIDENCE.root_class()
+                && path
+                    .relative()
+                    .as_path()
+                    .starts_with(VirtualPath::ARCHIVE_EVIDENCE.relative().as_path())
+                && path
+                    .relative()
+                    .as_path()
+                    .extension()
+                    .is_some_and(|extension| extension == "json")
+        })
+        .map(|path| {
+            let check = match records.file_bytes(path) {
+                Ok(Some(bytes)) => archive_evidence_drift(path, bytes),
+                Ok(None) => Ok(Some("missing".to_string())),
+                Err(error) => Err(error.into()),
+            };
+            report(path, check)
+        });
     let events = events.map_or_else(Vec::new, event_log_drift);
     Ok(issues
         .into_iter()
         .chain(runs)
+        .chain(evidence)
         .chain([index.and_then(|bytes| report(&VirtualPath::INDEX, index_drift(bytes)))])
         .flatten()
         .chain(
@@ -64,6 +89,23 @@ pub(crate) fn record_drift(
                 .map(|reason| format!("{}: {reason}", VirtualPath::EVENTS.repository_relative())),
         )
         .collect())
+}
+
+fn archive_evidence_drift(path: &VirtualPath, bytes: &[u8]) -> Result<Option<String>> {
+    let evidence: ArchiveEvidenceRecord = serde_json::from_slice(bytes)?;
+    if VirtualPath::archive_evidence_record(&evidence.target) != *path
+        || evidence
+            .executions
+            .iter()
+            .any(|execution| execution.target != evidence.target)
+    {
+        return Ok(Some("archive evidence contains another target".to_string()));
+    }
+    let raw: Value = serde_json::from_slice(bytes)?;
+    Ok(
+        (canonical_json(&evidence, true)? != canonical_json(&raw, true)?)
+            .then(|| "re-serializing changes the record".to_string()),
+    )
 }
 
 fn index_drift(bytes: &[u8]) -> Result<Option<String>> {
@@ -165,6 +207,41 @@ mod tests {
             serde_json::from_slice(&serialize_event(&tag.sample()).unwrap()).unwrap();
         value["id"] = format!("00000000-0000-0000-0000-{position:012x}").into();
         value.to_string()
+    }
+
+    #[test]
+    fn test_record_drift_reports_archive_evidence_that_loses_data() {
+        use crate::test_harness::image::ImageBuilder;
+        let target = crate::domain::artifact_plan::PlanTarget::Document {
+            path: "doc.md".into(),
+        };
+        let path = VirtualPath::archive_evidence_record(&target);
+        let mut raw = serde_json::to_value(ArchiveEvidenceRecord {
+            executions: vec![crate::test_utils::archive_execution(
+                target.clone(),
+                "archive",
+                &[],
+            )],
+            target,
+        })
+        .unwrap();
+        let image = ImageBuilder::new()
+            .file(
+                VirtualPath::INDEX,
+                crate::repository_state::fresh_index_bytes().unwrap(),
+            )
+            .build();
+        let records = ImageBuilder::new()
+            .file(path.clone(), raw.to_string())
+            .build();
+        assert!(record_drift(&image, &records, None).unwrap().is_empty());
+        raw["executions"][0]["field_no_reader_knows"] = true.into();
+        let records = ImageBuilder::new()
+            .file(path.clone(), raw.to_string())
+            .build();
+        let drift = record_drift(&image, &records, None).unwrap();
+        assert_eq!(drift.len(), 1, "{drift:?}");
+        assert!(drift[0].contains(&path.repository_relative()));
     }
 
     #[test]

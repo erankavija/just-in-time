@@ -331,7 +331,6 @@ proptest! {
             acquired_at: now - chrono::Duration::seconds(secs_since_beat as i64),
             expires_at: None,
             last_beat: now - chrono::Duration::seconds(secs_since_beat as i64),
-            stale: false, // Not yet computed
         };
 
         let is_stale = lease.is_stale(now);
@@ -362,13 +361,12 @@ proptest! {
         ).unwrap().0;
         let now = base + chrono::Duration::seconds(secs_since_beat as i64);
         clock.set(now);
-        let mut index = coordinator.load_claims_index().unwrap();
 
-        let lapsed = coordinator.evict_lapsed(&mut index).unwrap();
+        let lapsed = coordinator.evict_lapsed().unwrap();
 
         let stale = lease.is_stale(now);
         prop_assert_eq!(lapsed.reclaimed == 1, stale);
-        prop_assert_eq!(index.leases.is_empty(), stale);
+        prop_assert_eq!(read_leases(&coordinator.paths).unwrap().is_empty(), stale);
     }
 }
 
@@ -390,7 +388,6 @@ proptest! {
             acquired_at: now - chrono::Duration::seconds(secs_since_beat as i64),
             expires_at: Some(now + chrono::Duration::seconds(3600)),
             last_beat: now - chrono::Duration::seconds(secs_since_beat as i64),
-            stale: false,
         };
 
         let is_stale = lease.is_stale(now);
@@ -399,42 +396,5 @@ proptest! {
         prop_assert!(!is_stale,
             "Finite lease (ttl={}) should never be stale, regardless of last_beat ({}s ago)",
             ttl, secs_since_beat);
-    }
-}
-
-// Property 10: Staleness field is correctly set during index rebuild
-proptest! {
-    #![proptest_config(io_config())]
-    #[test]
-    fn test_staleness_computed_during_rebuild(
-        issue_ids in prop::collection::vec(issue_id_strategy(), 1..5)
-    ) {
-        let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
-
-        // Acquire indefinite leases
-        for issue_id in &issue_ids {
-            coordinator.acquire_claim_synchronized(
-                issue_id, 0, Some("test lease"),
-                ClaimAcquireLimits::new(100, 100), |_| Ok(()),
-            ).unwrap();
-        }
-
-        // Rebuild index - staleness should be computed
-        let index = coordinator.rebuild_index_from_log().unwrap();
-
-        for lease in &index.leases {
-            if lease.ttl_secs == 0 {
-                // For indefinite leases, verify stale matches is_stale()
-                let expected_stale = lease.is_stale(index.generated_at);
-                prop_assert_eq!(lease.stale, expected_stale,
-                    "Lease {} stale field ({}) should match is_stale() ({})",
-                    lease.lease_id, lease.stale, expected_stale);
-            } else {
-                // Finite leases should have stale = false
-                prop_assert!(!lease.stale,
-                    "Finite lease {} should have stale=false", lease.lease_id);
-            }
-        }
     }
 }

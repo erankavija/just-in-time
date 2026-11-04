@@ -1015,19 +1015,17 @@ pub fn latest_gate_run(runs: Vec<GateRunResult>) -> Option<GateRunResult> {
 /// that many independent verifications, and the named run is where the report
 /// text and findings that produced the verdict live.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
-#[serde(
-    tag = "derivation",
-    content = "source_run",
-    rename_all = "snake_case",
-    deny_unknown_fields
-)]
+#[serde(tag = "derivation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum GateVerdictOrigin {
     /// This run executed the checker and the verdict is its own.
     #[default]
     Executed,
-    /// The verdict was taken from the run with this id, whose declared inputs
+    /// The verdict was taken from the addressed run, whose declared inputs
     /// digested to the same value. That run executed the checker.
-    Reused(GateRunId),
+    Reused {
+        source_issue: IssueId,
+        source_run: GateRunId,
+    },
     /// The verdict is a manual gate's attestation: `by` names the attestor and
     /// `started_at` the time. No checker ran.
     Attested,
@@ -1056,7 +1054,7 @@ impl GateVerdictOrigin {
     pub fn source_run(&self) -> Option<&GateRunId> {
         match self {
             Self::Executed | Self::Attested => None,
-            Self::Reused(run_id) => Some(run_id),
+            Self::Reused { source_run, .. } => Some(source_run),
         }
     }
 
@@ -1748,6 +1746,64 @@ mod tests {
     use crate::test_utils::{
         document_reference, document_reference_at, document_reference_typed, fixture_issue,
     };
+
+    #[test]
+    fn test_gate_verdict_origin_reused_round_trips_the_source_address() {
+        let source_issue = crate::test_utils::issue_id(160);
+        let source_run = crate::test_utils::gate_run_id(1);
+        let encoded = serde_json::json!({
+            "derivation": "reused",
+            "source_issue": source_issue,
+            "source_run": source_run,
+        });
+
+        let decoded: GateVerdictOrigin = serde_json::from_value(encoded.clone()).unwrap();
+
+        assert_eq!(serde_json::to_value(decoded).unwrap(), encoded);
+    }
+
+    #[test]
+    fn test_gate_verdict_origin_reused_requires_source_issue() {
+        let encoded = serde_json::json!({
+            "derivation": "reused",
+            "source_run": crate::test_utils::gate_run_id(1),
+        });
+
+        assert!(serde_json::from_value::<GateVerdictOrigin>(encoded).is_err());
+    }
+
+    #[test]
+    fn test_gate_verdict_origin_non_reused_variants_are_tag_only() {
+        for (origin, derivation) in [
+            (GateVerdictOrigin::Executed, "executed"),
+            (GateVerdictOrigin::Attested, "attested"),
+        ] {
+            let encoded = serde_json::json!({ "derivation": derivation });
+            assert_eq!(serde_json::to_value(&origin).unwrap(), encoded);
+            assert_eq!(
+                serde_json::from_value::<GateVerdictOrigin>(encoded).unwrap(),
+                origin
+            );
+        }
+    }
+
+    #[test]
+    fn test_gate_run_result_missing_origin_decodes_as_executed() {
+        let run = GateRunResult::attestation(
+            &crate::test_utils::gate_run_id(1),
+            &crate::test_utils::issue_id(160),
+            &"review".parse().unwrap(),
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        let mut encoded = serde_json::to_value(run).unwrap();
+        encoded.as_object_mut().unwrap().remove("origin");
+
+        let decoded: GateRunResult = serde_json::from_value(encoded).unwrap();
+
+        assert_eq!(decoded.origin, GateVerdictOrigin::Executed);
+    }
 
     #[test]
     fn test_priority_ord_follows_rank() {

@@ -1766,6 +1766,14 @@ impl From<&MinimalIssue> for UnmetDependency {
     }
 }
 
+/// Response for `issue create`: the created issue's view and its findings.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueCreateResponse {
+    #[serde(flatten)]
+    pub issue: IssueShowResponse,
+    pub findings: Vec<crate::validation::ReportedFinding>,
+}
+
 /// Response for `issue show` command with enriched dependencies
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowResponse {
@@ -2463,7 +2471,7 @@ pub struct GateRunSummary {
     pub inputs_digest: Option<crate::domain::repository_inputs::InputsDigest>,
     /// Whether this run executed the checker (`{"derivation": "executed"}`),
     /// carried an earlier run's verdict
-    /// (`{"derivation": "reused", "source_run": "<run-id>"}`), or records a
+    /// (`{"derivation": "reused", "source_issue": "<issue-id>", "source_run": "<run-id>"}`), or records a
     /// manual gate's attestation (`{"derivation": "attested"}`). A reader
     /// tallying how many times a gate was actually verified counts the executed
     /// and attested ones and follows the named run for the report text behind a
@@ -2834,7 +2842,7 @@ pub struct LabelValuesScope {
 }
 
 /// Response for `claim status` and `claim list`.
-pub type LeaseListResponse = ListEnvelope<LeasesKey, crate::storage::claim_coordinator::Lease>;
+pub type LeaseListResponse = ListEnvelope<LeasesKey, crate::commands::claim::ListedLease>;
 
 /// Response for `worktree list` command
 pub type WorktreeListResponse =
@@ -3923,9 +3931,12 @@ mod tests {
             acquired_at: now,
             expires_at: None,
             last_beat: now,
+        };
+        let listed = crate::commands::claim::ListedLease {
+            lease,
             stale: false,
         };
-        let value = serde_json::to_value(LeaseListResponse::new(vec![lease])).unwrap();
+        let value = serde_json::to_value(LeaseListResponse::new(vec![listed])).unwrap();
         assert_envelope_value(&value, "leases", 1);
         assert!(value["leases"][0]["expires_at"].is_null());
         assert!(value["leases"][0]["branch"].is_null());

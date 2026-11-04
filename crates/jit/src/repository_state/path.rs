@@ -24,9 +24,6 @@ pub const REPO_WRITE_LOCK_FILE: &str = ".repo-write.lock";
 /// The data root's index lock.
 pub const INDEX_LOCK_FILE: &str = ".index.lock";
 
-/// The data root's gate-registry lock.
-pub const GATES_LOCK_FILE: &str = ".gates.lock";
-
 /// The data root's event-log lock.
 pub const EVENTS_LOCK_FILE: &str = ".events.lock";
 
@@ -216,8 +213,9 @@ pub use self::identity::VirtualPath;
 /// `Result`; [`issue_record`](VirtualPath::issue_record),
 /// [`gate_run_directory`](VirtualPath::gate_run_directory), and
 /// [`gate_run_record`](VirtualPath::gate_run_record) are the infallible derived
-/// paths, whose canonical UUID component makes their descendants safe by
-/// construction.
+/// paths, whose canonical UUID components make their descendants safe by
+/// construction. [`archive_evidence_record`](VirtualPath::archive_evidence_record)
+/// uses a canonical UUID or a hexadecimal digest.
 ///
 /// Only this module can write the raw struct literal needed for const identities
 /// and the well-formed record descendants. It is therefore kept to the
@@ -228,8 +226,10 @@ mod identity {
     use super::{
         RepositoryLayoutError, RepositoryRootClass, RootRelativePath, GATE_RUN_RECORD_FILE,
     };
+    use crate::domain::artifact_plan::{normalize_artifact_path, PlanTarget};
     use crate::domain::identity::{GateRunId, IssueId};
     use serde::Serialize;
+    use sha2::{Digest, Sha256};
     use std::borrow::Cow;
 
     /// A canonical semantic path qualified by its selected root.
@@ -240,6 +240,23 @@ mod identity {
     }
 
     impl VirtualPath {
+        /// Address evidence by container id or the digest of a normalized document path.
+        pub fn archive_evidence_record(target: &PlanTarget) -> Self {
+            let key = match target {
+                PlanTarget::Container { id } => format!("container/{id}"),
+                PlanTarget::Document { path } => format!(
+                    "document/{:x}",
+                    Sha256::digest(normalize_artifact_path(path).as_bytes())
+                ),
+            };
+            Self {
+                root: RepositoryRootClass::Data,
+                relative: Self::ARCHIVE_EVIDENCE
+                    .relative()
+                    .join(&format!("{key}.json")),
+            }
+        }
+
         /// Construct the data-root directory path of one gate run.
         pub fn gate_run_directory(id: &GateRunId) -> Self {
             Self {
@@ -351,6 +368,8 @@ mod identity {
     declare_well_known_paths! {
         /// The format marker and tombstones under the data root (`.jit/index.json`).
         INDEX: Data = "index.json";
+        /// Per-target archive execution evidence.
+        ARCHIVE_EVIDENCE: Data = "archive-evidence";
         /// Repository configuration under the data root (`.jit/config.toml`).
         CONFIG: Data = "config.toml";
         /// Gate registry definitions under the data root (`.jit/gates.toml`).
@@ -393,8 +412,14 @@ mod identity {
 /// access so the defining module above stays the only const-capable scope.
 impl VirtualPath {
     /// The data root's records: issue records, the event log, gate-run
-    /// records, and the index holding the tombstones.
-    pub const RECORDS: [Self; 4] = [Self::ISSUES, Self::EVENTS, Self::GATE_RUNS, Self::INDEX];
+    /// records, archive evidence, and the index holding the tombstones.
+    pub const RECORDS: [Self; 5] = [
+        Self::ISSUES,
+        Self::EVENTS,
+        Self::GATE_RUNS,
+        Self::ARCHIVE_EVIDENCE,
+        Self::INDEX,
+    ];
 
     /// Data-root paths holding history: the event log, the gate-run records, and
     /// the redo scratch directory, which can hold appended event bytes.
@@ -644,7 +669,6 @@ impl RepositoryLayout {
             .chain([
                 REPO_WRITE_LOCK_FILE,
                 INDEX_LOCK_FILE,
-                GATES_LOCK_FILE,
                 EVENTS_LOCK_FILE,
                 RECORD_SCRATCH_DIR,
                 worktree_identity.relative().as_str(),
@@ -913,6 +937,40 @@ mod tests {
     }
 
     #[test]
+    fn test_virtual_path_archive_evidence_record_addresses_normalized_targets() {
+        use crate::domain::artifact_plan::PlanTarget;
+        use sha2::{Digest, Sha256};
+        let id = crate::test_utils::issue_id(1);
+        assert_eq!(
+            VirtualPath::archive_evidence_record(&PlanTarget::Container { id: id.clone() }),
+            VirtualPath::data(format!("archive-evidence/container/{id}.json")).unwrap()
+        );
+        let canonical = "docs/plan.md";
+        let expected = VirtualPath::data(format!(
+            "archive-evidence/document/{:x}.json",
+            Sha256::digest(canonical.as_bytes())
+        ))
+        .unwrap();
+        for path in [
+            canonical,
+            "./docs/plan.md",
+            "docs/sub/../plan.md",
+            r"docs\plan.md",
+        ] {
+            assert_eq!(
+                VirtualPath::archive_evidence_record(&PlanTarget::Document { path: path.into() }),
+                expected
+            );
+        }
+        assert_ne!(
+            VirtualPath::archive_evidence_record(&PlanTarget::Document {
+                path: "other/plan.md".into()
+            }),
+            expected
+        );
+    }
+
+    #[test]
     fn test_virtual_path_gate_run_record_nests_the_record_in_the_runs_directory() {
         let id = crate::test_utils::gate_run_id(1);
         let path = VirtualPath::gate_run_record(&id);
@@ -1000,6 +1058,9 @@ mod tests {
             .iter()
             .all(|path| path.as_str().starts_with("state/data/")));
         assert!(relocated.contains(&RootRelativePath::parse("state/data/tmp").unwrap()));
+        assert!(
+            relocated.contains(&RootRelativePath::parse("state/data/archive-evidence").unwrap())
+        );
         assert!(entries_under("/external/data").is_empty());
     }
 

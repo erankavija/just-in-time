@@ -5,23 +5,8 @@ use crate::domain::identity::GateKey;
 use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
+use crate::validation::report::BuiltInPass;
 use anyhow::Context;
-
-/// Rule name carried by every finding the built-in dangling-item-link pass emits
-/// (REQ-08 clause i, REQ-03). It is not a `.jit/rules.toml` rule; the pass runs
-/// unconditionally, so the name is a stable constant for grouping and rendering.
-pub const DANGLING_LINK_RULE: &str = "dangling-item-link";
-
-/// Rule name carried by every finding the built-in enforcement-drift pass emits
-/// (REQ-01/REQ-02). Like [`DANGLING_LINK_RULE`], it is not a `.jit/rules.toml`
-/// rule: the pass runs as part of every validate path, gated only on the
-/// presence of declared invariants, so the name is a stable constant for
-/// grouping and rendering.
-pub const ENFORCEMENT_DRIFT_RULE: &str = "enforcement-drift";
-
-/// Rule name carried by the built-in advisory finding emitted while one or
-/// more gate definitions still use [`GateChecker::ReviewPlaceholder`].
-pub const REVIEW_PLACEHOLDER_RULE: &str = "review-placeholder";
 
 #[derive(Clone, Copy)]
 enum BaseCapturePurpose<'a> {
@@ -391,7 +376,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 }
             };
         let mut issues = None::<Vec<Issue>>;
-        let mut capture_precheck_history = false;
         let mut discover = |image: &RepositoryImage, spec: &mut CaptureSpec| -> Result<()> {
             base(spec)?;
             if spec != image.capture_spec() {
@@ -454,7 +438,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     purpose,
                     BaseCapturePurpose::Validation | BaseCapturePurpose::Mutation { .. }
                 ) {
-                    capture_precheck_history = discover_issue_closure(
+                    discover_issue_closure(
                         image,
                         spec,
                         &parsed,
@@ -464,9 +448,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     )?;
                 }
                 issues = Some(parsed);
-            }
-            if capture_precheck_history {
-                super::discover_gate_run_results(image, spec)?;
             }
             Ok(())
         };
@@ -805,10 +786,8 @@ fn effective_templates(
 }
 
 /// Add what the captured `issues` name to `spec`: the plan documents, and a
-/// precheck target's prompt files.
-///
-/// Returns whether a precheck gate consumes the gate-run history, which the
-/// round then reads as well.
+/// precheck target's prompt files and, when one of its precheck gates consumes
+/// run history, the runs its required gates' states name.
 fn discover_issue_closure(
     image: &crate::repository_state::RepositoryImage,
     spec: &mut crate::repository_state::CaptureSpec,
@@ -816,12 +795,12 @@ fn discover_issue_closure(
     config: &JitConfig,
     effective: &EffectiveVirtualPath<'_>,
     precheck_target: Option<&IssueId>,
-) -> Result<bool> {
+) -> Result<()> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
     let mut full_config = config.clone();
     full_config.templates = effective_templates(image, config, effective)?;
-    let precheck = match precheck_target {
+    let (issue, precheck) = match precheck_target {
         Some(raw_target) => {
             let target = super::require_issue_in_capture(issues, raw_target)?;
             let issue = issues
@@ -832,15 +811,16 @@ fn discover_issue_closure(
                 Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
                 None => crate::declarations::GateRegistry::default(),
             };
-            issue
+            let precheck = issue
                 .gates_required
                 .iter()
                 .filter_map(|key| gates.gates.get(key))
                 .filter(|gate| gate.stage == GateStage::Precheck)
                 .cloned()
-                .collect()
+                .collect();
+            (Some(issue), precheck)
         }
-        None => Vec::new(),
+        None => (None, Vec::new()),
     };
     spec.discover_paths(plan_document_paths(issues, &full_config)?)?;
     let automated = || {
@@ -867,7 +847,14 @@ fn discover_issue_closure(
             })
             .collect::<Result<Vec<_>>>()?,
     )?;
-    Ok(automated().any(super::checker_consumes_run_history))
+    if let Some(issue) = issue.filter(|_| automated().any(super::checker_consumes_run_history)) {
+        spec.discover_paths(
+            super::named_gate_run_records(issue)
+                .map(|(_, _, path)| path)
+                .collect::<Vec<_>>(),
+        )?;
+    }
+    Ok(())
 }
 
 /// Capture budget for mutation bases and preflights.
@@ -940,7 +927,7 @@ fn capture_document_reference_validation(
     Ok(Some(Ok(())))
 }
 
-/// Capture every gate-run record, read the whole event log, and judge the
+/// Capture every gate-run and archive-evidence record, read the whole event log, and judge the
 /// stored records against `image`. Whole-repository validation pays these
 /// reads; no other capture does.
 fn capture_record_fidelity_validation(
@@ -948,15 +935,16 @@ fn capture_record_fidelity_validation(
     image: &crate::repository_state::RepositoryImage,
 ) -> Result<Option<Result<()>>> {
     let spec = crate::repository_state::CaptureSpec::new([], MUTATION_CAPTURE_BUDGET)?;
-    let Some(gate_runs) = super::capture_discovering(session, spec, |image, spec| {
-        super::discover_gate_run_results(image, spec)
+    let Some(records) = super::capture_discovering(session, spec, |image, spec| {
+        super::discover_gate_run_results(image, spec)?;
+        discover_archive_evidence_records(image, spec)
     })?
     else {
         return Ok(None);
     };
     let events = session.read_history_log()?;
     let drift =
-        crate::validation::record_fidelity::record_drift(image, &gate_runs, events.as_deref())?;
+        crate::validation::record_fidelity::record_drift(image, &records, events.as_deref())?;
     Ok(Some(match drift.is_empty() {
         true => Ok(()),
         false => Err(
@@ -968,6 +956,37 @@ fn capture_record_fidelity_validation(
             .into(),
         ),
     }))
+}
+
+fn discover_archive_evidence_records(
+    image: &crate::repository_state::RepositoryImage,
+    spec: &mut crate::repository_state::CaptureSpec,
+) -> Result<()> {
+    use crate::repository_state::{RepositoryEntry, VirtualPath};
+
+    let root = VirtualPath::ARCHIVE_EVIDENCE;
+    spec.discover_paths([root.clone()])?;
+    spec.discover_listing(root.clone())?;
+    for (directory, listing) in image.directory_listings().iter().filter(|(path, _)| {
+        path.root_class() == root.root_class()
+            && (path == &&root
+                || path.relative().as_path().parent() == Some(root.relative().as_path()))
+    }) {
+        let paths = listing
+            .names()
+            .iter()
+            .filter(|name| directory == &root || name.ends_with(".json"))
+            .map(|name| VirtualPath::data(directory.relative().as_path().join(name)))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        spec.discover_paths(paths)?;
+    }
+    spec.discover_listings(image.entries().iter().filter_map(|(path, entry)| {
+        (path.root_class() == root.root_class()
+            && path.relative().as_path().parent() == Some(root.relative().as_path())
+            && matches!(entry, RepositoryEntry::Directory { .. }))
+        .then_some(path.clone())
+    }))?;
+    Ok(())
 }
 
 /// Each breakable container's linked plan-document path.
@@ -1228,7 +1247,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
     ///
     /// The finding severity is [`Severity::Error`](crate::declarations::rules::Severity::Error)
     /// so a dangling link fails `jit validate`. The rule name is the constant
-    /// [`DANGLING_LINK_RULE`]. This pass touches no `.jit/` ruleset: it runs
+    /// [`BuiltInPass::DanglingItemLink`]. This pass touches no `.jit/` ruleset: it runs
     /// unconditionally as part of the validate path.
     pub fn dangling_link_findings(
         &self,
@@ -1269,7 +1288,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
                     findings.push(GraphFinding::for_issue(
                         issue.id.clone(),
                         Finding {
-                            rule: DANGLING_LINK_RULE.to_string(),
+                            rule: BuiltInPass::DanglingItemLink.as_str().to_owned(),
                             severity: Severity::Error,
                             message,
                         },
@@ -1288,7 +1307,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
                     findings.push(GraphFinding::for_issue(
                         issue.id.clone(),
                         Finding {
-                            rule: DANGLING_LINK_RULE.to_string(),
+                            rule: BuiltInPass::DanglingItemLink.as_str().to_owned(),
                             severity: Severity::Error,
                             message: format!(
                                 "issue {} has a dangling item link '{label}': \
@@ -1327,7 +1346,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
     /// gate is NOT drift (the enforced-but-undeclared direction was removed in
     /// REQ-05).
     ///
-    /// The rule name on every finding is [`ENFORCEMENT_DRIFT_RULE`]. A `rules.toml`
+    /// The rule name on every finding is [`BuiltInPass::EnforcementDrift`]. A `rules.toml`
     /// (or gate registry) load failure is tolerated, NOT propagated as an `Err`:
     /// [`compute_drift_findings`](crate::commands::ValidationOps::compute_drift_findings)
     /// resolves it defensively to
@@ -1346,7 +1365,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             .into_iter()
             .map(|f| {
                 GraphFinding::unattributed(Finding {
-                    rule: ENFORCEMENT_DRIFT_RULE.to_string(),
+                    rule: BuiltInPass::EnforcementDrift.as_str().to_owned(),
                     // A broken binding (declared-but-unenforced) is a real defect
                     // -> fails validate. It is the only drift direction (REQ-05).
                     severity: Severity::Error,
@@ -1570,7 +1589,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
                 findings.push(ReportedFinding::new(
                     None,
                     &crate::validation::engine::Finding {
-                        rule: "rules-file".to_string(),
+                        rule: BuiltInPass::RulesFile.as_str().to_owned(),
                         severity: crate::declarations::rules::Severity::Error,
                         message: format!("config error: {e}"),
                     },
@@ -1688,7 +1707,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             vec![ReportedFinding::new(
                 None,
                 &Finding {
-                    rule: REVIEW_PLACEHOLDER_RULE.to_string(),
+                    rule: BuiltInPass::ReviewPlaceholder.as_str().to_owned(),
                     severity: Severity::Warn,
                     message: format!(
                         "WARNING: passing external-review placeholder still configured for gate(s): {}. Replace each placeholder with a real review checker before relying on these gates.",
@@ -2172,7 +2191,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
 
     /// Validate all active leases are consistent and not stale.
     ///
-    /// Checks claims.index.json for:
+    /// Checks every lease record for:
     /// - Expired leases (TTL exceeded)
     /// - Leases referencing non-existent worktrees
     /// - Leases referencing non-existent issues
@@ -2425,6 +2444,32 @@ mod tests {
         );
         let repaired = stale.replacen(STALE_LABEL_ASSERTION, DEFAULT_LABEL_ASSERTION, 1);
         (stale, repaired)
+    }
+
+    #[test]
+    fn test_validate_silent_captures_archive_evidence_for_record_fidelity() {
+        use crate::domain::artifact_plan::PlanTarget;
+        use crate::repository_state::VirtualPath;
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config("").unwrap();
+        for target in [
+            PlanTarget::Document {
+                path: "docs/plan.md".into(),
+            },
+            PlanTarget::Container {
+                id: crate::test_utils::issue_id(1),
+            },
+        ] {
+            let path = VirtualPath::archive_evidence_record(&target);
+            let physical = executor.storage.root().join(path.relative().as_path());
+            std::fs::create_dir_all(physical.parent().unwrap()).unwrap();
+            std::fs::write(&physical, b"not json").unwrap();
+            let error = executor.validation().validate_silent().unwrap_err();
+            assert!(
+                format!("{error:#}").contains(&path.repository_relative()),
+                "{error:#}"
+            );
+            std::fs::remove_file(physical).unwrap();
+        }
     }
 
     #[test]
@@ -2932,7 +2977,10 @@ priority = 100
         let findings = exec.validation().dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].issue_id.as_ref(), Some(&node_id));
-        assert_eq!(findings[0].finding.rule, DANGLING_LINK_RULE);
+        assert_eq!(
+            findings[0].finding.rule,
+            BuiltInPass::DanglingItemLink.as_str()
+        );
         assert_eq!(
             findings[0].finding.severity,
             crate::declarations::rules::Severity::Error
@@ -3158,7 +3206,7 @@ priority = 100
         let err = exec.validation().validate_silent().unwrap_err();
         let msg = err.to_string();
         assert!(
-            msg.contains(DANGLING_LINK_RULE) && msg.contains("BOGUS"),
+            msg.contains(BuiltInPass::DanglingItemLink.as_str()) && msg.contains("BOGUS"),
             "expected dangling-link rule failure, got: {msg}"
         );
     }
@@ -3190,13 +3238,15 @@ priority = 100
         let dangling: Vec<_> = report
             .findings
             .iter()
-            .filter(|f| f.rule == DANGLING_LINK_RULE)
+            .filter(|f| f.rule == BuiltInPass::DanglingItemLink.as_str())
             .collect();
         assert_eq!(dangling.len(), 1);
         assert!(dangling[0].message.contains("BOGUS"));
         // The finding serializes (used by `jit validate --json`).
         let value = serde_json::to_value(&report.findings).unwrap();
-        assert!(value.to_string().contains(DANGLING_LINK_RULE));
+        assert!(value
+            .to_string()
+            .contains(BuiltInPass::DanglingItemLink.as_str()));
     }
 
     /// Shared bases exclude references; a consuming pass requests its own scope.

@@ -1,7 +1,9 @@
 use anyhow::Result;
 use std::env;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
+use crate::domain::identity::IssueId;
 use crate::storage::git::{Git, GitCheckout, ProbedCheckout};
 
 /// The checkout a command runs in when its data root lies outside every checkout
@@ -137,6 +139,25 @@ impl WorktreePaths {
     /// for a store outside every checkout invoked from inside one.
     pub fn has_claims_coordination(&self) -> bool {
         self.git_repository || self.relocated_worktree_checkout.is_some()
+    }
+
+    /// The directory of lease records under the control plane `shared_jit`.
+    pub fn leases_dir(shared_jit: &Path) -> PathBuf {
+        shared_jit.join("leases")
+    }
+
+    /// The issue's lease record under `shared_jit`; an absent file means no lease.
+    pub fn lease_path(shared_jit: &Path, issue_id: &IssueId) -> PathBuf {
+        Self::leases_dir(shared_jit).join(format!("{issue_id}.json"))
+    }
+
+    /// The issue a [`Self::lease_path`] file name names, or `None` for any
+    /// other name in the lease directory.
+    pub fn lease_record_issue(file_name: &OsStr) -> Option<IssueId> {
+        file_name
+            .to_str()?
+            .strip_suffix(".json")
+            .and_then(|stem| IssueId::try_from(stem).ok())
     }
 
     /// Return whether the selected store belongs to a linked checkout. A store

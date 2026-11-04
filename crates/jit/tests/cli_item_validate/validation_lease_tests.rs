@@ -6,7 +6,7 @@ use chrono::{Duration, Utc};
 use jit::storage::claim_coordinator::Lease;
 use jit::storage::worktree_paths::WorktreePaths;
 use jit::test_cli::JitCli;
-use jit::test_lease_store::{corrupt_lease, plant_lease, LeaseCorruption};
+use jit::test_lease_store::plant_lease;
 use serde_json::Value;
 
 /// Create a lease with an explicit acquisition time.
@@ -33,12 +33,11 @@ fn create_test_lease(
         acquired_at,
         expires_at,
         last_beat: acquired_at,
-        stale: false,
     }
 }
 
 #[test]
-fn test_validate_leases_no_claims_index() {
+fn test_validate_leases_without_lease_records_is_valid() {
     let (primary, _linked) = JitCli::linked_checkouts().unwrap();
 
     let json = primary.run_json(["validate", "--leases"]).unwrap();
@@ -51,10 +50,15 @@ fn test_validate_repository_detects_invalid_claims_index() {
     let (primary, _linked) = JitCli::linked_checkouts().unwrap();
     let paths =
         WorktreePaths::detect_for_data_root(&primary.root().join(".jit"), primary.root()).unwrap();
-    corrupt_lease(
-        &paths.shared_jit,
-        &jit::test_utils::issue_id(1),
-        LeaseCorruption::InvalidSchema,
+    // The index is recovery's claims-log replay, not lease storage.
+    std::fs::create_dir_all(&paths.shared_jit).unwrap();
+    std::fs::write(
+        paths.shared_jit.join("claims.index.json"),
+        serde_json::to_vec(&jit::storage::claim_coordinator::ClaimsIndex {
+            schema_version: 2,
+            ..Default::default()
+        })
+        .unwrap(),
     )
     .unwrap();
 

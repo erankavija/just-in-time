@@ -99,6 +99,7 @@ its coupled issue and event updates.
   "message": "all suites green",
   "origin": {
     "derivation": "reused",
+    "source_issue": "6a2b8c40-9d15-4f37-8e62-0b3c7d5e1f90",
     "source_run": "1c4e8a90-3d2b-4f61-9a07-5b8c2d1e6f34"
   },
   "run_id": "7b2b0a4c-2f5a-4d3e-9b1a-6c8f0d5e4a21",
@@ -138,5 +139,5 @@ a `null` one alike.
 | `message` | `null` when unset | Free-text note attached to the run. |
 | `findings` | omitted when unset | Structured findings parsed from the checker's machine-readable block, carrying the checker's `verdict`, a `summary`, and the `findings` array. Each finding may carry an optional `references` array of opaque strings; it is omitted when empty. Unset when the checker emitted no such block; the raw `stdout` is kept either way. `jit gate status --findings` prints this field. |
 | `inputs_digest` | omitted when unset | Digest of the repository files the gate declares its checker reads, taken before the verdict was obtained. Two runs of one gate carrying the same value read byte-identical content at byte-identical paths. Unset when the gate declares no inputs, which is what keeps its checker running on every evaluation. |
-| `origin` | always | Where the verdict came from. `{"derivation": "executed"}` means this run ran the checker; `{"derivation": "reused", "source_run": "<run-id>"}` means it carries the named earlier run's verdict, whose `inputs_digest` matched, without the checker running again. The report text behind a reused verdict lives at the named run. `{"derivation": "attested"}` means the run records a manual gate's attestation: `by` names the attestor and `started_at` the time. |
+| `origin` | always | Where the verdict came from. `{"derivation": "executed"}` means this run ran the checker; `{"derivation": "reused", "source_issue": "<issue-id>", "source_run": "<run-id>"}` means it carries the named earlier run's verdict, whose `inputs_digest` matched, without the checker running again. The report text behind a reused verdict lives at the run addressed by `source_issue` and `source_run`. `{"derivation": "attested"}` means the run records a manual gate's attestation: `by` names the attestor and `started_at` the time. |
 | `evaluation_stability` | always | Whether the evaluation inputs still matched the repository when the run was recorded. `stable` means they held still; `inputs_moved` means the verdict is the checker's verdict over the state captured before it started, not over the state the record was published against. A reader can therefore distinguish post-run repository drift without treating the completed verdict as discarded. |
