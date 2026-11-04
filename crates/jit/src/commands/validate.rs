@@ -332,47 +332,6 @@ fn plan_derived_state_fixes(
 }
 
 impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
-    /// Capture the declaration and rule-validation image through a mutation
-    /// session, in the one round
-    /// [`capture_proposed_base_inner`](Self::capture_proposed_base_inner) reads.
-    fn capture_validation_image(&self) -> Result<crate::repository_state::RepositoryImage> {
-        self.capture_validation_image_with(&std::collections::BTreeMap::new())
-    }
-
-    /// Capture the declaration and rule-validation image, optionally over a
-    /// proposed overlay. Document-reference auditing is a separate capture pass.
-    ///
-    /// With an empty `overrides` this captures and validates the live repository.
-    /// With a non-empty overlay (the projection of a proposed
-    /// [`RepositoryDelta`](crate::repository_state::RepositoryDelta) to final
-    /// bytes/absence) the closure is computed from the OVERLAID declarations — so
-    /// it covers what the proposed state's passes read — the base is captured over
-    /// that closure, and the overlay is applied
-    /// ([`apply_overlay`](crate::repository_state::apply_overlay)) so
-    /// the validation report judges one coherent proposed repository under the same
-    /// closed-read discipline.
-    pub(crate) fn capture_validation_image_with(
-        &self,
-        overrides: &std::collections::BTreeMap<
-            crate::repository_state::VirtualPath,
-            Option<Vec<u8>>,
-        >,
-    ) -> Result<crate::repository_state::RepositoryImage> {
-        use crate::repository_state::apply_overlay;
-
-        let layout = self.require_layout()?;
-        with_mutation_session(
-            self.storage(),
-            &layout,
-            "validation capture",
-            |session| match self.capture_proposed_base(session, overrides, &[], None)? {
-                None => Ok(SessionStep::Retry),
-                Some(base) if overrides.is_empty() => Ok(SessionStep::Done(base)),
-                Some(base) => Ok(SessionStep::Done(apply_overlay(&base, overrides.clone())?)),
-            },
-        )
-    }
-
     /// One bounded capture round of the whole-repository validation base under an
     /// already-held session.
     ///
@@ -816,7 +775,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
 
     /// Capture the whole-repository validation base with the issue records its
     /// closure planning parsed.
-    fn capture_validation(
+    pub(super) fn capture_validation(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
     ) -> Result<Option<crate::validation::CapturedValidation<'static>>> {
@@ -1210,14 +1169,12 @@ fn plan_document_paths(
         .collect()
 }
 
-/// Plan-document content for `emit_for` from a captured image, whose closure
-/// holds every path [`plan_document_paths`] derives; `all_issues` is the image's
-/// complete issue set. A missing or malformed configuration yields no plan
-/// documents, and the validation report reports it.
+/// Plan content for the image's complete issue set. Its closure holds every
+/// path [`plan_document_paths`] derives. Invalid configuration yields no plans;
+/// the validation report reports the failure.
 pub(crate) fn plan_content_with_issues(
     image: &crate::repository_state::RepositoryImage,
-    all_issues: &[Issue],
-    emit_for: &[Issue],
+    issues: &[Issue],
 ) -> Result<std::collections::HashMap<IssueId, String>> {
     let effective_virtual_path =
         |img: &crate::repository_state::RepositoryImage,
@@ -1229,88 +1186,13 @@ pub(crate) fn plan_content_with_issues(
     let templates = effective_templates(image, &config, effective_virtual_path)?;
     crate::validation::repository::plan_content(
         &|path| super::image_repo_bytes(image, path),
-        all_issues,
-        emit_for,
+        issues,
+        issues,
         &templates,
     )
 }
 
 impl<S: IssueStore> ValidationOps<'_, S> {
-    /// Evaluate every `RuleScope::Graph` rule from `.jit/rules.toml` over the supplied
-    /// issue set, returning one
-    /// [`GraphFinding`](crate::validation::graph::GraphFinding) per violation
-    /// (including `config-error` findings for malformed rules). Each finding
-    /// carries the issue it pertains to (or `None` for a config-error), so
-    /// per-issue reporting can attribute findings exactly rather than by matching
-    /// substrings in the message.
-    ///
-    /// The ruleset is loaded via [`CommandExecutor::rules`](crate::commands::CommandExecutor::rules);
-    /// a genuine `rules.toml` parse/load failure is surfaced as an `Err` rather
-    /// than silently disabling enforcement. A missing `rules.toml` yields no
-    /// findings. This method performs no filesystem writes; it reads the cached
-    /// ruleset and the issues passed in.
-    pub fn evaluate_graph_rules(
-        &self,
-        issues: &[Issue],
-    ) -> Result<Vec<crate::validation::graph::GraphFinding>>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::declarations::rules::RuleScope;
-
-        // Surface a misconfigured rules.toml instead of swallowing it.
-        let ruleset = self.exec.effective_rules()?;
-
-        let graph_rules: Vec<&crate::declarations::rules::Rule> = ruleset
-            .rules
-            .iter()
-            .filter(|rule| rule.scope == RuleScope::Graph)
-            .collect();
-
-        // The repo HierarchyConfig is injected into `type-hierarchy` rules at
-        // evaluation time (D1); it is no longer stored in the parsed rule. Build
-        // it from the same namespace registry as the rule declarations.
-        let namespaces = self.exec.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-        let hierarchy =
-            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
-        let repo_format = self.exec.cached_config()?.content_format();
-
-        // Resolve any external plan documents from the captured validation image
-        // so a container whose criteria live in an external file is validated
-        // against the FILE content; the engine itself reads only the injected map
-        // (stays pure) and the plan bytes come from the closed image, not the
-        // live filesystem.
-        let plan_content = self.image_plan_content(issues)?;
-
-        // Inject the wall-clock instant at the boundary so `gate-recency` rules
-        // are deterministic and the graph engine stays pure (CC-5b).
-        Ok(crate::validation::graph::evaluate_graph(
-            &graph_rules,
-            issues,
-            &hierarchy,
-            repo_format,
-            chrono::Utc::now(),
-            &plan_content,
-        ))
-    }
-
-    /// Plan-document content for `emit_for` from the whole-repository validation
-    /// image, resolving planning nodes over every captured issue so a scoped slice
-    /// still finds its bracket's planning node.
-    pub(crate) fn image_plan_content(
-        &self,
-        emit_for: &[Issue],
-    ) -> Result<std::collections::HashMap<IssueId, String>>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let image = self.exec.capture_validation_image()?;
-        // Undecodable issue records yield no plan content; the validation report
-        // reports them.
-        let all_issues = super::captured_active_issues(&image).unwrap_or_default();
-        plan_content_with_issues(&image, &all_issues, emit_for)
-    }
-
     pub fn get_status(&self) -> Result<StatusSummary> {
         let issues = self.exec.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
@@ -1637,24 +1519,6 @@ mod tests {
         assert!(
             format!("{error:#}").contains(&corrupt.repository_relative()),
             "{error:#}"
-        );
-    }
-
-    #[test]
-    fn test_evaluate_graph_rules_preserves_invalid_hierarchy_error() {
-        let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
-        std::fs::write(storage.root().join("config.toml"), config).unwrap();
-        let executor = crate::test_utils::file_executor(repo.path()).unwrap();
-
-        let error = executor
-            .validation()
-            .evaluate_graph_rules(&[])
-            .expect_err("invalid hierarchy must fail graph-rule evaluation");
-
-        assert_eq!(
-            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
-            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
         );
     }
 
@@ -2654,6 +2518,27 @@ depends_on = ["planning"]
         split(executor.validation().validate_repository_report().unwrap())
     }
 
+    fn capture_overlaid_image(
+        executor: &crate::commands::CommandExecutor<JsonFileStorage>,
+        overrides: &std::collections::BTreeMap<VirtualPath, Option<Vec<u8>>>,
+        finish: impl Fn(&RepositoryImage) -> anyhow::Result<RepositoryImage>,
+    ) -> RepositoryImage {
+        with_mutation_session(
+            executor.storage(),
+            &executor.require_layout().unwrap(),
+            "overlay fixture capture",
+            |session| {
+                let Some(base) = executor.capture_proposed_base(session, overrides, &[], None)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let proposed = crate::repository_state::apply_overlay(&base, overrides.clone())?;
+                Ok(SessionStep::Done(finish(&proposed)?))
+            },
+        )
+        .unwrap()
+    }
+
     /// Capture and validate the fixture overlaid with proposed final bytes/absence.
     fn validate_overlaid<P: Into<PathBuf>>(
         executor: &crate::commands::CommandExecutor<JsonFileStorage>,
@@ -2666,7 +2551,10 @@ depends_on = ["planning"]
                 .map(|(path, value)| (path.into(), value)),
         )
         .unwrap();
-        let image = executor.capture_validation_image_with(&overrides).unwrap();
+        if overrides.is_empty() {
+            return split(executor.validation().selection_report().unwrap());
+        }
+        let image = capture_overlaid_image(executor, &overrides, |proposed| Ok(proposed.clone()));
         split(crate::validation::report(
             &crate::validation::CapturedValidation::from_image(&image),
             &crate::validation::ReportInputs {
@@ -2683,26 +2571,26 @@ depends_on = ["planning"]
         changes: impl IntoIterator<Item = (P, Option<Vec<u8>>)>,
     ) -> std::result::Result<ValidationReport, ValidationReport> {
         let layout = executor.require_layout().unwrap();
-        let mut overrides = crate::commands::overrides_from_repo_changes(
+        let overrides = crate::commands::overrides_from_repo_changes(
             &layout,
             changes
                 .into_iter()
                 .map(|(path, value)| (path.into(), value)),
         )
         .unwrap();
-        let proposed = executor.capture_validation_image_with(&overrides).unwrap();
-        let declarations = crate::repository_state::declarations_from_image(&proposed).unwrap();
-        let plan = crate::repository_state::derive_materialization(
-            &proposed,
-            crate::repository_state::MaterializationRequest::RepairDerivedState {
-                declarations: declarations.borrowed(),
-            },
-        )
-        .unwrap();
-        overrides.extend(crate::repository_state::action_overrides(
-            plan.delta().actions(),
-        ));
-        let image = executor.capture_validation_image_with(&overrides).unwrap();
+        let image = capture_overlaid_image(executor, &overrides, |proposed| {
+            let declarations = crate::repository_state::declarations_from_image(proposed)?;
+            let plan = crate::repository_state::derive_materialization(
+                proposed,
+                crate::repository_state::MaterializationRequest::RepairDerivedState {
+                    declarations: declarations.borrowed(),
+                },
+            )?;
+            Ok(crate::repository_state::apply_overlay(
+                proposed,
+                crate::repository_state::action_overrides(plan.delta().actions()),
+            )?)
+        });
         split(crate::validation::report(
             &crate::validation::CapturedValidation::from_image(&image),
             &crate::validation::ReportInputs {
