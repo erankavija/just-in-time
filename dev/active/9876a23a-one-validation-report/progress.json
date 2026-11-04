@@ -177,7 +177,7 @@
         },
         {
           "short_id": "2b5f452c",
-          "status": "first pass 532b649b2; rework 1: fidelity re-decodes records into Value (REQ-03)",
+          "status": "rework 1 a55545bcf accepted; pipeline running",
           "worker": "claude opus",
           "worker_reason": "fidelity on parsed records (REQ-10)"
         },
@@ -319,7 +319,8 @@
     "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566",
     "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch",
     "jit-server graceful_shutdown_tests::test_the_drain_assertion_rejects_a_server_that_force_closes_early failed once under load ~10 (5d5a1794 CI); passes alone",
-    "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording."
+    "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording.",
+    "2b5f452c: issue records now decode bytes->Value->Issue once; a duplicated JSON key in a record now loads (last wins) instead of failing, and field-type errors lose line/column. Accepted (no criterion); flag to steward."
   ],
   "started_at": "2026-11-03T23:40:00+02:00",
   "rejected": [
