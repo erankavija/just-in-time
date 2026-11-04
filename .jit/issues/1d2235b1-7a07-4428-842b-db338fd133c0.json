@@ -24,7 +24,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Centralize watcher path selection",
-  "updated_at": "2026-11-04T22:25:07.648907703Z"
+  "updated_at": "2026-11-04T23:06:53.853956706Z"
 }

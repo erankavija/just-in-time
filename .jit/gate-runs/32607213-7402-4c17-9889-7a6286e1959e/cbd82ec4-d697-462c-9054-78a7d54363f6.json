@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6797273a47de5fab873f04acac7a695b02fbe639",
+  "completed_at": "2026-11-04T23:06:26.179723435Z",
+  "duration_ms": 274538,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/0f8efc37-frontends-share-core/breakdown.json",
+        "id": "F1",
+        "line": 31,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/110a4a2f/REQ-02",
+          "@/issue/0f8efc37/REQ-02"
+        ],
+        "severity": "low",
+        "summary": "The layout-binding footprint lists five files although the investigation inventories 31 fallible-builder callers; summarize the additional caller and test groups more concretely."
+      }
+    ],
+    "summary": "All required checks and graph-fidelity comparisons pass; one previously reviewed footprint-clarity advisory remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "32607213-7402-4c17-9889-7a6286e1959e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cbd82ec4-d697-462c-9054-78a7d54363f6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:01:51.640907983Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "All required checks pass: manifest validation, renderer check, native batch dry-run (16 issues/19 edges), and `jit validate`. Stored fields, edges, bracket wiring, external re-homes, and the 16-key UUID map match exactly. No `planning` metadata is persisted or batch-exported.\n\n| Key / issue | Coherent change | Observable test boundary | Footprint credible | One cycle | Not a chain link | Result |\n|---|---|---|---|---|---|---|\n| layout-binding | Yes | Storage binding conformance | Borderline: five named files plus 31 inventoried callers | Yes | Yes | Pass, advisory |\n| watch-paths | Yes | Storage watcher predicate | Yes | Yes | Yes | Pass |\n| config-refresh | Yes | Event-driven hierarchy refresh | Yes | Yes | Yes | Pass |\n| shared-capture | Yes | Concurrent refresh-cache behavior | Yes | Yes | Yes | Pass |\n| executor-offload | Yes | Offload/error mapping | Yes | Yes | Yes; override justified | Pass |\n| semantic-search | Yes | Core semantic search | Yes | Yes | Yes | Pass |\n| browser-search | Yes | Out-of-order search responses | Yes | Yes | Yes | Pass |\n| documents | Yes | Document version behavior | Yes | Yes | Yes | Pass |\n| api-pruning | Yes | Server routing contract | Yes | Yes | Yes | Pass |\n| server-modules | Yes | Build-target topology | Yes | Yes | Yes | Pass |\n| raw-responses | Yes | Raw-document responses | Yes | Yes | Yes | Pass |\n| graph-summary | Yes | Browser metadata refresh | Yes | Yes | Yes | Pass |\n| layout-indexes | Yes | Cluster-aware layout | Yes | Yes | Yes | Pass |\n\nThe contract modes and producer reachability are sound: `executor-helper` has one reachable producer, while plan-fixed contracts require none. All footprint paths exist; overlap advisories have distinct behavior/test boundaries and do not justify extra ordering edges.\n\n1. **F1 — low, advisory, issue-impact:** `layout-binding` lists five concrete touched files although its uncertainty and investigation expand the cutover to 31 inventoried fallible-builder caller files. This unchanged plan-review advisory should be resolved by summarizing the additional caller/test groups more concretely; it is not a material sizing failure because the approved decision treats the fallible API and mechanical caller migration as one coherent cutover. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/0f8efc37-frontends-share-core/breakdown.json:31), [investigation.md](/home/vkaskivuo/Projects/just-in-time/dev/active/0f8efc37-frontends-share-core/investigation.md:1135). References: `@/issue/110a4a2f/REQ-02`, `@/issue/0f8efc37/REQ-02`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All required checks and graph-fidelity comparisons pass; one previously reviewed footprint-clarity advisory remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The layout-binding footprint lists five files although the investigation inventories 31 fallible-builder callers; summarize the additional caller and test groups more concretely.\",\"file\":\"dev/active/0f8efc37-frontends-share-core/breakdown.json\",\"line\":31,\"references\":[\"@/issue/110a4a2f/REQ-02\",\"@/issue/0f8efc37/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
