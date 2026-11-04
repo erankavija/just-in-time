@@ -10,6 +10,7 @@
   ],
   "description": "Derive the new issue's advisory findings inside the creation mutation, from the image it captured, through one captured graph-evaluation helper that also replaces the hand-built copies in the other mutation paths.\n\n## Background\n\n- `publish_issue_creation` (`crates/jit/src/commands/mod.rs:2510-2587`) captures a mutation base holding the image and every issue, discards the issues (`:2525`), evaluates local rules through `derive_write_validation` (`:1091-1115`) and returns its warnings. `create_issue` (`crates/jit/src/commands/issue.rs:209-274`) returns the created issue with those warnings.\n- Graph-rule findings for a new issue are computed only by the CLI's human path after the commit, through `evaluate_graph_rules` over a fresh issue list and a whole validation capture (the `IssueCommands::Create` arm of `crates/jit/src/main.rs`, `:1874-1886`).\n- The other mutation paths assemble the same captured evidence by hand. Each reads the declarations and projects plan content from the mutation image (`commands/mod.rs:2762,2773` field update; `:3189,3191` lifecycle; `commands/dependency.rs:382` dependency removal; `commands/bulk_update.rs:373-377` bulk-update verification) into `CapturedTransitionEvidence` (`mod.rs:561-567`), and `derive_state_transition` (`:1118-1318`) evaluates graph rules over it with the mutation timestamp (`:1226-1233`). Issue deletion projects plan content the same way (`commands/issue.rs:129`).\n- Issue-linked documents are not part of a mutation image, so document-reading passes are not evaluated here.\n- Readers of the returned warnings: the `issue create` arm in `main.rs` (`:1838-1841`) and `crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs:167`.\n\n## Success Criteria\n\n- [hard] REQ-01: Creation returns `findings`, in the wire `ReportedFinding` shape: the new issue's local-rule findings and the graph-rule findings attributed to it, evaluated over the captured issues plus the new record with the mutation's timestamp and plan content from the mutation image. It replaces the returned warnings.\n- [hard] REQ-02: One helper derives the captured evidence (declarations and plan content from the mutation image) and evaluates graph rules over it at the mutation timestamp. Issue creation, state transitions, field updates, lifecycle mutations, dependency removal and bulk-update verification go through it, and no mutation path under `crates/jit/src/commands/` pairs plan-content projection with graph evaluation other than through the shared helper.\n- [hard] REQ-03: A harness test over `InMemoryStorage` shows that creating an orphan leaf returns its `orphan-leaf` finding and creating a compliant issue returns none.\n- [hard] REQ-04: The listed readers read `findings`, `issue create` prints today's warning lines from them, and the transition, dependency and bulk-update suites pass unchanged.\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: `issue create --orphan` is removed. Creation findings are advisory and identical in human and JSON output, so a flag that only hid the `orphan-leaf` hint added a special case for no behaviour (`@/charter/D-18`) and named a workflow-package rule in the engine. Rejected: filtering `orphan-leaf` from the returned findings.\n\n## Notes\n\n- The validation views' own pairings of plan content and graph evaluation are removed by the epic's report work.\n- Behaviour is unchanged in this change; output changes land with the CLI rendering.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T00:47:12.431536868Z",
   "first_ready_at": "2026-11-03T23:04:05.037735496Z",
   "gates_required": [
     "cargo-ci",
@@ -23,9 +24,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "cf7bb70a-08c9-4b17-9ac9-ab47c225d4c7",
-      "status": "failed",
-      "updated_at": "2026-11-04T00:36:23.959607196Z",
+      "run_id": "e7c989f9-e86c-48aa-8ba1-02b6e0d92c09",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:46:59.909373562Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,7 +41,7 @@
     "satisfies:9876a23a/REQ-13"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Issue creation derives its findings inside its mutation",
-  "updated_at": "2026-11-04T00:43:15.245699714Z"
+  "updated_at": "2026-11-04T00:47:12.431536868Z"
 }

@@ -101,9 +101,10 @@ issue-linked documents and pinned evidence are validation's reads
 
 The event log is the one path a mutation reads as a tail: an `EventLogTail`
 (`EventLogTail::read_tail`) holds the log's exact length and its last bytes,
-reaching back to the start of the final line, so the read is bounded by that line
-and never by the log's history (`@/issue/c88822a5/decision/D-1`). Validation,
-which parses the log, reads it whole.
+reaching back to the start of the final line. That tail determines the committed
+length where event appends are positioned and is bounded by the final line,
+never by the log's history (`@/issue/c88822a5/decision/D-1`). Validation, which
+parses the log, reads it whole.
 
 The budgets bound the one place a capture grows beyond what a caller declared:
 expanding a complete listing names children nobody asked for, and `max_listings`
@@ -264,9 +265,10 @@ the time and emits one exact plan.
   and times.
 - `finalize` (built on `finalize_delta`) follows a frozen identifier order — the
   indices of new issue ids first, reserved for the ids their commands derived,
-  gate-run/record ids next, event ids last after canonical event ordering — stamps the one timestamp on every transition, emits the new
-  event lines as one `AppendEvents` action at the log's committed length, the end
-  of its last newline-terminated line (`@/inv/event-log`), and derives `index.json`
+  gate-run/record ids next, event ids last after canonical event ordering —
+  stamps the one timestamp on every transition and emits event lines as one
+  `AppendEvents` action positioned at the log's committed length, the end of its
+  last newline-terminated line (`@/inv/event-log`). It derives `index.json`
   tombstones from the captured preimage. The captured tail determines that length,
   so an unterminated final line is overwritten. `finalize_audit_append` positions
   its append the same way for init/profile deltas that carry their own asset
@@ -347,9 +349,9 @@ sequenceDiagram
 
 A `RedoRecord` (`storage/redo_record.rs`) is one mutation's file changes: the
 directories it makes, the complete new bytes and mode of every file it puts, the
-paths it deletes, and one event append (bytes at the offset the capture read as
-the log's committed length). A mode change is a put of the captured bytes under the new
-mode. Operation paths are pairwise disjoint — no two operations name one path and
+paths it deletes, and one event append positioned at the log's committed length,
+the end of its last newline-terminated line. A mode change is a put of the
+captured bytes under the new mode. Operation paths are pairwise disjoint — no two operations name one path and
 none is an ancestor of another, the event append's implicit target included —
 checked identically by `RedoRecord::new` and `RedoRecord::parse`, so only a
 directory no other operation lies beneath is carried as a make-directory.

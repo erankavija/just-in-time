@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T00:51:33.588736588Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "Make archive execute read prior executions from the target's evidence record, once, instead of parsing the event log twice.\n\n## Background\n\nExecute captures the whole event log (`capture_archive_base`, `crates/jit/src/commands/validate.rs`) and parses it twice from the image: in the planner (`commands/archive.rs`) and in the finalizer (`finalize_archive_execution`, `repository_state/archive.rs`), both through `captured_archive_events` (`pub(crate)`, re-exported from `repository_state/mod.rs`), which fails as `ArchiveExecutionError::EventLog`. Each target's executions are in `archive-evidence/<target-key>.json`, which execute captures.\n\nKept as one change for a build reason: the planner and the finalizer are the only callers of `captured_archive_events`, and unused crate-private code fails the zero-warning build, so the function, its re-export and the error variant it alone produces go with them.\n\n## Success Criteria\n\n- [hard] REQ-01: Execute reads the target's evidence record once from its image, the finalizer receives it from the planner, and `BaseCapturePurpose::Archive` captures the event log as a tail, so `capture_proposed_base_inner` has no whole-log arm and `capture_archive_base`'s doc comment says so.\n- [hard] REQ-02: `captured_archive_events`, its re-export and `ArchiveExecutionError::EventLog` no longer exist.\n- [hard] REQ-03: A test shows that execute of a re-archived target succeeds with an unparseable event log and produces the same coverage and residue identities as before.\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T00:51:02.902186808Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +26,7 @@
     "satisfies:f8a6b298/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Archive execute reads the per-target evidence record",
-  "updated_at": "2026-11-02T23:39:50.224808099Z"
+  "updated_at": "2026-11-04T00:51:33.588736588Z"
 }

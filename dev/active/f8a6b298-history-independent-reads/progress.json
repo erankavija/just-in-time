@@ -631,6 +631,13 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "absorbs 53d19851 (steward ruling): index machinery removal"
+    },
+    {
+      "id": "7fc08dff",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "archive execute reads evidence record"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
