@@ -1045,6 +1045,54 @@ fn test_apply_admits_a_plan_only_against_its_exact_image<B: Backend>() {
     assert_eq!(outcome.actions_applied, delta.actions().len());
 }
 
+/// A session recognises only the image it captured: a plan over a
+/// byte-identical image captured by another session is a retryable conflict,
+/// and a plan shares its image's storage.
+fn test_apply_refuses_a_plan_over_a_byte_identical_image_of_another_session<B: Backend>() {
+    let target = VirtualPath::data("target.txt").unwrap();
+    let repository = Repository::<B>::seeded(&[]);
+    let layout = repository.layout();
+    let budget = CaptureBudget {
+        max_listings: 8,
+        max_bytes: 1024 * 1024,
+        max_depth: 8,
+    };
+    let spec = || CaptureSpec::new([target.clone()], budget).unwrap();
+    let delta = RepositoryDelta::new(
+        &layout,
+        vec![RepositoryAction::write_file(
+            target.clone(),
+            RepositoryActionOwner::RepositoryStateMutation,
+            ExpectedPreimage::Absent,
+            b"materialized".to_vec(),
+            FileMode::Regular,
+        )],
+    )
+    .unwrap();
+    let first_image = repository
+        .store
+        .open_mutation_session(layout.clone())
+        .unwrap()
+        .capture(spec())
+        .unwrap();
+    let foreign_plan = MaterializationPlan::new(&first_image, delta.clone());
+    assert!(foreign_plan.image().shares_data_with(&first_image));
+
+    let mut session = repository.store.open_mutation_session(layout).unwrap();
+    let image = session.capture(spec()).unwrap();
+
+    assert_eq!(first_image, image, "the two captures are byte-identical");
+    assert!(matches!(
+        session.apply(&foreign_plan),
+        Err(RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+    let own_plan = MaterializationPlan::new(&image, delta.clone());
+    assert_eq!(
+        session.apply(&own_plan).unwrap().actions_applied,
+        delta.actions().len()
+    );
+}
+
 fn test_root_is_shared_by_clones_and_names_the_data_root_when_file_backed<B: Backend>() {
     let repository = Repository::<B>::empty();
     let store = &repository.store;
@@ -1397,6 +1445,7 @@ conformance_suite!(
         test_gate_run_readers_refuse_a_special_object_as_the_issue_directory,
         test_load_gate_run_result_reports_an_issue_directory_without_the_record_as_not_found,
         test_apply_admits_a_plan_only_against_its_exact_image,
+        test_apply_refuses_a_plan_over_a_byte_identical_image_of_another_session,
         test_root_is_shared_by_clones_and_names_the_data_root_when_file_backed,
         test_read_repo_file_reads_present_files_and_refuses_unsafe_paths,
         test_gate_presets_list_and_get_the_declared_presets,

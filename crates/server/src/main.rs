@@ -161,8 +161,10 @@ async fn main() -> Result<()> {
         await_shutdown_signal(),
     ));
 
-    axum_server::from_tcp(std_listener)?
-        .handle(handle)
+    let server = axum_server::from_tcp(std_listener)?.handle(handle);
+    #[cfg(feature = "test-support")]
+    let server = server.acceptor(jit_server::first_read::FirstReadAcceptor::from_env());
+    server
         .serve(app.into_make_service())
         .await
         .context("HTTP server stopped with an error")?;

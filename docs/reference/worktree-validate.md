@@ -385,13 +385,20 @@ the history reads. Selections differ only in what they admit:
 Each built-in validation gate checker reports what its view reports; see
 [gate presets](gate-presets.md#portable-checker-types).
 
-`--fix` additionally repairs the auto-fixable findings (type-hierarchy label
+#### Repairs
+
+`--fix` repairs the auto-fixable findings (type-hierarchy label
 fixes, transitive-reduction violations, pending state transitions) and
-derived-state drift (default rules and schemas, configured projections). Derived
-repairs publish through one redo record
-([Publication and Recovery](storage-format.md#publication-and-recovery)) and
-preserve authored or unmanaged bytes. An ambiguous target is reported without
-writes. Coordination state — stale
+derived-state drift (default rules and schemas, configured projections). Every
+fix of the run publishes through one mutation and one redo record
+([Publication and Recovery](storage-format.md#publication-and-recovery));
+derived repairs preserve authored or unmanaged bytes. An ambiguous target is
+reported without writes. The run then renders the whole-repository report over
+the fixed repository, with that report's exit status, whether or not a fix
+applied; `--dry-run` writes nothing, so its report covers the repository as it
+stands. Human output prints the fix messages and a fix count before the report;
+JSON adds `fixes_applied`, `fix_messages`, and `dry_run` to the report object.
+Coordination state — stale
 locks and expired leases — is repaired by
 [`jit recover`](#jit-recover), not by `jit validate`.
 Plain `jit validate` does not check leases; `--leases` checks lease records
@@ -469,8 +476,8 @@ the [machine-readable failure contract](cli-commands.md#cli-json-contracts).
 
 ### Failure modes
 
-`jit validate` passes when it finds nothing to report (and, under `--fix`, when
-its repairs complete). It signals findings by exiting non-zero:
+`jit validate` passes when it finds nothing to report (under `--fix`, in the
+repository its repairs leave). It signals findings by exiting non-zero:
 
 - **Declarative-rule errors** — whole-repo or per-issue.
 - **Repository-integrity failures** — a broken dependency, a DAG cycle, an

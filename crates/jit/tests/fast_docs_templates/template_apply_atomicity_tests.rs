@@ -5,6 +5,7 @@
 //! call. These tests inject a failure at that boundary and compare complete
 //! captured preimages, rather than observing superseded per-record writes.
 
+use jit::test_utils::add_reducing_edge;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -459,10 +460,7 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
         .unwrap()
         .issue
         .id;
-    executor
-        .graph()
-        .add_dependency(&container, &upstream)
-        .unwrap();
+    add_reducing_edge(&executor, &container, &upstream).unwrap();
     (executor, container, upstream)
 }
 

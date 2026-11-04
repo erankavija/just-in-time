@@ -88,11 +88,11 @@ impl<R> Outcome<R> {
     pub fn with_warnings<I>(mut self, warnings: I) -> Self
     where
         I: IntoIterator,
-        I::Item: Into<String>,
+        I::Item: std::fmt::Display,
     {
         let (Self::Success { warnings: own, .. } | Self::Findings { warnings: own, .. }) =
             &mut self;
-        own.extend(warnings.into_iter().map(Into::into));
+        own.extend(warnings.into_iter().map(|warning| warning.to_string()));
         self
     }
 }

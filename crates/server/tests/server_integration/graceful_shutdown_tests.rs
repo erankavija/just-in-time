@@ -5,19 +5,22 @@
 //! a signalled server closes its sockets, releases its port, and exits `0`
 //! within a bounded time even when a connection refuses to finish on its own.
 
+use std::collections::HashSet;
 use std::fs::File;
-use std::io::{ErrorKind, Read, Write};
-use std::net::TcpStream;
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
+use std::net::{SocketAddr, TcpStream};
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStderr, Command, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
 use jit::storage::JsonFileStorage;
 use jit::test_utils::{file_executor, setup_test_repo};
+use jit_server::first_read::{FIRST_READ_EVENT, FIRST_READ_REPORT_ENV};
 use jit_server::shutdown::{DRAIN_DEADLINE_MS_ENV, GRACEFUL_DRAIN_TIMEOUT};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
@@ -96,11 +99,53 @@ fn record_repository_change(executor: &CommandExecutor<JsonFileStorage>) {
 
 // ── Server process fixture ──────────────────────────────────────────────────
 
-/// A spawned `jit-server` process, its bound port, and its captured log.
+/// A spawned `jit-server` process, its bound port, its captured log, and the
+/// connections it has reported reading from.
 struct RunningServer {
     child: Child,
     port: u16,
     log_path: PathBuf,
+    first_reads: Arc<FirstReads>,
+}
+
+/// The peers whose first bytes the server reported reading, filled from its
+/// stderr as the reports arrive.
+#[derive(Default)]
+struct FirstReads {
+    peers: Mutex<HashSet<SocketAddr>>,
+    reported: Condvar,
+}
+
+impl FirstReads {
+    /// Blocks until the server reports reading from `peer`. `budget` bounds a
+    /// server that never reads rather than stating a property.
+    fn wait_for(&self, peer: SocketAddr, budget: Duration) {
+        let peers = self.peers.lock().expect("first-read set lock");
+        let (peers, _) = self
+            .reported
+            .wait_timeout_while(peers, budget, |peers| !peers.contains(&peer))
+            .expect("first-read set lock");
+        assert!(
+            peers.contains(&peer),
+            "the server never reported reading from {peer} within {budget:?}"
+        );
+    }
+
+    /// Records first-read reports from `stderr` and appends every other line
+    /// to `log`, until the server closes its stderr.
+    fn collect(&self, stderr: ChildStderr, mut log: File) {
+        let prefix = format!("{FIRST_READ_EVENT} ");
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            match line.strip_prefix(&prefix) {
+                Some(peer) => {
+                    let peer = peer.parse().expect("a first-read report names a peer");
+                    self.peers.lock().expect("first-read set lock").insert(peer);
+                    self.reported.notify_all();
+                }
+                None => writeln!(log, "{line}").expect("append server stderr to the log"),
+            }
+        }
+    }
 }
 
 impl RunningServer {
@@ -194,18 +239,24 @@ fn spawn_server(
         .current_dir(worktree_root)
         .args(["--data-dir", ".jit", "--bind", bind])
         .stdin(Stdio::null())
+        .env(FIRST_READ_REPORT_ENV, "1")
         .stdout(Stdio::from(log.try_clone().expect("clone the log handle")))
-        .stderr(Stdio::from(log));
+        .stderr(Stdio::piped());
     match drain_deadline {
         Some(deadline) => command.env(DRAIN_DEADLINE_MS_ENV, deadline.as_millis().to_string()),
         None => command.env_remove(DRAIN_DEADLINE_MS_ENV),
     };
-    let child = command.spawn().expect("spawn jit-server");
+    let mut child = command.spawn().expect("spawn jit-server");
+    let stderr = child.stderr.take().expect("the server's stderr is piped");
+    let first_reads = Arc::new(FirstReads::default());
+    let collector = Arc::clone(&first_reads);
+    std::thread::spawn(move || collector.collect(stderr, log));
 
     let mut server = RunningServer {
         child,
         port: 0,
         log_path,
+        first_reads,
     };
     server.port = wait_for_listening_port(&mut server);
     probe_health(server.port);
@@ -431,37 +482,24 @@ fn open_completed_connection(port: u16) -> TcpStream {
 }
 
 /// Opens a connection whose request never completes, and returns only once the
-/// server has accepted and registered it.
+/// server has registered it and begun reading it.
 ///
 /// The request line and a header are sent, the terminating blank line never is,
 /// so the server stays mid message and nothing but the drain deadline can retire
-/// the connection. That construction is also why the socket can never answer:
-/// the registration has to be established off it.
-///
-/// It is established on the listener's queue instead, and the probe connection
-/// is what establishes it:
-///
-/// 1. This socket's handshake completes before the probe connects, so the probe
-///    is queued behind it, and `accept` takes the first pending connection off
-///    that queue.
-/// 2. The probe's exchange only produces a response once the accept loop has
-///    spawned a serving task for the probe's socket.
-/// 3. axum-server's accept loop is one sequential loop that registers each
-///    accepted connection with its handle — the increment
-///    `Handle::connection_count` reports, and the count the drain deadline
-///    samples — before it accepts the next one.
-///
-/// So the probe answering is not merely evidence that the accept loop ran: it is
-/// evidence that the loop moved past this socket, which it cannot do without
-/// registering it. `shutdown::tests::wait_for_connection_count` states the same
-/// precondition in process, where the count is reachable directly.
-fn open_registered_stalled_connection(port: u16) -> TcpStream {
+/// the connection. Registration alone is not enough: until the serving task
+/// reads those bytes the connection is still in hyper-util's protocol
+/// detection, and a graceful shutdown cancels it there instead of leaving it
+/// for the deadline. The server's first-read report for this socket is what
+/// establishes both, since axum-server registers a connection with its handle
+/// before spawning the task that reads it.
+fn open_registered_stalled_connection(port: u16, first_reads: &FirstReads) -> TcpStream {
     let mut stalled = connect(port);
     send(
         &mut stalled,
         "GET /api/health HTTP/1.1\r\nHost: localhost\r\n",
     );
-    probe_health(port);
+    let peer = stalled.local_addr().expect("the stalled socket's address");
+    first_reads.wait_for(peer, EXCHANGE_BUDGET);
     stalled
 }
 
@@ -540,11 +578,8 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     );
 
     // The four connections the shutdown logs must account for: one that cannot
-    // finish, two live event streams, and one that completes. The one that
-    // cannot finish is opened first because establishing its registration spends
-    // a probe connection, and the three opened after it separate that probe's
-    // retirement from the count the signal samples.
-    let mut stalled = open_registered_stalled_connection(server.port);
+    // finish, two live event streams, and one that completes.
+    let mut stalled = open_registered_stalled_connection(server.port, &server.first_reads);
     let mut first_stream = open_event_stream(server.port);
     let mut second_stream = open_event_stream(server.port);
     record_repository_change(&executor);
@@ -631,7 +666,7 @@ fn test_the_drain_assertion_rejects_a_server_that_force_closes_early() {
         "early-close.log",
         SEEDED_EARLY_CLOSE_DEADLINE,
     );
-    let mut stalled = open_registered_stalled_connection(server.port);
+    let mut stalled = open_registered_stalled_connection(server.port, &server.first_reads);
 
     let signalled_at = Instant::now();
     send_signal(server.pid(), Signal::SIGTERM);
@@ -691,9 +726,10 @@ fn test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop() {
 
     send_signal(server.pid(), Signal::SIGSTOP);
     let port = server.port;
+    let first_reads = Arc::clone(&server.first_reads);
     let (registered, observed) = mpsc::channel();
     let opener = std::thread::spawn(move || {
-        let stalled = open_registered_stalled_connection(port);
+        let stalled = open_registered_stalled_connection(port, &first_reads);
         registered.send(()).expect("report the registration");
         stalled
     });

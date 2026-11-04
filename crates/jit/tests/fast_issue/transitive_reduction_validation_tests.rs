@@ -5,6 +5,7 @@
 use jit::domain::SHORT_ID_LENGTH;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
+use jit::test_utils::add_reducing_edge;
 
 #[test]
 fn test_fix_transitive_reduction_logs_event() {
@@ -15,8 +16,8 @@ fn test_fix_transitive_reduction_logs_event() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.graph().add_dependency(&b, &c).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
+    add_reducing_edge(&h.executor, &b, &c).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
 
     // Manually inject redundant edge
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -64,8 +65,8 @@ fn test_detect_transitive_redundancy() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.graph().add_dependency(&b, &c).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
+    add_reducing_edge(&h.executor, &b, &c).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
 
     // Manually add redundant edge (bypassing reduction logic)
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -92,8 +93,8 @@ fn test_fix_transitive_redundancy() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.graph().add_dependency(&b, &c).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
+    add_reducing_edge(&h.executor, &b, &c).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
 
     // Add redundant edge
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -128,9 +129,9 @@ fn test_validate_reports_all_redundancies() {
     let c = h.create_issue("C");
     let d = h.create_issue("D");
 
-    h.executor.graph().add_dependency(&b, &c).unwrap();
-    h.executor.graph().add_dependency(&b, &d).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
+    add_reducing_edge(&h.executor, &b, &c).unwrap();
+    add_reducing_edge(&h.executor, &b, &d).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
 
     // Add redundant edges
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -163,10 +164,10 @@ fn test_no_false_positives_diamond_pattern() {
     let c = h.create_issue("C");
     let d = h.create_issue("D");
 
-    h.executor.graph().add_dependency(&b, &d).unwrap();
-    h.executor.graph().add_dependency(&c, &d).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
-    h.executor.graph().add_dependency(&a, &c).unwrap();
+    add_reducing_edge(&h.executor, &b, &d).unwrap();
+    add_reducing_edge(&h.executor, &c, &d).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
+    add_reducing_edge(&h.executor, &a, &c).unwrap();
 
     // Validation should pass - no redundancies
     let result = h.executor.validation().validate_silent();
@@ -182,8 +183,8 @@ fn test_no_false_positives_independent_deps() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.graph().add_dependency(&a, &b).unwrap();
-    h.executor.graph().add_dependency(&a, &c).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
+    add_reducing_edge(&h.executor, &a, &c).unwrap();
 
     // Validation should pass
     let result = h.executor.validation().validate_silent();
@@ -199,8 +200,8 @@ fn test_dry_run_does_not_modify() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.graph().add_dependency(&b, &c).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
+    add_reducing_edge(&h.executor, &b, &c).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
 
     let mut issue_a = h.storage.load_issue(&a).unwrap();
     issue_a.dependencies.push(c.clone());
@@ -230,9 +231,9 @@ fn test_complex_chain_reduction() {
     let c = h.create_issue("C");
     let d = h.create_issue("D");
 
-    h.executor.graph().add_dependency(&c, &d).unwrap();
-    h.executor.graph().add_dependency(&b, &c).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
+    add_reducing_edge(&h.executor, &c, &d).unwrap();
+    add_reducing_edge(&h.executor, &b, &c).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
 
     // Add redundant edge (A can reach D via B→C→D)
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -264,10 +265,10 @@ fn test_multiple_issues_with_redundancies() {
     let f = h.create_issue("F");
 
     // Setup chains
-    h.executor.graph().add_dependency(&b, &c).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
-    h.executor.graph().add_dependency(&e, &f).unwrap();
-    h.executor.graph().add_dependency(&d, &e).unwrap();
+    add_reducing_edge(&h.executor, &b, &c).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
+    add_reducing_edge(&h.executor, &e, &f).unwrap();
+    add_reducing_edge(&h.executor, &d, &e).unwrap();
 
     // Add redundant edges
     let mut issue_a = h.storage.load_issue(&a).unwrap();
@@ -315,14 +316,14 @@ fn test_dep_add_rejects_edge_that_shadows_existing_edge() {
     let c = h.create_issue("C");
 
     // A → C and A → B exist (no redundancy yet).
-    h.executor.graph().add_dependency(&a, &c).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
+    add_reducing_edge(&h.executor, &a, &c).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
 
     // Adding B → C makes A → C redundant (A reaches C via A → B → C).
     let err = h
         .executor
         .graph()
-        .add_dependency_with_policy(&b, &c, RedundancyPolicy::Reject)
+        .add_dependencies_with_policy(&b, std::slice::from_ref(&c), RedundancyPolicy::Reject)
         .expect_err("redundant add must be rejected");
     let msg = err.to_string();
     // The offending edge pair (A → C) must be named.
@@ -332,7 +333,11 @@ fn test_dep_add_rejects_edge_that_shadows_existing_edge() {
         "error must name the shadowed edge A→C, got: {msg}"
     );
     assert!(
-        err.downcast_ref::<jit::errors::RedundantDependencyError>()
+        err.downcast_ref::<jit::errors::DependencyBatchRejectedError>()
+            .unwrap()
+            .rejected()[0]
+            .1
+            .downcast_ref::<jit::errors::RedundantDependencyError>()
             .is_some(),
         "must be a typed RedundantDependencyError"
     );
@@ -354,14 +359,14 @@ fn test_dep_add_rejects_self_redundant_edge() {
     let c = h.create_issue("C");
 
     // B → C and A → B exist.
-    h.executor.graph().add_dependency(&b, &c).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
+    add_reducing_edge(&h.executor, &b, &c).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
 
     // A → C is itself redundant (A reaches C via A → B → C).
     let err = h
         .executor
         .graph()
-        .add_dependency_with_policy(&a, &c, RedundancyPolicy::Reject)
+        .add_dependencies_with_policy(&a, std::slice::from_ref(&c), RedundancyPolicy::Reject)
         .expect_err("self-redundant add must be rejected");
     let msg = err.to_string();
     assert!(
@@ -385,16 +390,14 @@ fn test_dep_add_reduce_drops_shadowed_edge() {
     let b = h.create_issue("B");
     let c = h.create_issue("C");
 
-    h.executor.graph().add_dependency(&a, &c).unwrap();
-    h.executor.graph().add_dependency(&a, &b).unwrap();
+    add_reducing_edge(&h.executor, &a, &c).unwrap();
+    add_reducing_edge(&h.executor, &a, &b).unwrap();
 
     // Add B → C with --reduce: succeeds and drops the shadowed A → C.
-    let (result, _warnings) = h
-        .executor
-        .graph()
-        .add_dependency_with_policy(&b, &c, RedundancyPolicy::Reduce)
-        .expect("reduce add must succeed");
-    assert_eq!(result, jit::commands::DependencyAddResult::Added);
+    let result = add_reducing_edge(&h.executor, &b, &c).expect("reduce add must succeed");
+    assert_eq!(result.added, vec![c.clone()]);
+    assert!(result.already_exist.is_empty());
+    assert!(result.skipped.is_empty());
 
     // The new edge B → C is present.
     let loaded_b = h.storage.load_issue(&b).unwrap();
@@ -428,16 +431,14 @@ fn test_dep_add_reduce_background_scenario_leaves_validate_clean() {
     let y = h.create_issue("Y");
     let z = h.create_issue("Z");
 
-    h.executor.graph().add_dependency(&x, &y).unwrap();
-    h.executor.graph().add_dependency(&x, &z).unwrap();
+    add_reducing_edge(&h.executor, &x, &y).unwrap();
+    add_reducing_edge(&h.executor, &x, &z).unwrap();
 
     // Adding Y → Z makes the pre-existing X → Z redundant (X reaches Z via X→Y→Z).
-    let (result, _warnings) = h
-        .executor
-        .graph()
-        .add_dependency_with_policy(&y, &z, RedundancyPolicy::Reduce)
-        .expect("reduce add must succeed");
-    assert_eq!(result, jit::commands::DependencyAddResult::Added);
+    let result = add_reducing_edge(&h.executor, &y, &z).expect("reduce add must succeed");
+    assert_eq!(result.added, vec![z.clone()]);
+    assert!(result.already_exist.is_empty());
+    assert!(result.skipped.is_empty());
 
     let loaded_x = h.storage.load_issue(&x).unwrap();
     assert!(
@@ -466,12 +467,14 @@ fn test_dep_add_non_redundant_edge_still_added_and_validate_clean() {
     let a = h.create_issue("A");
     let b = h.create_issue("B");
 
-    let (result, _warnings) = h
+    let result = h
         .executor
         .graph()
-        .add_dependency_with_policy(&a, &b, RedundancyPolicy::Reject)
+        .add_dependencies_with_policy(&a, std::slice::from_ref(&b), RedundancyPolicy::Reject)
         .expect("non-redundant add must succeed even under Reject");
-    assert_eq!(result, jit::commands::DependencyAddResult::Added);
+    assert_eq!(result.added, vec![b.clone()]);
+    assert!(result.already_exist.is_empty());
+    assert!(result.skipped.is_empty());
 
     let loaded_a = h.storage.load_issue(&a).unwrap();
     assert!(loaded_a.dependencies.contains(&b));

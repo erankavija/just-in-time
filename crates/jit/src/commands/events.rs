@@ -5,12 +5,6 @@ use crate::domain::event_catalog::EventTag;
 use crate::domain::identity::IssueIdPrefix;
 
 impl<S: IssueStore> QueryOps<'_, S> {
-    pub fn tail_events(&self, n: usize) -> Result<Vec<Event>> {
-        let events = self.exec.storage.read_events()?;
-        let start = events.len().saturating_sub(n);
-        Ok(events[start..].to_vec())
-    }
-
     /// Newest-first events matching `event_type` and the `issue` filter.
     pub fn query_events(
         &self,

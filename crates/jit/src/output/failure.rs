@@ -6,7 +6,6 @@
 //! suggestions its type determines.
 
 use super::{ErrorCode, ExitCode, JsonError};
-use crate::domain::identity::IssueId;
 
 /// Classify a propagated failure by its typed cause.
 ///
@@ -692,43 +691,18 @@ pub fn command_json_error(error: &anyhow::Error, code: ErrorCode) -> JsonError {
 pub fn dependency_batch_json_error(
     batch: &crate::errors::DependencyBatchRejectedError,
 ) -> JsonError {
-    use crate::graph::GraphError;
-
     let from_id = batch.from_id();
-    let is_cycle = |err: &anyhow::Error| {
-        matches!(
-            err.downcast_ref::<GraphError<IssueId>>(),
-            Some(GraphError::CycleDetected)
-        )
-    };
-    let is_missing_issue = |err: &anyhow::Error| {
-        err.is::<crate::storage::IssueNotFoundError>()
-            || matches!(
-                err.downcast_ref::<GraphError<IssueId>>(),
-                Some(GraphError::NodeNotFound { .. })
-            )
-    };
-    let edge_code = |err: &anyhow::Error| {
-        if is_cycle(err) {
-            ErrorCode::CycleDetected
-        } else if err.is::<crate::errors::RedundantDependencyError>() {
-            ErrorCode::ValidationFailed
-        } else if is_missing_issue(err) {
-            ErrorCode::IssueNotFound
-        } else if err.is::<crate::domain::identity::InvalidIdPrefixError>() {
-            ErrorCode::InvalidIdPrefix
-        } else if err.is::<crate::storage::AmbiguousIdError>() {
-            ErrorCode::AmbiguousId
-        } else {
-            ErrorCode::DependencyError
-        }
+    let edge_code = |err: &anyhow::Error| match classify_code(err) {
+        ErrorCode::GenericError => ErrorCode::DependencyError,
+        code => code,
     };
 
     let rejected = batch
         .rejected()
         .iter()
         .map(|(to, err)| {
-            let message = if is_cycle(err) {
+            let code = edge_code(err);
+            let message = if code == ErrorCode::CycleDetected {
                 format!("Adding dependency would create a cycle: {from_id} -> {to}")
             } else {
                 err.to_string()
@@ -736,7 +710,7 @@ pub fn dependency_batch_json_error(
             serde_json::json!({
                 "from": from_id,
                 "to": to,
-                "code": edge_code(err).as_str(),
+                "code": code.as_str(),
                 "message": message,
             })
         })
@@ -747,14 +721,11 @@ pub fn dependency_batch_json_error(
         .iter()
         .position(|(_, err)| classify_code(err).exit_code() != ExitCode::ValidationFailed)
         .unwrap_or(0)];
-    let mut json_error = if is_cycle(err) {
-        JsonError::cycle_detected(from_id, to)
-    } else if err.is::<crate::errors::RedundantDependencyError>() {
-        command_json_error(err, ErrorCode::ValidationFailed)
-    } else if is_missing_issue(err) {
-        JsonError::issue_not_found(to)
-    } else {
-        super::refine_id_error(err, command_json_error(err, ErrorCode::DependencyError))
+    let mut json_error = match edge_code(err) {
+        ErrorCode::CycleDetected => JsonError::cycle_detected(from_id, to),
+        ErrorCode::IssueNotFound => JsonError::issue_not_found(to),
+        ErrorCode::ValidationFailed => command_json_error(err, ErrorCode::ValidationFailed),
+        _ => super::refine_id_error(err, command_json_error(err, ErrorCode::DependencyError)),
     };
 
     let mut details = json_error

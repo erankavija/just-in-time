@@ -905,6 +905,27 @@
       "issue": "df129d9e REQ-10",
       "summary": "planned deletions cannot close 721-line gap; options: amend counted modules, survey+deletion task, or survey first",
       "status": "ruled (c): survey + whole-crate ledger dispatched; target change is the user's decision"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "max-rework",
+      "issue": "9be5b0de",
+      "summary": "-23 vs >=25 after two reworks; proposed target amendment to >=20",
+      "status": "open"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "max-rework",
+      "issue": "4a01ccba",
+      "summary": "quiet evidence predates final change",
+      "status": "open"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "criterion-vs-invariant",
+      "issue": "10fdad38",
+      "summary": "shared test helper vs REQ-03 direct calls",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -935,7 +956,10 @@
     "cd8e04cc": 2,
     "cc4ea8a9": 2,
     "1a4f2ebd": 2,
-    "4a01ccba": 1
+    "4a01ccba": 2,
+    "10fdad38": 1,
+    "9be5b0de": 2,
+    "3b696589": 1
   },
   "surfaced_pitfalls": [
     {
@@ -978,7 +1002,9 @@
     "Some code-review evaluations recorded two runs a minute apart with different verdicts (8e91126b, 1a4f2ebd); cause unknown.",
     "A for-loop over gate-one.sh continues past a failing issue; the lead assumed it stopped and started a second runner, doubling code-review runs. Break on failure or check ps before starting another runner.",
     "Codex brief TMPDIR=$PWD/target/tmp puts temp dirs inside the git tree; claim/archive tests that need a non-git directory then fail (handoff-11 trap). Use /mnt/nvme/jit/tmp/df129d9e-workers.",
-    "test_strict_lease_exempt_paths_write_for_their_stated_reason took 12-13 s in parallel runs (not on the 4a01ccba list); relevant to f487aeef's per-test limits."
+    "test_strict_lease_exempt_paths_write_for_their_stated_reason took 12-13 s in parallel runs (not on the 4a01ccba list); relevant to f487aeef's per-test limits.",
+    "Codex workers attempted `jit recover` despite the no-tracker-writes rule; briefs now name it explicitly.",
+    "Lead review asked for a shared test helper (shared-test-contracts) that the code-review then read as recreating a removed wrapper against REQ-03; check a rework instruction against the issue's literal criteria before sending it."
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
@@ -1030,7 +1056,11 @@
       "epic_net": 1011,
       "crate_base": 78801,
       "crate_main": 74130,
-      "file": "ledger-2026-11-04.txt"
+      "file": "ledger-2026-11-04.txt",
+      "since_2026_11_04": {
+        "f82a2e4a": -60
+      },
+      "epic_net_running": 951
     },
     "survey_2026_11_04": "output+dispatch: ~29 high-confidence, ~75 speculative, ~20 contract-changing (5 dead ErrorCodes, 0eca332a); ~150-250 legacy output helpers die after main.rs migrates. Projected REQ-10 end ~9,200-9,400. Reported to 6a for the user's decision.",
     "net_plan_2026_11_04": {
@@ -1047,8 +1077,13 @@
         "derive generate_command_exit_codes (329 lines)",
         "survey commands/storage/repository_state"
       ],
-      "status": "sent to 6a; nothing dispatched"
-    }
+      "status": "sent to 6a for rulings (N6-N9 proposed)",
+      "exit_code_derivation": "scoped -90..-160 (48 rows: 8 universal, 15 restating, 16 typed, 9 findings); after handler moves and 5687e281",
+      "survey_commands_storage_repo": "high -280 (dead bulk preview chain -215, test-only wrappers -64), speculative -190 (archive plan computed twice -150 D-20, coordinator typing -30, doc prologue), contract -60",
+      "revised_projection": "central ~+75 (-100..+450); with archive/coordinator ~-105"
+    },
+    "req10_ceiling_draft": "+375 (measured +1..+736); sent to 6a for confirmation vs +290",
+    "req10_ceiling": 375
   },
   "wave_notes": {
     "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line). Session 12 (lead 7c): one Claude Opus integrator on w7batch fixes the three cli_issue failures as per-issue fix commits (06ee9b67, 71f5296c, 20fc3b92) and merges main with the 614a6f97 claim port (66790c84); per-branch main merges conflict on registration lines, so fixes go on the batch. Each counts as one rework. Integrator (Opus) finished at 4ad4175c1: fix commits e21e28fe8 (06ee9b67), 287c3bbd9 (71f5296c, interim INVALID_ARGUMENT per steward; 487f45a9 ends it), 9160ec574 (20fc3b92), merge 1f50f71c5 (66790c84 claim port), dccad565d (06ee9b67), 4ad4175c1 (66790c84). Lead review PASS; batch merges cleanly with main. REQ-10: batch takes main+dispatch+output from 9248 to 9503 (+255). Landing queue after batch gating: 182f4c03, 10751360, cd8e04cc, 1ac651c7, cc4ea8a9 (all lead-reviewed; Claude workers could not run whole-tree suites under the shared lock, branch CI is the evidence)."
@@ -1238,10 +1273,10 @@
     },
     "4a01ccba": {
       "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43).",
-      "status": "rework",
+      "status": "escalated",
       "vendor": "Claude Sonnet",
       "reason": "test refactors needing judgement on seams; f487aeef stays held (D-43)",
-      "review": "b1ed23165 landed; cargo-ci passed; code-review 32037cf7: F1 sleep-polling readiness in serve test (REQ-02), F2 no same-method remeasurement evidence (REQ-01). Rework 1 to same worker."
+      "review": "b1ed23165 landed; cargo-ci passed; code-review 32037cf7: F1 sleep-polling readiness in serve test (REQ-02), F2 no same-method remeasurement evidence (REQ-01). Rework 1 to same worker. Rework 1 at 5e3f82d8b landed; code-review R2 (e973c700) failed only on quiet-host (loads 9-14 vs <4). One rework left; asked 6a for a host-quiet window or a D-01 ruling. Quiet-window evidence ff8a8d1a9 (loads 1.82/3.32/3.94; medians 0.629/0.062/2.131 s). First landing failed on unrelated flaky server test; steward allowed one fresh attempt. Fresh landing passed cargo-ci; code-review R3 (13b970de): 50 ms real deadline in serve test (REQ-02). Rework 2 of 2 (last): injected clock in StartupWatch. Rework 2 at 82745633d: lead PASS; WatchClock seam, stepped test clock, 0.01 s, no real wait. Landed; code-review 2a14530e: quiet evidence predates injected clock (REQ-01). Escalated: proposed single-test locked remeasure + D-01."
     },
     "8a14e8e9": {
       "status": "done",
@@ -1260,6 +1295,50 @@
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained script change without sockets; alternation",
       "review": "lead R1 PASS; landed f0ed97f2e; worktree-cache-test passed; code-review R1 failed (run efb94dd6): F1 self-test leaks default-root temp dirs. Rework 1 to Claude Haiku. Rework 1 (64a2866c4) passed lead review; re-landing. Re-landed 2283280fa; worktree-cache-test passed; code-review R2 failed (run 19301ebb): new F1, protocol.md:176 hand-maintained config list omits LEAD_WORKTREE_TMP_ROOT (@/inv/single-source-prose); R1 F1 closed. Rework 2 of 2 to Codex gpt-6-astra. Re-landed dbbb1cb8b; code-review R3 passed; closed 35d88652d. Dispatch now makes per-worktree TMPDIRs: this host passes LEAD_WORKTREE_TMP_ROOT=/mnt/nvme/jit/tmp to dispatch and reclaim (steward worker-TMPDIR rule)."
+    },
+    "9be5b0de": {
+      "status": "escalated",
+      "vendor": "Codex gpt-6-luna (high)",
+      "reason": "mechanical renderer dedup",
+      "note": "resumed after quiet window",
+      "review": "lead R1 FAIL: -4 vs >=25; dep.rs helper with two bool flags +26; rework to Option<String> heading helper. Rework 1 to Codex luna. Rework 1: -22 (dep.rs +7, labelled sections not routed through helper). Rework 2 of 2 (last) to Codex. Worker attempted `jit recover` (failed, forbidden). Rework 2 committed by lead; production-lines delta -23 vs >=25. Escalated (options a/b/c)."
+    },
+    "f82a2e4a": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "classifier routing with contract tests",
+      "review": "lead PASS at 2cad00a53: edge codes via classify_code (generic -> DependencyError), render_checker table, with_warnings takes Display; -60 lines"
+    },
+    "10fdad38": {
+      "status": "escalated",
+      "note": "resumed after quiet window",
+      "review": "lead R1 FAIL: production -234 good; test call sites expanded to 7-line add_dependencies_with_policy (~+470 test lines), violates shared-test-contracts; one shared test helper + wrapped doc examples. Rework 1 to Codex. Rework 1: lead PASS; -222 production; shared add_reducing_edge (lead added its test-support gate). Landed; code-review 148117fc: add_reducing_edge recreates wrapper vs REQ-03 (helper came from lead's rework-1 review). Escalated."
+    },
+    "3b696589": {
+      "status": "landing",
+      "vendor": "Claude Opus",
+      "reason": "flaky graceful-shutdown tests (steward filed to lead); needs server seam judgement",
+      "note": "criteria rewritten per steward (A1, cheaper partial-request fixture first); D-01 records the corrected diagnosis (348a3814b)",
+      "review": "lead PASS at 6f81dd120: test-support FirstReadAcceptor (server crate; same feature as the drain seam), fixture blocks on first-read report after a partial request; 20/20 alone and 20/20 under parallel suite Landed; code-review 8f278006: F1 unjoined stderr collector race, F2 no committed 20+20 evidence. Rework 1 to same worker. Rework 1 (cef206e33, 46cc5e1): lead PASS; wait_for_exit joins the collector and returns ExitedServer.log; evidence note dev/active/3b696589/req-04-evidence.md (lead links after landing)."
+    },
+    "f7a59f5f": {
+      "status": "done",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 storage-only, medium",
+      "epic": "b697a3f7 (executed by df129d9e lead; own ledger)",
+      "review": "lead PASS: Arc image + token, token-based apply check, conformance test both backends; +42 lines (b697a3f7 ledger)"
+    },
+    "f56bad8d": {
+      "status": "done",
+      "vendor": "Codex gpt-6-astra",
+      "reason": "b697a3f7 one-file domain, small",
+      "epic": "b697a3f7 (executed by df129d9e lead; own ledger)",
+      "review": "lead PASS at fd2221df3 (Codex); stored resolutions + per-root reachability; +29 lines (b697a3f7 ledger)"
+    },
+    "4575a03d": {
+      "status": "claimed",
+      "epic": "v1-release (taken on per 6a)",
+      "note": "gates cargo-ci, code-review added; Notes amended (ac1c71c64)"
     }
   },
   "handoff": {
@@ -1268,5 +1347,56 @@
     "to": "just-in-time-7c",
     "date": "2026-11-04"
   },
-  "lead": "just-in-time-7c (session 12)"
+  "lead": "just-in-time-7c (session 12)",
+  "b697a3f7_execution": {
+    "ruling": "user via 6a 2026-11-04: lead executes 693a2fdd, 65aafaba, c0775a83, 19404174 and their b697a3f7 deps as b697a3f7 issues; separate ledger",
+    "track_A_bulk": [
+      "945f9181",
+      "b674382e",
+      "635f23c7",
+      "c2b3cefa",
+      "d2acb105",
+      "fe9147fa",
+      "693a2fdd"
+    ],
+    "track_B_infra": {
+      "parallel_ready": [
+        "1ade3e6f",
+        "f7a59f5f",
+        "f56bad8d"
+      ],
+      "chain": [
+        "ceaaf0ab",
+        "5d09e74b",
+        "d58f80c9",
+        "01a88d32",
+        "c517b88b",
+        "eaca3f52",
+        "578ed10d"
+      ]
+    },
+    "external_blockers": {
+      "4575a03d": "v1-release bug (ceaaf0ab)",
+      "git-cli-module": [
+        "d9ba0029 (65aafaba)",
+        "7cd27db8 (30334066)"
+      ]
+    },
+    "status": "criteria checked; paused for quiet window",
+    "criteria_check_2026_11_04": {
+      "945f9181": "valid; line cites drifted; large; touches commands/{issue,dependency,template,mod}, overlaps 3f816619/5687e281 files",
+      "1ade3e6f": "valid; cites drifted; large; misses ConfigManager::load/EffectiveConfig::load callers",
+      "f7a59f5f": "valid; cites drifted; medium; storage-only",
+      "f56bad8d": "valid; small; one file",
+      "4575a03d": "defect present; REQ-05 partly stale (f2532a2d copies gone); no deps/gates - needs gates added (scope -> 6a)"
+    }
+  },
+  "host_windows": [
+    {
+      "what": "gf2 benchmark",
+      "when": "2026-11-05 04:00 Europe/Helsinki (~15 min)",
+      "rules": "from 03:30 no new dispatch/landing/CI; by 03:55 no cargo/npm/test from lead or workers; hold until 6a releases",
+      "mechanism": "background timer touches the landing hold file at 03:30; lead stops any running worker cargo by 03:55 (TaskStop on owned tasks)"
+    }
+  ]
 }

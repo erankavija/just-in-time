@@ -284,6 +284,18 @@
           "short_id": "f22147ec",
           "status": "done 42373fb82 (-124; rework 1: shared test fixtures)",
           "worker": "codex gpt-6.1-sol high"
+        },
+        {
+          "short_id": "7516ed50",
+          "status": "done d1c20647a (-2)"
+        },
+        {
+          "short_id": "ce221384",
+          "status": "done 2575accc8, 708aee592 (doc-review 2 rounds)"
+        },
+        {
+          "short_id": "4b66bc6b",
+          "status": "done 73490b18a (epic review F1 remediation)"
         }
       ]
     }
@@ -384,7 +396,7 @@
         }
       }
     ],
-    "running_total": -397,
+    "running_total": -399,
     "reestimate_2026_11_04": {
       "remaining": -950,
       "epic_end": -470,
@@ -508,5 +520,7 @@
     "breakdown-review de9a7557": "passed on rerun after restoring ea843d26 -> de9a7557 (2 advisory findings, no change)"
   },
   "worker_policy": "User 2026-11-04: Codex gpt-6-luna, gpt-6.1-sol and gpt-6-astra plus Claude, liberally. Host quiet window: no new dispatch from 03:30 EET, no builds from 03:55 until just-in-time-6a releases; workers wait on 88's cargo-hold file.",
-  "lead": "just-in-time-b9 (from a4, 2026-11-04)"
+  "lead": "just-in-time-b9 (from a4, 2026-11-04)",
+  "status": "complete",
+  "completed_at": "2026-11-04"
 }

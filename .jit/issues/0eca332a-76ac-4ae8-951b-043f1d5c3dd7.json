@@ -4,29 +4,8 @@
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
-    "06ee9b67-07c3-48ad-a938-179a83d12564",
-    "0fe46027-8a33-4dce-bc6f-76162d067fee",
-    "153c9851-dca1-40f3-838b-ee2790fb9318",
-    "182f4c03-2c8b-431c-9c1e-a208c234a525",
-    "1a4f2ebd-6041-4965-b15d-2411a6bdd9ec",
-    "20fc3b92-6ce6-48e1-9d51-9bd77956236e",
-    "24a982b7-d2e0-4bd2-bdd8-2cd4dbeacfd0",
     "256c8eb1-0f74-47cc-a6f5-79180de8ecfe",
-    "3cf69ecf-5ec1-4cb1-855f-100aa76f7520",
-    "3f816619-6163-46d4-8549-f988a3de65db",
-    "52110fb4-8fe5-4090-9f7e-5da7081953ac",
-    "66790c84-f39f-4004-ba9d-4ceb83a1e8d6",
-    "71f5296c-7de3-498b-b088-75a2f052014c",
-    "8c46fc85-284a-4491-aa5c-57a5b22f96db",
-    "8e91126b-c17b-4274-bccb-13385e40c318",
-    "8f297e60-a74e-4efa-bdcc-54659f9959a4",
-    "98cc2097-026d-4744-aeaa-82532910328e",
-    "b23b1bf3-e875-44aa-b879-4dc96c0b7caf",
-    "b25c2e54-2614-4d87-b967-0f2cb25c37f9",
-    "c9103fcf-aa0c-4642-8531-5360f5fdd58d",
-    "cc4ea8a9-6f24-4dc2-ad6a-fccbe7d79be4",
-    "cd8e04cc-1f52-40a5-935a-b2b77a67240e",
-    "f930acf2-0f03-4ca0-8ad8-97ddcc85f368"
+    "8b3cce62-28e5-4871-9303-3d114191af16"
   ],
   "description": "Once every call site classifies failures by type, the `ErrorCode` variants that only fallback sites produced are dead vocabulary and are removed.\n\n## Background\n\n`ErrorCode` in `crates/jit/src/output.rs` declares codes that existed only so a call site could substitute them: candidates include `GateCheckError`, `GateError`, `DependencyError`, `PresetError`, the `Claim*Error` family, the `Worktree*Error` family, `ItemCommandFailed`, `InvariantCommandFailed`, `ProjectCommandFailed`, `HooksInstallError`, `SearchFailed`, `RecoveryFailed` and `ProfileError`. With command groups moved to library handlers whose failures go through `jit::output::failure::classify`, a code is live only if some error type classifies to it or a findings outcome registers it. Dead codes still appear in `ErrorCode::ALL`, the generated `docs/reference/error-codes.md` (from `scripts/generate-error-code-reference.sh`), the schema's error-code vocabulary, and the expectations in `crates/jit/tests/cli_issue/failure_lever_registry.toml`.\n\n## Success Criteria\n\n- [hard] REQ-01: Every remaining `ErrorCode` variant is returned by `classify` for some error type or registered by some findings outcome; no variant exists only for call-site substitution.\n- [hard] REQ-02: No production code constructs a `JsonError` or exit code from a code chosen at the call site.\n- [hard] REQ-03: `docs/reference/error-codes.md` and `docs/reference/exit-codes.md` are regenerated from the reduced vocabulary, and the failure-lever registry names only live codes.\n- [hard] REQ-04: Each command whose observable code or exit status changes has a test stating the new code and status, and the failure-probe census and envelope contract suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: The retired codes include the five variants nothing constructs (InvalidState, InvariantCommandFailed, WorktreeInfoError, WorktreeListError, WorktreeStoreDivergenceError) and the gate-command fallback codes once the gate handler moves land (steward ruling, 2026-11-04, net-reduction plan D-52).\n\n## Notes\n\nThe candidate list is from the investigation; the deciding evidence is the code at the time of the work. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
@@ -48,5 +27,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Retire error codes that nothing produces",
-  "updated_at": "2026-11-04T12:28:45.564184444Z"
+  "updated_at": "2026-11-04T12:32:06.403754798Z"
 }
