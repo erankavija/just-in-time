@@ -284,7 +284,7 @@ impl<S: IssueStore> TemplateOps<'_, S> {
             };
             let proposed = crate::repository_state::apply_overlay(
                 &image,
-                super::validation_overlay(&image, plan.delta())?,
+                crate::repository_state::action_overrides(plan.delta().actions()),
             )?;
             captured.derived.result.populate_created_issues(&proposed)?;
             classify_apply(session.apply(&plan), (captured.derived.result, warnings))
