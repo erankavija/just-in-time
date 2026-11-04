@@ -146,19 +146,18 @@ impl LocalEvaluation {
             })
     }
 
-    /// Human-readable messages for findings that do NOT block the write under
-    /// this evaluation's [`Strictness`] level, so callers can surface them
-    /// without rejecting.
+    /// The findings that do NOT block the write under this evaluation's
+    /// [`Strictness`] level, so callers can surface them without rejecting.
     ///
     /// The partition tracks strictness: under [`Strictness::Permissive`] every
     /// violation is a warning; under [`Strictness::Strict`] a blocking finding is
     /// not also surfaced here.
-    pub fn warnings(&self) -> Vec<String> {
+    pub fn warnings(&self) -> Vec<&Finding> {
         self.findings
             .iter()
             .filter(|f| !self.finding_blocks(f))
             .filter(|f| f.finding.severity != Severity::Off)
-            .map(|f| format!("[{}] {}", f.finding.rule, f.finding.message))
+            .map(|f| &f.finding)
             .collect()
     }
 

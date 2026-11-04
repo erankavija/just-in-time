@@ -110,8 +110,7 @@ fn derive_issue_deletion(
 ) -> Result<DerivedIssueDeletion> {
     use crate::repository_state::MutationIntent;
 
-    let declarations = crate::repository_state::declarations_from_image(image)?;
-    let config = crate::repository_state::assemble_config(image)?;
+    let graph = super::CapturedGraphEvidence::capture(image, issues, context)?;
     let mut projected = issues
         .iter()
         .filter(|issue| &issue.id != target_id)
@@ -125,7 +124,6 @@ fn derive_issue_deletion(
             issue.id.clone()
         })
         .collect::<Vec<_>>();
-    let plan_content = validate::plan_content_with_issues(image, issues, &projected)?;
     let ready_ids = crate::domain::queries::issues_becoming_ready(&projected);
 
     let mut intents = vec![MutationIntent::DeleteIssue {
@@ -143,10 +141,7 @@ fn derive_issue_deletion(
                 dependent,
                 CapturedTransitionEvidence {
                     issues: &projected,
-                    declarations: &declarations,
-                    config: &config,
-                    plan_content: &plan_content,
-                    context,
+                    graph: &graph,
                 },
             )?
         } else {
@@ -177,11 +172,11 @@ fn derive_issue_deletion(
     })
 }
 
-/// The issue as persisted by creation, with the write-validation warnings.
+/// The issue as persisted by creation, with its advisory findings.
 #[derive(Debug, Clone)]
 pub struct IssueCreation {
     pub issue: Issue,
-    pub warnings: Vec<String>,
+    pub findings: Vec<crate::validation::ReportedFinding>,
 }
 
 /// The issue as persisted by a mutation, with its advisory warnings.
@@ -262,14 +257,11 @@ impl<S: IssueStore> IssueOps<'_, S> {
         // (`type-hierarchy-known`), which only warns on the normal path.
         // Scoped to the explicit-type path so non-`--type` writes keep warn-only
         // behavior; runs before the write so a bad type changes nothing.
-        let (issue, validation) =
+        let (issue, findings) =
             self.exec
                 .publish_issue_creation(&context, issue, explicit_type, force)?;
 
-        Ok(IssueCreation {
-            issue,
-            warnings: validation.warnings,
-        })
+        Ok(IssueCreation { issue, findings })
     }
 
     pub fn list_issues(
