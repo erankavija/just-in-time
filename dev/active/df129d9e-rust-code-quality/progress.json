@@ -1365,10 +1365,10 @@
       "review": "lead PASS at db05aa795: declarations::assemble_configuration; JitConfig::load and ConfigManager::load route through it; -191 (b697a3f7 ledger); 5013 workspace tests passed (worker). Minor: ConfigManager::load rustdoc still says 'from config.toml'."
     },
     "f87f9b00": {
-      "status": "rework",
+      "status": "landing",
       "vendor": "Claude Sonnet",
       "reason": "gate status handler move; first of the four remaining moves",
-      "review": "lead PASS at 1f76f1deb: gate status/status-all handlers, transposed-arg predicate typed INVALID_ARGUMENT, not-run typed, status-all findings GATE_FAILED; whole-crate -114 Lead merged main (8e9b1242e); landed; code-review 3b158db1: F1 RFC 3339 attestation timestamp regression (rework 1), F2 uniform findings-stderr (D-01 asked)."
+      "review": "lead PASS at 1f76f1deb: gate status/status-all handlers, transposed-arg predicate typed INVALID_ARGUMENT, not-run typed, status-all findings GATE_FAILED; whole-crate -114 Lead merged main (8e9b1242e); landed; code-review 3b158db1: F1 RFC 3339 attestation timestamp regression (rework 1), F2 uniform findings-stderr (D-01 asked). Rework 1 at 33459be46: F1 not reproducible (same format string over the same to_rfc3339 String; lead verified GateRunSummary.started_at: String from to_rfc3339); pinning test added. D-01 recorded for F2. Re-landing with one code-review rerun."
     },
     "24a982b7": {
       "status": "landing",
