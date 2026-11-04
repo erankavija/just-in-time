@@ -8,6 +8,7 @@
   ],
   "description": "The storage predicate and its watcher consumer form one small behavior cutover.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage-owned predicate derives watched paths from storage constants, includes config.toml, and emits configuration changes; watcher tests cover included and unrelated paths.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-04T23:38:19.632457107Z",
   "first_ready_at": "2026-11-04T22:24:54.946576604Z",
   "gates_required": [
     "cargo-ci",
@@ -21,9 +22,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "f274c7b3-17cd-4e34-aead-e592f3fd9fc0",
+      "run_id": "040dcae8-993b-42a3-910a-35b511a90339",
       "status": "passed",
-      "updated_at": "2026-11-04T23:18:53.134076282Z",
+      "updated_at": "2026-11-04T23:36:46.933875024Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,7 +39,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Centralize watcher path selection",
-  "updated_at": "2026-11-04T23:32:55.997345001Z"
+  "updated_at": "2026-11-04T23:38:19.632457107Z"
 }
