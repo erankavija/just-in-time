@@ -6,6 +6,25 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use std::fmt::Write;
 
+fn section(
+    text: &mut String,
+    heading: Option<String>,
+    mut rows: impl ExactSizeIterator<Item = String>,
+) {
+    if rows.len() == 0 {
+        return;
+    }
+    let _ = heading.map(|heading| writeln!(text, "{heading}"));
+    let _ = rows.try_for_each(|row| writeln!(text, "  • {row}"));
+}
+
+fn dependency_count(verb: &str, count: usize) -> String {
+    format!(
+        "{verb} {count} dependenc{}:",
+        if count == 1 { "y" } else { "ies" }
+    )
+}
+
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DependencyAddResponse {
     pub from_id: IssueId,
@@ -17,29 +36,25 @@ pub struct DependencyAddResponse {
 impl HumanRender for DependencyAddResponse {
     fn render_human(&self, mode: OutputMode) -> String {
         let mut text = String::new();
-        if !self.added.is_empty() && !mode.quiet {
-            let _ = writeln!(
-                text,
-                "Added {} dependenc{}:",
-                self.added.len(),
-                if self.added.len() == 1 { "y" } else { "ies" }
-            );
-        }
-        self.added.iter().for_each(|id| {
-            let _ = writeln!(text, "  • {} → {}", self.from_id, id);
-        });
-        if !self.already_exist.is_empty() {
-            let _ = writeln!(text, "Already exist ({}):", self.already_exist.len());
-            self.already_exist.iter().for_each(|id| {
-                let _ = writeln!(text, "  • {}", id);
-            });
-        }
-        if !self.skipped.is_empty() {
-            let _ = writeln!(text, "Skipped ({}):", self.skipped.len());
-            self.skipped.iter().for_each(|(id, reason)| {
-                let _ = writeln!(text, "  • {}: {}", id, reason);
-            });
-        }
+        section(
+            &mut text,
+            (!mode.quiet).then(|| dependency_count("Added", self.added.len())),
+            self.added
+                .iter()
+                .map(|id| format!("{} → {id}", self.from_id)),
+        );
+        section(
+            &mut text,
+            Some(format!("Already exist ({}):", self.already_exist.len())),
+            self.already_exist.iter().map(ToString::to_string),
+        );
+        section(
+            &mut text,
+            Some(format!("Skipped ({}):", self.skipped.len())),
+            self.skipped
+                .iter()
+                .map(|(id, reason)| format!("{id}: {reason}")),
+        );
         text
     }
 }
@@ -54,23 +69,16 @@ pub struct DependencyRemoveResponse {
 impl HumanRender for DependencyRemoveResponse {
     fn render_human(&self, mode: OutputMode) -> String {
         let mut text = String::new();
-        if !self.removed.is_empty() && !mode.quiet {
-            let _ = writeln!(
-                text,
-                "Removed {} dependenc{}:",
-                self.removed.len(),
-                if self.removed.len() == 1 { "y" } else { "ies" }
-            );
-        }
-        self.removed.iter().for_each(|id| {
-            let _ = writeln!(text, "  • {}", id);
-        });
-        if !self.not_found.is_empty() {
-            let _ = writeln!(text, "Not found ({}):", self.not_found.len());
-            self.not_found.iter().for_each(|id| {
-                let _ = writeln!(text, "  • {}", id);
-            });
-        }
+        section(
+            &mut text,
+            (!mode.quiet).then(|| dependency_count("Removed", self.removed.len())),
+            self.removed.iter().map(ToString::to_string),
+        );
+        section(
+            &mut text,
+            Some(format!("Not found ({}):", self.not_found.len())),
+            self.not_found.iter().map(ToString::to_string),
+        );
         text
     }
 }
