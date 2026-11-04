@@ -144,6 +144,7 @@ pub fn resolve_issue_filter<S: IssueStore>(
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     config::output_schema,
     invariant::output_schema,
+    snapshot::output_schema,
     #[cfg(test)]
     test_group::output_schema,
     #[cfg(test)]
@@ -331,6 +332,7 @@ macro_rules! command_group {
 
 pub mod config;
 pub mod invariant;
+pub mod snapshot;
 #[cfg(test)]
 mod test_forms;
 #[cfg(test)]

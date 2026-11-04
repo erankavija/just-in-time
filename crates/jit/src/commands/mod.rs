@@ -2060,7 +2060,7 @@ pub struct AssetSummary {
 }
 
 /// Result of exporting a snapshot
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct SnapshotExportResult {
     pub path: String,
     pub issue_count: usize,
