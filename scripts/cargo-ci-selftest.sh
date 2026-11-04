@@ -953,7 +953,25 @@ readonly JUST_BELOW_LOAD1=0.67 AT_THRESHOLD_LOAD1=0.68
 readonly TIMEOUT_LINE='        TIMEOUT [  60.001s] jit commands::slow::test_slow'
 readonly FAIL_LINE='        FAIL [   0.120s] jit commands::x::test_broken'
 readonly ENOSPC_FAIL_BLOCK='        FAIL [   0.200s] jit profile_cli_tests::test_pack
-thread panicked: No space left on device (os error 28)'
+--- STDERR: jit profile_cli_tests::test_pack ---
+thread test_pack panicked at crates/jit/tests/pack.rs:12:5:
+create the bounded package asset directory: Os { code: 28, kind: StorageFull, message: "No space left on device" }
+note: run with RUST_BACKTRACE=1 environment variable to display a backtrace'
+readonly ENOSPC_ASSERT_BLOCK='        FAIL [   0.200s] jit profile_cli_tests::test_add
+--- STDERR: jit profile_cli_tests::test_add ---
+thread test_add panicked at crates/jit/tests/add.rs:30:5:
+command failed: Output { status: ExitStatus(1), stdout: "", stderr: "write: No space left on device (os error 28)" }
+note: run with RUST_BACKTRACE=1 environment variable to display a backtrace'
+readonly MIXED_BLOCK='        FAIL [   0.200s] jit gate_tests::test_digest
+--- STDOUT: jit gate_tests::test_digest ---
+log: write failed: No space left on device (os error 28)
+--- STDERR: jit gate_tests::test_digest ---
+thread test_digest panicked at crates/jit/tests/digest.rs:9:5:
+assertion left == right failed
+  left: Stable
+ right: InputsMoved
+note: run with RUST_BACKTRACE=1 environment variable to display a backtrace
+log: later No space left on device'
 readonly DURATION_VIOLATION='  - test suite duration: observed 41000 ms, threshold 30000 ms (must be below threshold).'
 readonly FOOTPRINT_VIOLATION='  - integration-test targets: observed 99, limit 10.'
 
@@ -1015,7 +1033,7 @@ expect_enospc_classification() { # expect_enospc_classification <message> <exit>
 test_classifier_enospc_exit_paths() {
   echo
   echo "== classifier: ENOSPC exits 75 whatever the load, unless a genuine failure joins it =="
-  local beside_fail="$ENOSPC_FAIL_BLOCK"$'\n'"$FAIL_LINE"$'\n'"thread panicked: assertion failed"
+  local beside_fail="$ENOSPC_FAIL_BLOCK"$'\n'"$FAIL_LINE"$'\n'"thread 'x' panicked at a.rs:1:1:"$'\n'"assertion failed"
   expect_enospc_classification "ENOSPC test failure on a quiet host" 75 "$QUIET_LOAD1" "$ENOSPC_FAIL_BLOCK" "" test
   expect_enospc_classification "ENOSPC test failure on a loaded host" 75 "$LOADED_LOAD1" "$ENOSPC_FAIL_BLOCK" "" test
   expect_enospc_classification "ENOSPC test failure with unknown load" 75 "" "$ENOSPC_FAIL_BLOCK" "" test
@@ -1026,6 +1044,9 @@ error: could not compile \`x\` due to 1 previous error" budget
 error[E0308]: mismatched types" budget
   expect_enospc_classification "ENOSPC beside a footprint violation in a non-test step" 1 "$QUIET_LOAD1" "" "write failed: No space left on device
 $FOOTPRINT_VIOLATION" budget
+  expect_enospc_classification "ENOSPC assert-message failure" 75 "$QUIET_LOAD1" "$ENOSPC_ASSERT_BLOCK" "" test
+  expect_enospc_classification "ENOSPC elsewhere in a block whose panic is an assertion" 1 "$QUIET_LOAD1" "$MIXED_BLOCK" "" test
+  expect_enospc_classification "one ENOSPC panic and one assertion panic in a block" 1 "$QUIET_LOAD1" "$ENOSPC_FAIL_BLOCK"$'\n'"thread 'y' panicked at b.rs:2:2:"$'\n'"assertion failed" "" test
   expect_enospc_classification "ENOSPC failure beside a genuine test FAIL" 1 "$LOADED_LOAD1" "$beside_fail" "" test
   expect_enospc_classification "ENOSPC failure beside a genuine FAIL on a quiet host" 1 "$QUIET_LOAD1" "$beside_fail" "" test
   expect_enospc_classification "ENOSPC test step beside a footprint budget failure" 1 "$QUIET_LOAD1" "$ENOSPC_FAIL_BLOCK" "$FOOTPRINT_VIOLATION" test budget
