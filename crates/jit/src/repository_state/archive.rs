@@ -345,10 +345,14 @@ pub fn finalize_archive_execution(
     let materialization =
         MaterializationPlan::new(image, delta, context).map_err(ArchiveExecutionError::Mutation)?;
     let mut warnings = plan
-        .warnings()
+        .plan_warnings()
         .iter()
         .cloned()
-        .chain(artifacts.iter().flat_map(|a| a.warnings().iter().cloned()))
+        .chain(
+            artifacts
+                .iter()
+                .flat_map(|a| a.plan_warnings().iter().cloned()),
+        )
         .chain(execution_warnings)
         .collect::<Vec<_>>();
     warnings.sort_by(|left, right| {
@@ -364,7 +368,7 @@ pub fn finalize_archive_execution(
         reference_changes: event_changes,
         planned_deletions,
         deleted_sources: deletions.into_iter().map(|d| d.source).collect(),
-        warnings,
+        plan_warnings: warnings,
         event_appended: event_needed,
         reconciling,
     };
