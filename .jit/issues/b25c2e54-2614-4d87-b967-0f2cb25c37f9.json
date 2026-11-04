@@ -9,6 +9,7 @@
   ],
   "description": "The events arms build count bodies inline. This moves the events group to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `EventCommands::{Tail, Query}` build `count`/`events` bodies with `json!` and in human mode print one raw serialized event per line, which is intended. Both leaves fall back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `events tail|query` to a handler in `crates/jit/src/dispatch/events.rs`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: Both payloads are `ListEnvelope` instantiations under the `events` key, and the schema names a typed response for both leaves.\n- [hard] REQ-03: Human output keeps one serialized event per line.\n- [hard] REQ-04: The handler returns failures as errors with no substituted code or `std::process::exit`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T09:38:19.272851174Z",
   "first_ready_at": "2026-11-03T23:08:02.108570551Z",
   "gates_required": [
     "cargo-ci",
@@ -50,7 +51,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Events commands move to library handlers",
-  "updated_at": "2026-11-04T09:18:23.595751080Z"
+  "updated_at": "2026-11-04T09:38:19.272851174Z"
 }

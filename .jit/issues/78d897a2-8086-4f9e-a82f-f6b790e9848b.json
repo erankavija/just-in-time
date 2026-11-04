@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T09:35:10.080562898Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -10,12 +10,26 @@
   ],
   "description": "Update the validation, gate-checker and invariant references to state that every validation view and built-in validation checker is a selection of one report, and the behaviour that follows.\n\n## Background\n\n- `docs/reference/cli-commands.md` documents `jit validate` (`:3249-3334`) and `jit invariant check` (`:3507-3520`); `docs/reference/worktree-validate.md` documents `jit validate` (`:288` onwards); `docs/reference/gate-presets.md` lists the portable checkers (`:25-105`); `docs/concepts/validation-engine.md` describes where rules run (`:40-80`); `docs/concepts/planning-bracket.md:248` and `docs/how-to/adopt-planning-bracket.md:408-415` describe `--scope`.\n- Changed behaviour: `--scope` evaluates rules over the whole repository, restricts findings to the container's bracket scope, and reports an unloadable rule set as the `rules-file` finding instead of failing; per-issue and `--explain` configuration errors narrow to the selected issue's subject or rule; issue and explain views always include `rules-file` and never `enforcement-drift`; the rule view reports `rules-file` for an unloadable rule set; `jit invariant check` fails on an unloadable gate registry; each built-in validation checker reports what `jit validate` reports for its selection, so the label-target checker evaluates rules over the whole repository and the issue checker's configuration errors narrow to the gated issue's subject or rule.\n\n## Success Criteria\n\n- [hard] REQ-01: The listed pages describe each view and each built-in validation checker as a selection of the one report, and state the changed behaviour above where each page covers the view.\n- [hard] REQ-02: No page under `docs/` describes `--scope` as evaluating rules over the slice alone, or `jit invariant check` as tolerating an unloadable gate registry.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T09:50:30.837407140Z",
   "first_ready_at": "2026-11-04T09:34:30.568628952Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "731c99a7-7d1d-4187-a2ec-1169d5f84926",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:50:18.521098618Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "56ee3947-0d87-4478-8b77-3f9c71d7f9cd",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:40:09.548979194Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "78d897a2-8086-4f9e-a82f-f6b790e9848b",
   "labels": [
     "type:task",
@@ -29,7 +43,7 @@
     "satisfies:9876a23a/REQ-03"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Validation and gate references describe views as report selections",
-  "updated_at": "2026-11-04T09:35:10.080562898Z"
+  "updated_at": "2026-11-04T09:50:30.837407140Z"
 }
