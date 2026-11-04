@@ -51,6 +51,15 @@ If any result contains a truncation marker or omits a requested range, recover t
 
 Treat each required gate's latest recorded status and exit code in `context.issue.gates` as available evidence. Include every required gate's latest status in the evidence header and consume it according to the gate's purpose. A newer successful run supersedes older failures. Do not claim that cargo, clippy, or test stdout is present. Do not rerun a gate that is currently recorded as passing. Executable repository validation policy remains owned by `@/gate/jit-validate`; resolve it when it governs the review rather than copying or independently recreating its checker.
 
+Use only the wrapper's `Gate evidence ancestry` facts to judge whether a run's
+commit covers the attributable work. Each `contained` value states whether the
+tagged commit is an ancestor of that run's commit. A run that contains every
+attributable commit covers them, including when the run is on a merge commit.
+Unavailable ancestry or a null relation proves neither coverage nor its absence;
+do not infer ancestry from commit dates, log order, or the appearance of a merge.
+The wrapper resolves an omitted run commit through read-only latest-run inspection
+only when its status, timestamp, and exit code match the captured gate projection.
+
 An unrun, pending, or failed peer review or judgment gate is not by itself an implementation defect and must not create a blocking finding or fail the verdict. Perform this code review's own judgment without treating incomplete independent judgment as proof of a defect.
 
 Executable CI or validation gate evidence may support a blocking finding when it demonstrates an attributable failure or leaves a hard criterion materially unverified. Tie any such finding to the attributable behavior or unmet criterion shown by the evidence, not merely to the gate's status.

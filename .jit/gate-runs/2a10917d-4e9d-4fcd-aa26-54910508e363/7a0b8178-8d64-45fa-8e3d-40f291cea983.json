@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-2a10917d",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f41988959cbb97e51712b1ebe9d8f614e7094904",
+  "completed_at": "2026-11-04T23:04:11.610553068Z",
+  "duration_ms": 290268,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "profiles/jit-dogfood/manifest.toml",
+        "id": "F1",
+        "line": 506,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/domain-agnostic"
+        ],
+        "severity": "high",
+        "summary": "New contrib/gates helper and test are neither packaged nor excluded, so package conformance fails and installed wrappers lack the helper."
+      }
+    ],
+    "summary": "The ancestry helper and test are not accounted for by the profile package.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2a10917d-4e9d-4fcd-aa26-54910508e363",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7a0b8178-8d64-45fa-8e3d-40f291cea983",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:59:21.342346417Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 17502 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-2a10917d\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a8c9-d333-7493-be74-7c5a2414c9da\n--------\nuser\n--- 17489 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f41988959, 48bcbd793, b7dec9812, a95bf25a5  \nPolicy sources: AGENTS.md  \nResolved items: @/invariant/domain-agnostic (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/2a10917d/decision/D-01 (issue description); @/gate/code-review (.jit/gates.toml)  \nGate evidence: none (captured context has no required-gate projection; supplied ancestry is unavailable)  \nTruncation recovery: narrowed reads of wrapper, helper, tests, gate-status contract, and profile manifest  \n\n1. **F1 — blocking, issue-impact (high):** The new helper and its test are under the declared `contrib/gates` live-source root but are neither packaged nor excluded. The manifest excludes only `contrib/gates/prompts/**` ([profiles/jit-dogfood/manifest.toml:506](</mnt/nvme/jit/agents/worktrees/agent-2a10917d/profiles/jit-dogfood/manifest.toml:506>)) and declares assets only for the wrapper and prompt files ([profiles/jit-dogfood/manifest.toml:760](</mnt/nvme/jit/agents/worktrees/agent-2a10917d/profiles/jit-dogfood/manifest.toml:760>)). Consequently, profile-package conformance rejects [ai-review-ancestry.py](</mnt/nvme/jit/agents/worktrees/agent-2a10917d/contrib/gates/ai-review-ancestry.py:1>) and [test-ai-review.py](</mnt/nvme/jit/agents/worktrees/agent-2a10917d/contrib/gates/test-ai-review.py:1>) as unpackaged live files; moreover, an installed wrapper cannot find its required sibling helper. This prevents the ancestry behavior from shipping. References: @/invariant/domain-agnostic.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The ancestry helper and test are not accounted for by the profile package.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"New contrib/gates helper and test are neither packaged nor excluded, so package conformance fails and installed wrappers lack the helper.\",\"file\":\"profiles/jit-dogfood/manifest.toml\",\"line\":506,\"references\":[\"@/invariant/domain-agnostic\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

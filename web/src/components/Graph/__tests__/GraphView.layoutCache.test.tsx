@@ -17,11 +17,13 @@ import type { GraphData, GraphNode } from '../../../types/models';
  * in-place data patch does not.
  */
 
+const { setNodes } = vi.hoisted(() => ({ setNodes: vi.fn() }));
+
 vi.mock('reactflow', () => ({
   default: () => null,
   Controls: () => null,
   Background: () => null,
-  useNodesState: () => [[], vi.fn(), vi.fn()],
+  useNodesState: () => [[], setNodes, vi.fn()],
   useEdgesState: () => [[], vi.fn(), vi.fn()],
   MarkerType: { ArrowClosed: 'arrowclosed' },
   Position: { Left: 'left', Right: 'right' },
@@ -169,6 +171,24 @@ describe('GraphView stable-layout cache', () => {
     await refetchWith(view, reranked);
 
     expect(dagreLayout.mock.calls.length).toBeGreaterThan(baseline);
+  });
+
+  it('updates refreshed node data while retaining layout positions', async () => {
+    const { view } = await renderAndSettle();
+    const initial = setNodes.mock.calls.map(call => call[0]).find(Array.isArray);
+    if (!initial) throw new Error('Initial layout was not applied');
+
+    const repainted = baseGraph();
+    repainted.nodes[1] = node({ id: 't1', parent: 'e1', cluster: 'e1', rank: 1, state: 'done' });
+    await refetchWith(view, repainted);
+
+    const patch = setNodes.mock.calls.map(call => call[0]).find(value => typeof value === 'function');
+    expect(patch).toBeDefined();
+    const refreshed = patch(initial);
+    const original = initial.find((n: { id: string }) => n.id === 't1');
+    const updated = refreshed.find((n: { id: string }) => n.id === 't1');
+    expect(updated.position).toEqual(original.position);
+    expect(updated.style.border).not.toBe(original.style.border);
   });
 
   it('preserves positions when only presentational node data changes', async () => {

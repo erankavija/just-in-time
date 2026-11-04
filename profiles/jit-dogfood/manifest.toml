@@ -505,6 +505,8 @@ exclude = []
 [[live-source]]
 root = "contrib/gates"
 exclude = [
+  # Test suites for the packaged gate scripts they sit beside.
+  "contrib/gates/test-*.py",
   # The contributed prompt library: worked examples an adopter composes a gate
   # from, rather than prompts this workflow's own gates resolve.
   "contrib/gates/prompts/**",
@@ -760,6 +762,10 @@ target = ".jit/reference/content-standards.md"
 source = "assets/live/contrib/gates/ai-review.sh"
 target = "contrib/gates/ai-review.sh"
 executable = true
+
+[[asset]]
+source = "assets/live/contrib/gates/ai-review-ancestry.py"
+target = "contrib/gates/ai-review-ancestry.py"
 
 [[asset]]
 source = "assets/live/contrib/gates/breakdown-review-prompt.md"
