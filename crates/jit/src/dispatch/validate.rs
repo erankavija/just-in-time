@@ -1,19 +1,18 @@
 //! `jit validate` handlers.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::ValidateArgs;
 use crate::domain::identity::IssueIdPrefix;
 use crate::output::{
     ErrorCode, RepositoryValidationResponse, ValidateResponse, ValidationCheck,
     ValidationChecksResponse, ValidationFixSummary, ValidationWarning,
 };
-use crate::storage::{IssueStore, RepositoryStateStore};
 use crate::validation::report::{RuleReport, RuleSelectionFault, Selection};
 
-fn validate<S: IssueStore + RepositoryStateStore>(
+fn validate<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     args: ValidateArgs,
-) -> anyhow::Result<Outcome<ValidateResponse>> {
+) -> HandlerResult<ValidateResponse> {
     let ValidateArgs {
         id,
         explain,
@@ -293,7 +292,7 @@ impl ValidationMode {
 
 command_group! {
     command: ValidateArgs,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [HandlerStore],
     leaves: {
         "validate" => args => validate(args) -> ValidateResponse
             as union [

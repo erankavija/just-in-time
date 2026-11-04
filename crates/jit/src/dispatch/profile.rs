@@ -1,6 +1,6 @@
 //! `jit profile` handlers.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::ProfileCommands;
 use crate::commands::{
     parse_profile_selectors, parse_profile_variable_assignments, ProfileVariableOptions,
@@ -10,26 +10,25 @@ use crate::output::ErrorCode;
 use crate::profile::{
     ProfileAddResult, ProfileComposedApplyResult, ProfilePackResult, ProfileShowResult,
 };
-use crate::storage::{IssueStore, RepositoryStateStore};
 use std::path::PathBuf;
 
-fn show<S: IssueStore + RepositoryStateStore>(
+fn show<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     profile: Vec<String>,
-) -> anyhow::Result<Outcome<ProfileShowResult>> {
-    Ok(Outcome::success(
-        ctx.executor
-            .profiles()
-            .show_profiles(&parse_profile_selectors(&profile)?)?,
-    ))
+) -> HandlerResult<ProfileShowResult> {
+    Ok((ctx
+        .executor
+        .profiles()
+        .show_profiles(&parse_profile_selectors(&profile)?)?)
+    .into())
 }
 
-fn diff<S: IssueStore + RepositoryStateStore>(
+fn diff<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     profile: Vec<String>,
     values_file: Option<PathBuf>,
     set: Vec<String>,
-) -> anyhow::Result<Outcome<ProfileComposedApplyResult>> {
+) -> HandlerResult<ProfileComposedApplyResult> {
     let selectors = parse_profile_selectors(&profile)?;
     let assignments = parse_profile_variable_assignments(&set)?;
     if selectors.is_empty() {
@@ -62,13 +61,13 @@ fn diff<S: IssueStore + RepositoryStateStore>(
     })
 }
 
-fn apply<S: IssueStore + RepositoryStateStore>(
+fn apply<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     profile: Vec<String>,
     values_file: Option<PathBuf>,
     set: Vec<String>,
     dry_run: bool,
-) -> anyhow::Result<Outcome<ProfileComposedApplyResult>> {
+) -> HandlerResult<ProfileComposedApplyResult> {
     let selectors = parse_profile_selectors(&profile)?;
     let assignments = parse_profile_variable_assignments(&set)?;
     if selectors.is_empty() {
@@ -84,19 +83,19 @@ fn apply<S: IssueStore + RepositoryStateStore>(
             assignments,
         },
     )?;
-    Ok(Outcome::success(if dry_run {
+    Ok(Outcome::from(if dry_run {
         ctx.executor.profiles().plan_profiles(&selection)?
     } else {
         ctx.executor.profiles().apply_profiles(&selection)?
     }))
 }
 
-fn pack<S: IssueStore + RepositoryStateStore>(
+fn pack<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     source: PathBuf,
     output: PathBuf,
     dry_run: bool,
-) -> anyhow::Result<Outcome<ProfilePackResult>> {
+) -> HandlerResult<ProfilePackResult> {
     let invocation_dir = std::env::current_dir()?;
     let (result, warnings) = if dry_run {
         ctx.executor
@@ -107,17 +106,17 @@ fn pack<S: IssueStore + RepositoryStateStore>(
             .profiles()
             .pack_profile_package(&invocation_dir, &source, &output)?
     };
-    Ok(Outcome::success(result).with_warnings(warnings))
+    Ok(Outcome::from(result).with_warnings(warnings))
 }
 
-fn add<S: IssueStore + RepositoryStateStore>(
+fn add<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     archive: PathBuf,
     destination: PathBuf,
     dry_run: bool,
-) -> anyhow::Result<Outcome<ProfileAddResult>> {
+) -> HandlerResult<ProfileAddResult> {
     let invocation_dir = std::env::current_dir()?;
-    Ok(Outcome::success(if dry_run {
+    Ok(Outcome::from(if dry_run {
         ctx.executor
             .profiles()
             .plan_profile_add(&invocation_dir, &archive, &destination)?
@@ -130,7 +129,7 @@ fn add<S: IssueStore + RepositoryStateStore>(
 
 command_group! {
     command: ProfileCommands,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [HandlerStore],
     leaves: {
         "profile_show" => ProfileCommands::Show { profile } => show(profile) -> ProfileShowResult,
         "profile_diff" => ProfileCommands::Diff { profile, values_file, set } => diff(profile, values_file, set) -> ProfileComposedApplyResult,

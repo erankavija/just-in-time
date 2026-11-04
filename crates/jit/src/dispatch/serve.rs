@@ -1,6 +1,6 @@
 //! `jit serve` handler.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult};
 use crate::cli::ServeArgs;
 use crate::commands::serve::{
     find_web_dir, run_foreground, server_status, start_server, stop_server, ForegroundOptions,
@@ -30,7 +30,7 @@ fn already_running(pid: u32, port: u16) -> ServeResponse {
 fn serve<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     args: ServeArgs,
-) -> anyhow::Result<Outcome<ServeResponse>> {
+) -> HandlerResult<ServeResponse> {
     let layout = ctx.executor.repository_layout()?;
     let data_root = layout.data_root();
     let web_dir = args
@@ -117,7 +117,7 @@ fn serve<S: IssueStore>(
             ServeOutcome::AlreadyRunning { pid, port } => already_running(pid, port),
         }
     };
-    Ok(Outcome::success(response))
+    Ok(response.into())
 }
 
 command_group! {

@@ -1,6 +1,6 @@
 //! `jit events` handlers.
 
-use super::{resolve_issue_filter, CommandContext, Outcome};
+use super::{resolve_issue_filter, CommandContext, HandlerResult, Outcome};
 use crate::cli::EventCommands;
 use crate::domain::event_catalog::EventTag;
 use crate::output::EventListResponse;
@@ -10,10 +10,7 @@ fn event_count_message(count: usize) -> String {
     format!("{count} event(s)")
 }
 
-fn tail<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-    n: usize,
-) -> anyhow::Result<Outcome<EventListResponse>> {
+fn tail<S: IssueStore>(ctx: &CommandContext<'_, S>, n: usize) -> HandlerResult<EventListResponse> {
     let events = ctx.executor.queries().query_events(None, None, n)?;
     let message = event_count_message(events.len());
     Ok(Outcome::success_with(
@@ -27,7 +24,7 @@ fn query<S: IssueStore>(
     event_type: Option<EventTag>,
     issue_id: Option<String>,
     limit: usize,
-) -> anyhow::Result<Outcome<EventListResponse>> {
+) -> HandlerResult<EventListResponse> {
     let issue = issue_id
         .map(|id| resolve_issue_filter(ctx.executor.storage(), &id))
         .transpose()?;

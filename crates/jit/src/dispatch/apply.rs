@@ -1,19 +1,18 @@
 //! `jit apply` handler.
 
-use super::{resolve_issue, CommandContext, Outcome};
+use super::{resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::ApplyArgs;
 use crate::output::TemplateApplyResponse;
-use crate::storage::{IssueStore, RepositoryStateStore};
 use anyhow::anyhow;
 use std::collections::BTreeMap;
 
-fn apply<S: IssueStore + RepositoryStateStore>(
+fn apply<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     template: &str,
     container: &str,
     anchors: &[String],
     force: bool,
-) -> anyhow::Result<Outcome<TemplateApplyResponse>> {
+) -> HandlerResult<TemplateApplyResponse> {
     let templates = ctx.executor.templates();
     let resolve = |requested: &str| resolve_issue(ctx.executor.storage(), requested);
     let bindings = anchors
@@ -46,7 +45,7 @@ fn apply<S: IssueStore + RepositoryStateStore>(
 
 command_group! {
     command: ApplyArgs,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [HandlerStore],
     leaves: {
         "apply" => ApplyArgs { template, container, anchor, force } => apply(&template, &container, &anchor, force) -> TemplateApplyResponse,
     }

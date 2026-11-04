@@ -1,19 +1,19 @@
 //! `jit dep` handlers.
 
-use super::{resolve_issue, CommandContext, Outcome};
+use super::{resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::DepCommands;
 use crate::commands::RedundancyPolicy;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::output::{DependencyAddResponse, DependencyRemoveResponse};
-use crate::storage::{IssueStore, RepositoryStateStore};
+use crate::storage::IssueStore;
 use anyhow::Result;
 
-fn add<S: IssueStore + RepositoryStateStore>(
+fn add<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     from_id: String,
     to_ids: Vec<String>,
     reduce: bool,
-) -> Result<Outcome<DependencyAddResponse>> {
+) -> HandlerResult<DependencyAddResponse> {
     let from_id = resolve_issue(ctx.executor.storage(), &from_id)?;
     let to_ids = resolve_dependency_args(ctx.executor.storage(), &from_id, &to_ids)?;
     let policy = if reduce {
@@ -41,11 +41,11 @@ fn add<S: IssueStore + RepositoryStateStore>(
     .with_warnings(result.warnings))
 }
 
-fn rm<S: IssueStore + RepositoryStateStore>(
+fn rm<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     from_id: String,
     to_ids: Vec<String>,
-) -> Result<Outcome<DependencyRemoveResponse>> {
+) -> HandlerResult<DependencyRemoveResponse> {
     let from_id = resolve_issue(ctx.executor.storage(), &from_id)?;
     let (to_ids, unmatched) =
         resolve_dependency_removal_args(ctx.executor.storage(), &from_id, &to_ids)?;
@@ -75,7 +75,7 @@ fn rm<S: IssueStore + RepositoryStateStore>(
 
 command_group! {
     command: DepCommands,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [HandlerStore],
     leaves: {
         "dep_add" => DepCommands::Add { from_id, to_ids, reduce } => add(from_id, to_ids, reduce) -> DependencyAddResponse,
         "dep_rm" => DepCommands::Rm { from_id, to_ids } => rm(from_id, to_ids) -> DependencyRemoveResponse,

@@ -1,6 +1,6 @@
 //! A test-only command group exercising the handler contract end to end.
 
-use super::{registered_output_schema, CommandContext, Outcome};
+use super::{registered_output_schema, CommandContext, HandlerResult, Outcome};
 use crate::output::{ErrorCode, ExitCode, HumanRender, OutputMode};
 use crate::schema::CommandSchema;
 use crate::storage::IssueStore;
@@ -43,15 +43,15 @@ const FINDINGS_CODE: ErrorCode = ErrorCode::ValidationFailed;
 fn count<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     label: String,
-) -> anyhow::Result<Outcome<CountResponse>> {
+) -> HandlerResult<CountResponse> {
     let issues = ctx.executor.storage().list_issues()?.len();
-    Ok(Outcome::success(CountResponse { label, issues }))
+    Ok(CountResponse { label, issues }.into())
 }
 
 fn flag<S: IssueStore>(
     _ctx: &CommandContext<'_, S>,
     reason: String,
-) -> anyhow::Result<Outcome<CountResponse>> {
+) -> HandlerResult<CountResponse> {
     Ok(Outcome::findings(
         FINDINGS_CODE,
         format!("flagged because {reason}"),
@@ -59,7 +59,7 @@ fn flag<S: IssueStore>(
     ))
 }
 
-fn fail<S: IssueStore>(_ctx: &CommandContext<'_, S>) -> anyhow::Result<Outcome<FlagReport>> {
+fn fail<S: IssueStore>(_ctx: &CommandContext<'_, S>) -> HandlerResult<FlagReport> {
     anyhow::bail!("handler failed")
 }
 

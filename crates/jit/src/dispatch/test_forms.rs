@@ -1,6 +1,6 @@
 //! Test-only groups proving each `command_group!` form through its own handler.
 
-use super::{registered_output_schema, CommandContext, Dispatched, Outcome};
+use super::{registered_output_schema, CommandContext, Dispatched, HandlerResult, Outcome};
 use crate::output::{ExitCode, HumanRender, OutputMode};
 use crate::schema::OutputSchema;
 use crate::storage::{InMemoryStorage, IssueStore};
@@ -54,7 +54,7 @@ struct EchoArgs {
 }
 
 fn echo_of(args: EchoArgs) -> Outcome<Echo> {
-    Outcome::success(Echo { word: args.word }).with_warnings(["careful"])
+    Outcome::from(Echo { word: args.word }).with_warnings(["careful"])
 }
 
 fn mode(json: bool, quiet: bool) -> OutputMode {
@@ -96,15 +96,15 @@ mod free {
         Say { word: String },
     }
 
-    fn say(word: String) -> anyhow::Result<Outcome<Echo>> {
+    fn say(word: String) -> HandlerResult<Echo> {
         Ok(echo_of(EchoArgs { word }))
     }
 
-    fn ping() -> anyhow::Result<Outcome<Count>> {
+    fn ping() -> HandlerResult<Count> {
         Ok(Outcome::success_with(Count { issues: 0 }, "pong"))
     }
 
-    fn echo(args: EchoArgs) -> anyhow::Result<Outcome<Echo>> {
+    fn echo(args: EchoArgs) -> HandlerResult<Echo> {
         Ok(echo_of(args))
     }
 
@@ -135,16 +135,13 @@ mod free {
 mod with_executor {
     use super::*;
 
-    fn echo<S: IssueStore>(
-        _: &CommandContext<'_, S>,
-        args: EchoArgs,
-    ) -> anyhow::Result<Outcome<Echo>> {
+    fn echo<S: IssueStore>(_: &CommandContext<'_, S>, args: EchoArgs) -> HandlerResult<Echo> {
         Ok(echo_of(args))
     }
 
-    fn ping<S: IssueStore>(ctx: &CommandContext<'_, S>) -> anyhow::Result<Outcome<Count>> {
+    fn ping<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<Count> {
         let issues = ctx.executor.storage().list_issues()?.len();
-        Ok(Outcome::success(Count { issues }))
+        Ok(Count { issues }.into())
     }
 
     pub(super) mod single_args {
@@ -169,9 +166,9 @@ mod with_executor {
 mod concrete {
     use super::*;
 
-    fn count(ctx: &CommandContext<'_, InMemoryStorage>) -> anyhow::Result<Outcome<Count>> {
+    fn count(ctx: &CommandContext<'_, InMemoryStorage>) -> HandlerResult<Count> {
         let issues = ctx.executor.storage().list_issues()?.len();
-        Ok(Outcome::success(Count { issues }))
+        Ok(Count { issues }.into())
     }
 
     command_group! {
@@ -196,8 +193,8 @@ mod union {
         }
     }
 
-    fn shape(selection: Selection) -> anyhow::Result<Outcome<Shape>> {
-        Ok(Outcome::success(pick(OutputMode::default(), selection.0)))
+    fn shape(selection: Selection) -> HandlerResult<Shape> {
+        Ok(pick(OutputMode::default(), selection.0).into())
     }
 
     pub(super) struct Selection(pub Command);
@@ -219,8 +216,8 @@ mod split {
         Remaining(u8),
     }
 
-    fn owned() -> anyhow::Result<Outcome<Echo>> {
-        Ok(Outcome::success(Echo {
+    fn owned() -> HandlerResult<Echo> {
+        Ok(Outcome::from(Echo {
             word: "owned".to_owned(),
         }))
     }
