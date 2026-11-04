@@ -1489,6 +1489,10 @@
     "6acd7a05": {
       "status": "dispatched",
       "vendor": "Codex gpt-6-luna"
+    },
+    "fb38bf1f": {
+      "status": "ready",
+      "note": "rescoped by plan D-59 to commands-import-no-output (REQ-01..03)"
     }
   },
   "handoff": {
