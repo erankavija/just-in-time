@@ -1374,7 +1374,7 @@
       "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44)"
     },
     "ceaaf0ab": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "b697a3f7 track B after 4575a03d; worker checks criteria first",
       "epic": "b697a3f7",
@@ -1427,7 +1427,7 @@
         "7cd27db8 (30334066)"
       ]
     },
-    "status": "done: f56bad8d, f7a59f5f, 4575a03d; landing: 1ade3e6f; running: ceaaf0ab; track A 945f9181 waits for 3f816619",
+    "status": "done: f56bad8d, f7a59f5f, 4575a03d, 1ade3e6f, ceaaf0ab; next track B 5d09e74b; track A 945f9181 after 3f816619",
     "criteria_check_2026_11_04": {
       "945f9181": "valid; line cites drifted; large; touches commands/{issue,dependency,template,mod}, overlaps 3f816619/5687e281 files",
       "1ade3e6f": "valid; cites drifted; large; misses ConfigManager::load/EffectiveConfig::load callers",
