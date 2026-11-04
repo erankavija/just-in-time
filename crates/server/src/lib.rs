@@ -95,7 +95,7 @@ pub fn prepare_server_storage(
 mod recovery_startup_tests {
     use super::*;
     use jit::repository_state::{FileMode, VirtualPath};
-    use jit::storage::{PutFile, RedoRecord};
+    use jit::storage::{commit_redo_record, DataRoot, PutFile, RedoRecord};
 
     /// REQ-02, REQ-03, REQ-04: a spelling through `..` components and the
     /// normalized one bind the same layout, so reads through either serve the
@@ -149,7 +149,7 @@ mod recovery_startup_tests {
         let index = data.join("index.json");
         let bytes = std::fs::read(&index).unwrap();
         std::fs::remove_file(&index).unwrap();
-        RedoRecord::new(
+        let record = RedoRecord::new(
             Vec::new(),
             vec![PutFile {
                 path: VirtualPath::data("index.json").unwrap(),
@@ -159,9 +159,8 @@ mod recovery_startup_tests {
             Vec::new(),
             None,
         )
-        .unwrap()
-        .commit(&data)
         .unwrap();
+        commit_redo_record(&DataRoot::open(&data).unwrap(), &record).unwrap();
 
         let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
         let (_storage, session) =
@@ -175,7 +174,7 @@ mod recovery_startup_tests {
     fn test_server_startup_counts_the_leftover_redo_record_it_applied() {
         let (temp, _storage) = jit::test_utils::setup_test_repo().unwrap();
         let data = temp.path().join(".jit");
-        RedoRecord::new(
+        let record = RedoRecord::new(
             Vec::new(),
             vec![PutFile {
                 path: VirtualPath::worktree("applied-at-startup.md").unwrap(),
@@ -185,9 +184,8 @@ mod recovery_startup_tests {
             Vec::new(),
             None,
         )
-        .unwrap()
-        .commit(&data)
         .unwrap();
+        commit_redo_record(&DataRoot::open(&data).unwrap(), &record).unwrap();
 
         let served_layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
         let (_storage, session) = prepare_server_storage(served_layout).expect("startup recovery");
