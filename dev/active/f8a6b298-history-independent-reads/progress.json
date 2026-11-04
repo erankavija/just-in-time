@@ -644,6 +644,19 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "critical path verdict reuse lookup; dispatched 03:19 before quiet window"
+    },
+    {
+      "id": "0851fae4",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path: one gate-run reader for both backends"
+    },
+    {
+      "id": "5e1ba005",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "archive preview reads evidence record; well-specified"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
@@ -660,6 +673,7 @@
     "User approved format-4 cutover for all five repos (just-in-time, gf2, mealie-fi, inflected-messages, research) without per-repo runtime confirmation. Conditions: inspect research first; stop and report via 6a if any repo is not a format-3 jit tracker; before each rewrite, .jit/ has no uncommitted changes and git tree is clean enough to revert; coordinate with live sessions (gf2-4e in gf2; benchmark 04:00-04:15); reinstall jit only after all five are rewritten, then tell 6a.",
     "User allows Codex gpt-6-luna and gpt-6.1-sol liberally alongside astra and Claude.",
     "User ruling: reorder toward 944edb32 (format rewrite tooling); defer tasks off its path.",
-    "a7314585 added LeaseChange::Reclaim and edited the lease-sequence contract in plan.md; batch a plan-review rerun after the wave."
+    "a7314585 added LeaseChange::Reclaim and edited the lease-sequence contract in plan.md; batch a plan-review rerun after the wave.",
+    "gf2 quiet window 03:52-04:09 held the full-CI lock; released by 6a."
   ]
 }
