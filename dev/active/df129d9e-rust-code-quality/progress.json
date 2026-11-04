@@ -972,7 +972,9 @@
     "578ed10d": 1,
     "5f12265a": 1,
     "f35c86de": 1,
-    "487f45a9": 1
+    "487f45a9": 3,
+    "0eca332a": 1,
+    "0546fc82": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1614,7 +1616,8 @@
       }
     },
     "0546fc82": {
-      "status": "backlog"
+      "status": "backlog",
+      "note": "Docs270d8c7d7 + wording70853144d; configured R2 doc-review PASS5a6df072, record454951f05; still backlog pending0ecaDone and mechanical gate"
     },
     "083c9a91": {
       "status": "done"
@@ -1625,7 +1628,7 @@
     "0eca332a": {
       "status": "in_progress",
       "model": "gpt-6.1-sol high",
-      "note": "Prepared6b563b365, branch refreshed with retirement/f35; pending source slot afterGit4ba anddb094"
+      "note": "Astra repairing evaluate-many typed findings admission defect; canonical code-slice representation; focusedchecks/generation pending; issue delta projected\u221239core"
     },
     "1002524a": {
       "status": "done"
@@ -1664,17 +1667,22 @@
       "status": "backlog"
     },
     "487f45a9": {
-      "status": "in_progress",
-      "note": "Core landed; docs reworkb72bd9aaa refreshed; pending source slot",
+      "status": "done",
       "production_delta": -1,
       "review": {
-        "verdict": "FAIL",
-        "gates": "cargo-ci passed5040+25; code-reviewR1F1 Git requirement prose omits hooks",
-        "prior_findings": "R1F1 repair committedb72bd9aaa; D24 committed2ec33f8c5 explicitly supersedes D4 exclusivity",
-        "criteria": "core criteria met; docs rework awaiting main landing+review",
-        "deferred_items": "no linked design docs",
-        "stale_narrative": "rework covers guarantees,profiles,manualAGENTS; historicalD4 preserved underD24",
-        "required_changes": "land documented rework and rerun authoritative gates"
+        "verdict": "PASS",
+        "gates": "final merged cargo-ci passed; configured R4 code-review passed with zero findings; actual records integrated",
+        "criteria": {
+          "REQ-01": "RequiresGitError / REQUIRES_GIT replace old names, no aliases",
+          "REQ-02": "claims retain exit10 and remediation",
+          "REQ-03": "hooks outside Git use same typed condition",
+          "REQ-04": "generated schema/references and all live issue/manifest requirements use current names",
+          "REQ-05": "human and JSON claim/hooks boundary tests pass"
+        },
+        "prior_findings": "R1 F1 canonical policy closed by D24 + b72bd9aaa; R2 F1 active manifest closed992f62fd3; R3 F1 three live issue descriptions closed4542cd08b; R4 pass2bc81399 under explicit additional-round authorization",
+        "stale_narrative": "exhaustive tracked-file scan including hidden .jit; remaining old tokens only immutable history, explicit cutover background and recorded rationale",
+        "deferred_items": "no linked documents or deferred implementation",
+        "holistic": "one canonical typed requirement; D4 historical text retained with D24 supersession"
       }
     },
     "5962427b": {
@@ -1738,8 +1746,24 @@
       "status": "done"
     },
     "c06daf50": {
-      "status": "in_progress",
-      "note": "Complete preparatory audit found global-option hint placement defect; isolated Sol repair and approved active-plan prose correction underway"
+      "status": "done",
+      "production_delta": 0,
+      "review": {
+        "verdict": "PASS",
+        "gates": "merged cargo-ci passed; configured isolated code-review passed zero findings, real records integrated",
+        "criteria": {
+          "REQ-01": "one parsed global mode; generic hint scan does not infer mode",
+          "REQ-02": "existing owner tests prefix/intervening/suffix JSON, exact2, hint+clapstderr/emptystdout",
+          "REQ-03": "one flattenedfiltergroup andconversion",
+          "REQ-04": "allgroups typed registry only",
+          "REQ-05": "shared outcomes/classification; explicit accepted findings/passthrough boundary D02",
+          "REQ-06": "f35 storagecall removal retained"
+        },
+        "prior_findings": "advisory F1 approvedREQ05 reconciliationf32551057;F2activeplan rows repairedf5c3583f7;all23descendant priorfindings audited",
+        "stale_narrative": "active approach table uses actualrun/registry,+375ceiling and MCPretirement; historypreserved",
+        "deferred_items": "nonein scope; no linked docs; plan/investigation out-of-scope notes audited",
+        "holistic": "one expression simplified; existing testowner extended; fullmainvalidation"
+      }
     },
     "d05b5639": {
       "status": "done"
@@ -1935,7 +1959,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "f35 done; source handed toGit4ba then context repairdb094;0eca/487docs prepared;c06 bounded repair underway",
+    "status": "487 and c06 done;0eca configured review running;0546 doc-review passed, dependency/mechanical pending",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -1960,7 +1984,7 @@
       "integration_targets": 3,
       "production_delta": 0
     },
-    "production_net": "Default-mode ledger: inherited+171,fb38+37,487\u22121,f35\u22123,build0 = current+204. Prepared0eca\u221241 yields+163; this session core net\u22128, plus8server lines removed.",
+    "production_net": "Default core ledger: inherited+171,fb38+37,487\u22121,f35\u22123,c06/build0=current+204. Prepared0eca\u221239 would yield+165; session core net\u22126, plus8server lines removed.",
     "prepared_branches": {
       "f35c86de": {
         "commit": "c5b146e02",
@@ -1988,6 +2012,20 @@
       "doctests": 25,
       "production_delta": -3
     },
-    "scope_reconciliation": "0546 Background/REQ01 corrected1428a996a per steward to existingD04/9529 warnings contract; active plan correction approved withc06"
+    "scope_reconciliation": "0546 Background/REQ01 corrected1428a996a per steward to existingD04/9529 warnings contract; active plan correction approved withc06",
+    "c06daf50": {
+      "merge": "6d471aa22",
+      "status": "done",
+      "production_delta": 0,
+      "code_review_run": "6e864058-2a2f-4146-8444-11e0013294f0"
+    },
+    "parallel_reviews": "Steward authorized pinned-worktree configured reviews with local .jit realrecords and conflict-aware integration; no Cargo lock/primarydata redirect forreview. Final mergedCargo stillrequired.",
+    "487_extra_rework": "Steward authorized oneadditionalround beyondMAX2; R4PASS after exactname correction toallthree livebacklogdescriptions and active manifest. Earlier sweep incorrectly excludedlive.jitdescriptions ashistorical.",
+    "487f45a9": {
+      "merge": "05b00219f",
+      "status": "done",
+      "production_delta": -1,
+      "review_run": "2bc81399-c2e8-4f71-a467-7aeaefaaeccb"
+    }
   }
 }

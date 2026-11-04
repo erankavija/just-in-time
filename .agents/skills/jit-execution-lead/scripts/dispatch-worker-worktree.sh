@@ -15,6 +15,8 @@
 #   .agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh <short-id> [<short-id>...]
 #
 # Effects:
+#   - Allows staged/unstaged changes only under the data root reported by
+#     `jit worktree info --json`; rejects other tracked changes.
 #   - Snapshots `git status -uall --porcelain` of main to
 #     <dir>/lead-pre-dispatch-<ts>.txt and symlinks
 #     <dir>/lead-pre-dispatch-latest.txt to it, where <dir> is
@@ -33,7 +35,7 @@
 #
 # Exit codes:
 #   0 — all worktrees created and verified
-#   1 — pre-flight failed (not on main, dirty tree, branch collision,
+#   1 — pre-flight failed (not on main, tracked changes outside the data root, branch collision,
 #       worktree HEAD mismatch)
 #   2 — bad invocation
 
@@ -67,15 +69,26 @@ if [[ "$current_branch" != "main" ]]; then
     exit 1
 fi
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "ERROR: main has uncommitted changes. Commit or stash before dispatching." >&2
-    git status --short >&2
+# Fail closed if jit cannot resolve the selected store. Literal pathspecs keep
+# spaces and glob characters in configured data-root names uninterpreted.
+data_root="$(jit worktree info --json | jq -er '.data_root | select(type == "string" and startswith("/"))')" || {
+    echo "ERROR: cannot resolve the data root with jit worktree info --json." >&2
+    exit 1
+}
+paths=(.)
+if [[ "$data_root" == "$repo_root/"* ]]; then
+    paths+=(":(top,literal,exclude)${data_root#"$repo_root/"}")
+fi
+if ! git diff --quiet -- "${paths[@]}" || ! git diff --cached --quiet -- "${paths[@]}"; then
+    echo "ERROR: main has uncommitted tracked changes outside the data root ($data_root). Commit or stash them before dispatching." >&2
+    git diff --name-only -- "${paths[@]}" >&2
+    git diff --cached --name-only -- "${paths[@]}" >&2
     exit 1
 fi
 
 main_sha="$(git rev-parse HEAD)"
 short_main_sha="$(git rev-parse --short HEAD)"
-echo "[ok] main at ${short_main_sha} (${main_sha}); working tree clean"
+echo "[ok] main at ${short_main_sha} (${main_sha}); no tracked changes outside data root ${data_root}"
 
 worker_tmp_root="${LEAD_WORKTREE_TMP_ROOT:-/tmp/lead-worker-tmp}"
 if [[ "$worker_tmp_root" != /* ]]; then

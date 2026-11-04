@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-1cdf5965",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "93839e5a85cab0685cead4914de07c9f78ca6438",
+  "completed_at": "2026-11-04T23:16:31.173702555Z",
+  "duration_ms": 164964,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The tagged implementation indexes the affected bulk layout and refresh lookups while preserving the scoped layout behavior and tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1cdf5965-226b-4eb0-8707-33b35a7854d5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "68aded08-89b2-4278-afeb-660cbfc161ad",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:13:46.208865707Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 93839e5a8 (`jit:1cdf5965`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/0f8efc37/requirement/REQ-15 and @/issue/3a61ff16/requirement/REQ-01 (.jit issue Markdown); @/issue/0f8efc37/decision/D-4 (.jit issue Markdown); @/charter/D-18 and @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/npm-ci (.jit/gates.toml)\nGate evidence: npm-ci — pending, exit code none\nTruncation recovery: narrowed linked-plan and investigation reads to their relevant line ranges\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged implementation indexes the affected bulk layout and refresh lookups while preserving the scoped layout behavior and tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

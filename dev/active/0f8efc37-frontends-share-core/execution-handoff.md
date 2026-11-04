@@ -1,10 +1,11 @@
 # Execution handoff: 0f8efc37
 
-Status: review in progress, not released. Start execution only after breakdown
-`32607213` is Done with coverage-preview and breakdown-review passed. Repair
-`db094cac` is Done, merged in `876f41a81`, and installed; the real breakdown
-activation succeeded without force. Coverage passed in run
-`e442f916-31c6-4103-a4fa-0042de96c349`. Breakdown review is running.
+Status: released. Planning `110a4a2f` and breakdown `32607213` are Done.
+Coverage-preview passed in run `e442f916-31c6-4103-a4fa-0042de96c349`;
+breakdown-review passed in run `cbd82ec4-d697-462c-9054-78a7d54363f6` with
+all 13 terminal assignment simulations passing. Repair `db094cac` is Done,
+merged in `876f41a81`, and installed; the real breakdown activation and completion
+succeeded without force. A fresh execution lead may dispatch the ready frontier.
 
 ## Authoritative inputs
 
@@ -21,13 +22,12 @@ about native external-edge publication was corrected. B's earlier review was
 interrupted after a new infrastructure prerequisite changed its evidence; that
 runner error (`b442f1f7-20fd-4fcc-b640-b081fec8d79f`) is not a completed
 review verdict. The earlier P failure is preserved as
-`d8f0b4fd-84e3-41a3-9b76-7fb8f2fccdd7`. Final B results must be recorded
-before this handoff is released.
+`d8f0b4fd-84e3-41a3-9b76-7fb8f2fccdd7`. The successful final B results above supersede that interrupted run.
 
 ## First implementation wave
 
-At preparation, these four leaves would be dependency-ready if B were Done.
-Re-query live states at dispatch; these are a frontier snapshot, not new edges.
+At bracket completion, these four leaves are dependency-ready. Re-query live
+states at dispatch; these are a frontier snapshot, not new edges.
 
 | Issue / key | Suggested worker | Scope | Dispatch constraint |
 |---|---|---|---|
@@ -102,3 +102,17 @@ this epic's browser work consume flat graph nodes and edges. No specific planned
 hunk conflict or prerequisite was identified. Preserve that surface distinction
 and recheck actual consumers if the standalone implementation changes scope.
 MCP is retired; its mention in the older standalone issue is not a live consumer.
+
+## Binding review advisory: dispatch scope
+
+Both configured reviews passed with one low advisory: the manifest's five-file
+footprint uses its uncertainty clause to include the complete caller inventory.
+The binding worker owns the fallible API plus the mechanical caller migration
+as one cutover. Beyond storage and executor/bootstrap, that inventory covers
+command-family tests and shared fixtures (`commands/test_helpers.rs`,
+`test_utils.rs`), profile application, CLI gate/repository workflow tests, document
+and template harness suites, configuration tests, and the server's startup
+constructor. Resolve every actual `configure_repository_layout` and `with_layout`
+consumer from fresh searches; historical issue/planning prose in the inventory
+is evidence, not a code consumer to edit. This clarifies dispatch scope without
+changing the approved manifest or creating a new assignment.
