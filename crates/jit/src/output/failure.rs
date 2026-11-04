@@ -79,6 +79,15 @@ fn derive_guidance(error: &anyhow::Error) -> Guidance {
             ],
         };
     }
+    if let Some(exited) = error.downcast_ref::<crate::commands::serve::ForegroundServerExited>() {
+        return Guidance {
+            details: Some(serde_json::json!({
+                "port": exited.port,
+                "exit_code": exited.status.code(),
+            })),
+            suggestions: Vec::new(),
+        };
+    }
     if let Some(not_required) = error.downcast_ref::<GateNotRequiredError>() {
         let (issue, key) = (&not_required.issue_id, &not_required.gate_key);
         return Guidance {
@@ -236,6 +245,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     }
     // Targeting a gate the issue does not require is an argument/lookup error,
     // classified before the run path, never reported as a runner error.
+    if error.is::<crate::commands::serve::ForegroundServerExited>() {
+        return ErrorCode::ServerExited;
+    }
     if error
         .downcast_ref::<crate::commands::GateNotRequiredError>()
         .is_some()

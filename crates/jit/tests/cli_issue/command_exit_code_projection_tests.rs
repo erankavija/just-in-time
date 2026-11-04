@@ -7,15 +7,9 @@
 //! binding because they do not exercise parsing, dispatch, or `--json` output
 //! selection.
 //!
-//! One row has no fixed projected code: `serve --fg` is a pass-through. Its
-//! public plain and JSON forms are exercised with a deterministic child exit,
-//! while `serve::foreground_exit_code` separately covers the full helper-level
-//! pass-through range and signal-termination fallback.
-//!
 //! `test_command_exit_codes_every_row_is_verified` compares the projection with
 //! the rows the binding cases declare: a row without a case, or with two, fails.
 
-use jit::commands::serve::foreground_exit_code;
 use jit::schema::CommandSchema;
 use jit::storage::worktree_paths::WorktreePaths;
 use jit::test_cli::{jit_binary, JitCli};
@@ -96,7 +90,7 @@ fn setup_prospective_cycle(cli: &JitCli) -> (String, String) {
 }
 
 /// The projection's exit status for `command`, asserting its exception
-/// classification; `None` denotes a pass-through row.
+/// classification.
 fn documented_exit_code(command: &str, code: Option<i32>, exception: bool) -> Option<i32> {
     let schema = CommandSchema::generate();
     let row = schema
@@ -562,8 +556,7 @@ fn invoke_serve_daemon_error(json: bool) -> Vec<Output> {
 ///
 /// `find_server_binary` prefers a sibling of the current executable, so this
 /// fixture drives the public foreground dispatch without starting a long-lived
-/// server or relying on PATH. The arbitrary child code is deliberately outside
-/// the documented taxonomy: observing it proves pass-through behavior.
+/// server or relying on PATH.
 #[cfg(unix)]
 fn jit_with_exiting_server(cli: &JitCli, exit_code: i32) -> std::path::PathBuf {
     let bin_dir = cli.root().join("serve-fg-bin");
@@ -581,9 +574,10 @@ fn jit_with_exiting_server(cli: &JitCli, exit_code: i32) -> std::path::PathBuf {
     jit_copy
 }
 
-/// `jit serve --fg` passes the inline dev-server child's own exit code through.
+/// `jit serve --fg` reports a failing server child as `SERVER_EXITED`, carrying
+/// the child's status in `error.details`.
 #[cfg(unix)]
-fn invoke_serve_foreground_passthrough(json: bool) -> Vec<Output> {
+fn invoke_serve_foreground_exit(json: bool) -> Vec<Output> {
     const CHILD_EXIT: i32 = 42;
 
     let cli = JitCli::initialised().unwrap();
@@ -593,17 +587,11 @@ fn invoke_serve_foreground_passthrough(json: bool) -> Vec<Output> {
         command.arg("--json");
     }
     let output = command.output().unwrap();
-    assert_eq!(
-        output.status.code(),
-        Some(CHILD_EXIT),
-        "serve --fg must exit with the child's status; stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
     if json {
         let response: serde_json::Value =
             serde_json::from_slice(&output.stdout).expect("serve --fg --json result");
-        assert_eq!(response["status"], "exited");
-        assert_eq!(response["exit_code"], CHILD_EXIT);
+        assert_eq!(response["error"]["code"], "SERVER_EXITED");
+        assert_eq!(response["error"]["details"]["exit_code"], CHILD_EXIT);
     }
     vec![output]
 }
@@ -755,7 +743,7 @@ row_bindings! {
     test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", Some(3), false) => invoke_gate_preset_apply_missing_target;
     test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", Some(1), false) => invoke_serve_daemon_error;
     #[cfg(unix)]
-    test_command_exit_codes_serve_foreground_passthrough_is_dual_form: ("serve --fg", None, true) => invoke_serve_foreground_passthrough;
+    test_command_exit_codes_serve_foreground_exit_emits_1: ("serve --fg", Some(1), false) => invoke_serve_foreground_exit;
     test_command_exit_codes_dep_add_cycle_emits_4: ("dep add", Some(4), false) => invoke_dep_add_cycle;
     test_command_exit_codes_blocked_transition_emits_4: ("issue update, issue claim, issue claim-next", Some(4), false) => invoke_blocked_transition;
     test_command_exit_codes_gate_define_duplicate_emits_6: ("gate define", Some(6), false) => invoke_gate_define_duplicate;
@@ -765,31 +753,10 @@ row_bindings! {
     test_command_exit_codes_claim_without_git_emits_10: ("claim", Some(10), false) => invoke_claim_without_git;
 }
 
-/// `serve --fg` passes a child's code through verbatim; the dual-form binding
-/// above observes it through the public command, and this covers the helper's
-/// full pass-through range and signal-termination fallback.
-#[test]
-fn test_command_exit_codes_serve_foreground_is_passthrough() {
-    assert_eq!(documented_exit_code("serve --fg", None, true), None);
-
-    for child_code in [0, 1, 2, 3, 4, 10, 101, 127] {
-        assert_eq!(
-            foreground_exit_code(Some(child_code)),
-            child_code,
-            "serve --fg must pass the child's exit code {child_code} through verbatim"
-        );
-    }
-    assert_eq!(
-        foreground_exit_code(None),
-        1,
-        "a signal-terminated child carries no code, so serve --fg reports 1"
-    );
-}
-
 /// Guard: **every** projected row, exception and standard alike, has exactly one
 /// binding case in [`row_bindings!`]. A row added without a binding, or bound
 /// twice, fails here. Unix-only: the `*`/5 and `serve --fg` rows are bound by
-/// cases that need Unix permissions and signals.
+/// cases that need Unix permissions and shell scripts.
 #[cfg(unix)]
 #[test]
 fn test_command_exit_codes_every_row_is_verified() {

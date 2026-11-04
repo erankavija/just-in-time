@@ -262,6 +262,46 @@ fn test_serve_stop_not_running_json() {
     assert_eq!(v["status"], "not_running");
 }
 
+// ── --status and --stop payloads ──────────────────────────────────────────────
+
+#[test]
+fn test_serve_status_and_stop_not_running_payload_is_the_status_document() {
+    let cli = JitCli::initialised().unwrap();
+    for flag in ["--status", "--stop"] {
+        assert_eq!(
+            cli.run_json(["serve", flag]).unwrap(),
+            serde_json::json!({"status": "not_running"}),
+            "{flag}"
+        );
+    }
+}
+
+#[test]
+#[cfg(unix)]
+fn test_serve_status_and_stop_of_a_live_server_state_their_payloads() {
+    let cli = JitCli::initialised().unwrap();
+    let mut server = Command::new("sleep").arg("60").spawn().unwrap();
+    write_stale_pid(&cli, server.id(), 3053);
+    let log_file = cli.root().join(".jit/server.log");
+
+    assert_eq!(
+        cli.run_json(["serve", "--status"]).unwrap(),
+        serde_json::json!({
+            "status": "running",
+            "pid": server.id(),
+            "port": 3053,
+            "url": "http://localhost:3053",
+            "log_file": log_file,
+            "started_at": "2024-01-01T00:00:00Z",
+        })
+    );
+    assert_eq!(
+        cli.run_json(["serve", "--stop"]).unwrap(),
+        serde_json::json!({"status": "stopped", "pid": server.id(), "port": 3053})
+    );
+    assert!(exited_by(&mut server, Instant::now() + REAP_GRACE));
+}
+
 // ── stale PID file cleanup ────────────────────────────────────────────────────
 
 #[test]

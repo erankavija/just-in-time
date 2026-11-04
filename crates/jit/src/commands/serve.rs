@@ -85,6 +85,14 @@ pub enum ForegroundOutcome {
     },
 }
 
+/// The foreground server exited with a failure status.
+#[derive(Debug, thiserror::Error)]
+#[error("Foreground server on port {port} exited with {status}")]
+pub struct ForegroundServerExited {
+    pub port: u16,
+    pub status: std::process::ExitStatus,
+}
+
 /// Outcome of `jit serve --stop`.
 #[derive(Debug, PartialEq)]
 pub enum StopOutcome {
@@ -97,10 +105,6 @@ pub enum StopOutcome {
 // ────────────────────────────────────────────────────────────────────────────
 // PID file helpers
 // ────────────────────────────────────────────────────────────────────────────
-
-pub fn foreground_exit_code(child_code: Option<i32>) -> i32 {
-    child_code.unwrap_or(1)
-}
 
 /// Resolve the PID record through the selected repository layout.
 pub fn pid_file_path(layout: &RepositoryLayout) -> Result<PathBuf> {

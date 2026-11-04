@@ -16,8 +16,10 @@ use thiserror::Error;
 mod emit;
 pub mod failure;
 mod invariant;
+mod serve;
 
 pub use emit::{emit_outcome, HumanRender, Report, Response};
+pub use serve::{ServeResponse, WebUiSource};
 
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
@@ -991,6 +993,8 @@ wire_vocabulary! {
         ClaimListError = "CLAIM_LIST_ERROR",
         /// Forced claim eviction failed.
         ClaimForceEvictError = "CLAIM_FORCE_EVICT_ERROR",
+        /// The foreground server process exited with a failure status.
+        ServerExited = "SERVER_EXITED",
         /// A lock wait expired while another jit process held the lock.
         LockTimeout = "LOCK_TIMEOUT",
     }
@@ -1048,7 +1052,8 @@ impl ErrorCode {
             | ErrorCode::GenericError
             | ErrorCode::RecoveryFailed
             | ErrorCode::ClaimStatusError
-            | ErrorCode::ClaimListError => ExitCode::GenericError,
+            | ErrorCode::ClaimListError
+            | ErrorCode::ServerExited => ExitCode::GenericError,
         }
     }
 
@@ -1136,6 +1141,9 @@ impl ErrorCode {
                 "Claim enumeration failed without a more specific classification."
             }
             ErrorCode::ClaimForceEvictError => "Forced claim eviction failed.",
+            ErrorCode::ServerExited => {
+                "The foreground server process exited with a failure status."
+            }
             ErrorCode::LockTimeout => {
                 "A lock wait expired while another jit process held the lock; nothing was changed."
             }
@@ -3622,6 +3630,7 @@ mod tests {
             (ErrorCode::ClaimStatusError, ExitCode::GenericError),
             (ErrorCode::ClaimListError, ExitCode::GenericError),
             (ErrorCode::ClaimForceEvictError, ExitCode::NotFound),
+            (ErrorCode::ServerExited, ExitCode::GenericError),
             (ErrorCode::LockTimeout, ExitCode::LockTimeout),
         ];
 
@@ -3784,6 +3793,7 @@ mod tests {
             ErrorCode::RecoveryFailed,
             ErrorCode::ClaimStatusError,
             ErrorCode::ClaimListError,
+            ErrorCode::ServerExited,
         ] {
             assert_eq!(code.exit_code(), ExitCode::GenericError, "{code}");
         }
