@@ -6,8 +6,58 @@
   "dependencies": [
     "81664a6a-958e-4e4d-9403-7b6210dc9d6c"
   ],
-  "description": "Add the module's single lookup of the checked-out commit and branch, so every consumer of either fact asks one operation backed by one git process.\n\n## Background\n\nSix branch lookups exist, with differing semantics:\n\n| Site | Command | Detached HEAD | Unborn branch |\n|---|---|---|---|\n| `crates/jit/src/commands/claim.rs:46-64` | `rev-parse --abbrev-ref HEAD` | `HEAD` | second process, then a typed no-commits error |\n| `crates/jit/src/commands/worktree.rs:46-63` | same | `HEAD` | generic error |\n| `crates/jit/src/storage/claim_coordinator.rs:974-993` | same | `HEAD` | error, read as no branch |\n| `crates/jit/src/commands/mod.rs:3350` | `branch --show-current` | empty string | the unborn branch's name |\n| `crates/jit/src/gate_execution.rs:551`, `crates/jit/src/gate_execution.rs:567` | `rev-parse HEAD`, `rev-parse --abbrev-ref HEAD` | `HEAD` | none |\n| `crates/jit/src/commands/snapshot.rs:25-29` | libgit2 `head().shorthand()` | `HEAD` | none |\n\n`git rev-parse HEAD --abbrev-ref HEAD` prints the commit and the abbreviated ref in one process (`HEAD` when detached) and exits nonzero on an unborn branch. The domain's canonical commit type is `CanonicalCommitOid` (`crates/jit/src/domain/artifact_plan.rs:112`).\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::head()` starts one git process. It returns `Ok(None)` on an unborn branch, and otherwise a `Head` holding the commit as `CanonicalCommitOid` and the branch name, absent on a detached HEAD.\n- [hard] REQ-02: `Head` renders its branch as the branch name, or `HEAD` when detached, which is what `git rev-parse --abbrev-ref HEAD` prints.\n- [hard] REQ-03: An executable that cannot start returns the module's unavailable error. A nonzero exit is an unborn branch, since a `GitCheckout` exists only for a checkout git already recognized.\n- [hard] REQ-04: The behaviour suite covers a branch, a detached HEAD, an unborn branch and a missing executable, and counts one process per lookup.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
-  "documents": [],
+  "description": "Add the module's single lookup of the checked-out commit and branch, so every consumer of either fact asks one bounded operation backed by at most two git processes.\n\n## Background\n\nSix branch lookups exist, with differing semantics:\n\n| Site | Command | Detached HEAD | Unborn branch |\n|---|---|---|---|\n| `crates/jit/src/commands/claim.rs:46-64` | `rev-parse --abbrev-ref HEAD` | `HEAD` | second process, then a typed no-commits error |\n| `crates/jit/src/commands/worktree.rs:46-63` | same | `HEAD` | generic error |\n| `crates/jit/src/storage/claim_coordinator.rs:974-993` | same | `HEAD` | error, read as no branch |\n| `crates/jit/src/commands/mod.rs:3350` | `branch --show-current` | empty string | the unborn branch's name |\n| `crates/jit/src/gate_execution.rs:551`, `crates/jit/src/gate_execution.rs:567` | `rev-parse HEAD`, `rev-parse --abbrev-ref HEAD` | `HEAD` | none |\n| `crates/jit/src/commands/snapshot.rs:25-29` | libgit2 `head().shorthand()` | `HEAD` | none |\n\nA previously recognized checkout can become invalid, so a nonzero exit cannot establish an unborn branch. Read HEAD identity with `rev-parse --revs-only HEAD --symbolic-full-name HEAD`, then validate the captured OID with `rev-list --no-walk --missing=print <oid> --`, or validate a successful empty identity result with `symbolic-ref --quiet HEAD`. Both processes use `--no-replace-objects`; commit validation also uses child-local `-c core.commitGraph=false`. The domain's commit identity is `CanonicalCommitOid`. [The approved experiment](dev/active/f4d9502a-git-cli-module/head-lookup-experiment.md) records the protocol and failure evidence.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::head()` starts at most two configured git processes, reading only HEAD identity and its captured commit or validating the unborn symbolic target, with no unrelated ref, reflog, ancestor or worktree traversal and no lazy fetch. It returns `Ok(None)` only on a confirmed unborn branch, and otherwise a `Head` holding the commit as `CanonicalCommitOid` and the branch name, absent on a detached HEAD.\n- [hard] REQ-02: `Head` renders its branch as the branch name, or `HEAD` when detached, which is what `git rev-parse --abbrev-ref HEAD` prints.\n- [hard] REQ-03: An executable that cannot start returns the module's unavailable error. Only a successfully validated unborn branch returns `Ok(None)`; command failures, missing, corrupt or non-commit objects, and malformed output return typed errors, including after a previously recognized checkout becomes invalid.\n- [hard] REQ-04: The owning behavior suite covers branch, detached, unborn, missing executable, stale or invalid checkout, malformed refs, missing or corrupt commit and non-commit objects, and bounds each lookup at two processes. Focused regressions prove no promisor fetch or unrelated history/worktree traversal, and rejection of missing objects masked by commit graphs or replacements.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://raw.githubusercontent.com/git/git/v2.15.0/builtin/rev-list.c",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://raw.githubusercontent.com/git/git/v2.39.5/builtin/rev-list.c",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://raw.githubusercontent.com/git/git/v2.16.0/builtin/rev-list.c",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://raw.githubusercontent.com/git/git/v2.17.0/builtin/rev-list.c",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://packages.debian.org/bookworm/git",
+          "resolved_path": null
+        }
+      ],
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Bounded head lookup experiment",
+      "path": "dev/active/f4d9502a-git-cli-module/head-lookup-experiment.md"
+    }
+  ],
   "first_ready_at": "2026-11-01T14:05:18.430019023Z",
   "gates_required": [
     "cargo-ci",
@@ -18,6 +68,12 @@
       "run_id": "b90299c6-4567-48ac-a459-ddb2a79d24b0",
       "status": "passed",
       "updated_at": "2026-11-04T22:47:26.900432705Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "008c2ae3-d632-448a-85d4-982b9490c59e",
+      "status": "failed",
+      "updated_at": "2026-11-04T22:52:15.540307289Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +90,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "One head lookup in the git module",
-  "updated_at": "2026-11-04T22:47:26.900432705Z"
+  "updated_at": "2026-11-04T23:26:30.796310009Z"
 }

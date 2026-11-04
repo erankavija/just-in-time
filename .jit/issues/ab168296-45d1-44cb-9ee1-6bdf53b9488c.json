@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T23:26:08.371357826Z",
+  "context": {},
+  "created_at": "2026-11-04T23:26:00.051673379Z",
+  "dependencies": [],
+  "description": "Issue listing and query subset rendering use the shared issue-list renderer directly, removing the intermediate method reintroduced during query dispatch migration.\n\n## Background\n\n`IssueListing::render` duplicates the rendering entry point beside `HumanRender`. It was removed during output consolidation and returned when query subset headings were added. The final output contract requires rendering through `HumanRender` and one shared issue-list helper.\n\n## Success Criteria\n\n- [hard] REQ-01: Issue listing and search results have no separate intermediate `render` method; their human rendering enters through `HumanRender` and uses the shared issue-list helper.\n- [hard] REQ-02: Issue-list and query-subset JSON, human text, quiet output and exit statuses are unchanged, with existing semantic rendering coverage preserved.\n- [hard] REQ-03: The repair introduces no parallel renderer abstraction and has a nonpositive production-line delta under the default production-line counter.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T23:26:00.051673379Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ab168296-45d1-44cb-9ee1-6bdf53b9488c",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "story:output-contract",
+    "component:cli",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Issue listing renders directly through the shared output contract",
+  "updated_at": "2026-11-04T23:26:08.371357826Z"
+}

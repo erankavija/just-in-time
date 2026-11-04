@@ -101,8 +101,9 @@
           "short_id": "24d3b460",
           "title": "User name query in the git module",
           "classification": "implementation",
-          "status": "ready",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "fixture_default_behavior_correction"
         },
         {
           "id": "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
@@ -117,16 +118,18 @@
           "short_id": "437907da",
           "title": "One worktree listing in the git module",
           "classification": "implementation",
-          "status": "ready",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "pinned_configured_gates_running"
         },
         {
           "id": "46a89061-8383-42e0-b20a-a92406f33fcb",
           "short_id": "46a89061",
           "title": "Pinned revision reads move into the git module behind a bridge",
           "classification": "implementation",
-          "status": "ready",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "pinned_configured_gates_running"
         },
         {
           "id": "4ba18af4-dcf3-480d-a785-40dc4533349c",
@@ -135,23 +138,25 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "reviewed_pending_gates"
+          "worker_status": "authorized_two_process_experiment"
         },
         {
           "id": "bb5040a8-1341-4e8e-ac13-6eef116574f4",
           "short_id": "bb5040a8",
           "title": "Origin URL query in the git module",
           "classification": "implementation",
-          "status": "ready",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "implementation"
         },
         {
           "id": "cc9f213e-7683-47a5-91fe-fedbba10043b",
           "short_id": "cc9f213e",
           "title": "Path history query in the git module",
           "classification": "implementation",
-          "status": "ready",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "prepared_waiting_worker_slot"
         }
       ]
     },
@@ -163,9 +168,10 @@
           "short_id": "7297f922",
           "title": "CLI test bounds the git processes of issue reads",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_pending_gates"
+          "worker_status": "merged_and_gated",
+          "source_merge": "c65447466451e7d4c58988e4ba02568a2363e986"
         },
         {
           "id": "732f7afb-f1ee-4242-aa18-82b3b70ea96f",
@@ -468,7 +474,9 @@
   "escalations": [],
   "rework_counts": {
     "7aafec83": 1,
-    "81664a6a": 1
+    "81664a6a": 1,
+    "4ba18af4": 1,
+    "24d3b460": 1
   },
   "surfaced_pitfalls": [
     {
@@ -554,6 +562,51 @@
       "effort": "high",
       "reason": "Bounded CLI composition tests with linked-worktree isolation and child-only PATH injection. Independent of pending module edits.",
       "agent": "/root/process_budget"
+    },
+    {
+      "issue": "46a89061",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "Shared Git error/bridge contract and concurrent subprocess I/O migration",
+      "agent": "/root/pinned_reads"
+    },
+    {
+      "issue": "437907da",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Bounded one-process listing and robust record parsing",
+      "agent": "/root/worktree_listing"
+    },
+    {
+      "issue": "24d3b460",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "reason": "Bounded config query primitive with child-isolated tests",
+      "agent": "/root/user_name"
+    },
+    {
+      "issue": "4ba18af4",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "agent": "/root/head_contract",
+      "classification": "research",
+      "reason": "Reliable single-process unborn versus genuine Git failure contract requires experimental edge-case analysis before criterion reconciliation."
+    },
+    {
+      "issue": "bb5040a8",
+      "model": "gpt-6-luna",
+      "effort": "high",
+      "reason": "Bounded origin URL primitive and process-count tests",
+      "agent": "/root/origin_url",
+      "prepared": true
+    },
+    {
+      "issue": "cc9f213e",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Bounded Git log parsing and merge-history behavior matrix",
+      "agent": "/root/file_history",
+      "prepared": true
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -567,7 +620,18 @@
     "Main source landings and full gates remain serialized with df129d9e and steward retirement work.",
     "Steward permits at most two isolated worker trees for this epic; supersedes October temporary one-tree disk-pressure cap. Reclaim after landing. b4ca051c verified already implemented by 1e0dd2572; pending required docs gates.",
     "Ready 7297f922 pulled into current execution batch after both prerequisites done; disjoint test module and second worker tree stay within steward cap. No source landing until coordinated.",
-    "b4ca051c completed 0c03971cd after both gates. 7297f922 test-only implementation preserved 251bc3250; focused 2 tests and 25 doctests passed. Head branch e977cbbde ready for locked landing after f35 clean release 66fdef247. Repository membership cleanup separately completed; current validation has no divergences per steward."
+    "b4ca051c completed 0c03971cd after both gates. 7297f922 test-only implementation preserved 251bc3250; focused 2 tests and 25 doctests passed. Head branch e977cbbde ready for locked landing after f35 clean release 66fdef247. Repository membership cleanup separately completed; current validation has no divergences per steward.",
+    "Latest steward policy supersedes earlier limits: three active isolated implementation workers; independent pinned AI reviews do not consume implementation slots. Resource locks cover Cargo only; short main source slots remain coordinated.",
+    "7297f922 configured cargo-ci 75648818-5b22-4b6b-b7a0-e82533f5f632 and code-review 8b7dabdb-92eb-4b0f-a06c-e40d616940b1 passed against pinned source 2d998c5b7670cda2c3e551b0f2a150c2fa6e0cf1. Actual evidence committed 9770b610a in worker tree; main integration and merged Cargo pending.",
+    "Head source 8854c45a2 passed Cargo but review 008c2ae3-d632-448a-85d4-982b9490c59e failed: unchecked construction permits genuine Git failures to look unborn. Constructor restriction alone is insufficient. Steward requires bounded experimental design: confirmed unborn None, genuine failure typed error, one process, no worktree walk or locale-dependent stderr parsing; propose criterion reconciliation only after evidence.",
+    "Steward approved 24d3b460 narrow shared GitStandIn explicit child config/env override for deterministic unset user.name testing. Defaults unchanged; no host/process-wide changes. Existing equivalent inspected and absent.",
+    "Steward approved df exact-name-only corrections in live f6eaba42/d5cae9e3/23b48cf0 descriptions; df owns those edits. Root repository validation cleanup completed separately with zero errors/warnings/divergences.",
+    "7297f922 Done in593d78dde after merged stable Cargo gate; worktree reclaimed canonically. Source slot released to df487, now done; next root ancestry fix owns slot.",
+    "46a89061 source9af52c2af and437907da sourcea0f836080 committed, refreshed from main and frozen for configured gates. Lost worker check session25527 is inaccessible to both worker and lead; no remaining process exists in46tree. Configured cargo-ci will establish remaining evidence; no duplicate focused run needed.",
+    "24d3b460 lead found extra PATH-resolved env executable introduced into default GitStandIn behavior. Worker replacing it with validated quoted shell environment assignments and direct absolute Git exec; no new private runner.",
+    "Steward chooses D-19 over branch-listing history scan: head phase2 may experimentally use at most two direct Git processes with no unrelated ref/history/worktree walk or lazy network fetch. No Git minimum or criterion budget change yet approved; reconcile after evidence. Experiment report currently scratch /tmp/f4d9502a-lead/head-experiment-results.md.",
+    "Steward temp policy: new focused tests use short unique owned /dev/shm TMPDIR and cleanup on exit; build caches remain disk. Pause new heavy launches/report if /tmp free inodes below20% or free bytes below4GiB. Do not alter running directories or generic /tmp contents.",
+    "df487 exact error-name corrections now landed05b00219f. Planning refresh remains required beforec506 and should include pending head contract reconciliation. Frontend lead owns fallible layout binding9c3; c506 will consume landed API, no concurrent server changes here."
   ],
   "planning_reviews_pending": [
     {
@@ -576,7 +640,7 @@
       "before_implementation": "c5062e21"
     }
   ],
-  "worker_limit": 2,
+  "worker_limit": 3,
   "reviews": {
     "b4ca051c": {
       "verdict": "PASS",
@@ -592,6 +656,38 @@
       "stale_narrative": "No HEAD read-source guidance remains in affected pages.",
       "deferred_items": "No linked design artifacts or in-scope deferrals.",
       "holistic": "Current docs agree with storage read behavior; no unnecessary edits."
+    },
+    "4ba18af4": {
+      "verdict": "FAIL",
+      "cargo_ci": "passed",
+      "code_review": "008c2ae3-d632-448a-85d4-982b9490c59e",
+      "findings": [
+        {
+          "id": "F1",
+          "status": "open",
+          "summary": "A public unvalidated GitCheckout constructor makes head() classify arbitrary nonzero Git failures as an unborn branch."
+        }
+      ],
+      "deferred_items": "No linked design artifacts or deferred items in issue audit.",
+      "required_changes": "Experimentally prove reliable unborn versus genuine-error semantics before rework; no constructor-only waiver."
+    },
+    "7297f922": {
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "5a78af94-d08c-4606-b4ad-927d3f9540ef",
+        "code-review": "8b7dabdb-92eb-4b0f-a06c-e40d616940b1"
+      },
+      "reviewed_source": "2d998c5b7670cda2c3e551b0f2a150c2fa6e0cf1",
+      "criteria": {
+        "REQ-01": "Both CLI reads bounded at one Git invocation in primary checkout.",
+        "REQ-02": "Both reads retrieve primary-only issue from linked checkout within one invocation.",
+        "REQ-03": "Budget and read assertions print invocation records."
+      },
+      "prior_findings": "None; first review.",
+      "stale_narrative": "No stale forward-looking process-budget narrative; planning manifest remains authoritative task description.",
+      "deferred_items": "No linked documents.",
+      "holistic": "Uses shared JitCli/GitStandIn; child-only PATH; adds module under existing CLI target.",
+      "integration": "Merged source unchanged; intervening graph-validation and invalid-command hint changes do not alter reviewed process-budget logic. Actual pinned review evidence integrated; merged configured Cargo gate passed stable."
     }
   }
 }

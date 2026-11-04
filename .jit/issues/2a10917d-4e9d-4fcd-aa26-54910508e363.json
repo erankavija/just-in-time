@@ -1,19 +1,22 @@
 {
-  "assignee": null,
+  "assignee": "agent:review-ancestry",
+  "claimed_at": "2026-11-04T22:53:57.821509955Z",
   "context": {},
   "created_at": "2026-11-03T22:38:21.381647288Z",
   "dependencies": [],
-  "description": "Give the code-review gate the commit ancestry between each attributable commit and the commit each required gate's latest run judged, so the reviewer stops treating a merge commit that contains the work as older evidence.\n\n## Background\n\n- `contrib/gates/ai-review.sh` passes the jit gate context (`JIT_CONTEXT_FILE`) to the reviewer verbatim. The context records each required gate's latest run and its commit. `contrib/gates/code-review-prompt.md` tells the reviewer to find the issue's commits by their `jit:<short-id>` tag and to use the latest gate status as evidence (section \"Current evidence semantics\").\n- Nothing in the context says how those commits relate. Twice a reviewer has read a cargo-ci run on a merge commit as having run on an ancestor of the issue's commit, and failed hard criteria as unverified:\n  - 083c9a91, evidence in `dev/active/df129d9e-rust-code-quality/evidence-083c9a91-ci-ancestry.md`;\n  - 70ac98fc, evidence in `dev/active/9876a23a-one-validation-report/evidence-70ac98fc-ci-ancestry.md`.\n  Each needed a user ruling and a hand-written evidence note.\n- `git merge-base --is-ancestor <commit> <run-commit>` decides the relation.\n\n## Success Criteria\n\n- [hard] REQ-01: Before invoking the reviewer, `contrib/gates/ai-review.sh` adds a fact for each required gate whose latest run names a commit, and puts these facts in the prompt it sends. Each fact names the gate, its run commit, and every commit reachable from `HEAD` whose message carries `jit:<short-id>` for the context issue, marking whether each is contained in the run commit.\n- [hard] REQ-02: `contrib/gates/code-review-prompt.md` tells the reviewer to judge whether gate evidence covers the attributable work from those facts alone. It also states that a run whose commit contains every attributable commit covers them.\n- [hard] REQ-03: When git is unavailable, or the context names no run commit or no tagged commit, the script still runs the review and states that ancestry is unavailable. The exit-code contract in the script header is unchanged.\n- [hard] REQ-04: A scripted test runs `ai-review.sh` with a dry-run reviewer (`REVIEWER_AGENT=cat`) over a repository the test builds. It asserts the facts for a run on a merge commit that contains the tagged commit, and for a run on a commit that predates it.\n\n## Notes\n\n- Approved by the user on 2026-11-04 as a standalone task after the second misread (70ac98fc).\n- The fix is confined to `contrib/gates/`, which is this repository's own gate configuration, not shipped engine behaviour (`@/inv/domain-agnostic`).",
+  "description": "Give the code-review gate the commit ancestry between each attributable commit and the commit each required gate's latest run judged, so the reviewer stops treating a merge commit that contains the work as older evidence.\n\n## Background\n\n- `contrib/gates/ai-review.sh` passes the jit gate context (`JIT_CONTEXT_FILE`) to the reviewer verbatim. The context records each required gate's latest run and its commit. `contrib/gates/code-review-prompt.md` tells the reviewer to find the issue's commits by their `jit:<short-id>` tag and to use the latest gate status as evidence (section \"Current evidence semantics\").\n- Nothing in the context says how those commits relate. Twice a reviewer has read a cargo-ci run on a merge commit as having run on an ancestor of the issue's commit, and failed hard criteria as unverified:\n  - 083c9a91, evidence in `dev/active/df129d9e-rust-code-quality/evidence-083c9a91-ci-ancestry.md`;\n  - 70ac98fc, evidence in `dev/active/9876a23a-one-validation-report/evidence-70ac98fc-ci-ancestry.md`.\n  Each needed a user ruling and a hand-written evidence note.\n- `git merge-base --is-ancestor <commit> <run-commit>` decides the relation.\n\n## Success Criteria\n\n- [hard] REQ-01: Before invoking the reviewer, `contrib/gates/ai-review.sh` adds a fact for each required gate whose latest run names a commit, and puts these facts in the prompt it sends. Each fact names the gate, its run commit, and every commit reachable from `HEAD` whose message carries `jit:<short-id>` for the context issue, marking whether each is contained in the run commit. When a projection omits its commit, resolve its latest run through read-only gate status in the review checkout, accepting it only when captured status, last_run_at, and exit_code match; otherwise mark ancestry unavailable.\n- [hard] REQ-02: `contrib/gates/code-review-prompt.md` tells the reviewer to judge whether gate evidence covers the attributable work from those facts alone. It also states that a run whose commit contains every attributable commit covers them.\n- [hard] REQ-03: When git is unavailable, or no run commit can be resolved consistently with the captured context, or no tagged commit is reachable, the script still runs the review and states that ancestry is unavailable. The exit-code contract in the script header is unchanged.\n- [hard] REQ-04: A scripted test runs `ai-review.sh` with a dry-run reviewer (`REVIEWER_AGENT=cat`) over a repository the test builds. It asserts the facts for a run on a merge commit that contains the tagged commit, and for a run on a commit that predates it.\n\n## Notes\n\n- Approved by the user on 2026-11-04 as a standalone task after the second misread (70ac98fc).\n- The fix changes the gate wrapper and prompt under `contrib/gates/`, with matching asset wiring in `profiles/jit-dogfood/manifest.toml`. The workflow profile installs the wrapper and ancestry helper; the engine remains domain-agnostic (`@/inv/domain-agnostic`).\n\n## Decisions\n\n- **D-01** — The required-gate context projection currently omits commits. Resolve a missing commit through the canonical read-only latest-run interface in the review checkout only when status, last-run timestamp, and exit code match the captured projection. A mismatch or missing evidence makes ancestry unavailable; no engine or issue-show surface changes are required. This narrow clarification preserves the original ancestry rationale and was approved by the project steward on 2026-11-05.\n\n- **D-02** — The dogfood workflow profile explicitly packages live gate assets. Include the ancestry helper beside its wrapper and exclude the development test suite from the profile, following the manifest's existing live-source conventions. This necessary profile-wiring exception to the original directory scope was approved by the project steward on 2026-11-05.\n",
   "documents": [],
+  "done_at": "2026-11-04T23:17:04.915714917Z",
   "first_ready_at": "2026-11-03T22:38:21.381647288Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-11-03T22:38:25.315255581Z",
-      "updated_by": null
+      "run_id": "2d7970d0-790d-4c78-96fb-38cf47579f6c",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:10:44.271702933Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "2a10917d-4e9d-4fcd-aa26-54910508e363",
@@ -23,7 +26,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Code-review context states commit ancestry for gate evidence",
-  "updated_at": "2026-11-03T22:38:25.315255581Z"
+  "updated_at": "2026-11-04T23:17:04.915714917Z"
 }
