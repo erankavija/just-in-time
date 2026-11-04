@@ -5538,7 +5538,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         Commands::Project(project_cmd) => {
             run_project(&executor, project_cmd, mode)?;
         }
-        Commands::Search { args } => {
+        Commands::Search(args) => {
             return search::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Status => {

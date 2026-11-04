@@ -343,10 +343,7 @@ pub enum Commands {
     /// Search issues and documents
     ///
     /// JSON output uses the list envelope `{"count": N, "results": [...]}`.
-    Search {
-        #[command(flatten)]
-        args: SearchArgs,
-    },
+    Search(SearchArgs),
 
     /// Show CLI version and build metadata
     Version,
@@ -2686,7 +2683,7 @@ impl Commands {
             | Self::Label(_)
             | Self::Worktree(_)
             | Self::Item(_)
-            | Self::Search { .. }
+            | Self::Search(_)
             | Self::Version { .. }
             | Self::Status { .. } => false,
         }
@@ -2729,7 +2726,7 @@ impl Commands {
             | Self::Query {
                 subcommand: None, ..
             }
-            | Self::Search { .. }
+            | Self::Search(_)
             | Self::Validate { .. }
             | Self::Serve { .. }
             | Self::Version { .. }
