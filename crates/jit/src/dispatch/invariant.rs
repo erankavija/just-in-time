@@ -64,7 +64,7 @@ mod tests {
             printed["error"]["code"],
             serde_json::to_value(ErrorCode::ValidationFailed).unwrap()
         );
-        assert_eq!(status, ExitCode::ValidationFailed);
+        assert_eq!(status, ExitCode::ValidationFailed.into());
         assert_eq!(status.code(), 4);
     }
 

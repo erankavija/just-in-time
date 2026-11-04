@@ -1,7 +1,7 @@
 use super::*;
 use crate::domain::EventBody;
 use crate::repository_state::{
-    serialize_gate_run, CaptureBudget, RepositoryAction, RepositoryActionOwner,
+    serialize_gate_run, CaptureBudget, MutationContext, RepositoryAction, RepositoryActionOwner,
     EVENT_LOG_TAIL_WINDOW,
 };
 #[cfg(windows)]
@@ -61,7 +61,7 @@ fn test_json_apply_admits_a_listing_that_changed_since_capture() {
     let storage = JsonFileStorage::new(&data);
     let notes_path = VirtualPath::worktree("notes").unwrap();
     let published_path = VirtualPath::worktree("published.txt").unwrap();
-    let mut spec = CaptureSpec::new([published_path.clone()], budget()).unwrap();
+    let mut spec = publishing_spec([published_path.clone()]);
     spec.discover_listing(notes_path.clone()).unwrap();
     let delta = RepositoryDelta::new(
         &layout,
@@ -160,9 +160,21 @@ fn initialization_delta(layout: &RepositoryLayout) -> RepositoryDelta {
     .unwrap()
 }
 
+/// A capture of `paths` that also reads what a publication over a present
+/// data root needs: the root itself and the event log's tail.
+fn publishing_spec(paths: impl IntoIterator<Item = VirtualPath>) -> CaptureSpec {
+    let mut spec = CaptureSpec::new(
+        paths.into_iter().chain([VirtualPath::data("").unwrap()]),
+        budget(),
+    )
+    .unwrap();
+    spec.discover_tail(VirtualPath::EVENTS).unwrap();
+    spec
+}
+
 /// Close a hand-built test delta over its captured image.
 fn test_plan(image: &RepositoryImage, delta: &RepositoryDelta) -> MaterializationPlan {
-    MaterializationPlan::new(image, delta.clone())
+    MaterializationPlan::new(image, delta.clone(), &MutationContext::preview()).unwrap()
 }
 
 #[cfg(unix)]
@@ -184,9 +196,7 @@ fn test_set_mode_replaces_inode_without_chmodding_external_hard_link() {
     let storage = JsonFileStorage::new(&data);
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
     let path = VirtualPath::data("mode.txt").unwrap();
-    let image = session
-        .capture(CaptureSpec::new([path.clone()], budget()).unwrap())
-        .unwrap();
+    let image = session.capture(publishing_spec([path.clone()])).unwrap();
     let delta = RepositoryDelta::new(
         &layout,
         vec![RepositoryAction::set_mode(
@@ -426,20 +436,15 @@ fn test_conformance_absent_root_publishes_identically_across_topologies() {
 
 #[cfg(unix)]
 fn existing_conformance_spec() -> CaptureSpec {
-    CaptureSpec::new(
-        [
-            VirtualPath::data("").unwrap(),
-            VirtualPath::data("keep.txt").unwrap(),
-            VirtualPath::data("replace.txt").unwrap(),
-            VirtualPath::data("remove.txt").unwrap(),
-            VirtualPath::data("chmod.txt").unwrap(),
-            VirtualPath::data("generated").unwrap(),
-            VirtualPath::data("generated/new.txt").unwrap(),
-            VirtualPath::worktree("out.txt").unwrap(),
-        ],
-        budget(),
-    )
-    .unwrap()
+    publishing_spec([
+        VirtualPath::data("keep.txt").unwrap(),
+        VirtualPath::data("replace.txt").unwrap(),
+        VirtualPath::data("remove.txt").unwrap(),
+        VirtualPath::data("chmod.txt").unwrap(),
+        VirtualPath::data("generated").unwrap(),
+        VirtualPath::data("generated/new.txt").unwrap(),
+        VirtualPath::worktree("out.txt").unwrap(),
+    ])
 }
 
 fn seed_memory_existing(memory: &InMemoryStorage, files: &[(VirtualPath, &[u8])]) {
@@ -700,17 +705,7 @@ fn test_conformance_a_nested_write_creates_its_parent_on_both_backends() {
     std::fs::create_dir(&data).unwrap();
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let nested = VirtualPath::data("nested/file.txt").unwrap();
-    let spec = || {
-        CaptureSpec::new(
-            [
-                VirtualPath::data("").unwrap(),
-                VirtualPath::data("nested").unwrap(),
-                nested.clone(),
-            ],
-            budget(),
-        )
-        .unwrap()
-    };
+    let spec = || publishing_spec([VirtualPath::data("nested").unwrap(), nested.clone()]);
     let delta = RepositoryDelta::new(
         &layout,
         vec![RepositoryAction::write_file(
@@ -1257,15 +1252,10 @@ fn test_json_apply_rejects_data_root_replaced_since_capture_as_retryable_conflic
 
     let storage = JsonFileStorage::new(&data);
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let spec = CaptureSpec::new(
-        [
-            VirtualPath::data("").unwrap(),
-            VirtualPath::data("keep.txt").unwrap(),
-            VirtualPath::data("new.txt").unwrap(),
-        ],
-        budget(),
-    )
-    .unwrap();
+    let spec = publishing_spec([
+        VirtualPath::data("keep.txt").unwrap(),
+        VirtualPath::data("new.txt").unwrap(),
+    ]);
     let image = session.capture(spec).unwrap();
 
     // Externally replace the WHOLE data-root directory with a fresh inode
@@ -1406,7 +1396,7 @@ fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
     seed_memory_existing(&memory, &[(VirtualPath::data("x").unwrap(), b"v1")]);
 
     let mut session = memory.open_mutation_session(layout.clone()).unwrap();
-    let spec = CaptureSpec::new([VirtualPath::data("x").unwrap()], budget()).unwrap();
+    let spec = publishing_spec([VirtualPath::data("x").unwrap()]);
     let image = session.capture(spec).unwrap();
     let expected = ExpectedPreimage::of(image.entry(&VirtualPath::data("x").unwrap()).unwrap());
     let delta = RepositoryDelta::new(
@@ -2593,9 +2583,7 @@ fn assert_an_interrupted_publication_converges<B: SessionRecordBackend>() {
         let mut session = old
             .open_interrupted(MutationPoint::Redo(RedoPoint::BeforePut { index: 0 }))
             .unwrap();
-        let image = session
-            .capture(CaptureSpec::new([target.clone()], budget()).unwrap())
-            .unwrap();
+        let image = session.capture(publishing_spec([target.clone()])).unwrap();
         let delta = RepositoryDelta::new(
             session.layout(),
             vec![RepositoryAction::write_file(
@@ -2638,6 +2626,55 @@ fn assert_an_interrupted_publication_converges<B: SessionRecordBackend>() {
         !old.holds_record(),
         "a converged repository must leave the commit point"
     );
+}
+
+/// A publication over a present data root that appends no event is refused
+/// before its record commits: the event log's length counts every commit.
+fn assert_a_publication_without_an_event_append_is_refused<B: SessionRecordBackend>() {
+    let backend = B::seeded();
+    let note = VirtualPath::worktree("note.txt").unwrap();
+    let mut session = backend.open().unwrap();
+    let before = backend.published();
+    // The image shows no data-root entry, so the plan composes no generic event.
+    let image = session
+        .capture(CaptureSpec::new([note.clone()], budget()).unwrap())
+        .unwrap();
+    let delta = RepositoryDelta::new(
+        session.layout(),
+        vec![RepositoryAction::write_file(
+            note,
+            RepositoryActionOwner::RepositoryStateMutation,
+            ExpectedPreimage::Absent,
+            b"note".to_vec(),
+            FileMode::Regular,
+        )],
+    )
+    .unwrap();
+    let plan = test_plan(&image, &delta);
+    assert_eq!(
+        plan.publication(),
+        &delta,
+        "the publication appends nothing"
+    );
+
+    let outcome = session.apply(&plan);
+
+    assert!(
+        matches!(
+            outcome,
+            Err(RepositoryStateStoreError::RecordWithoutEventAppend)
+        ),
+        "got {outcome:?}"
+    );
+    drop(session);
+    assert_eq!(backend.published(), before, "the repository is unchanged");
+    assert!(!backend.holds_record(), "no record is left behind");
+}
+
+#[test]
+fn test_apply_refuses_a_record_without_an_event_append_on_both_backends() {
+    assert_a_publication_without_an_event_append_is_refused::<FileSessionBackend>();
+    assert_a_publication_without_an_event_append_is_refused::<MemorySessionBackend>();
 }
 
 #[test]

@@ -43,6 +43,74 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
+impl Cli {
+    /// Parse `args`, or print clap's diagnostic, after the canonical-command
+    /// hint when the rejected subcommand is a known wrong guess, and return
+    /// clap's exit status.
+    pub fn parse_or_status(args: &[String]) -> Result<Self, crate::output::RunStatus> {
+        Self::try_parse_from(args).map_err(|error| {
+            if let Some(hint) = unknown_subcommand_hint(&error, args) {
+                eprintln!("Hint: use '{hint}' instead.");
+            }
+            // Clap's own exit path ignores a failed diagnostic write too.
+            let _ = error.print();
+            crate::output::RunStatus::Passthrough(error.exit_code())
+        })
+    }
+}
+
+/// Wrong-command guess -> canonical-command hint, keyed by (group, guessed verb).
+/// Consulted only when clap rejects a subcommand, so a wrong verb prints its
+/// hint and clap's diagnostic on stderr and exits 2, outside the failure
+/// envelope. See docs/reference/cli-commands.md's "Command and flag aliases"
+/// section: these are hints, not aliases.
+const COMMAND_HINTS: &[(&str, &str, &str)] = &[
+    ("dep", "remove", "jit dep rm"),
+    ("dep", "delete", "jit dep rm"),
+    ("issue", "rm", "jit issue delete"),
+    ("issue", "remove", "jit issue delete"),
+    ("issue", "complete", "jit issue update <id> --state done"),
+    ("issue", "edit", "jit issue update <id>"),
+    ("gate", "rm", "jit gate remove"),
+    ("gate", "delete", "jit gate remove"),
+    ("doc", "rm", "jit doc remove"),
+    ("doc", "delete", "jit doc remove"),
+    (
+        "label",
+        "add",
+        "jit issue update <id> --label <namespace:value>",
+    ),
+    (
+        "label",
+        "rm",
+        "jit issue update <id> --remove-label <namespace:value>",
+    ),
+    (
+        "label",
+        "remove",
+        "jit issue update <id> --remove-label <namespace:value>",
+    ),
+    ("invariant", "list", "jit item list --kind invariant"),
+];
+
+/// The canonical command for a parser-level unknown subcommand, if the
+/// rejected command is one of the known first-guess residuals.
+fn unknown_subcommand_hint(error: &clap::Error, args: &[String]) -> Option<&'static str> {
+    if error.kind() != clap::error::ErrorKind::InvalidSubcommand {
+        return None;
+    }
+    let mut positional = args
+        .iter()
+        .skip(1)
+        .filter(|argument| !matches!(argument.as_str(), "-q" | "--quiet" | "--schema"));
+    let (group, verb) = (positional.next()?, positional.next()?);
+    COMMAND_HINTS
+        .iter()
+        .find_map(|(known_group, known_verb, hint)| {
+            (known_group == group && known_verb == verb).then_some(*hint)
+        })
+}
+
 /// Field filters shared by issue listings, searches, and query subsets.
 #[derive(Args, Default)]
 pub struct IssueFilterArgs {

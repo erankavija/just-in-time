@@ -23,7 +23,7 @@ mod tests {
         let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
         let context = MutationContext::deterministic([seed; 32], draft.started_at);
         let run_id = draft.run_id.clone();
-        let spec = CaptureSpec::new(
+        let mut spec = CaptureSpec::new(
             [
                 VirtualPath::GATE_RUNS,
                 VirtualPath::gate_run_issue_directory(&draft.issue_id),
@@ -36,6 +36,7 @@ mod tests {
             },
         )
         .unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
         let mut session = storage.open_mutation_session(layout.clone()).unwrap();
         let image = session.capture(spec).unwrap();
         let plan = finalize(

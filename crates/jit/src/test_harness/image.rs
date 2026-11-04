@@ -41,7 +41,9 @@ impl ImagePath for &str {
 ///
 /// Unless [`with_spec`](Self::with_spec) supplies one, the capture spec requests
 /// exactly what was declared, each in the read mode its answer implies, within
-/// an unbounded budget. Event-log files are reduced to their tail.
+/// an unbounded budget. Event-log files are reduced to their tail, and an
+/// undeclared event log is captured absent, as every publishing capture reads
+/// the log its plan may append to.
 #[derive(Debug)]
 pub struct ImageBuilder {
     layout: RepositoryLayout,
@@ -134,7 +136,16 @@ impl ImageBuilder {
     }
 
     /// The closed image; panics when the declarations do not close.
-    pub fn build(self) -> RepositoryImage {
+    pub fn build(mut self) -> RepositoryImage {
+        let reads_events = self
+            .spec
+            .as_ref()
+            .is_none_or(|spec| spec.contains_path(&VirtualPath::EVENTS));
+        if reads_events {
+            self.entries
+                .entry(VirtualPath::EVENTS)
+                .or_insert(RepositoryEntry::Absent);
+        }
         let spec = self
             .spec
             .unwrap_or_else(|| derived_spec(&self.entries, &self.listings, &self.pinned));

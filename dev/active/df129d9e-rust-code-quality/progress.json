@@ -963,7 +963,8 @@
     "24a982b7": 1,
     "f87f9b00": 1,
     "d58f80c9": 1,
-    "01a88d32": 1
+    "01a88d32": 1,
+    "b674382e": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1071,12 +1072,13 @@
         "24a982b7": 27,
         "f87f9b00": -114,
         "3f816619": -105,
-        "b23b1bf3": -53
+        "b23b1bf3": -53,
+        "5687e281": -175
       },
       "epic_net_running": 951,
-      "epic_net_latest": 459,
-      "merges_latest": 93,
-      "crate_main_latest": 73532,
+      "epic_net_latest": 284,
+      "merges_latest": 94,
+      "crate_main_latest": 73361,
       "file_latest": "ledger-2026-11-05.txt",
       "projected_end": "+70..+250 (ceiling +375)",
       "b697a3f7_merges": {
@@ -1442,18 +1444,22 @@
       "epic": "b697a3f7"
     },
     "5687e281": {
-      "status": "dispatched",
+      "status": "done",
       "vendor": "Claude Opus"
     },
     "da30b92a": {
-      "status": "waiting",
+      "status": "dispatched",
       "vendor": "Codex gpt-6.1-sol",
-      "reason": "Codex pre-check 2026-11-04: table already gone; worktree exec has no registered response until 5687e281 lands. Redispatch after 5687e281 for the remaining fallback removal and visible-path test."
+      "reason": "redispatch after 5687e281"
     },
     "b674382e": {
       "status": "dispatched",
       "vendor": "Codex gpt-6-luna",
       "epic": "b697a3f7"
+    },
+    "ae3f4f8b": {
+      "status": "dispatched",
+      "vendor": "Codex gpt-6-astra"
     }
   },
   "handoff": {
@@ -1521,5 +1527,14 @@
     "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)",
     "b23b1bf3": "gate_evaluate-many is the last legacy schema-table row; test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema targets it: repoint or delete with the row (or leave to da30b92a)"
   },
-  "coordination": "All other lead sessions closed by the user (6a, 2026-11-04); df129d9e lead is the only active lead. Escalations and milestone ledgers go to 6a."
+  "coordination": "All other lead sessions closed by the user (6a, 2026-11-04); df129d9e lead is the only active lead. Escalations and milestone ledgers go to 6a.",
+  "incidents": [
+    {
+      "date": "2026-11-04",
+      "issue": "c517b88b",
+      "merge": "973bb01b6",
+      "what": "cargo-ci gate suite-build link failure (undefined hidden drop_glue symbol for btree SplitResult<..PinnedTargetRead..>) with sccache in use; branch CI on the same commit passed minutes earlier",
+      "ruling": "6a: one re-evaluation with CARGO_CI_NO_SCCACHE=1 under the same locks; a repeat failure is a content verdict; a recurrence that disappears without sccache goes to 6a (would make authoritative runs sccache-free)"
+    }
+  ]
 }

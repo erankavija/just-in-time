@@ -14,8 +14,8 @@ use crate::domain::{Event, EventBody, GateRunResult, GateStatus, GateVerdictOrig
 use crate::gate_presets::{GatePresetDefinition, GateTemplate};
 use crate::repository_state::{
     serialize_gate_run, serialize_issue, CaptureBudget, CaptureSpec, ExpectedPreimage, FileMode,
-    MaterializationPlan, RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryIndex,
-    RepositoryLayout, RepositoryRootClass, VirtualPath,
+    MaterializationPlan, MutationContext, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
+    RepositoryIndex, RepositoryLayout, RepositoryRootClass, VirtualPath,
 };
 use crate::storage::{
     discover_repository_layout, AmbiguousIdError, GateRunNotFoundError, InMemoryStorage,
@@ -226,7 +226,7 @@ impl<B: Backend> Repository<B> {
         .collect();
         let delta = RepositoryDelta::new(&layout, actions).unwrap();
         session
-            .apply(&MaterializationPlan::new(&image, delta))
+            .apply(&MaterializationPlan::new(&image, delta, &MutationContext::preview()).unwrap())
             .unwrap();
     }
 }
@@ -1005,7 +1005,11 @@ fn test_apply_admits_a_plan_only_against_its_exact_image<B: Backend>() {
         max_bytes: 1024 * 1024,
         max_depth: 8,
     };
-    let spec = || CaptureSpec::new([target.clone(), evidence.clone()], budget).unwrap();
+    let spec = || {
+        let mut spec = CaptureSpec::new([target.clone(), evidence.clone()], budget).unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        spec
+    };
     let delta = RepositoryDelta::new(
         &layout,
         vec![RepositoryAction::write_file(
@@ -1023,7 +1027,8 @@ fn test_apply_admits_a_plan_only_against_its_exact_image<B: Backend>() {
         .unwrap()
         .capture(spec())
         .unwrap();
-    let plan_a = MaterializationPlan::new(&image_a, delta.clone());
+    let plan_a =
+        MaterializationPlan::new(&image_a, delta.clone(), &MutationContext::preview()).unwrap();
     assert_eq!(plan_a.image(), &image_a);
 
     repository.write(&evidence, b"image-b");
@@ -1039,10 +1044,13 @@ fn test_apply_admits_a_plan_only_against_its_exact_image<B: Backend>() {
         session.apply(&plan_a),
         Err(RepositoryStateStoreError::RetryableConflict { .. })
     ));
-    let outcome = session
-        .apply(&MaterializationPlan::new(&image_b, delta.clone()))
-        .unwrap();
-    assert_eq!(outcome.actions_applied, delta.actions().len());
+    let plan_b =
+        MaterializationPlan::new(&image_b, delta.clone(), &MutationContext::preview()).unwrap();
+    let outcome = session.apply(&plan_b).unwrap();
+    assert_eq!(
+        outcome.actions_applied,
+        plan_b.publication().actions().len()
+    );
 }
 
 /// A session recognises only the image it captured: a plan over a
@@ -1075,7 +1083,8 @@ fn test_apply_refuses_a_plan_over_a_byte_identical_image_of_another_session<B: B
         .unwrap()
         .capture(spec())
         .unwrap();
-    let foreign_plan = MaterializationPlan::new(&first_image, delta.clone());
+    let foreign_plan =
+        MaterializationPlan::new(&first_image, delta.clone(), &MutationContext::preview()).unwrap();
     assert!(foreign_plan.image().shares_data_with(&first_image));
 
     let mut session = repository.store.open_mutation_session(layout).unwrap();
@@ -1086,7 +1095,8 @@ fn test_apply_refuses_a_plan_over_a_byte_identical_image_of_another_session<B: B
         session.apply(&foreign_plan),
         Err(RepositoryStateStoreError::RetryableConflict { .. })
     ));
-    let own_plan = MaterializationPlan::new(&image, delta.clone());
+    let own_plan =
+        MaterializationPlan::new(&image, delta.clone(), &MutationContext::preview()).unwrap();
     assert_eq!(
         session.apply(&own_plan).unwrap().actions_applied,
         delta.actions().len()

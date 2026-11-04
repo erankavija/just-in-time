@@ -1,7 +1,7 @@
 //! Test-only groups proving each `command_group!` form through its own handler.
 
-use super::{registered_output_schema, CommandContext, Dispatched, HandlerResult, Outcome};
-use crate::output::{ExitCode, HumanRender, OutputMode};
+use super::{registered_output_schema, CommandContext, HandlerResult, Outcome};
+use crate::output::{ExitCode, HumanRender, OutputMode, RunStatus};
 use crate::schema::OutputSchema;
 use crate::storage::{InMemoryStorage, IssueStore};
 use crate::test_harness::TestHarness;
@@ -68,8 +68,8 @@ struct Run {
 }
 
 fn captured(
-    call: impl FnOnce(&mut Vec<u8>, &mut Vec<u8>) -> anyhow::Result<ExitCode>,
-) -> (Run, ExitCode) {
+    call: impl FnOnce(&mut Vec<u8>, &mut Vec<u8>) -> anyhow::Result<RunStatus>,
+) -> (Run, RunStatus) {
     let (mut out, mut err) = (Vec::new(), Vec::new());
     let status = call(&mut out, &mut err).unwrap();
     (
@@ -208,27 +208,6 @@ mod union {
     }
 }
 
-mod split {
-    use super::*;
-
-    pub(super) enum Command {
-        Owned,
-        Remaining(u8),
-    }
-
-    fn owned() -> HandlerResult<Echo> {
-        Ok(Outcome::from(Echo {
-            word: "owned".to_owned(),
-        }))
-    }
-
-    command_group! {
-        command: Command,
-        leaves: { "test_split_owned" => Command::Owned => owned() -> Echo },
-        unmigrated: Command::Remaining(_)
-    }
-}
-
 pub(super) fn output_schema(cmd_path: &str) -> Option<OutputSchema> {
     free::output_schema(cmd_path)
         .or_else(|| free::single_args::output_schema(cmd_path))
@@ -237,7 +216,6 @@ pub(super) fn output_schema(cmd_path: &str) -> Option<OutputSchema> {
         .or_else(|| with_executor::single_unit::output_schema(cmd_path))
         .or_else(|| concrete::output_schema(cmd_path))
         .or_else(|| union::output_schema(cmd_path))
-        .or_else(|| split::output_schema(cmd_path))
 }
 
 #[test]
@@ -256,7 +234,7 @@ fn test_executor_free_form_dispatches_with_output_mode_and_registers_schema() {
         json!({ "word": "hi", "warnings": ["careful"] })
     );
     assert!(json.err.is_empty());
-    assert_eq!(status, ExitCode::Success);
+    assert_eq!(status, ExitCode::Success.into());
     assert_eq!(human.out, "echo\nhi\n");
     assert_eq!(human.err, "Warning: careful\n");
     assert_eq!(quiet.out, "hi\n");
@@ -318,7 +296,7 @@ fn test_concrete_store_form_dispatches_over_its_named_store_and_registers_schema
         serde_json::from_str::<Value>(&run.out).unwrap(),
         json!({ "issues": 2 })
     );
-    assert_eq!(status, ExitCode::Success);
+    assert_eq!(status, ExitCode::Success.into());
     assert_eq!(
         registered_schema("test_concrete_count"),
         schema_of::<Count>()
@@ -361,27 +339,4 @@ fn test_union_leaf_emits_each_shape_and_registers_one_of_over_the_member_types()
             "description": "an Echo or a Count",
         }))
     );
-}
-
-#[test]
-fn test_unmigrated_form_handles_owned_variants_and_returns_the_rest_unchanged() {
-    let (mut out, mut err) = (Vec::new(), Vec::new());
-    let owned = split::dispatch(split::Command::Owned, mode(true, false), &mut out, &mut err);
-    let remaining = split::dispatch(
-        split::Command::Remaining(7),
-        mode(true, false),
-        &mut Vec::new(),
-        &mut Vec::new(),
-    );
-
-    assert!(matches!(owned, Ok(Dispatched::Handled(ExitCode::Success))));
-    assert_eq!(
-        serde_json::from_slice::<Value>(&out).unwrap(),
-        json!({ "word": "owned" })
-    );
-    assert!(matches!(
-        remaining,
-        Ok(Dispatched::Unhandled(split::Command::Remaining(7)))
-    ));
-    assert_eq!(registered_schema("test_split_owned"), schema_of::<Echo>());
 }

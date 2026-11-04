@@ -861,6 +861,7 @@ kind = "advisory"
     ) -> Result<MaterializationPlan, RepositoryStateError> {
         derive_materialization(
             image,
+            &MutationContext::preview(),
             match intent {
                 TestIntent::SemanticMutation => {
                     MaterializationRequest::SemanticMutation { declarations }
@@ -908,6 +909,7 @@ kind = "advisory"
             .build();
         let semantic = derive_materialization(
             &declared_image,
+            &MutationContext::preview(),
             MaterializationRequest::SemanticMutation {
                 declarations: declarations(&config, &gate_registry, &rule_set),
             },
@@ -915,6 +917,7 @@ kind = "advisory"
         .unwrap();
         let render = derive_materialization(
             &declared_image,
+            &MutationContext::preview(),
             MaterializationRequest::RenderConfiguredProjections {
                 declarations: declarations(&config, &gate_registry, &rule_set),
                 selected: None,
@@ -923,13 +926,13 @@ kind = "advisory"
         .unwrap();
         let repair = derive_materialization(
             &declared_image,
+            &MutationContext::preview(),
             MaterializationRequest::RepairDerivedState {
                 declarations: declarations(&config, &gate_registry, &rule_set),
             },
         )
         .unwrap();
 
-        let context = MutationContext::preview();
         let scaffold = InitializationScaffold::render(
             "",
             "identity-test".parse::<ProjectName>().unwrap(),
@@ -946,9 +949,9 @@ kind = "advisory"
             .build();
         let initialize = derive_materialization(
             &initialization_image,
+            &MutationContext::preview(),
             MaterializationRequest::Initialize {
                 scaffold: &scaffold,
-                context: &context,
             },
         )
         .unwrap();
@@ -981,9 +984,9 @@ kind = "advisory"
             .build();
         let apply_profile = derive_materialization(
             &profile_image,
+            &MutationContext::preview(),
             MaterializationRequest::ApplyProfileSelection {
                 profiles: std::slice::from_ref(&profile),
-                context: &context,
                 operation: crate::domain::ProfileLifecycleOperation::Apply,
             },
         )
@@ -1685,6 +1688,7 @@ kind = "advisory"
 
         let plan = derive_materialization(
             &img,
+            &MutationContext::preview(),
             MaterializationRequest::RepairDerivedState {
                 declarations: declarations(&cfg, &g, &r),
             },
@@ -1789,9 +1793,9 @@ kind = "advisory"
             .build();
         let plan = derive_materialization(
             &image,
+            &MutationContext::preview(),
             MaterializationRequest::Initialize {
                 scaffold: &scaffold,
-                context: &MutationContext::preview(),
             },
         )
         .unwrap();
@@ -1928,9 +1932,9 @@ kind = "advisory"
                     builder.entry(path, RepositoryEntry::Absent)
                 })
                 .build(),
+            &MutationContext::preview(),
             MaterializationRequest::Initialize {
                 scaffold: &scaffold,
-                context: &MutationContext::preview(),
             },
         )
         .unwrap();

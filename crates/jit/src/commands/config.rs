@@ -280,6 +280,7 @@ impl<S: IssueStore> ConfigOps<'_, S> {
         };
         let layout = self.exec.require_layout()?;
         let config_vpath = VirtualPath::CONFIG;
+        let context = super::production_mutation_context();
         with_mutation_session(self.exec.storage(), &layout, "config set", |session| {
             // Read the current config for a preservation-safe edit from the closed
             // image, so a concurrent edit is caught by the apply-time preimage check.
@@ -320,7 +321,8 @@ impl<S: IssueStore> ConfigOps<'_, S> {
                     .collect::<std::collections::BTreeMap<_, _>>(),
             )?;
             let declarations = crate::repository_state::declarations_from_image(&overlaid)?;
-            let plan = finalize_config_edit(&base, &edited_bytes, declarations.borrowed())?;
+            let plan =
+                finalize_config_edit(&base, &context, &edited_bytes, declarations.borrowed())?;
             let proposed = apply_overlay(
                 &base,
                 crate::repository_state::action_overrides(plan.delta().actions()),

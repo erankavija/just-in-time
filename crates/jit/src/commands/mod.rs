@@ -2489,12 +2489,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::finalize_repository_export;
 
+        let context = production_mutation_context();
         with_mutation_session(&self.storage, layout, "repository export", |session| {
             let Some(image) = capture_or_retry(session.capture(intent.capture_spec(budget)?))?
             else {
                 return Ok(SessionStep::Retry);
             };
-            let plan = finalize_repository_export(&image, intent)?;
+            let plan = finalize_repository_export(&image, &context, intent)?;
             Ok(SessionStep::Apply(plan, ()))
         })
     }
@@ -2520,7 +2521,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 else {
                     return Ok(SessionStep::Retry);
                 };
-                finalize_repository_export(&image, intent)?;
+                finalize_repository_export(
+                    &image,
+                    &crate::repository_state::MutationContext::preview(),
+                    intent,
+                )?;
                 Ok(SessionStep::Done(()))
             },
         )

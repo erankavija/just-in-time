@@ -31,7 +31,7 @@
     "satisfies:b697a3f7/REQ-23"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Every redo record appends an event, enforced by plan construction and storage",
-  "updated_at": "2026-11-04T16:07:52.690442265Z"
+  "updated_at": "2026-11-04T16:43:24.520743439Z"
 }

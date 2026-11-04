@@ -1,4 +1,7 @@
-use super::{HumanRender, OutputMode, WorktreeListResponse, WorktreeStoreDivergenceResponse};
+use super::{
+    HumanRender, OutputMode, WorktreeExecResponse, WorktreeListResponse,
+    WorktreeStoreDivergenceResponse,
+};
 use crate::commands::worktree::WorktreeInfo;
 
 impl HumanRender for WorktreeInfo {
@@ -65,5 +68,11 @@ impl HumanRender for WorktreeStoreDivergenceResponse {
             );
             format!("{table}\n{} divergence(s)\n", self.items.len())
         }
+    }
+}
+
+impl HumanRender for WorktreeExecResponse {
+    fn render_human(&self, _: OutputMode) -> String {
+        match *self {}
     }
 }

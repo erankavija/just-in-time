@@ -207,7 +207,7 @@ pub struct ExitCodeDoc {
 ///
 /// The classification rows derive from the typed-error classifier
 /// ([`classify`](crate::output::failure::classify)); the exception rows derive
-/// from the direct-exit sites in the CLI dispatch. The classifier's unit tests
+/// from the findings envelopes handlers return. The classifier's unit tests
 /// verify the classification rows against it, and
 /// [`CommandExitCode::code`] is verified against the global taxonomy in
 /// `schema.rs` tests, so this projection cannot silently drift from runtime
@@ -653,8 +653,8 @@ impl CommandSchema {
     /// specific to a command family, and exceptions — codes a completed run
     /// emits to signal findings, or codes whose meaning departs from the global
     /// taxonomy. Classification rows mirror the typed-error classifier
-    /// (`output::failure::classify`); exception rows mirror
-    /// the direct process-exit sites in the CLI dispatch. Both are verified by
+    /// (`output::failure::classify`); exception rows mirror the findings
+    /// envelopes handlers return. Both are verified by
     /// test rather than hand-copied (@/inv/single-source-prose).
     fn generate_command_exit_codes() -> Vec<CommandExitCode> {
         let row = |command: &str, code: i32, condition: &str, exception: bool| CommandExitCode {
@@ -960,9 +960,8 @@ impl CommandSchema {
                 false,
             ),
             // Every command reaches this if its stdout write outlives the
-            // downstream reader (`| head`, etc.): a direct process::exit site
-            // (main's panic hook + catch_unwind), not the typed-error
-            // classifier.
+            // downstream reader (`| head`, etc.): the renderers return it, not
+            // the typed-error classifier.
             row(
                 "*",
                 141,
@@ -1012,8 +1011,8 @@ pub fn render_exit_code_reference() -> String {
          `jit --schema`. Each emitted mapping is bound by a test to the runtime \
          that produces it: the shared classifier (`classify` in \
          `crates/jit/src/output/failure.rs`) for codes raised as typed errors, and the \
-         command's own `std::process::exit` site for codes a completed run emits \
-         directly (the findings signals).\n\n",
+         findings envelope a completed run reports (the findings signals). Every \
+         run exits through one exit site with its envelope's code.\n\n",
     );
 
     out.push_str("## Global taxonomy\n\n");

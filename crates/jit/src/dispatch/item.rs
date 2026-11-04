@@ -51,14 +51,14 @@ mod tests {
     use super::*;
     use crate::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use crate::output::failure::classify;
-    use crate::output::{ErrorCode, ExitCode, OutputMode};
+    use crate::output::{ErrorCode, OutputMode, RunStatus};
     use crate::storage::InMemoryStorage;
 
     fn run_with_config(
         config: &str,
         command: ItemCommands,
         json: bool,
-    ) -> anyhow::Result<ExitCode> {
+    ) -> anyhow::Result<RunStatus> {
         let executor = memory_executor_declaring(
             InMemoryStorage::new(),
             MemoryDeclarations {

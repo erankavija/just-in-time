@@ -96,7 +96,7 @@ mod tests {
         let events = printed["events"].as_array().unwrap();
         assert_eq!(printed["count"], events.len());
         assert_eq!(printed["message"], event_count_message(events.len()));
-        assert_eq!(status, ExitCode::Success);
+        assert_eq!(status, ExitCode::Success.into());
     }
 
     #[test]
