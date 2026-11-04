@@ -185,7 +185,9 @@ wire_vocabulary! {
     ///
     /// Each variant's doc states its effect; only [`Severity::Error`] (with
     /// `enforce` set) can block a write.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize, schemars::JsonSchema,
+    )]
     pub enum Severity {
         /// Rule is disabled.
         Off = "off",

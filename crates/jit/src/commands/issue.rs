@@ -176,7 +176,21 @@ fn derive_issue_deletion(
 #[derive(Debug, Clone)]
 pub struct IssueCreation {
     pub issue: Issue,
+    /// Local-rule findings, then graph-rule findings.
     pub findings: Vec<crate::validation::ReportedFinding>,
+    local_count: usize,
+}
+
+impl IssueCreation {
+    /// The local-rule and the graph-rule findings.
+    pub fn split_findings(
+        &self,
+    ) -> (
+        &[crate::validation::ReportedFinding],
+        &[crate::validation::ReportedFinding],
+    ) {
+        self.findings.split_at(self.local_count)
+    }
 }
 
 /// The issue as persisted by a mutation, with its advisory warnings.
@@ -257,11 +271,15 @@ impl<S: IssueStore> IssueOps<'_, S> {
         // (`type-hierarchy-known`), which only warns on the normal path.
         // Scoped to the explicit-type path so non-`--type` writes keep warn-only
         // behavior; runs before the write so a bad type changes nothing.
-        let (issue, findings) =
+        let (issue, findings, local_count) =
             self.exec
                 .publish_issue_creation(&context, issue, explicit_type, force)?;
 
-        Ok(IssueCreation { issue, findings })
+        Ok(IssueCreation {
+            issue,
+            findings,
+            local_count,
+        })
     }
 
     pub fn list_issues(
