@@ -23,7 +23,7 @@ use jit::cli::{
 use jit::commands::{
     parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
 };
-use jit::dispatch::{invariant, CommandContext};
+use jit::dispatch::{hooks, invariant, CommandContext};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -5505,61 +5505,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         },
-        Commands::Hooks(hooks_cmd) => match hooks_cmd {
-            jit::cli::HooksCommands::Install => {
-                use jit::commands::hooks::install_hooks;
-
-                let installed = if worktree_paths.is_git_repository() {
-                    install_hooks(&worktree_paths.common_dir)
-                } else {
-                    Err(anyhow::anyhow!(
-                        "Not in a git repository (no .git directory found)"
-                    ))
-                };
-                match installed {
-                    Ok(result) => {
-                        if json {
-                            let output = jit::output::JsonOutput::success(serde_json::json!({
-                                "hooks_dir": result.hooks_dir,
-                                "installed": result.installed,
-                                "skipped": result.skipped,
-                            }))
-                            .with_message(format!(
-                                "Installed {} hook(s) to {}",
-                                result.installed.len(),
-                                result.hooks_dir
-                            ));
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            println!("Installed hooks to: {}", result.hooks_dir);
-                            if !result.installed.is_empty() {
-                                println!("\nInstalled:");
-                                for hook in &result.installed {
-                                    println!("  {}", hook);
-                                }
-                            }
-                            if !result.skipped.is_empty() {
-                                println!("\nSkipped (already exist):");
-                                for hook in &result.skipped {
-                                    println!("  - {}", hook);
-                                }
-                            }
-                            println!("\nHooks are now active. Leases are enforced when a mutation is written, not at commit.");
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            let json_error =
-                                command_json_error(&e, jit::output::ErrorCode::HooksInstallError);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-        },
+        Commands::Hooks(command) => {
+            return hooks::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr())
+        }
         Commands::Item(item_cmd) => {
             run_item(&executor, item_cmd, mode)?;
         }

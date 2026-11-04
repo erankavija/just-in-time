@@ -823,8 +823,8 @@ confirmation = "invoked"
 path = "hooks install"
 argv = ["hooks", "install", "--json"]
 setup = ["init", "git:absent"]
-expected_failure = "HOOKS_INSTALL_ERROR: Not in a git repository (no .git directory found)"
-expected_code = "HOOKS_INSTALL_ERROR"
+expected_failure = "Not in a git repository (no .git directory found)"
+expected_code = "GENERIC_ERROR"
 confirmation = "invoked"
 
 [[arms]]

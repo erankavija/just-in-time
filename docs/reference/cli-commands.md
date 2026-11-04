@@ -3708,8 +3708,8 @@ An existing hook of the same name is left in place and reported as skipped. No
 hook checks leases; they are enforced when a mutation is written, so a hand edit
 of an issue record is not caught at commit.
 
-JSON returns `{hooks_dir, installed, skipped, message}`. A failure returns the
-error envelope with code `HOOKS_INSTALL_ERROR`.
+JSON returns `{hooks_dir, installed, skipped, message}`. Failures use the shared
+error classifier, which determines the envelope code and process exit status.
 
 Enforcement strictness is configuration, set in `.jit/config.toml`:
 

@@ -1019,6 +1019,30 @@ impl CommandSchema {
                  require git for worktree identity).",
                 false,
             ),
+            row(
+                "hooks install",
+                1,
+                "The invocation is outside a git repository, or hook installation failed without a more specific classification.",
+                false,
+            ),
+            row(
+                "hooks install",
+                3,
+                "A repository path needed to install hooks was not found.",
+                false,
+            ),
+            row(
+                "hooks install",
+                5,
+                "Filesystem permissions denied hook installation.",
+                false,
+            ),
+            row(
+                "hooks install",
+                10,
+                "A filesystem or subprocess operation needed to install hooks failed.",
+                false,
+            ),
             // Gate evaluation: the code carries the checker's verdict.
             row(
                 "gate evaluate, gate evaluate-all, gate evaluate-many",
@@ -1767,6 +1791,7 @@ mod tests {
         for command in [
             "*",
             "gate evaluate, gate evaluate-all, gate evaluate-many",
+            "hooks install",
             "validate",
         ] {
             assert!(
