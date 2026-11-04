@@ -38,7 +38,6 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `GATE_CHECK_ERROR` | A gate-status check failed. | `3` |
 | `PRESET_ERROR` | A gate-preset command failed. | `3` |
 | `ITEM_NOT_FOUND` | An issue item-address lookup did not resolve an item. | `1` |
-| `ITEM_COMMAND_FAILED` | An item command failed without a more specific classification. | `1` |
 | `INVARIANT_COMMAND_FAILED` | An invariant command failed without a more specific classification. | `1` |
 | `PROFILE_ERROR` | A profile command failed without a more specific classification. | `1` |
 | `SEARCH_FAILED` | The search backend failed while executing a query. | `1` |
