@@ -557,12 +557,50 @@ enum DerivedStateTransition {
     },
 }
 
+/// Declarations and plan content captured from one mutation image, over which
+/// the mutation evaluates graph rules at its timestamp.
+struct CapturedGraphEvidence<'a> {
+    declarations: crate::repository_state::CapturedRepositoryDeclarations,
+    plan_content: std::collections::HashMap<IssueId, String>,
+    context: &'a crate::repository_state::MutationContext,
+}
+
+impl<'a> CapturedGraphEvidence<'a> {
+    fn capture(
+        image: &crate::repository_state::RepositoryImage,
+        issues: &[Issue],
+        context: &'a crate::repository_state::MutationContext,
+    ) -> Result<Self> {
+        Ok(Self {
+            declarations: crate::repository_state::declarations_from_image(image)?,
+            plan_content: validate::plan_content_with_issues(image, issues, issues)?,
+            context,
+        })
+    }
+
+    fn evaluate_graph(
+        &self,
+        rules: &[&crate::declarations::rules::Rule],
+        issues: &[Issue],
+    ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
+        let config = self.declarations.config();
+        let namespaces = crate::config_manager::namespaces_from_config(config);
+        let hierarchy =
+            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
+        Ok(crate::validation::graph::evaluate_graph(
+            rules,
+            issues,
+            &hierarchy,
+            config.content_format(),
+            self.context.timestamp(),
+            &self.plan_content,
+        ))
+    }
+}
+
 struct CapturedTransitionEvidence<'a> {
     issues: &'a [Issue],
-    declarations: &'a crate::repository_state::CapturedRepositoryDeclarations,
-    config: &'a JitConfig,
-    plan_content: &'a std::collections::HashMap<IssueId, String>,
-    context: &'a crate::repository_state::MutationContext,
+    graph: &'a CapturedGraphEvidence<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1100,9 +1138,9 @@ struct CapturedFieldUpdateOutcome {
 fn derive_write_validation(
     issue: &Issue,
     declarations: &crate::repository_state::CapturedRepositoryDeclarations,
-    config: &JitConfig,
     force: bool,
 ) -> Result<WriteValidation> {
+    let config = declarations.config();
     let repo_format = config.content_format();
     let strictness = config.strictness();
     let evaluation = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
@@ -1118,7 +1156,7 @@ fn derive_write_validation(
         .into());
     }
     Ok(WriteValidation {
-        warnings: evaluation.warnings(),
+        warnings: evaluation.warnings().into_iter().cloned().collect(),
         bypassed_rules: blocking,
     })
 }
@@ -1131,7 +1169,6 @@ fn derive_state_transition(
     evidence: CapturedTransitionEvidence<'_>,
 ) -> Result<DerivedStateTransition> {
     use crate::declarations::rules::{RuleScope, Severity};
-    use crate::validation::graph::evaluate_graph;
     use std::collections::HashSet;
 
     let old_state = issue.state;
@@ -1175,7 +1212,7 @@ fn derive_state_transition(
                 issue.id.clone(),
                 target,
                 old_state,
-                unpassed_gate_blockers(&issue, &evidence.declarations.gates),
+                unpassed_gate_blockers(&issue, &evidence.graph.declarations.gates),
             )
             .into());
         }
@@ -1186,6 +1223,7 @@ fn derive_state_transition(
         let mut projected = issue.clone();
         projected.state = target;
         let rules = evidence
+            .graph
             .declarations
             .rules
             .rules
@@ -1222,24 +1260,13 @@ fn derive_state_transition(
                     }
                 })
                 .collect::<Vec<_>>();
-            let namespaces = crate::config_manager::namespaces_from_config(evidence.config);
-            let hierarchy =
-                crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-            let repo_format = evidence.config.content_format();
-            let strictness = evidence.config.strictness();
+            let strictness = evidence.graph.declarations.config().strictness();
             let enforcing = rules
                 .iter()
                 .filter(|rule| rule.enforce)
                 .map(|rule| rule.name.as_str())
                 .collect::<HashSet<_>>();
-            let findings = evaluate_graph(
-                &rules,
-                &slice,
-                &hierarchy,
-                repo_format,
-                evidence.context.timestamp(),
-                evidence.plan_content,
-            );
+            let findings = evidence.graph.evaluate_graph(&rules, &slice)?;
             let mut blocking = Vec::new();
             for finding in findings {
                 let config_error = finding.is_config_error();
@@ -1344,9 +1371,9 @@ fn derive_field_update(
             |(issue, staged, mut events), mutation| {
                 let applied = apply_captured_issue_mutation(
                     issue,
-                    &evidence.declarations.gates,
+                    &evidence.graph.declarations.gates,
                     mutation,
-                    evidence.context,
+                    evidence.graph.context,
                 )?;
                 events.extend(applied.events);
                 Ok::<_, anyhow::Error>((applied.issue, staged || applied.changed, events))
@@ -1394,7 +1421,7 @@ fn derive_field_update(
     let missing_gates = request
         .add_gates
         .iter()
-        .filter(|key| !evidence.declarations.gates.gates.contains_key(key))
+        .filter(|key| !evidence.graph.declarations.gates.gates.contains_key(key))
         .cloned()
         .collect::<Vec<_>>();
     if !missing_gates.is_empty() {
@@ -1464,7 +1491,7 @@ fn derive_field_update(
                 issue.id.clone(),
                 State::Done,
                 State::Gated,
-                unpassed_gate_blockers(&issue, &evidence.declarations.gates),
+                unpassed_gate_blockers(&issue, &evidence.graph.declarations.gates),
             ));
             Some(State::Gated)
         }
@@ -1477,10 +1504,10 @@ fn derive_field_update(
     }
     let validation = match (&request.label_edit, request.rejection) {
         (Some(CapturedLabelEdit::AppendUnchecked(_)), _) | (None, true) => {
-            let repo_format = evidence.config.content_format();
+            let repo_format = evidence.graph.declarations.config().content_format();
             let evaluation = crate::validation::evaluate_local(
                 &projected,
-                &evidence.declarations.rules,
+                &evidence.graph.declarations.rules,
                 repo_format,
             )
             .map_err(|error| anyhow!("rule evaluation failed: {error}"))?;
@@ -1489,7 +1516,7 @@ fn derive_field_update(
                     .findings()
                     .into_iter()
                     .filter(|finding| finding.severity != crate::declarations::rules::Severity::Off)
-                    .map(|finding| format!("[{}] {}", finding.rule, finding.message))
+                    .cloned()
                     .collect(),
                 bypassed_rules: Vec::new(),
             }
@@ -1498,18 +1525,15 @@ fn derive_field_update(
             warnings: Vec::new(),
             bypassed_rules: Vec::new(),
         },
-        (None, false) => derive_write_validation(
-            &projected,
-            evidence.declarations,
-            evidence.config,
-            request.force,
-        )?,
+        (None, false) => {
+            derive_write_validation(&projected, &evidence.graph.declarations, request.force)?
+        }
     };
     if request.issue_type.is_some() {
-        let repo_format = evidence.config.content_format();
+        let repo_format = evidence.graph.declarations.config().content_format();
         let explicit_type = crate::validation::evaluate_local(
             &projected,
-            &evidence.declarations.rules,
+            &evidence.graph.declarations.rules,
             repo_format,
         )
         .map_err(|error| anyhow!("rule evaluation failed: {error}"))?;
@@ -1522,7 +1546,11 @@ fn derive_field_update(
         }
     }
 
-    let mut warnings = validation.warnings;
+    let mut warnings = validation
+        .warnings
+        .iter()
+        .map(|finding| format!("[{}] {}", finding.rule, finding.message))
+        .collect::<Vec<_>>();
     if let Some(target) = target {
         match derive_state_transition(
             issue,
@@ -2096,9 +2124,8 @@ pub enum RedundancyPolicy {
 /// failed save never leaves a false audit entry.
 #[derive(Debug, Clone, Default)]
 pub struct WriteValidation {
-    /// Non-blocking warnings (legacy validator + local `warn`/non-enforce
-    /// findings) to surface to the caller.
-    pub warnings: Vec<String>,
+    /// Local-rule findings that do not block the write, to surface to the caller.
+    pub warnings: Vec<crate::validation::Finding>,
     /// Names of `enforce` rules whose blocking findings were overridden by
     /// `--force`. One [`EventBody::LocalRuleBypassed`] must be logged per entry,
     /// AFTER the write commits.
@@ -2501,14 +2528,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         )
     }
 
-    /// Publish `draft`, whose id `context` derived, as a new issue.
+    /// Publish `draft`, whose id `context` derived, as a new issue, with its
+    /// advisory local-rule findings and the graph-rule findings attributed to it.
     fn publish_issue_creation(
         &self,
         context: &crate::repository_state::MutationContext,
         draft: Issue,
         explicit_type: bool,
         force: bool,
-    ) -> Result<(Issue, WriteValidation)>
+    ) -> Result<(Issue, Vec<crate::validation::ReportedFinding>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -2517,7 +2545,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         with_mutation_session(&self.storage, &layout, "issue creation", |session| {
             let issue_id = draft.id.clone();
-            let Some(crate::commands::validate::MutationBase { image, .. }) = self
+            let Some(crate::commands::validate::MutationBase { image, mut issues }) = self
                 .capture_mutation_base(
                     session,
                     &[VirtualPath::ISSUES, VirtualPath::issue_record(&issue_id)],
@@ -2526,7 +2554,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            let graph = CapturedGraphEvidence::capture(&image, &issues, context)?;
+            let declarations = &graph.declarations;
             let mut final_draft = draft.clone();
             if label_utils::type_label_value(&final_draft.labels).is_none() {
                 if let Some(default_type) = declarations
@@ -2557,8 +2586,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     );
                 }
             }
-            let validation =
-                derive_write_validation(&final_draft, &declarations, declarations.config(), force)?;
+            let validation = derive_write_validation(&final_draft, declarations, force)?;
             let intents = std::iter::once(MutationIntent::CreateIssue {
                 draft: Box::new(final_draft.clone()),
             })
@@ -2576,8 +2604,24 @@ impl<S: IssueStore> CommandExecutor<S> {
             )
             .collect::<Vec<_>>();
             let created = created_issue(&final_draft, context.timestamp());
+            issues.push(created.clone());
+            let rules = declarations.rules.rules.iter().collect::<Vec<_>>();
+            let findings = validation
+                .warnings
+                .iter()
+                .chain(
+                    graph
+                        .evaluate_graph(&rules, &issues)?
+                        .iter()
+                        .filter(|finding| finding.issue_id.as_ref() == Some(&issue_id))
+                        .map(|finding| &finding.finding),
+                )
+                .map(|finding| {
+                    crate::validation::ReportedFinding::new(Some(issue_id.clone()), finding)
+                })
+                .collect();
             let plan = finalize(&layout, &image, context, &intents)?;
-            Ok(SessionStep::Apply(plan, (created, validation)))
+            Ok(SessionStep::Apply(plan, (created, findings)))
         })
     }
 
@@ -2715,18 +2759,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .find(|issue| issue.id == target)
                 .cloned()
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.clone()))?;
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
-            let config = declarations.config();
+            let graph = CapturedGraphEvidence::capture(&image, &issues, &context)?;
             let lease_warnings = if request.enforce_lease {
                 refuse_foreign_leases_held(
-                    config.enforcement_mode(),
+                    graph.declarations.config().enforcement_mode(),
                     std::slice::from_ref(&target),
                     claims_guard.as_ref(),
                 )?
             } else {
                 Vec::new()
             };
-            let plan_content = validate::plan_content_with_issues(&image, &issues, &issues)?;
             let mut effective_request = request.clone();
             effective_request.issue_id = target.clone();
             let mut derived = derive_field_update(
@@ -2734,10 +2776,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &effective_request,
                 CapturedTransitionEvidence {
                     issues: &issues,
-                    declarations: &declarations,
-                    config,
-                    plan_content: &plan_content,
-                    context: &context,
+                    graph: &graph,
                 },
             )?;
             let mut lease_warnings = lease_warnings;
@@ -3131,9 +3170,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     State::Done
                 }
             };
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
-            let config = declarations.config();
-            let plan_content = validate::plan_content_with_issues(&image, &issues, &issues)?;
+            let graph = CapturedGraphEvidence::capture(&image, &issues, &context)?;
             let (mut warnings, mut events, mut update, blocked) = if issue.state == target {
                 (Vec::new(), Vec::new(), None, None)
             } else {
@@ -3143,10 +3180,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     false,
                     CapturedTransitionEvidence {
                         issues: &issues,
-                        declarations: &declarations,
-                        config,
-                        plan_content: &plan_content,
-                        context: &context,
+                        graph: &graph,
                     },
                 )? {
                     DerivedStateTransition::Applied {
@@ -3380,8 +3414,12 @@ mod tests {
             rules,
         );
         let issues = [issue.clone()];
-        let plan_content = std::collections::HashMap::new();
         let context = production_mutation_context();
+        let graph = CapturedGraphEvidence {
+            declarations,
+            plan_content: std::collections::HashMap::new(),
+            context: &context,
+        };
 
         let error = derive_state_transition(
             issue,
@@ -3389,10 +3427,7 @@ mod tests {
             false,
             CapturedTransitionEvidence {
                 issues: &issues,
-                declarations: &declarations,
-                config: declarations.config(),
-                plan_content: &plan_content,
-                context: &context,
+                graph: &graph,
             },
         )
         .err()

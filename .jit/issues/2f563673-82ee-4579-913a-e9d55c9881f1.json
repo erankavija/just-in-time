@@ -10,6 +10,7 @@
   ],
   "description": "Store each issue's lease in its own file, published by the lease lock's apply, so reading or changing one lease reads only that file and an interruption leaves the prior or the next lease.\n\n## Background\n\n`LeaseLock` (`load`, `list`, `apply`) and the lock-free reads (`read_leases`, `read_active_leases`, `read_active_lease`) in `crates/jit/src/storage/claim_coordinator.rs` are the only access to lease state. They store every lease in `claims.index.json` under `WorktreePaths::shared_jit` (`<common-dir>/jit`, named `.git/jit` below), rebuilt from `claims.jsonl` when the lock is taken, and take each sequence number by rescanning the log (`get_next_seq`, private). The index publish has a fixed temp name and no directory sync (`write_index_atomic`). `Lease.stale` is a stored field that the rebuild computes. The atomic-write primitives `write_file_synced`, `create_file_synced` and `sync_directory` (`storage/atomic_write.rs`) are visible to the storage module. `jit recover` verifies and rebuilds the index from the log until that machinery is deleted.\n\nKept as one change for a test reason: the shared test helper and the failure-lever expectations name the store's files, so the suites stay green only if they move with the store. The failure-lever registry expects `PARSE_ERROR: Failed to parse claims index` for a malformed store (`tests/cli_issue/failure_lever_registry.toml`).\n\nThe repository format is already 4 when this lands, and the installed binary stays at format 3 until the cutover window, so machine-local leases are not read by this code until the window rewrites them.\n\n## Success Criteria\n\n- [hard] REQ-01: Each active lease is the file `.git/jit/leases/<issue-id>.json`, named by one path constructor on `WorktreePaths` built on `shared_jit`. An absent file means no lease, and `Lease.stale` no longer exists. `LeaseLock` and the lock-free reads read and write only these files, and neither reads or writes `claims.index.json` or reads `claims.jsonl`.\n- [hard] REQ-02: `apply` publishes by synced temp file, rename and directory sync (or unlink and directory sync), then takes the next number from `.git/jit/claims.seq`, then appends the operation's history lines; `get_next_seq` no longer exists. Reading or changing one issue's lease reads only that file, and only the limit check and listing read the lease directory.\n- [hard] REQ-03: `list()` and the lock-free reads treat only names of the form `<issue-id>.json` as lease records and skip every other name in the directory, such as an interrupted operation's stage file.\n- [hard] REQ-04: The shared lease test helper plants, reads and corrupts lease records, and the failure levers expect a malformed lease record to fail `claim status` and `claim list` with `PARSE_ERROR` and exit 1.\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T00:12:23.621554746Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -28,7 +29,7 @@
     "satisfies:f8a6b298/REQ-07"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Each lease is one record under the lease lock",
-  "updated_at": "2026-11-02T23:40:45.957777041Z"
+  "updated_at": "2026-11-04T00:12:23.621554746Z"
 }

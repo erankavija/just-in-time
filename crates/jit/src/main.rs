@@ -1823,7 +1823,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     // The command layer owns `--type` validation and `type:<kind>`
                     // label derivation; the CLI just forwards the typed value.
-                    let jit::commands::IssueCreation { issue, warnings } =
+                    let jit::commands::IssueCreation { issue, findings } =
                         executor.issues().create_issue(
                             title,
                             description,
@@ -1835,9 +1835,15 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             force,
                         )?;
 
-                    // Print warnings to stderr
-                    for warning in &warnings {
-                        eprintln!("Warning: {}", warning);
+                    // Local-rule findings print here; graph findings below.
+                    let rules = executor.effective_rules()?;
+                    for finding in findings.iter().filter(|finding| {
+                        !rules.rules.iter().any(|rule| {
+                            rule.name == finding.rule
+                                && rule.scope == jit::declarations::rules::RuleScope::Graph
+                        })
+                    }) {
+                        eprintln!("Warning: [{}] {}", finding.rule, finding.message);
                     }
 
                     let output_ctx = OutputContext::new(quiet, json);

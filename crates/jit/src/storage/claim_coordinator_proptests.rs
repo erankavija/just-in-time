@@ -362,13 +362,12 @@ proptest! {
         ).unwrap().0;
         let now = base + chrono::Duration::seconds(secs_since_beat as i64);
         clock.set(now);
-        let mut index = coordinator.load_claims_index().unwrap();
 
-        let lapsed = coordinator.evict_lapsed(&mut index).unwrap();
+        let lapsed = coordinator.evict_lapsed().unwrap();
 
         let stale = lease.is_stale(now);
         prop_assert_eq!(lapsed.reclaimed == 1, stale);
-        prop_assert_eq!(index.leases.is_empty(), stale);
+        prop_assert_eq!(coordinator.load_claims_index().unwrap().leases.is_empty(), stale);
     }
 }
 
