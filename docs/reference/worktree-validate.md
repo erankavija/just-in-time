@@ -339,11 +339,13 @@ behavior depends on the arguments.
   integrity checks — broken dependency references, gate references absent from
   the registry, DAG cycles, issues isolated from the dependency graph, redundant
   (transitively-reducible) edges, and record fidelity:
-  the index, issue records, gate-run results, and event log each
-  decode and reproduce what the writer would publish, and no event id appears on
+  the index, issue records, gate-run results, verdict records, archive evidence,
+  and event log each decode and reproduce what the writer would publish, and no event id appears on
   more than one line. An event log that does not parse is one finding naming its
-  line. This mode and the `repository_validation` checker are the only validation
-  readers of the event log's records. Advisory membership-vs-DAG divergences are reported but do
+  line. This mode and the `repository_validation` checker read the whole event
+  log and every gate-run record for fidelity; other validation modes do not
+  read history. See [History Files](storage-format.md#history-files) for all
+  history readers. Advisory membership-vs-DAG divergences are reported but do
   not fail the run. A built-in `repository_validation` gate runs this same
   computation and never passes where it fails; see
   [gate presets](gate-presets.md) for its `failed` and `error` runs.
@@ -444,8 +446,8 @@ its repairs complete). It signals findings by exiting non-zero:
 
 - **Declarative-rule errors** — whole-repo or per-issue.
 - **Repository-integrity failures** — a broken dependency, a DAG cycle, an
-  isolated issue, a redundant edge, or an unknown gate reference. A `--scope`
-  error finding reports the same way.
+  isolated issue, a redundant edge, an unknown gate reference, or a stored record
+  that fails fidelity checks. A `--scope` error finding reports the same way.
 - **Check failures** under `--explain`, `--branch-drift`, or `--leases`.
 
 It fails as a usage error when `--dry-run` is given without `--fix`, and on the

@@ -22,6 +22,12 @@
       "updated_at": "2026-11-04T09:14:56.742531382Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "run_id": "52e58de7-249b-44bb-a132-88ac03a8c4d0",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:21:23.187051833Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
       "run_id": "5d16d174-86d7-4635-b24b-b9963c6fb922",
       "status": "passed",
@@ -47,5 +53,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Init and apply commands move to library handlers",
-  "updated_at": "2026-11-04T09:14:56.880039052Z"
+  "updated_at": "2026-11-04T09:21:23.187051833Z"
 }

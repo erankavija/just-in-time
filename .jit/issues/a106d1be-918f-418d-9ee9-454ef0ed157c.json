@@ -20,6 +20,12 @@
       "status": "passed",
       "updated_at": "2026-11-04T09:16:19.853159467Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "d14d8997-6602-40c9-833b-16c78570cd33",
+      "status": "failed",
+      "updated_at": "2026-11-04T09:20:05.297861301Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "a106d1be-918f-418d-9ee9-454ef0ed157c",
@@ -37,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Built-in validation gate checkers select from the report",
-  "updated_at": "2026-11-04T09:16:19.853159467Z"
+  "updated_at": "2026-11-04T09:20:05.297861301Z"
 }

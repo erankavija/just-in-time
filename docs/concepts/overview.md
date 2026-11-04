@@ -96,13 +96,28 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 ├── events.jsonl               # Append-only event log
 ├── issues/                    # One JSON file per issue
 │   └── <uuid>.json            # Issue state, dependencies, gates
-├── gate-runs/                 # Recorded gate runs
+├── gate-runs/                 # Runs by issue; reusable verdicts by gate and inputs
+│   ├── <issue-id>/<run-id>.json
+│   └── verdicts/<gate-key>/<inputs-digest>.json
+├── archive-evidence/<target-key>.json  # Prior archive executions for one target
 ├── schemas/                   # JSON Schema files referenced by rules.toml
 └── tmp/                       # Scratch space; git-ignored
     └── redo.record            # A mutation in flight, applied by the next mutating command
+
+.git/jit/                      # Machine-local coordination shared across worktrees
+├── leases/<issue-id>.json     # One lease record per issue
+├── claims.seq                # Claim-history sequence counter
+├── claims.jsonl              # Claim history; no command reads it
+└── locks/claims.lock          # Serializes lease changes
 ```
 
 See [Storage Format](../reference/storage-format.md) for the authoritative layout, including per-project files.
+
+Current state is addressed by key: an issue's gate state names its latest run,
+verdict reuse looks up the gate and inputs digest, and archive operations read
+the target's evidence. Ordinary commands do not scan prior history; the
+[history-files reference](../reference/storage-format.md#history-files) names
+the history readers, including whole-repository validation.
 
 **Workflow:**
 1. **Create issues** with dependencies and gates
