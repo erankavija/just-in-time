@@ -33,7 +33,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Every registered success response is output-owned",
-  "updated_at": "2026-11-04T15:06:14.504300317Z"
+  "updated_at": "2026-11-04T16:16:18.087512120Z"
 }
