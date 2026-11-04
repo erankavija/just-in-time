@@ -24853,3 +24853,4 @@
 {"fields":["dependencies"],"id":"3ca7853e-fc26-48d5-b76f-c607805f6b3d","issue_id":"4858de06-b973-443a-b6fd-6641d8694617","timestamp":"2026-11-04T23:46:41.091894074Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"b0ca810c-fc45-41e8-ad1e-a84258a23e92","issue_id":"3a61ff16-9afb-4c7c-9583-8ce588581350","timestamp":"2026-11-04T23:46:58.379282303Z","type":"issue_updated","updated_by":"dependency-add"}
 {"id":"bc57085d-a02e-4b28-8936-73d0f6a8cae4","issue_id":"bb03df0a-65c7-496a-bb09-2620eb253fd5","new_count":24,"old_count":25,"removed_deps":["6d93ab14-4c72-4ec5-9c50-471cf0d95746"],"timestamp":"2026-11-04T23:46:58.379282303Z","type":"dependency_reduced"}
+{"gate_key":"plan-review","id":"e56f6496-07a2-4a19-b158-a960e87f0414","issue_id":"28ccf9a9-939a-40e4-9c5c-e3cee6e1c7c3","timestamp":"2026-11-04T23:54:14.716604608Z","type":"gate_passed","updated_by":"auto:executor"}
