@@ -12,6 +12,18 @@
       "doc_type": "investigation",
       "label": "Investigation",
       "path": "dev/active/0f8efc37-frontends-share-core/investigation.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "label": "Plan",
+      "path": "dev/active/0f8efc37-frontends-share-core/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "manifest",
+      "label": "Authoritative breakdown",
+      "path": "dev/active/0f8efc37-frontends-share-core/breakdown.json"
     }
   ],
   "first_ready_at": "2026-11-04T21:59:02.643703922Z",
@@ -40,5 +52,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Plan the server and web shared mechanisms",
-  "updated_at": "2026-11-04T22:02:35.505560290Z"
+  "updated_at": "2026-11-04T22:12:05.201244193Z"
 }
