@@ -1540,7 +1540,7 @@
     "to": "just-in-time-7c",
     "date": "2026-11-04"
   },
-  "lead": "just-in-time-7c (session 12)",
+  "lead": "Codex execution lead (session 13)",
   "b697a3f7_execution": {
     "ruling": "user via 6a 2026-11-04: lead executes 693a2fdd, 65aafaba, c0775a83, 19404174 and their b697a3f7 deps as b697a3f7 issues; separate ledger",
     "track_A_bulk": [
@@ -1608,5 +1608,26 @@
       "what": "cargo-ci gate suite-build link failure (undefined hidden drop_glue symbol for btree SplitResult<..PinnedTargetRead..>) with sccache in use; branch CI on the same commit passed minutes earlier",
       "ruling": "6a: one re-evaluation with CARGO_CI_NO_SCCACHE=1 under the same locks; a repeat failure is a content verdict; a recurrence that disappears without sccache goes to 6a (would make authoritative runs sccache-free)"
     }
-  ]
+  ],
+  "session_13": {
+    "phase": "critical build footprint",
+    "preference": "Simplify; prefer net negative production lines without weakening criteria",
+    "waves": [
+      [
+        "5f12265a",
+        "f855d631"
+      ],
+      [
+        "75b46be9"
+      ],
+      [
+        "b22aabce"
+      ]
+    ],
+    "models": {
+      "5f12265a": "gpt-6.1-sol high: cache generation selection and shell tests",
+      "f855d631": "gpt-6-luna high: bounded profile policy and documentation"
+    },
+    "timing_hold": "Awaiting user confirmation of cargo-pool-run fix"
+  }
 }
