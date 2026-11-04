@@ -13,7 +13,14 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "run_id": "3d5356e9-9c0e-4d3f-a17c-385c8effef1a",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:34:16.649401763Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b4ca051c-e241-45a5-b0ae-6f9016ada867",
   "labels": [
     "type:task",
@@ -28,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Issue visibility pages describe two read sources",
-  "updated_at": "2026-11-04T22:30:43.321370458Z"
+  "updated_at": "2026-11-04T22:34:16.649401763Z"
 }
