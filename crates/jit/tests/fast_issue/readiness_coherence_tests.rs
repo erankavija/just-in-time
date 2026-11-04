@@ -11,6 +11,7 @@ use jit::domain::identity::IssueId;
 use jit::domain::{queries::build_issue_map, Issue, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
+use jit::test_utils::add_reducing_edge;
 use proptest::prelude::*;
 
 /// A batch entry with the given symbolic key, title, and in-batch dependencies.
@@ -80,10 +81,7 @@ fn test_add_dependency_demotes_a_ready_dependent_and_records_the_state_change() 
     let dependent = h.create_issue("Dependent");
     assert_eq!(h.get_issue(&dependent).state, State::Ready);
 
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &upstream)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &upstream).unwrap();
 
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
     let events = h.storage.read_events().unwrap();
@@ -104,10 +102,7 @@ fn test_validate_reports_a_ready_issue_with_an_unmet_dependency_as_a_violation()
     let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &upstream)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &upstream).unwrap();
     assert!(
         h.executor.validation().validate_silent().is_ok(),
         "the coherent repository must validate"
@@ -142,10 +137,7 @@ fn test_validate_fix_demotes_a_ready_issue_that_carries_an_unmet_dependency() {
     let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &upstream)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &upstream).unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
@@ -165,10 +157,7 @@ fn test_validate_fix_records_the_repair_demotion_in_the_event_log() {
     let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &upstream)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &upstream).unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
@@ -194,10 +183,7 @@ fn test_validate_fix_dry_run_reports_the_incoherent_issue_without_repairing_it()
     let h = TestHarness::new();
     let upstream = h.create_issue("Upstream");
     let dependent = h.create_issue("Dependent");
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &upstream)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &upstream).unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
     jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
@@ -263,10 +249,7 @@ proptest! {
             // no-op by design; the property must hold over the whole sequence
             // either way.
             let _ = match edit {
-                DependencyEdit::Add { from, to } => h
-                    .executor
-                    .graph().add_dependency(&ids[from], &ids[to])
-                    .map(|_| ()),
+                DependencyEdit::Add { from, to } => add_reducing_edge(&h.executor, &ids[from], &ids[to]).map(|_| ()),
                 DependencyEdit::Remove { from, to } => h
                     .executor
                     .graph().remove_dependency(&ids[from], &ids[to])
@@ -296,14 +279,8 @@ fn test_validate_reports_and_fix_promotes_a_backlog_dependent_whose_blockers_are
     let first = h.create_issue("First blocker");
     let second = h.create_issue("Second blocker");
     let dependent = h.create_issue("Dependent");
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &first)
-        .unwrap();
-    h.executor
-        .graph()
-        .add_dependency(&dependent, &second)
-        .unwrap();
+    add_reducing_edge(&h.executor, &dependent, &first).unwrap();
+    add_reducing_edge(&h.executor, &dependent, &second).unwrap();
     assert_eq!(h.get_issue(&dependent).state, State::Backlog);
     for blocker in [&first, &second] {
         let mut closed = h.get_issue(blocker);

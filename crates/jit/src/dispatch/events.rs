@@ -14,7 +14,7 @@ fn tail<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     n: usize,
 ) -> anyhow::Result<Outcome<EventListResponse>> {
-    let events = ctx.executor.queries().tail_events(n)?;
+    let events = ctx.executor.queries().query_events(None, None, n)?;
     let message = event_count_message(events.len());
     Ok(Outcome::success_with(
         EventListResponse::new(events),

@@ -36,37 +36,6 @@ impl<S: IssueStore> QueryOps<'_, S> {
         Ok(crate::domain::queries::query_by_assignee(&issues, assignee))
     }
 
-    pub fn query_by_state(&self, state: State) -> Result<Vec<Issue>> {
-        let issues = self.exec.storage.list_issues()?;
-        Ok(crate::domain::queries::query_by_state(&issues, state))
-    }
-
-    pub fn query_by_priority(&self, priority: Priority) -> Result<Vec<Issue>> {
-        let issues = self.exec.storage.list_issues()?;
-        Ok(crate::domain::queries::query_by_priority(&issues, priority))
-    }
-
-    pub fn query_by_label(&self, pattern: &str) -> Result<Vec<Issue>> {
-        crate::labels::validate_label_pattern(pattern)?;
-        let issues = self.exec.storage.list_issues()?;
-        Ok(crate::domain::queries::query_by_label(&issues, pattern))
-    }
-
-    /// Query issues matching every given label pattern (AND-combined).
-    ///
-    /// Each pattern is validated individually with the same rules as
-    /// [`Self::query_by_label`] (the first invalid pattern's error is
-    /// returned). Matching is AND-combined: an issue is kept only when it
-    /// matches every pattern. An empty `patterns` slice matches every issue.
-    pub fn query_by_labels(&self, patterns: &[String]) -> Result<Vec<Issue>> {
-        patterns
-            .iter()
-            .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
-
-        let issues = self.exec.storage.list_issues()?;
-        Ok(crate::domain::queries::query_by_labels(&issues, patterns))
-    }
-
     pub fn query_strategic(&self) -> Result<Vec<Issue>> {
         let namespaces = self.exec.config_manager.get_namespaces()?;
 
@@ -169,7 +138,7 @@ impl<S: IssueStore> QueryOps<'_, S> {
     /// state`.
     ///
     /// Every supplied field filter narrows the bucket. Label patterns use the
-    /// same validation as [`Self::query_by_labels`].
+    /// same validation as [`Self::query_all`].
     ///
     /// # Examples
     ///

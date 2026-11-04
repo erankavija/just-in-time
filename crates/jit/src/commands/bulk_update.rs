@@ -838,7 +838,7 @@ mod tests {
         // claimed_at stamped by the bulk assignment.
         let updated = executor
             .issues()
-            .get_issue(&crate::test_utils::issue_id(
+            .show_issue(&crate::test_utils::issue_id(
                 0x5a6a549eb9fb2027b699f39d12c939a1,
             ))
             .unwrap();
@@ -866,7 +866,7 @@ mod tests {
         assert_eq!(
             executor
                 .issues()
-                .get_issue(&crate::test_utils::issue_id(
+                .show_issue(&crate::test_utils::issue_id(
                     0x5a6a549eb9fb2027b699f39d12c939a1
                 ))
                 .unwrap()
@@ -911,7 +911,7 @@ mod tests {
         // Verify issue was updated
         let updated = executor
             .issues()
-            .get_issue(&crate::test_utils::issue_id(
+            .show_issue(&crate::test_utils::issue_id(
                 0x5a6a549eb9fb2027b699f39d12c939a1,
             ))
             .unwrap();
@@ -966,7 +966,7 @@ mod tests {
         // Verify labels added
         let issue1 = executor
             .issues()
-            .get_issue(&crate::test_utils::issue_id(
+            .show_issue(&crate::test_utils::issue_id(
                 0xedeb5b73a03a451ec76b0d6a0370f495,
             ))
             .unwrap();
@@ -974,7 +974,7 @@ mod tests {
 
         let issue3 = executor
             .issues()
-            .get_issue(&crate::test_utils::issue_id(
+            .show_issue(&crate::test_utils::issue_id(
                 0xa0cb57d0ac3469f2797837c661859fa8,
             ))
             .unwrap();
@@ -1244,7 +1244,7 @@ mod tests {
         // Verify assignee set correctly
         let updated = executor
             .issues()
-            .get_issue(&crate::test_utils::issue_id(
+            .show_issue(&crate::test_utils::issue_id(
                 0xedeb5b73a03a451ec76b0d6a0370f495,
             ))
             .unwrap();
@@ -1379,7 +1379,7 @@ mod tests {
         let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let issue = bulk
             .issues()
-            .get_issue(&crate::test_utils::issue_id(0xbbbb_2222))
+            .show_issue(&crate::test_utils::issue_id(0xbbbb_2222))
             .unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
@@ -1439,7 +1439,7 @@ mod tests {
         let bulk = crate::commands::test_helpers::memory_executor(bulk_storage);
         let issue = bulk
             .issues()
-            .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+            .show_issue(&crate::test_utils::issue_id(0xaaaa_1111))
             .unwrap();
         let ops = UpdateOperations {
             state: Some(State::Done),
@@ -1514,7 +1514,7 @@ mod tests {
         // Verify labels added
         let updated = executor
             .issues()
-            .get_issue(&crate::test_utils::issue_id(
+            .show_issue(&crate::test_utils::issue_id(
                 0xedeb5b73a03a451ec76b0d6a0370f495,
             ))
             .unwrap();
@@ -2028,7 +2028,7 @@ mod tests {
         let direct = crate::commands::test_helpers::memory_executor(direct_storage);
         let issue = direct
             .issues()
-            .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+            .show_issue(&crate::test_utils::issue_id(0xaaaa_1111))
             .unwrap();
         let direct_error = direct
             .issues()
@@ -2038,7 +2038,7 @@ mod tests {
             .expect("direct per-issue path reports a typed transition blocker");
         let direct_final_state = direct
             .issues()
-            .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+            .show_issue(&crate::test_utils::issue_id(0xaaaa_1111))
             .unwrap()
             .state;
         assert_eq!(
@@ -2068,7 +2068,7 @@ mod tests {
         assert_eq!(result.errors[0].1, direct_error.to_string());
         assert_eq!(
             bulk.issues()
-                .get_issue(&crate::test_utils::issue_id(0xaaaa_1111))
+                .show_issue(&crate::test_utils::issue_id(0xaaaa_1111))
                 .unwrap()
                 .state,
             direct_final_state,
@@ -2147,7 +2147,7 @@ mod tests {
         assert_eq!(
             executor
                 .issues()
-                .get_issue(&crate::test_utils::issue_id(
+                .show_issue(&crate::test_utils::issue_id(
                     0xda63513d8380c6478f7f4e3c47a3b00c
                 ))
                 .unwrap()
@@ -2157,7 +2157,7 @@ mod tests {
         assert_eq!(
             executor
                 .issues()
-                .get_issue(&crate::test_utils::issue_id(
+                .show_issue(&crate::test_utils::issue_id(
                     0xfd4e5e37a828861d13bc00c5f491534f
                 ))
                 .unwrap()
@@ -2231,7 +2231,7 @@ mod tests {
         assert_eq!(
             executor
                 .issues()
-                .get_issue(&crate::test_utils::issue_id(
+                .show_issue(&crate::test_utils::issue_id(
                     0xda63513d8380c6478f7f4e3c47a3b00c
                 ))
                 .unwrap()

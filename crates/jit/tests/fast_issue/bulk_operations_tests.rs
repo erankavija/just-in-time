@@ -2,6 +2,7 @@
 use jit::declarations::GateMode;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
+use jit::test_utils::add_reducing_edge;
 use jit::test_utils::issue_id;
 
 // ========================================
@@ -259,7 +260,11 @@ fn test_add_multiple_dependencies() {
     let result = h
         .executor
         .graph()
-        .add_dependencies(&from, &[to1.clone(), to2.clone(), to3.clone()])
+        .add_dependencies_with_policy(
+            &from,
+            &[to1.clone(), to2.clone(), to3.clone()],
+            jit::commands::RedundancyPolicy::Reduce,
+        )
         .unwrap();
 
     assert_eq!(result.added.len(), 3);
@@ -279,13 +284,17 @@ fn test_add_dependencies_some_already_exist() {
     let to2 = h.create_issue("Dep 2");
 
     // Add one dependency first
-    h.executor.graph().add_dependency(&from, &to1).unwrap();
+    add_reducing_edge(&h.executor, &from, &to1).unwrap();
 
     // Try to add to1 again plus to2
     let result = h
         .executor
         .graph()
-        .add_dependencies(&from, &[to1.clone(), to2.clone()])
+        .add_dependencies_with_policy(
+            &from,
+            &[to1.clone(), to2.clone()],
+            jit::commands::RedundancyPolicy::Reduce,
+        )
         .unwrap();
 
     assert_eq!(result.added.len(), 1); // to2
@@ -302,10 +311,11 @@ fn test_add_dependencies_atomic_failure_nonexistent() {
     let to1 = h.create_issue("Dep 1");
     let absent = issue_id(1);
 
-    let result = h
-        .executor
-        .graph()
-        .add_dependencies(&from, &[to1.clone(), absent.clone()]);
+    let result = h.executor.graph().add_dependencies_with_policy(
+        &from,
+        &[to1.clone(), absent.clone()],
+        jit::commands::RedundancyPolicy::Reduce,
+    );
 
     let err = result.expect_err("an unresolvable target must fail the whole batch");
     let batch = err
@@ -327,10 +337,7 @@ fn test_add_single_dependency_still_works() {
     let from = h.create_issue("Parent");
     let to = h.create_issue("Dep");
 
-    h.executor
-        .graph()
-        .add_dependencies(&from, std::slice::from_ref(&to))
-        .unwrap();
+    add_reducing_edge(&h.executor, &from, &to).unwrap();
 
     let loaded = h.storage.load_issue(&from).unwrap();
     assert_eq!(loaded.dependencies.len(), 1);
@@ -348,7 +355,11 @@ fn test_remove_multiple_dependencies() {
     // Add three dependencies
     h.executor
         .graph()
-        .add_dependencies(&from, &[to1.clone(), to2.clone(), to3.clone()])
+        .add_dependencies_with_policy(
+            &from,
+            &[to1.clone(), to2.clone(), to3.clone()],
+            jit::commands::RedundancyPolicy::Reduce,
+        )
         .unwrap();
 
     // Remove two
@@ -369,10 +380,7 @@ fn test_remove_dependencies_some_not_present() {
     let to1 = h.create_issue("Dep 1");
     let to2 = h.create_issue("Dep 2");
 
-    h.executor
-        .graph()
-        .add_dependencies(&from, std::slice::from_ref(&to1))
-        .unwrap();
+    add_reducing_edge(&h.executor, &from, &to1).unwrap();
 
     let result = h
         .executor
@@ -403,7 +411,11 @@ fn test_add_dependencies_empty_list_error() {
     let h = TestHarness::new();
     let issue_id = h.create_issue("Test Issue");
 
-    let result = h.executor.graph().add_dependencies(&issue_id, &[]);
+    let result = h.executor.graph().add_dependencies_with_policy(
+        &issue_id,
+        &[],
+        jit::commands::RedundancyPolicy::Reduce,
+    );
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("at least one"));
 }

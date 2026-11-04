@@ -15,6 +15,7 @@ use jit::domain::identity::IssueId;
 use jit::domain::{Priority, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
+use jit::test_utils::add_reducing_edge;
 use jit::test_utils::toml_string_array;
 
 const CONFIG_TOML: &str = r#"
@@ -174,13 +175,13 @@ fn build_scenario(h: &TestHarness) -> Scenario {
 
     // E → {c1, c2, B}; children → B; B → P; c1 → ext (boundary); E2 → ext.
     for dep in [&c1, &c2, &b] {
-        h.executor.graph().add_dependency(&e, dep).unwrap();
+        add_reducing_edge(&h.executor, &e, dep).unwrap();
     }
-    h.executor.graph().add_dependency(&c1, &b).unwrap();
-    h.executor.graph().add_dependency(&c2, &b).unwrap();
-    h.executor.graph().add_dependency(&b, &p).unwrap();
-    h.executor.graph().add_dependency(&c1, &ext).unwrap();
-    h.executor.graph().add_dependency(&e2, &ext).unwrap();
+    add_reducing_edge(&h.executor, &c1, &b).unwrap();
+    add_reducing_edge(&h.executor, &c2, &b).unwrap();
+    add_reducing_edge(&h.executor, &b, &p).unwrap();
+    add_reducing_edge(&h.executor, &c1, &ext).unwrap();
+    add_reducing_edge(&h.executor, &e2, &ext).unwrap();
 
     Scenario {
         e,
