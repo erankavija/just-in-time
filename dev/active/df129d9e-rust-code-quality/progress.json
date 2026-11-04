@@ -1625,7 +1625,7 @@
     "0eca332a": {
       "status": "in_progress",
       "model": "gpt-6.1-sol high",
-      "note": "Prepared audit:8dead error variants and fallback helper removal; source starts after487 merged validation"
+      "note": "Prepared6b563b365, branch refreshed with retirement/f35; pending source slot afterGit4ba anddb094"
     },
     "1002524a": {
       "status": "done"
@@ -1665,7 +1665,7 @@
     },
     "487f45a9": {
       "status": "in_progress",
-      "note": "b0c51b0e7 core landed; main Rust gate passed; independent review running; obsolete MCP scope/gate removed by authorized retirement",
+      "note": "Core landed; docs reworkb72bd9aaa refreshed; pending source slot",
       "production_delta": -1,
       "review": {
         "verdict": "FAIL",
@@ -1738,7 +1738,8 @@
       "status": "done"
     },
     "c06daf50": {
-      "status": "ready"
+      "status": "in_progress",
+      "note": "Complete preparatory audit found global-option hint placement defect; isolated Sol repair and approved active-plan prose correction underway"
     },
     "d05b5639": {
       "status": "done"
@@ -1762,19 +1763,20 @@
       "status": "done"
     },
     "f35c86de": {
-      "status": "in_progress",
+      "status": "done",
+      "production_delta": -3,
       "review": {
-        "verdict": "FAIL",
-        "gates": "cargo-ci passed; code-review F1 blocking",
+        "verdict": "PASS",
+        "gates": "cargo-ci5040tests25doctests; independent code-review passed zero findings",
+        "prior_findings": "R1F1 CLOSED: commands/mod.rs:2858 storage private; commands/dependency.rs:67/101 owns requested batches;commands/worktree.rs:52 owns operations; dispatch has no production storage calls; policy test:286",
         "criteria": {
-          "REQ-01": "surface structural test passes",
-          "REQ-02": "UNMET: direct storage calls remain in dispatch",
-          "REQ-03": "existing5038tests25doctests pass"
+          "REQ-01": "constructors/family facades only; existing structural policy passes",
+          "REQ-02": "all43 prior bypasses moved behind existing command owners",
+          "REQ-03": "unchanged behavioral assertions; full merged suite passed"
         },
-        "prior_findings": "first review; F1 open",
-        "stale_narrative": "historical planning references retained as history",
-        "deferred_items": "no linked design documents",
-        "holistic": "repair dispatch storage bypasses at existing command owners; preserve criteria"
+        "stale_narrative": "no stale implementation promise in issue surfaces; active epic plan corrections tracked in c06 repair",
+        "deferred_items": "no linked docs; no in-scope deferred surface",
+        "holistic": "worktree implementations moved, not duplicated; command result ownership guard retained"
       }
     },
     "f487aeef": {
@@ -1933,7 +1935,7 @@
     "open_decisions": []
   },
   "session_14": {
-    "status": "Awaiting steward priority retirement landing; all prepared branches retained; no bypassed gates",
+    "status": "f35 done; source handed toGit4ba then context repairdb094;0eca/487docs prepared;c06 bounded repair underway",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
@@ -1958,7 +1960,7 @@
       "integration_targets": 3,
       "production_delta": 0
     },
-    "production_net": "Corrected default-mode ledger: inherited+171,fb38+37,487\u22121,build0 = current+207. Prepared f35\u22123 and0eca\u221241 would yield+163; this session core net\u22128, plus8server lines removed.",
+    "production_net": "Default-mode ledger: inherited+171,fb38+37,487\u22121,f35\u22123,build0 = current+204. Prepared0eca\u221241 yields+163; this session core net\u22128, plus8server lines removed.",
     "prepared_branches": {
       "f35c86de": {
         "commit": "c5b146e02",
@@ -1978,6 +1980,14 @@
         "scope": "current Git requirement docs consistent withD24; targeted links pass"
       }
     },
-    "count_correction": "487 worker\u221217 used optional flags; default committedb0c51b0e7 is73630 vs e47a08419 73631, therefore\u22121. All final counts use noflags."
+    "count_correction": "487 worker\u221217 used optional flags; default committedb0c51b0e7 is73630 vs e47a08419 73631, therefore\u22121. All final counts use noflags.",
+    "f35c86de": {
+      "merge": "6d9a1ed76",
+      "status": "done",
+      "tests": 5040,
+      "doctests": 25,
+      "production_delta": -3
+    },
+    "scope_reconciliation": "0546 Background/REQ01 corrected1428a996a per steward to existingD04/9529 warnings contract; active plan correction approved withc06"
   }
 }

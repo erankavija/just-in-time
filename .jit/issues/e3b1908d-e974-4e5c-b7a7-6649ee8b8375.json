@@ -18,9 +18,6 @@
   "id": "e3b1908d-e974-4e5c-b7a7-6649ee8b8375",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-gate-runs",
     "component:docs",
     "per:@/charter/D-19",
     "enforces:@/invariant/single-source-prose",
@@ -30,5 +27,5 @@
   "priority": "normal",
   "state": "rejected",
   "title": "Gate-run layout prose describes per-issue records",
-  "updated_at": "2026-11-02T23:41:48.659335090Z"
+  "updated_at": "2026-11-04T22:42:45.760948401Z"
 }
