@@ -471,7 +471,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         &self,
         issue: Option<&IssueIdPrefix>,
         agent_id: Option<&str>,
-    ) -> Result<Vec<Lease>> {
+    ) -> Result<Vec<ListedLease>> {
         let paths = self.exec.require_worktree_paths()?;
         use crate::agent_config::resolve_agent_id;
 
@@ -488,25 +488,34 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     }
 }
 
+/// A lease as `claim list` and `claim status` report it.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct ListedLease {
+    #[serde(flatten)]
+    pub lease: Lease,
+    /// Whether the lease was stale ([`Lease::is_stale`]) when it was read.
+    pub stale: bool,
+}
+
 /// Unexpired leases matching the filters, most recently acquired first, read
 /// without the claims lock. A stale lease is kept and marked stale as of now.
 fn unexpired_leases(
     paths: &WorktreePaths,
     issue: Option<&IssueIdPrefix>,
     agent_id: Option<&str>,
-) -> Result<Vec<Lease>> {
+) -> Result<Vec<ListedLease>> {
     let now = chrono::Utc::now();
     let mut leases = read_leases(paths)?
         .into_iter()
         .filter(|lease| !lease.is_expired(now))
-        .map(|lease| Lease {
-            stale: lease.is_stale(now),
-            ..lease
-        })
         .filter(|lease| issue.is_none_or(|issue| issue.matches(&lease.issue_id)))
         .filter(|lease| agent_id.is_none_or(|agent| lease.agent_id.to_string() == agent))
+        .map(|lease| ListedLease {
+            stale: lease.is_stale(now),
+            lease,
+        })
         .collect::<Vec<_>>();
-    leases.sort_by_key(|lease| std::cmp::Reverse(lease.acquired_at));
+    leases.sort_by_key(|listed| std::cmp::Reverse(listed.lease.acquired_at));
     Ok(leases)
 }
 
@@ -518,7 +527,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     ///
     /// The selected worktree is not a git checkout with a commit, or the leases
     /// cannot be read.
-    pub fn list(&self) -> Result<Vec<Lease>> {
+    pub fn list(&self) -> Result<Vec<ListedLease>> {
         let paths = self.exec.require_worktree_paths()?;
         // Claims require git (`@/charter/D-4`).
         get_current_branch(&paths.worktree_root)?;
@@ -969,11 +978,14 @@ mod tests {
         issue_id: Option<&crate::domain::identity::IssueId>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
-        unexpired_leases(
+        Ok(unexpired_leases(
             &create_test_paths(temp),
             issue_id.map(IssueIdPrefix::from).as_ref(),
             agent_id,
-        )
+        )?
+        .into_iter()
+        .map(|listed| listed.lease)
+        .collect())
     }
 
     /// Seed an exact identifier precondition for short-id collision tests.
@@ -1639,7 +1651,10 @@ mod tests {
 
     /// The leases `jit claim list` reports.
     fn execute_claim_list_test(temp: &TempDir) -> Result<Vec<Lease>> {
-        unexpired_leases(&create_test_paths(temp), None, None)
+        Ok(unexpired_leases(&create_test_paths(temp), None, None)?
+            .into_iter()
+            .map(|listed| listed.lease)
+            .collect())
     }
 
     #[test]
@@ -1693,9 +1708,9 @@ mod tests {
                 .claims()
                 .status(Some(&IssueIdPrefix::from(issue_id)), None)
         };
-        let marked = Lease {
+        let marked = ListedLease {
+            lease: stale,
             stale: true,
-            ..stale
         };
 
         let listed = executor.claims().list()?;

@@ -24,9 +24,6 @@ pub const REPO_WRITE_LOCK_FILE: &str = ".repo-write.lock";
 /// The data root's index lock.
 pub const INDEX_LOCK_FILE: &str = ".index.lock";
 
-/// The data root's gate-registry lock.
-pub const GATES_LOCK_FILE: &str = ".gates.lock";
-
 /// The data root's event-log lock.
 pub const EVENTS_LOCK_FILE: &str = ".events.lock";
 
@@ -672,7 +669,6 @@ impl RepositoryLayout {
             .chain([
                 REPO_WRITE_LOCK_FILE,
                 INDEX_LOCK_FILE,
-                GATES_LOCK_FILE,
                 EVENTS_LOCK_FILE,
                 RECORD_SCRATCH_DIR,
                 worktree_identity.relative().as_str(),

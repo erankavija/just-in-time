@@ -152,8 +152,7 @@ pub use overlay::{action_overrides, apply_overlay, OverlayError};
 pub use path::{
     repository_relative_path, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath, BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE,
-    GATES_LOCK_FILE, GATE_RUN_RECORD_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR,
-    REPO_WRITE_LOCK_FILE,
+    GATE_RUN_RECORD_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
 };
 pub use profile_apply::{
     compose_resolved_contributions, CompleteProjectionConfig, ComposedContribution, Contribution,

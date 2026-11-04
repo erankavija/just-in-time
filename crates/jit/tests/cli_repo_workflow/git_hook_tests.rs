@@ -107,10 +107,8 @@ fn test_land_sync_commit_passes_the_real_hook_with_others_records_and_a_closed_o
     let mut contents = std::fs::read_to_string(&config).unwrap();
     contents.push_str("\n[worktree]\nenforce_leases = \"strict\"\n");
     std::fs::write(&config, contents).unwrap();
-    let others = cli
-        .create_issue(["--title", "Other's", "--orphan"])
-        .unwrap();
-    let own = cli.create_issue(["--title", "Own", "--orphan"]).unwrap();
+    let others = cli.create_issue(["--title", "Other's"]).unwrap();
+    let own = cli.create_issue(["--title", "Own"]).unwrap();
     cli.commit("base").unwrap();
     cli.git(["checkout", "-q", "-b", "side"]).unwrap();
     std::fs::write(cli.root().join("side.txt"), "side\n").unwrap();

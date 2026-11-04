@@ -52,7 +52,7 @@ redo record. Initialization writes it and `jit validate --fix` restores it,
 each preserving every line outside that region, and the repository's root
 ignore file is neither read nor written. The store's fixed lock set under
 `.jit/` is
-`.repo-write.lock`, `.index.lock`, `.gates.lock`, and `.events.lock`; it is
+`.repo-write.lock`, `.index.lock` and `.events.lock`; it is
 independent of the number of issues. The repository-sibling
 `.jit-bootstrap.lock` and the `.git/jit/locks/claims.lock` control-plane lock
 complete the fixed set, and each checkout over a data root outside every
@@ -380,9 +380,11 @@ per-worktree lease store.
 
 ```
 .git/jit/
-├── claims.jsonl         # Append-only audit log of claim operations
-├── claims.index.json    # Stored leases, read and changed by claim operations
-└── locks/               # Advisory lock files guarding claim-log operations
+├── leases/
+│   └── {issue-id}.json  # The issue's lease; absent when it has none
+├── claims.seq           # The last claim-log sequence number
+├── claims.jsonl         # Append-only history of claim operations
+└── locks/               # Advisory lock files guarding lease changes
     └── claims.lock
 ```
 
@@ -391,20 +393,25 @@ A lease names its holder's `worktree_id`, which
 files can sit in this directory over a data root outside every checkout, and are
 separate from the claims state.
 
-- **`claims.jsonl`**: an append-only, newline-delimited log of claim
+- **`leases/{issue-id}.json`**: the issue's lease. Each record carries
+  `lease_id`, `issue_id`, `agent_id`, `worktree_id`, `branch`, `ttl_secs`,
+  `acquired_at`, `expires_at`, and `last_beat`. A `ttl_secs` of `0` marks an
+  indefinite lease, kept alive by `jit claim heartbeat` updating `last_beat`.
+  Claim operations change a record under `locks/claims.lock` by writing a
+  synced stage file, renaming it over the record and syncing the directory, or
+  by unlinking it; that rename or unlink commits the change. Other names in
+  `leases/`, such as an interrupted operation's stage file, are not leases.
+  `jit claim list` and `status` read the records without the lock.
+- **`claims.seq`**: the last sequence number handed to `claims.jsonl`, as a
+  decimal integer, advanced after each committed change.
+- **`claims.jsonl`**: an append-only, newline-delimited history of claim
   operations (`Acquire`, `Renew`, `Heartbeat`, `Release`, `AutoEvict`,
   `ForceEvict`, and `Reclaim`, recorded when `jit recover` removes a stale
-  indefinite lease), each entry carrying a monotonic `seq` for total ordering.
-- **`claims.index.json`**: the stored leases. Claim operations read and
-  atomically replace it under `locks/claims.lock` and append their records to
-  `claims.jsonl` after it; `jit claim list` and `status` read it without the
-  lock. `jit recover` rebuilds it from `claims.jsonl` when it is corrupt. Each lease record carries `lease_id`, `issue_id`, `agent_id`,
-  `worktree_id`, `branch`, `ttl_secs`, `acquired_at`, `expires_at`,
-  `last_beat`, and `stale`. A `ttl_secs` of `0` marks an indefinite lease,
-  kept alive by a `Heartbeat` log operation that updates `last_beat` in this
-  index; `jit claim heartbeat` does not write a per-agent heartbeat file.
-- **`locks/claims.lock`**: an advisory file lock guarding atomic reads and
-  appends against `claims.jsonl` and `claims.index.json`.
+  indefinite lease), each entry carrying its `seq`. An operation appends its
+  lines in one write after advancing `claims.seq`, so an interruption loses at
+  most that operation's history lines and never a lease. No lease read or
+  change reads it.
+- **`locks/claims.lock`**: an advisory file lock serializing lease changes.
 
 `jit claim` command usage (acquire, release, renew, heartbeat, status, list,
 force-evict) is documented in the [Claim reference](claim.md).

@@ -664,10 +664,6 @@ pub enum IssueCommands {
         /// Bypass validation warnings
         #[arg(long)]
         force: bool,
-
-        /// Explicitly allow orphaned leaf issues (tasks without parent labels)
-        #[arg(long)]
-        orphan: bool,
     },
 
     /// Batch-create issues with dependency wiring from a JSON file.

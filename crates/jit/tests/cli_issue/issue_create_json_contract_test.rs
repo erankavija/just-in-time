@@ -6,6 +6,7 @@
 //!   `exit_code`), not the legacy `gates_required`/`gates_status` map
 //! - `dependencies` is an array of enriched objects, not raw ID strings
 //! - `labels` is a JSON array
+//! - `findings` carries the findings creation returned
 
 use jit::test_cli::JitCli;
 
@@ -144,4 +145,44 @@ fn test_issue_create_json_labels_is_array() {
         labels.iter().any(|l| l == "type:task"),
         "label added at create time must appear in create --json output"
     );
+}
+
+#[test]
+fn test_issue_create_forced_reports_same_findings_in_json_and_human_output() {
+    let jit::test_taxonomy::TaxonomyRepo { temp, taxonomy } =
+        jit::test_taxonomy::setup_test_repo_with_taxonomy();
+    std::fs::write(
+        temp.path().join(".jit/rules.toml"),
+        "[[rules]]\nname = \"orphan-leaf\"\nseverity = \"warn\"\n\
+         assert = { type-hierarchy = { kind = \"orphan-leaf\" } }\n",
+    )
+    .unwrap();
+    let repo = JitCli::with_repository(temp);
+    let leaf = jit::test_taxonomy::type_label(&taxonomy, 4);
+    let args = ["issue", "create", "-t", "Leaf", "--label", &leaf, "--force"];
+
+    let json = repo.run_json(args).unwrap();
+    let human = repo.command(args).output().unwrap();
+
+    let findings = json["findings"]
+        .as_array()
+        .filter(|findings| !findings.is_empty())
+        .unwrap_or_else(|| panic!("create --json must report findings; got: {json}"));
+    let human_stdout = String::from_utf8_lossy(&human.stdout);
+    let human_id = human_stdout
+        .trim()
+        .strip_prefix("Created issue: ")
+        .unwrap_or_else(|| panic!("human create prints the id; got: {human_stdout}"));
+    let human_stderr = String::from_utf8_lossy(&human.stderr);
+    for finding in findings {
+        let expected = finding["message"]
+            .as_str()
+            .unwrap()
+            .replace(json["id"].as_str().unwrap(), human_id)
+            .replace(json["short_id"].as_str().unwrap(), &human_id[..8]);
+        assert!(
+            human_stderr.contains(&expected),
+            "human create must print the finding {expected:?}; got: {human_stderr}"
+        );
+    }
 }

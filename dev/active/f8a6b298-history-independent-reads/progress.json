@@ -614,6 +614,12 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "per-issue lease records + claims.seq; concurrency-critical, format-4 layout"
+    },
+    {
+      "id": "b33ed7eb",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path verdict record writes; Claude pauses cleanly on the host hold"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",

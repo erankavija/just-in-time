@@ -576,8 +576,7 @@ mod tests {
     use super::*;
     use crate::repository_state::{
         RepositoryLayout, RepositoryRootEvidence, VirtualPath, BOOTSTRAP_LOCK_FILE,
-        EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR,
-        REPO_WRITE_LOCK_FILE,
+        EVENTS_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE,
     };
     use crate::test_utils::{document_reference, document_reference_typed};
     use std::collections::HashMap;
@@ -1032,13 +1031,8 @@ mod tests {
             .iter()
             .map(|path| layout.resolve(path).expect("a resolvable record"))
             .chain(
-                [
-                    REPO_WRITE_LOCK_FILE,
-                    INDEX_LOCK_FILE,
-                    GATES_LOCK_FILE,
-                    EVENTS_LOCK_FILE,
-                ]
-                .map(|file| layout.data_root().join(file)),
+                [REPO_WRITE_LOCK_FILE, INDEX_LOCK_FILE, EVENTS_LOCK_FILE]
+                    .map(|file| layout.data_root().join(file)),
             )
             .chain(std::iter::once(
                 layout

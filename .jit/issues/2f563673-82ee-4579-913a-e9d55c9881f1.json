@@ -16,7 +16,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "730d4d46-8351-40bc-92cb-bc0b2c824b16",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:38:25.410822237Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2f563673-82ee-4579-913a-e9d55c9881f1",
   "labels": [
     "type:task",
@@ -32,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Each lease is one record under the lease lock",
-  "updated_at": "2026-11-04T00:13:08.188325115Z"
+  "updated_at": "2026-11-04T00:38:25.410822237Z"
 }

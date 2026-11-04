@@ -6,8 +6,8 @@
 //! # Design
 //!
 //! - Uses exclusive file locks (`fs4` crate) for atomicity
-//! - Claims stored in append-only JSONL log for audit trail
-//! - The claims index stores the leases; claim operations change it under the lock
+//! - Each issue's lease is one record under `leases/`, changed only under the lock
+//! - Claim operations append their history to `claims.jsonl`, which no command reads
 //! - Monotonic time semantics for expiration (immune to NTP)
 //!
 //! See design doc: `dev/archive/ad601a15-parallel-work/design/worktree-parallel-work.md` - "Claim Acquisition Algorithm"
@@ -19,6 +19,7 @@ use chrono::{DateTime, Duration, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::path::Path;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -51,9 +52,6 @@ pub struct Lease {
     pub expires_at: Option<DateTime<Utc>>,
     /// Last heartbeat timestamp (for indefinite leases)
     pub last_beat: DateTime<Utc>,
-    /// Whether the lease is stale (computed during index rebuild for TTL=0 leases)
-    #[serde(default)]
-    pub stale: bool,
 }
 
 fn deserialize_agent_id<'de, D>(deserializer: D) -> std::result::Result<Assignee, D::Error>
@@ -152,7 +150,8 @@ pub struct ClaimLogEntry {
     pub operation: ClaimOp,
 }
 
-/// Index of active leases (derived from log)
+/// The claims-log replay `jit recover` verifies and rebuilds; no lease read or
+/// change consults it.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ClaimsIndex {
     /// Schema version
@@ -196,7 +195,6 @@ impl ClaimAcquireLimits {
 
 impl ClaimsIndex {
     /// Load the stored index without locking, returning an empty index if absent.
-    /// Lease readers use [`read_leases`] or its active variants.
     pub fn load(paths: &WorktreePaths) -> Result<ClaimsIndex> {
         let index_path = paths.shared_jit.join("claims.index.json");
 
@@ -227,33 +225,12 @@ impl ClaimsIndex {
             .map(|&missing| StorageWarning::SequenceGap { missing })
             .collect()
     }
-
-    /// Find active lease for an issue
-    pub fn find_lease(&self, issue_id: &IssueId) -> Option<&Lease> {
-        self.leases.iter().find(|l| &l.issue_id == issue_id)
-    }
-
-    /// Add a lease to the index
-    pub fn add_lease(&mut self, lease: Lease) {
-        // Remove any existing lease for this issue
-        self.leases.retain(|l| l.issue_id != lease.issue_id);
-        self.leases.push(lease);
-    }
-
-    /// Remove a lease from the index
-    pub fn remove_lease(&mut self, lease_id: &LeaseId) {
-        self.leases.retain(|l| &l.lease_id != lease_id);
-    }
-
-    /// Find a lease by lease_id
-    pub fn find_lease_by_id(&self, lease_id: &LeaseId) -> Option<&Lease> {
-        self.leases.iter().find(|l| &l.lease_id == lease_id)
-    }
 }
 
-/// Read every stored lease without locking or evicting, including inactive leases.
+/// Read every stored lease without locking or evicting, including inactive
+/// leases, ordered by issue.
 pub fn read_leases(paths: &WorktreePaths) -> Result<Vec<Lease>> {
-    Ok(ClaimsIndex::load(paths)?.leases)
+    read_lease_records(&paths.shared_jit)
 }
 
 /// Read active leases without locking or evicting.
@@ -270,9 +247,55 @@ pub fn read_active_lease(
     issue_id: &IssueId,
     now: DateTime<Utc>,
 ) -> Result<Option<Lease>> {
-    Ok(read_leases(paths)?
-        .into_iter()
-        .find(|lease| &lease.issue_id == issue_id && lease.is_active(now)))
+    Ok(read_lease_record(&paths.shared_jit, issue_id)?.filter(|lease| lease.is_active(now)))
+}
+
+/// The issue's lease record, or `None` when it has none.
+fn read_lease_record(shared_jit: &Path, issue_id: &IssueId) -> Result<Option<Lease>> {
+    let path = WorktreePaths::lease_path(shared_jit, issue_id);
+    let bytes = match fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("Failed to read lease record at {}", path.display()))
+        }
+    };
+    let lease: Lease = serde_json::from_slice(&bytes)
+        .with_context(|| format!("Failed to parse lease record at {}", path.display()))?;
+    if &lease.issue_id != issue_id {
+        bail!(
+            "Lease record at {} holds a lease for issue {}",
+            path.display(),
+            lease.issue_id
+        );
+    }
+    Ok(Some(lease))
+}
+
+/// Every lease record, ordered by issue. Names other than a lease record's,
+/// such as an interrupted operation's stage file, are skipped, and so is a
+/// record removed while the directory is read.
+fn read_lease_records(shared_jit: &Path) -> Result<Vec<Lease>> {
+    let dir = WorktreePaths::leases_dir(shared_jit);
+    let entries = match fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("Failed to list lease records in {}", dir.display()))
+        }
+    };
+    let mut issues = entries
+        .map(|entry| entry.map(|entry| WorktreePaths::lease_record_issue(&entry.file_name())))
+        .filter_map(Result::transpose)
+        .collect::<std::io::Result<Vec<_>>>()
+        .with_context(|| format!("Failed to list lease records in {}", dir.display()))?;
+    issues.sort();
+    issues
+        .iter()
+        .filter_map(|issue_id| read_lease_record(shared_jit, issue_id).transpose())
+        .collect()
 }
 
 /// Claim coordinator for atomic lease operations
@@ -282,9 +305,9 @@ pub struct ClaimCoordinator {
     locker: FileLocker,
     worktree_id: WorktreeId,
     agent_id: Assignee,
-    /// Whether to fsync the audit log and index on every write. Defaults to
-    /// `true` for crash durability in production. Tests that exercise pure
-    /// index/rebuild logic (not crash recovery) disable it via
+    /// Whether to fsync lease records, the sequence and the history log on
+    /// every write. Defaults to `true` for crash durability in production.
+    /// Tests that exercise pure lease logic (not crash recovery) disable it via
     /// [`ClaimCoordinator::with_fsync`]: an fsync costs ~10ms and property
     /// tests do hundreds of writes, so leaving it on makes them minutes long.
     fsync: bool,
@@ -312,12 +335,10 @@ pub enum LeaseChange {
 /// The held claims lock: the one sequence through which every lease changes.
 ///
 /// It holds the coordination-order marker and `claims.lock` until dropped.
-/// [`load`](Self::load) and [`list`](Self::list) read the stored index loaded
-/// under the lock, expired and stale leases included; [`apply`](Self::apply) is
-/// the only writer. No operation reads the claims log's lease history.
+/// [`load`](Self::load) and [`list`](Self::list) read lease records, expired
+/// and stale leases included; [`apply`](Self::apply) is the only writer.
 pub struct LeaseLock {
     coordinator: ClaimCoordinator,
-    index: ClaimsIndex,
     _lock: crate::storage::lock::LockGuard,
     _order: crate::storage::guard_order::CoordinationOrderGuard,
 }
@@ -325,12 +346,12 @@ pub struct LeaseLock {
 impl LeaseLock {
     /// The issue's stored lease, expired or stale included.
     pub fn load(&self, issue_id: &IssueId) -> Result<Option<Lease>> {
-        Ok(self.index.find_lease(issue_id).cloned())
+        read_lease_record(&self.coordinator.paths.shared_jit, issue_id)
     }
 
-    /// Every stored lease, expired and stale included.
+    /// Every stored lease, expired and stale included, ordered by issue.
     pub fn list(&self) -> Result<Vec<Lease>> {
-        Ok(self.index.leases.clone())
+        read_lease_records(&self.coordinator.paths.shared_jit)
     }
 
     /// `lease-id-scan-bridge`: find a lease by id until renew, heartbeat and
@@ -345,9 +366,10 @@ impl LeaseLock {
     /// Change the issue's lease through `op(current, now)`.
     ///
     /// An expired lease is evicted first, so `op` sees it as absent. The
-    /// eviction and the change are appended to the claims log in one write and
-    /// published to the index before this returns, even when `op` fails; `op`'s
-    /// error is then returned. Returns the issue's lease after the change.
+    /// eviction and the change are published to the issue's lease record and
+    /// appended to the claims log in one write before this returns, even when
+    /// `op` fails; `op`'s error is then returned. Returns the issue's lease
+    /// after the change.
     ///
     /// # Errors
     ///
@@ -360,7 +382,7 @@ impl LeaseLock {
         op: impl FnOnce(Option<&Lease>, DateTime<Utc>) -> Result<LeaseChange>,
     ) -> Result<Option<Lease>> {
         let now = self.coordinator.clock.now();
-        let (expired, current) = match self.index.find_lease(issue_id).cloned() {
+        let (expired, current) = match self.load(issue_id)? {
             Some(lease) if lease.is_expired(now) => (Some(lease), None),
             stored => (None, stored),
         };
@@ -384,23 +406,26 @@ impl LeaseLock {
             .into_iter()
             .chain(change_record)
             .collect::<Vec<_>>();
-        self.publish(issue_id, &records, next, now)?;
+        self.publish(issue_id, &records, next.as_ref(), now)?;
         outcome.map(|(_, next)| next)
     }
 
-    /// Publish the issue's resulting lease to the index, which commits it, then
-    /// append `records` to the claims log in one write.
+    /// Publish the issue's resulting lease record, which commits the change,
+    /// then take `records`' sequence numbers from `claims.seq`, then append
+    /// them to the claims log in one write. An interruption after the commit
+    /// loses only history lines.
     fn publish(
         &mut self,
         issue_id: &IssueId,
         records: &[ClaimOp],
-        next: Option<Lease>,
+        next: Option<&Lease>,
         now: DateTime<Utc>,
     ) -> Result<()> {
         if records.is_empty() {
             return Ok(());
         }
-        let first_seq = self.coordinator.next_claim_seq()?;
+        self.coordinator.publish_lease_record(issue_id, next)?;
+        let first_seq = self.coordinator.take_claim_seqs(records.len() as u64)?;
         let lines = records
             .iter()
             .zip(first_seq..)
@@ -414,14 +439,6 @@ impl LeaseLock {
                 .map(|json| json + "\n")
             })
             .collect::<serde_json::Result<String>>()?;
-
-        self.index
-            .leases
-            .retain(|lease| &lease.issue_id != issue_id);
-        self.index.leases.extend(next);
-        self.index.last_seq = first_seq + records.len() as u64 - 1;
-        self.index.generated_at = now;
-        self.coordinator.write_index_atomic(&self.index)?;
         self.coordinator.append_claim_log(lines.as_bytes())
     }
 }
@@ -474,7 +491,6 @@ fn resolve_change(
                     if Lease {
                         expires_at: current.expires_at,
                         last_beat: current.last_beat,
-                        stale: current.stale,
                         ..lease.clone()
                     } != *current =>
                 {
@@ -598,18 +614,16 @@ impl ClaimCoordinator {
         Ok((order, lock))
     }
 
-    /// Take the [`LeaseLock`], loading the stored index under it.
+    /// Take the [`LeaseLock`].
     ///
     /// # Errors
     ///
-    /// Fails while a repository mutation session is held on this thread, when
-    /// the lock wait expires, or when the index cannot be read.
+    /// Fails while a repository mutation session is held on this thread or
+    /// when the lock wait expires.
     pub fn lock(&self) -> Result<LeaseLock> {
         let (order, lock) = self.enter_claims_lock()?;
-        let index = self.load_claims_index()?;
         Ok(LeaseLock {
             coordinator: self.clone(),
-            index,
             _lock: lock,
             _order: order,
         })
@@ -643,11 +657,15 @@ impl ClaimCoordinator {
 
         let mut lock = self.lock()?;
         let now = self.clock.now();
-        let indefinite = lock
-            .list()?
-            .into_iter()
-            .filter(|lease| lease.ttl_secs == 0 && lease.is_active(now))
-            .collect::<Vec<_>>();
+        // Only an indefinite lease has limits, so only it reads other leases.
+        let indefinite = if ttl_secs == 0 {
+            lock.list()?
+                .into_iter()
+                .filter(|lease| lease.ttl_secs == 0 && lease.is_active(now))
+                .collect()
+        } else {
+            Vec::new()
+        };
         let agent_indefinite = indefinite
             .iter()
             .filter(|lease| lease.agent_id == self.agent_id)
@@ -709,7 +727,6 @@ impl ClaimCoordinator {
                         expires_at: (ttl_secs > 0)
                             .then(|| now + Duration::seconds(ttl_secs as i64)),
                         last_beat: now,
-                        stale: false,
                     }))
                 }
             })?
@@ -741,7 +758,6 @@ impl ClaimCoordinator {
                 .ok_or_else(|| lease_not_found(lease_id))?;
             Ok(LeaseChange::Put(Lease {
                 last_beat: now,
-                stale: false,
                 ..current.clone()
             }))
         })?
@@ -762,9 +778,73 @@ impl ClaimCoordinator {
         Ok(())
     }
 
-    /// Load claims index (or create empty if missing)
-    pub fn load_claims_index(&self) -> Result<ClaimsIndex> {
-        ClaimsIndex::load(&self.paths)
+    /// Publish `lease` as the issue's lease record, or remove the record for
+    /// `None`; the rename or unlink is the commit point.
+    fn publish_lease_record(&self, issue_id: &IssueId, lease: Option<&Lease>) -> Result<()> {
+        let dir = WorktreePaths::leases_dir(&self.paths.shared_jit);
+        let path = WorktreePaths::lease_path(&self.paths.shared_jit, issue_id);
+        match lease {
+            Some(lease) => {
+                if !dir.try_exists()? {
+                    fs::create_dir_all(&dir).context("Failed to create lease directory")?;
+                    self.sync_directory(&self.paths.shared_jit)?;
+                }
+                let stage = dir.join(format!("{issue_id}.json.stage"));
+                self.replace_file(&stage, &path, &serde_json::to_vec_pretty(lease)?)
+            }
+            None => match fs::remove_file(&path) {
+                Ok(()) => self.sync_directory(&dir),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(error) => Err(error)
+                    .with_context(|| format!("Failed to remove lease record {}", path.display())),
+            },
+        }
+    }
+
+    /// Advance `claims.seq` by `count` and return the first number taken.
+    fn take_claim_seqs(&self, count: u64) -> Result<u64> {
+        let path = self.paths.shared_jit.join("claims.seq");
+        let last = match fs::read_to_string(&path) {
+            Ok(text) => text
+                .trim()
+                .parse::<u64>()
+                .with_context(|| format!("Failed to parse claim sequence at {}", path.display()))?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => 0,
+            Err(error) => {
+                return Err(error).with_context(|| {
+                    format!("Failed to read claim sequence at {}", path.display())
+                })
+            }
+        };
+        self.replace_file(
+            &self.paths.shared_jit.join("claims.seq.stage"),
+            &path,
+            (last + count).to_string().as_bytes(),
+        )?;
+        Ok(last + 1)
+    }
+
+    /// Replace `target` with `content` through `stage`: write and sync the
+    /// stage file, rename it over `target`, then sync the directory.
+    fn replace_file(&self, stage: &Path, target: &Path, content: &[u8]) -> Result<()> {
+        if self.fsync {
+            super::atomic_write::write_file_synced(stage, content)?;
+        } else {
+            fs::write(stage, content).with_context(|| format!("writing {}", stage.display()))?;
+        }
+        fs::rename(stage, target)
+            .with_context(|| format!("renaming {} to {}", stage.display(), target.display()))?;
+        target
+            .parent()
+            .map_or(Ok(()), |parent| self.sync_directory(parent))
+    }
+
+    fn sync_directory(&self, dir: &Path) -> Result<()> {
+        if self.fsync {
+            super::atomic_write::sync_directory(dir)
+        } else {
+            Ok(())
+        }
     }
 
     /// Write claims index atomically (temp + rename)
@@ -812,28 +892,6 @@ impl ClaimCoordinator {
                 })?;
                 Ok(lapsed)
             })
-    }
-
-    /// The sequence number after the claims log's highest; unparseable lines
-    /// are skipped. `claims.seq` replaces this scan with the per-issue store.
-    fn next_claim_seq(&self) -> Result<u64> {
-        let log_path = self.paths.shared_jit.join("claims.jsonl");
-        if !log_path.exists() {
-            return Ok(1);
-        }
-
-        let content = fs::read_to_string(&log_path)?;
-        let max_seq = content
-            .lines()
-            .filter_map(|line| {
-                serde_json::from_str::<ClaimLogEntry>(line)
-                    .ok()
-                    .map(|e| e.seq)
-            })
-            .max()
-            .unwrap_or(0);
-
-        Ok(max_seq + 1)
     }
 
     /// Get current git branch
@@ -894,7 +952,6 @@ impl ClaimCoordinator {
             Ok(LeaseChange::Put(Lease {
                 expires_at,
                 last_beat,
-                stale: false,
                 ..current.clone()
             }))
         })?
@@ -1015,16 +1072,9 @@ impl ClaimCoordinator {
             }
         }
 
-        // Expired leases leave the rebuilt index; stale ones stay, flagged below.
+        // Expired leases leave the rebuilt index; stale ones stay.
         active.retain(|_, lease| !lease.is_expired(now));
-
-        let leases: Vec<Lease> = active
-            .into_values()
-            .map(|lease| Lease {
-                stale: lease.is_stale(now),
-                ..lease
-            })
-            .collect();
+        let leases: Vec<Lease> = active.into_values().collect();
 
         Ok(ClaimsIndex {
             schema_version: 1,
@@ -1211,7 +1261,6 @@ mod tests {
             acquired_at: now,
             expires_at,
             last_beat: now,
-            stale: false,
         }
     }
 
@@ -1230,14 +1279,11 @@ mod tests {
             (0, Some(now - Duration::seconds(1)), now, true),
         ];
         for (ttl_secs, expires_at, last_beat, expected) in cases {
-            for stale in [false, true] {
-                let lease = Lease {
-                    last_beat,
-                    stale,
-                    ..make_lease(ttl_secs, expires_at)
-                };
-                assert_eq!(lease.is_active(now), expected, "{lease:?}");
-            }
+            let lease = Lease {
+                last_beat,
+                ..make_lease(ttl_secs, expires_at)
+            };
+            assert_eq!(lease.is_active(now), expected, "{lease:?}");
         }
     }
 
@@ -1257,13 +1303,31 @@ mod tests {
                 ..make_lease(0, None)
             },
         ];
-        coordinator
-            .write_index_atomic(&ClaimsIndex {
-                leases: leases.clone(),
-                ..ClaimsIndex::default()
-            })
-            .unwrap();
+        for lease in &leases {
+            crate::test_lease_store::plant_lease(&coordinator.paths.shared_jit, lease).unwrap();
+        }
         leases
+    }
+
+    /// Every file under the control plane outside `locks/`, by path, with its
+    /// bytes.
+    fn control_plane_files(coordinator: &ClaimCoordinator) -> Vec<(std::path::PathBuf, Vec<u8>)> {
+        fn walk(dir: &Path, files: &mut Vec<(std::path::PathBuf, Vec<u8>)>) {
+            for entry in fs::read_dir(dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.ends_with("locks") {
+                    continue;
+                } else if path.is_dir() {
+                    walk(&path, files);
+                } else {
+                    files.push((path.clone(), fs::read(&path).unwrap()));
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(&coordinator.paths.shared_jit, &mut files);
+        files.sort();
+        files
     }
 
     #[test]
@@ -1271,12 +1335,32 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp);
         let leases = stored_read_leases(&coordinator, Utc::now());
-        let index_path = coordinator.paths.shared_jit.join("claims.index.json");
-        let before = fs::read(&index_path).unwrap();
         let _lock = hold_claims_lock(&temp);
+        let before = control_plane_files(&coordinator);
 
         assert_eq!(read_leases(&coordinator.paths).unwrap(), leases);
-        assert_eq!(fs::read(index_path).unwrap(), before);
+        assert_eq!(control_plane_files(&coordinator), before);
+    }
+
+    #[test]
+    fn test_read_leases_and_lease_lock_list_skip_names_that_are_not_lease_records() {
+        let temp = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp);
+        let leases = stored_read_leases(&coordinator, Utc::now());
+        let dir = WorktreePaths::leases_dir(&coordinator.paths.shared_jit);
+        let issue = crate::test_utils::issue_id(12);
+        for name in [
+            format!("{issue}.json.stage"),
+            format!("{}.json", issue.as_str().to_uppercase()),
+            "notes.json".to_string(),
+            issue.to_string(),
+        ] {
+            fs::write(dir.join(name), "not a lease record").unwrap();
+        }
+        fs::create_dir(dir.join("nested")).unwrap();
+
+        assert_eq!(read_leases(&coordinator.paths).unwrap(), leases);
+        assert_eq!(coordinator.lock().unwrap().list().unwrap(), leases);
     }
 
     #[test]
@@ -1317,16 +1401,25 @@ mod tests {
     }
 
     #[test]
-    fn test_read_leases_missing_index_is_empty_and_corrupt_index_is_an_error() {
+    fn test_read_leases_missing_store_is_empty_and_malformed_record_is_a_parse_error() {
+        use crate::test_lease_store::{corrupt_lease, LeaseCorruption};
+
         let temp = TempDir::new().unwrap();
         let paths = crate::test_utils::primary_checkout_paths(temp.path());
+        let issue = crate::test_utils::issue_id(13);
         assert!(read_leases(&paths).unwrap().is_empty());
-        fs::create_dir_all(&paths.shared_jit).unwrap();
-        fs::write(paths.shared_jit.join("claims.index.json"), "invalid json").unwrap();
-        assert!(read_leases(&paths)
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to parse claims index"));
+        corrupt_lease(&paths.shared_jit, &issue, LeaseCorruption::MalformedJson).unwrap();
+
+        for error in [
+            read_leases(&paths).unwrap_err(),
+            read_active_lease(&paths, &issue, Utc::now()).unwrap_err(),
+        ] {
+            assert!(
+                error.to_string().contains("Failed to parse lease record")
+                    && error.chain().any(|cause| cause.is::<serde_json::Error>()),
+                "{error:#}"
+            );
+        }
     }
 
     fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
@@ -1740,7 +1833,7 @@ mod tests {
         let issue_id = crate::test_utils::issue_id(1);
         let fields = [
             format!(
-                r#""acquire","lease_id":"{lease_id}","issue_id":"{issue_id}","agent_id":"agent:valid","worktree_id":"wt:main","branch":null,"ttl_secs":0,"acquired_at":"2026-01-06T20:00:00Z","expires_at":null,"last_beat":"2026-01-06T20:00:00Z","stale":false}}"#
+                r#""acquire","lease_id":"{lease_id}","issue_id":"{issue_id}","agent_id":"agent:valid","worktree_id":"wt:main","branch":null,"ttl_secs":0,"acquired_at":"2026-01-06T20:00:00Z","expires_at":null,"last_beat":"2026-01-06T20:00:00Z"}}"#
             ),
             format!(
                 r#""renew","lease_id":"{lease_id}","new_expires_at":null,"new_last_beat":"2026-01-06T20:00:00Z"}}"#
@@ -1781,7 +1874,6 @@ mod tests {
                     acquired_at: now,
                     expires_at: None,
                     last_beat: now,
-                    stale: false,
                 },
             },
         })
@@ -1822,26 +1914,54 @@ mod tests {
     }
 
     #[test]
-    fn test_claims_index_updated() {
+    fn test_lease_lock_apply_stores_each_lease_as_its_issue_record_only() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);
-
+        let shared_jit = &coordinator.paths.shared_jit;
+        let limits = ClaimAcquireLimits::new(100, 100);
+        let (kept, ()) = acquire(&coordinator, &crate::test_utils::issue_id(21), 600, limits);
+        let (evicted, ()) = acquire(&coordinator, &crate::test_utils::issue_id(22), 600, limits);
         coordinator
-            .acquire_claim_synchronized(
-                &crate::test_utils::issue_id(22),
-                600,
-                Some("test lease"),
-                ClaimAcquireLimits::new(100, 100),
-                |_| Ok(()),
-            )
+            .force_evict_lease(&evicted.lease_id, "test")
             .unwrap();
 
-        let index_path = temp_dir.path().join(".git/jit/claims.index.json");
-        assert!(index_path.exists());
+        let records = fs::read_dir(WorktreePaths::leases_dir(shared_jit))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            records,
+            vec![WorktreePaths::lease_path(shared_jit, &kept.issue_id)]
+        );
+        let stored: Lease = serde_json::from_slice(&fs::read(&records[0]).unwrap()).unwrap();
+        assert_eq!(stored, kept);
+        assert!(!shared_jit.join("claims.index.json").exists());
+    }
 
-        let index = coordinator.load_claims_index().unwrap();
-        assert_eq!(index.leases.len(), 1);
-        assert_eq!(index.leases[0].issue_id, crate::test_utils::issue_id(22));
+    #[test]
+    fn test_lease_lock_apply_takes_sequence_numbers_from_claims_seq() {
+        use crate::storage::clock::FixedClock;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = Utc::now();
+        let clock = Arc::new(FixedClock::new(base));
+        let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
+        let seq_path = coordinator.paths.shared_jit.join("claims.seq");
+        let issue_id = crate::test_utils::issue_id(20);
+        acquire(&coordinator, &issue_id, 1, ClaimAcquireLimits::new(1, 1));
+        fs::write(&seq_path, "41").unwrap();
+        clock.set(base + Duration::seconds(2));
+
+        // Evicting the expired lease and acquiring anew log two records.
+        acquire(&coordinator, &issue_id, 600, ClaimAcquireLimits::new(1, 1));
+
+        let seqs = fs::read_to_string(temp_dir.path().join(".git/jit/claims.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str::<ClaimLogEntry>(line).unwrap().seq)
+            .collect::<Vec<_>>();
+        assert_eq!(seqs, vec![1, 42, 43]);
+        assert_eq!(fs::read_to_string(&seq_path).unwrap(), "43");
     }
 
     #[test]
@@ -2012,6 +2132,37 @@ mod tests {
         clock.set(base + Duration::seconds(threshold + 1));
 
         assert!(!blocked(27), "a stale indefinite lease does not count");
+    }
+
+    #[test]
+    fn test_acquire_claim_synchronized_reads_other_leases_only_for_the_indefinite_limit_check() {
+        use crate::test_lease_store::{corrupt_lease, LeaseCorruption};
+
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        let limits = ClaimAcquireLimits::new(10, 10);
+        corrupt_lease(
+            &coordinator.paths.shared_jit,
+            &crate::test_utils::issue_id(28),
+            LeaseCorruption::MalformedJson,
+        )
+        .unwrap();
+        let acquire_with_ttl = |issue, ttl_secs| {
+            coordinator.acquire_claim_synchronized(
+                &crate::test_utils::issue_id(issue),
+                ttl_secs,
+                Some("test lease"),
+                limits,
+                |_| Ok(()),
+            )
+        };
+
+        assert!(acquire_with_ttl(29, 600).is_ok());
+        let error = acquire_with_ttl(30, 0).unwrap_err();
+        assert!(
+            error.to_string().contains("Failed to parse lease record"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -2223,8 +2374,7 @@ mod tests {
             .unwrap();
 
         // Verify lease is gone
-        let index = coordinator1.load_claims_index().unwrap();
-        assert!(index.find_lease(&crate::test_utils::issue_id(31)).is_none());
+        assert!(read_leases(&coordinator1.paths).unwrap().is_empty());
 
         // Should be able to claim again
         coordinator1
@@ -2525,7 +2675,6 @@ mod tests {
                     acquired_at: Utc::now(),
                     expires_at: Some(Utc::now() + Duration::seconds(600)),
                     last_beat: Utc::now(),
-                    stale: false,
                 },
             },
         };
@@ -2545,7 +2694,6 @@ mod tests {
                     acquired_at: Utc::now(),
                     expires_at: Some(Utc::now() + Duration::seconds(600)),
                     last_beat: Utc::now(),
-                    stale: false,
                 },
             },
         };
@@ -2566,7 +2714,6 @@ mod tests {
                     acquired_at: Utc::now(),
                     expires_at: Some(Utc::now() + Duration::seconds(600)),
                     last_beat: Utc::now(),
-                    stale: false,
                 },
             },
         };
@@ -2619,7 +2766,6 @@ mod tests {
             acquired_at: Utc::now(),
             expires_at: Some(Utc::now() + Duration::seconds(600)),
             last_beat: Utc::now(),
-            stale: false,
         };
         let index = ClaimsIndex {
             schema_version: 1,
@@ -2904,28 +3050,14 @@ mod tests {
         (coordinator, clock, expired, stale)
     }
 
-    fn claims_log_bytes(coordinator: &ClaimCoordinator) -> Vec<u8> {
-        fs::read(coordinator.paths.shared_jit.join("claims.jsonl")).unwrap()
-    }
-
-    fn claims_index_bytes(coordinator: &ClaimCoordinator) -> Vec<u8> {
-        fs::read(coordinator.paths.shared_jit.join("claims.index.json")).unwrap()
-    }
-
     #[test]
-    fn test_lease_lock_loads_lists_and_applies_without_reading_the_claims_log_history() {
-        use std::io::Write;
-
+    fn test_lease_lock_loads_lists_and_applies_without_the_claims_index_or_log_history() {
         let temp_dir = TempDir::new().unwrap();
         let (coordinator, _clock, expired, stale) = lease_lock_fixture(&temp_dir);
-        // Replaying this log fails; only the sequence scan skips the line.
-        fs::OpenOptions::new()
-            .append(true)
-            .open(coordinator.paths.shared_jit.join("claims.jsonl"))
-            .unwrap()
-            .write_all(b"not a claim record\n")
-            .unwrap();
-        assert!(coordinator.rebuild_index_from_log().is_err());
+        let shared_jit = &coordinator.paths.shared_jit;
+        // Neither file decodes, so reading either one fails the operation.
+        fs::write(shared_jit.join("claims.jsonl"), "not a claim record\n").unwrap();
+        fs::write(shared_jit.join("claims.index.json"), "not an index").unwrap();
 
         let mut lock = coordinator.lock().unwrap();
 
@@ -2940,6 +3072,10 @@ mod tests {
             .unwrap()
             .iter()
             .all(|lease| lease.lease_id != stale.lease_id));
+        assert_eq!(
+            fs::read(shared_jit.join("claims.index.json")).unwrap(),
+            b"not an index"
+        );
     }
 
     #[test]
@@ -2996,8 +3132,7 @@ mod tests {
     fn test_lease_lock_apply_keep_returns_the_current_lease_and_writes_nothing() {
         let temp_dir = TempDir::new().unwrap();
         let (coordinator, _clock, _expired, stale) = lease_lock_fixture(&temp_dir);
-        let log_before = claims_log_bytes(&coordinator);
-        let index_before = claims_index_bytes(&coordinator);
+        let before = control_plane_files(&coordinator);
         let mut lock = coordinator.lock().unwrap();
 
         let kept = lock
@@ -3008,8 +3143,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(kept.map(|l| l.lease_id), Some(stale.lease_id));
-        assert_eq!(claims_log_bytes(&coordinator), log_before);
-        assert_eq!(claims_index_bytes(&coordinator), index_before);
+        assert_eq!(control_plane_files(&coordinator), before);
     }
 
     #[test]
@@ -3131,7 +3265,7 @@ mod tests {
     fn test_lease_lock_apply_rejects_a_put_for_another_issue_or_lease_and_writes_nothing() {
         let temp_dir = TempDir::new().unwrap();
         let (coordinator, _clock, _expired, stale) = lease_lock_fixture(&temp_dir);
-        let log_before = claims_log_bytes(&coordinator);
+        let before = control_plane_files(&coordinator);
         let mut lock = coordinator.lock().unwrap();
         let other_issue = crate::test_utils::issue_id(65);
         let replacement = Lease {
@@ -3153,11 +3287,7 @@ mod tests {
                 .is_err());
         }
 
-        assert_eq!(claims_log_bytes(&coordinator), log_before);
-        assert_eq!(
-            lock.load(&stale.issue_id).unwrap().map(|l| l.lease_id),
-            Some(stale.lease_id)
-        );
+        assert_eq!(control_plane_files(&coordinator), before);
     }
 }
 

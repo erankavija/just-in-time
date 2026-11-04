@@ -6,7 +6,7 @@
 
 use crate::repository_state::{
     repository_relative_path, RepositoryRootClass, RootRelativePath, VirtualPath,
-    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR,
+    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, INDEX_LOCK_FILE, RECORD_SCRATCH_DIR,
     REPO_WRITE_LOCK_FILE,
 };
 use anyhow::{anyhow, bail, ensure, Context, Result};
@@ -324,7 +324,6 @@ fn machine_local_ignores() -> Result<Vec<String>> {
     let data_locks = [
         REPO_WRITE_LOCK_FILE,
         INDEX_LOCK_FILE,
-        GATES_LOCK_FILE,
         EVENTS_LOCK_FILE,
         RECORD_SCRATCH_DIR,
     ]
