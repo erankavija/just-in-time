@@ -68,6 +68,19 @@ fn test_batch_create_starts_an_entry_carrying_an_unmet_dependency_in_backlog() {
         .expect("the upstream entry was created");
     assert!(dependent.dependencies.contains(&upstream.id));
     assert_eq!(dependent.state, State::Backlog);
+    assert!(dependent.first_ready_at.is_none());
+    assert!(
+        !h.storage
+            .read_events()
+            .unwrap()
+            .iter()
+            .any(|event| matches!(
+                event.body(),
+                jit::domain::EventBody::IssueStateChanged { issue_id, from, to, .. }
+                    if *issue_id == dependent.id && *from == State::Ready && *to == State::Backlog
+            )),
+        "the blocked entry is never Ready, so it records no demotion"
+    );
     assert_eq!(upstream.state, State::Ready);
     assert!(ready_but_blocked(&issues).is_empty());
 }
