@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "649d398b37c8492631783babffaa510c6bc0b5f5",
+  "completed_at": "2026-11-04T21:43:39.133079961Z",
+  "duration_ms": 184422,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Attributable changes implement and document the approved split-debug configuration with no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "75b46be9-ebc5-4320-92c7-454b01ecb4db",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6ea0b765-8d61-486d-ad1b-c2c31eb530ad",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T21:40:34.710430962Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1daddafd1, fee783635 (jit:75b46be9)\nPolicy sources: AGENTS.md\nResolved items: @/issue/75b46be9/requirement/REQ-01–REQ-05 and decision/D-01 (issue Markdown); @/invariant/bounded-rust-build-footprint, orthogonal-tests, essential-code-prose, single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: pending (no exit code or recorded run)\nTruncation recovery: none\n\n1. No findings identified.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Attributable changes implement and document the approved split-debug configuration with no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

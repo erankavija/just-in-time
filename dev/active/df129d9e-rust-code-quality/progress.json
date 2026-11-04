@@ -1558,13 +1558,29 @@
       }
     },
     "75b46be9": {
-      "status": "in_progress",
-      "note": "User approved30% floor; tested branch1daddafd1 awaits README reconciliation and gates",
-      "model": "gpt-6.1-sol"
+      "status": "done",
+      "note": "Landed649d398b3; all gates passed; approved30% floor met",
+      "model": "gpt-6.1-sol",
+      "review": {
+        "verdict": "PASS",
+        "gates": "cargo-ci and code-review passed",
+        "criteria": {
+          "REQ-01": "both profiles unpacked",
+          "REQ-02": "31.436850% measured reduction, README commands",
+          "REQ-03": "recorded workspace source-line backtrace",
+          "REQ-04": "1234MiB budget,9.935078% headroom",
+          "REQ-05": "policy assertion and5038 tests25doctests passed"
+        },
+        "prior_findings": "none",
+        "stale_narrative": "no stale live references; historical measurements labeled",
+        "deferred_items": "no linked design documents",
+        "holistic": "zero production Rust delta; shared profile policy"
+      }
     },
     "b22aabce": {
-      "status": "ready",
-      "note": "critical; filed 2026-11-04 by user ruling; first next session"
+      "status": "in_progress",
+      "note": "two-suite consolidation with exact inventory preservation",
+      "model": "gpt-6.1-sol high"
     },
     "0546fc82": {
       "status": "backlog"
@@ -1851,20 +1867,22 @@
         "branch_tests": 5038,
         "branch_doctests": 25,
         "backtrace": "workspace source file/line preserved",
-        "criterion": "original40% unmet; proposed30% awaits approval"
+        "criterion": "user-approved30% floor met"
       }
     },
     "timing_diagnosis": "Private pipe probe reproduced queue wait before test start. Pinned nextest 0.9.133 times wrapper and lacks ready handshake; clean solution requires nextest-side acquisition before attempt clock. User keeps dynamic sharing; no host edits.",
     "ownership_reconciliation": "Approved and recorded as epic D-05 and story D-01; plan reconciled",
-    "current_wave": 2,
+    "current_wave": 3,
     "open_decisions": []
   },
   "session_14": {
-    "status": "resuming approved work",
+    "status": "split-debug done; suite consolidation active",
     "approvals": [
       "75b46be9 floor30%",
       "D-59 ownership wording"
     ],
-    "timing": "remains deferred; preserve dynamic sharing"
+    "timing": "remains deferred; preserve dynamic sharing",
+    "split_debug_merge": "649d398b3",
+    "production_delta": 0
   }
 }
