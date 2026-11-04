@@ -28,8 +28,7 @@ fn acquire<S: IssueStore + RepositoryStateStore>(
         issue_id,
         ttl_secs: ttl,
     };
-    Ok(Outcome::success_with(response, message)
-        .with_warnings(warnings.iter().map(ToString::to_string)))
+    Ok(Outcome::success_with(response, message).with_warnings(&warnings))
 }
 
 fn release<S: IssueStore + RepositoryStateStore>(
@@ -42,10 +41,7 @@ fn release<S: IssueStore + RepositoryStateStore>(
         "Released lease {} on issue {} (was held by {}) by {}",
         released.lease_id, released.issue_id, released.previous_owner, released.actor
     );
-    Ok(
-        Outcome::success_with(ClaimReleaseResponse { released }, message)
-            .with_warnings(warnings.iter().map(ToString::to_string)),
-    )
+    Ok(Outcome::success_with(ClaimReleaseResponse { released }, message).with_warnings(&warnings))
 }
 
 fn renew<S: IssueStore + RepositoryStateStore>(
@@ -57,8 +53,7 @@ fn renew<S: IssueStore + RepositoryStateStore>(
     let (lease, warnings) = ctx.executor.claims().renew(&id, extension)?;
     let message = format!("Renewed lease {} by {extension} seconds", lease.lease_id);
     let response = ClaimRenewResponse { lease, extension };
-    Ok(Outcome::success_with(response, message)
-        .with_warnings(warnings.iter().map(ToString::to_string)))
+    Ok(Outcome::success_with(response, message).with_warnings(&warnings))
 }
 
 fn heartbeat<S: IssueStore + RepositoryStateStore>(
@@ -72,8 +67,7 @@ fn heartbeat<S: IssueStore + RepositoryStateStore>(
         lease_id: lease.lease_id,
         issue_id: lease.issue_id,
     };
-    Ok(Outcome::success_with(response, message)
-        .with_warnings(warnings.iter().map(ToString::to_string)))
+    Ok(Outcome::success_with(response, message).with_warnings(&warnings))
 }
 
 fn status<S: IssueStore + RepositoryStateStore>(
@@ -121,8 +115,7 @@ fn force_evict<S: IssueStore + RepositoryStateStore>(
         issue_id: evicted.issue_id,
         reason,
     };
-    Ok(Outcome::success_with(response, message)
-        .with_warnings(warnings.iter().map(ToString::to_string)))
+    Ok(Outcome::success_with(response, message).with_warnings(&warnings))
 }
 
 command_group! {
@@ -163,11 +156,7 @@ pub mod recover {
             report.expired_leases_evicted,
             report.stale_leases_reclaimed
         );
-        let shown = report
-            .warnings
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>();
+        let shown = report.warnings.clone();
         let response = RecoverResponse {
             success: true,
             report,
