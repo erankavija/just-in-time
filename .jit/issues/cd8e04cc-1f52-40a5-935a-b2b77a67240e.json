@@ -21,6 +21,12 @@
       "updated_at": "2026-11-04T10:22:35.584209622Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "run_id": "0989acfc-3997-4642-b217-f993bcb97673",
+      "status": "failed",
+      "updated_at": "2026-11-04T10:27:51.441183956Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
       "run_id": "54cb794e-b8ee-4fc9-946b-b827aad5da82",
       "status": "passed",
@@ -45,5 +51,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Worktree commands move to library handlers",
-  "updated_at": "2026-11-04T10:22:52.729284125Z"
+  "updated_at": "2026-11-04T10:27:51.441183956Z"
 }
