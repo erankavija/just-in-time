@@ -566,8 +566,14 @@ fn invoke_doc_check_links(json: bool) -> Vec<Output> {
     )]
 }
 
+fn invoke_gate_registry_parse_failure(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/gates.toml"), "[[gates]").unwrap();
+    vec![output_in_form(&cli, &["gate", "list"], json)]
+}
+
 /// `jit gate preset apply` on a well-formed but nonexistent id, which fails
-/// through the ordinary not-found classifier.
+/// as a preset findings outcome.
 fn invoke_gate_preset_apply_missing_target(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
     vec![output_in_form(
@@ -1044,6 +1050,45 @@ fn invoke_worktree_identity_io_failure(json: bool) -> Vec<Output> {
     worktree_inspection_outputs(&cli, json)
 }
 
+/// A linked checkout whose store `worktree store-divergence` compares against
+/// the primary checkout's, with the linked store selected on the child alone.
+fn linked_store_divergence_repo() -> JitCli {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    cli.git(["worktree", "add", "linked"]).unwrap();
+    cli
+}
+
+fn store_divergence_output(cli: &JitCli, json: bool) -> Output {
+    let selected = cli.root().join("linked/.jit");
+    let mut command = cli.command_with_env(
+        ["worktree", "store-divergence"],
+        [("JIT_DATA_DIR", selected.as_os_str())],
+    );
+    if json {
+        command.arg("--json");
+    }
+    command.output().unwrap()
+}
+
+/// A primary store root that cannot be searched denies reading its records.
+#[cfg(unix)]
+fn invoke_store_divergence_permission_denied(json: bool) -> Vec<Output> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let cli = linked_store_divergence_repo();
+    let primary_store = cli.root().join(".jit");
+    let original = fs::metadata(&primary_store).unwrap().permissions();
+    let mut denied = original.clone();
+    denied.set_mode(0o600);
+    fs::set_permissions(&primary_store, denied).unwrap();
+
+    let output = store_divergence_output(&cli, json);
+
+    fs::set_permissions(&primary_store, original).unwrap();
+    vec![output]
+}
+
 row_bindings! {
     test_command_exit_codes_profile_apply_missing_values_file_emits_2: ("profile apply", 2, false) => invoke_profile_apply_missing_values_file;
     test_command_exit_codes_profile_apply_repository_state_conflict_emits_4: ("profile apply", 4, false) => invoke_profile_apply_conflict;
@@ -1072,7 +1117,8 @@ row_bindings! {
     test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", 4, false) => invoke_config_validate;
     test_command_exit_codes_doc_check_links_emits_4: ("doc check-links", 4, true) => invoke_doc_check_links;
     test_command_exit_codes_init_missing_values_file_emits_2: ("init", 2, false) => invoke_init_missing_values_file;
-    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, false) => invoke_gate_preset_apply_missing_target;
+    test_command_exit_codes_gate_handlers_use_classified_failures: ("gate define, gate update, gate remove, gate add, gate list, gate show, gate preset list, gate preset show, gate preset create", 1, false) => invoke_gate_registry_parse_failure;
+    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, true) => invoke_gate_preset_apply_missing_target;
     test_command_exit_codes_project_render_unknown_projection_emits_2: ("project render", 2, false) => invoke_project_render_unknown_name;
     test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", 1, false) => invoke_serve_daemon_error;
     #[cfg(unix)]
@@ -1097,6 +1143,8 @@ row_bindings! {
     #[cfg(unix)]
     test_command_exit_codes_worktree_identity_permission_denied_emits_5: ("worktree info, worktree list", 5, false) => invoke_worktree_identity_permission_denied;
     test_command_exit_codes_worktree_identity_io_failure_emits_10: ("worktree info, worktree list", 10, false) => invoke_worktree_identity_io_failure;
+    #[cfg(unix)]
+    test_command_exit_codes_store_divergence_permission_denied_emits_5: ("worktree store-divergence", 5, false) => invoke_store_divergence_permission_denied;
 }
 
 /// Guard: **every** projected row, exception and standard alike, has exactly one

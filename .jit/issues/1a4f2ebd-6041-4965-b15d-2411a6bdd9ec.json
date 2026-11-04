@@ -16,21 +16,21 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ff54f494-c8df-4c9f-a712-9cf71d757136",
+      "run_id": "0eaa39b3-88b8-4414-91d4-97e24521f102",
       "status": "passed",
-      "updated_at": "2026-11-04T09:14:57.457236935Z",
+      "updated_at": "2026-11-04T10:55:57.221665416Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "9dc5bf99-b1ef-4af4-aa7c-38d6c3565013",
+      "run_id": "7ad092f6-064e-4a89-8a98-48ebe01c7f9a",
       "status": "failed",
-      "updated_at": "2026-11-04T09:28:02.374974871Z",
+      "updated_at": "2026-11-04T11:00:15.107024238Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
-      "run_id": "39d8ad8f-92f4-41c2-8aa4-1d3a98c7903a",
+      "run_id": "5b93a710-df8d-4e29-82e0-46eaeba10a26",
       "status": "passed",
-      "updated_at": "2026-11-04T09:14:57.597770282Z",
+      "updated_at": "2026-11-04T10:55:57.346959138Z",
       "updated_by": "auto:executor"
     }
   },
@@ -51,5 +51,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Item commands move to library handlers",
-  "updated_at": "2026-11-04T09:41:19.438598200Z"
+  "updated_at": "2026-11-04T11:00:15.107024238Z"
 }

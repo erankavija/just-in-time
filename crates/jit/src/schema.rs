@@ -635,14 +635,6 @@ impl CommandSchema {
                 (Some(union), "BlockedListResponse")
             }
 
-            "gate_list" => (
-                Some(schema_to_value::<GateListResponse>()),
-                "GateListResponse",
-            ),
-            "gate_preset_list" => (
-                Some(schema_to_value::<GatePresetListResponse>()),
-                "GatePresetListResponse",
-            ),
             // Default: no specific schema
             _ => (None, "CommandResponse"),
         };
@@ -792,6 +784,12 @@ impl CommandSchema {
                 "An I/O failure prevented worktree inspection.",
                 false,
             ),
+            row(
+                "worktree store-divergence",
+                5,
+                "A filesystem operation reading the primary checkout's store was denied.",
+                false,
+            ),
             // Universal: any command reaches these — `0` on successful completion,
             // the failure codes through the shared classifier.
             row("*", 0, "Command completed successfully.", false),
@@ -905,6 +903,13 @@ impl CommandSchema {
                 4,
                 "A state transition is blocked by unmet dependencies or unpassed \
                  gates.",
+                false,
+            ),
+            row(
+                "gate define, gate update, gate remove, gate add, gate list, gate show, gate preset list, gate preset show, gate preset create",
+                1,
+                "A registry or preset file could not be parsed, or an untyped \
+                 command failure occurred. Other typed failures use the universal codes.",
                 false,
             ),
             row(
@@ -1036,8 +1041,9 @@ impl CommandSchema {
             row(
                 "gate preset apply",
                 3,
-                "A preset target was not found, so the application failed.",
-                false,
+                "One or more preset targets failed; the findings report retains \
+                 successful targets and per-target errors.",
+                true,
             ),
             row(
                 "project render",

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "98a98a2d198dff4064bbd3c564cdf2ac5cbc25b1",
+  "completed_at": "2026-11-04T10:44:56.872525147Z",
+  "duration_ms": 255019,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue success criteria are satisfied; the prior missing store-divergence exit-code mapping is corrected.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cd8e04cc-1f52-40a5-935a-b2b77a67240e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c4570711-2ad4-4511-89bc-dcfcc725417b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T10:40:41.853403634Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2cb30f0ac, e69f46779, eed453f70, 8d81d1e27 (`jit:cd8e04cc`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (markdown-first issue); @/invariant/architecture-dependency-direction, essential-code-prose, orthogonal-tests, single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T10:38:17Z); mcp-ci passed (exit 0, 2026-11-04T10:40:23Z)\nTruncation recovery: per-path reads recovered the worktree handler, output, schema, tests, and generated exit-code documentation; unrelated mainline merge content was outside the impact cone\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue success criteria are satisfied; the prior missing store-divergence exit-code mapping is corrected.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

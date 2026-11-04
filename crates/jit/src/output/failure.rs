@@ -872,6 +872,14 @@ mod exit_code_projection_tests {
                 "*",
             ),
             (
+                "Bad_Key"
+                    .parse::<crate::domain::identity::GateKey>()
+                    .unwrap_err()
+                    .into(),
+                2,
+                "*",
+            ),
+            (
                 crate::domain::identity::InvalidIdPrefixError::new("ab").into(),
                 2,
                 "*",

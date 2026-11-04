@@ -22,6 +22,7 @@ mod doc;
 mod emit;
 mod events;
 pub mod failure;
+pub mod gate;
 mod graph;
 pub mod hooks;
 mod init;
@@ -1455,7 +1456,8 @@ collection_keys! {
     ValuesKey = "values" as "LabelValuesResponse";
     /// Collection key of [`WorktreeListResponse`].
     WorktreesKey = "worktrees" as "WorktreeListResponse";
-    PresetsKey = "presets";
+    /// Collection key of [`GatePresetListResponse`].
+    PresetsKey = "presets" as "GatePresetListResponse";
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)
