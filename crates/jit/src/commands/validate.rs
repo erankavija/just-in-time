@@ -5,23 +5,8 @@ use crate::domain::identity::GateKey;
 use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
+use crate::validation::report::BuiltInPass;
 use anyhow::Context;
-
-/// Rule name carried by every finding the built-in dangling-item-link pass emits
-/// (REQ-08 clause i, REQ-03). It is not a `.jit/rules.toml` rule; the pass runs
-/// unconditionally, so the name is a stable constant for grouping and rendering.
-pub const DANGLING_LINK_RULE: &str = "dangling-item-link";
-
-/// Rule name carried by every finding the built-in enforcement-drift pass emits
-/// (REQ-01/REQ-02). Like [`DANGLING_LINK_RULE`], it is not a `.jit/rules.toml`
-/// rule: the pass runs as part of every validate path, gated only on the
-/// presence of declared invariants, so the name is a stable constant for
-/// grouping and rendering.
-pub const ENFORCEMENT_DRIFT_RULE: &str = "enforcement-drift";
-
-/// Rule name carried by the built-in advisory finding emitted while one or
-/// more gate definitions still use [`GateChecker::ReviewPlaceholder`].
-pub const REVIEW_PLACEHOLDER_RULE: &str = "review-placeholder";
 
 #[derive(Clone, Copy)]
 enum BaseCapturePurpose<'a> {
@@ -1227,7 +1212,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
     ///
     /// The finding severity is [`Severity::Error`](crate::declarations::rules::Severity::Error)
     /// so a dangling link fails `jit validate`. The rule name is the constant
-    /// [`DANGLING_LINK_RULE`]. This pass touches no `.jit/` ruleset: it runs
+    /// [`BuiltInPass::DanglingItemLink`]. This pass touches no `.jit/` ruleset: it runs
     /// unconditionally as part of the validate path.
     pub fn dangling_link_findings(
         &self,
@@ -1268,7 +1253,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
                     findings.push(GraphFinding::for_issue(
                         issue.id.clone(),
                         Finding {
-                            rule: DANGLING_LINK_RULE.to_string(),
+                            rule: BuiltInPass::DanglingItemLink.as_str().to_owned(),
                             severity: Severity::Error,
                             message,
                         },
@@ -1287,7 +1272,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
                     findings.push(GraphFinding::for_issue(
                         issue.id.clone(),
                         Finding {
-                            rule: DANGLING_LINK_RULE.to_string(),
+                            rule: BuiltInPass::DanglingItemLink.as_str().to_owned(),
                             severity: Severity::Error,
                             message: format!(
                                 "issue {} has a dangling item link '{label}': \
@@ -1326,7 +1311,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
     /// gate is NOT drift (the enforced-but-undeclared direction was removed in
     /// REQ-05).
     ///
-    /// The rule name on every finding is [`ENFORCEMENT_DRIFT_RULE`]. A `rules.toml`
+    /// The rule name on every finding is [`BuiltInPass::EnforcementDrift`]. A `rules.toml`
     /// (or gate registry) load failure is tolerated, NOT propagated as an `Err`:
     /// [`compute_drift_findings`](crate::commands::ValidationOps::compute_drift_findings)
     /// resolves it defensively to
@@ -1345,7 +1330,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             .into_iter()
             .map(|f| {
                 GraphFinding::unattributed(Finding {
-                    rule: ENFORCEMENT_DRIFT_RULE.to_string(),
+                    rule: BuiltInPass::EnforcementDrift.as_str().to_owned(),
                     // A broken binding (declared-but-unenforced) is a real defect
                     // -> fails validate. It is the only drift direction (REQ-05).
                     severity: Severity::Error,
@@ -1569,7 +1554,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
                 findings.push(ReportedFinding::new(
                     None,
                     &crate::validation::engine::Finding {
-                        rule: "rules-file".to_string(),
+                        rule: BuiltInPass::RulesFile.as_str().to_owned(),
                         severity: crate::declarations::rules::Severity::Error,
                         message: format!("config error: {e}"),
                     },
@@ -1687,7 +1672,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             vec![ReportedFinding::new(
                 None,
                 &Finding {
-                    rule: REVIEW_PLACEHOLDER_RULE.to_string(),
+                    rule: BuiltInPass::ReviewPlaceholder.as_str().to_owned(),
                     severity: Severity::Warn,
                     message: format!(
                         "WARNING: passing external-review placeholder still configured for gate(s): {}. Replace each placeholder with a real review checker before relying on these gates.",
@@ -2931,7 +2916,10 @@ priority = 100
         let findings = exec.validation().dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].issue_id.as_ref(), Some(&node_id));
-        assert_eq!(findings[0].finding.rule, DANGLING_LINK_RULE);
+        assert_eq!(
+            findings[0].finding.rule,
+            BuiltInPass::DanglingItemLink.as_str()
+        );
         assert_eq!(
             findings[0].finding.severity,
             crate::declarations::rules::Severity::Error
@@ -3157,7 +3145,7 @@ priority = 100
         let err = exec.validation().validate_silent().unwrap_err();
         let msg = err.to_string();
         assert!(
-            msg.contains(DANGLING_LINK_RULE) && msg.contains("BOGUS"),
+            msg.contains(BuiltInPass::DanglingItemLink.as_str()) && msg.contains("BOGUS"),
             "expected dangling-link rule failure, got: {msg}"
         );
     }
@@ -3189,13 +3177,15 @@ priority = 100
         let dangling: Vec<_> = report
             .findings
             .iter()
-            .filter(|f| f.rule == DANGLING_LINK_RULE)
+            .filter(|f| f.rule == BuiltInPass::DanglingItemLink.as_str())
             .collect();
         assert_eq!(dangling.len(), 1);
         assert!(dangling[0].message.contains("BOGUS"));
         // The finding serializes (used by `jit validate --json`).
         let value = serde_json::to_value(&report.findings).unwrap();
-        assert!(value.to_string().contains(DANGLING_LINK_RULE));
+        assert!(value
+            .to_string()
+            .contains(BuiltInPass::DanglingItemLink.as_str()));
     }
 
     /// Shared bases exclude references; a consuming pass requests its own scope.

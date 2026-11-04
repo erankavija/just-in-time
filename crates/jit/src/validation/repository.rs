@@ -237,7 +237,9 @@ pub(crate) fn validate_repository_with_materializations(
         findings.push(ReportedFinding::new(
             None,
             &Finding {
-                rule: "rules-file".to_string(),
+                rule: crate::validation::report::BuiltInPass::RulesFile
+                    .as_str()
+                    .to_owned(),
                 severity: Severity::Error,
                 message: format!("config error: {error:#}"),
             },
@@ -597,7 +599,9 @@ fn collect_enforcement_drift_findings(
         ReportedFinding::new(
             None,
             &Finding {
-                rule: crate::commands::ENFORCEMENT_DRIFT_RULE.to_string(),
+                rule: crate::validation::report::BuiltInPass::EnforcementDrift
+                    .as_str()
+                    .to_owned(),
                 severity: Severity::Error,
                 message: finding.message(),
             },
@@ -621,7 +625,9 @@ fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFind
         vec![ReportedFinding::new(
             None,
             &Finding {
-                rule: crate::commands::REVIEW_PLACEHOLDER_RULE.to_string(),
+                rule: crate::validation::report::BuiltInPass::ReviewPlaceholder
+                    .as_str()
+                    .to_owned(),
                 severity: Severity::Warn,
                 message: format!(
                     "WARNING: passing external-review placeholder still configured for gate(s): {}. Replace each placeholder with a real review checker before relying on these gates.",
@@ -723,7 +729,9 @@ fn collect_item_link_findings(
                 findings.push(ReportedFinding::new(
                     Some(issue.id.clone()),
                     &Finding {
-                        rule: crate::commands::DANGLING_LINK_RULE.to_string(),
+                        rule: crate::validation::report::BuiltInPass::DanglingItemLink
+                            .as_str()
+                            .to_owned(),
                         severity: Severity::Error,
                         message,
                     },
@@ -777,7 +785,9 @@ fn collect_item_link_findings(
             findings.push(ReportedFinding::new(
                 Some(issue.id.clone()),
                 &Finding {
-                    rule: crate::commands::DANGLING_LINK_RULE.to_string(),
+                    rule: crate::validation::report::BuiltInPass::DanglingItemLink
+                        .as_str()
+                        .to_owned(),
                     severity: Severity::Error,
                     message: format!(
                         "issue {} has a dangling item link '{label}': {detail}",
@@ -1119,7 +1129,7 @@ mod tests {
             |finding| finding.rule == "rules-file" && finding.message.contains("config error")
         ));
         assert!(report.rule_report.findings.iter().any(|finding| {
-            finding.rule == crate::commands::ENFORCEMENT_DRIFT_RULE
+            finding.rule == crate::validation::report::BuiltInPass::EnforcementDrift.as_str()
                 && finding.message.contains("declared-but-unenforced")
                 && finding.message.contains("failed to load")
         }));
@@ -1567,11 +1577,9 @@ mod tests {
             [(VirtualPath::INVARIANTS.repository_relative(), None)],
         )
         .unwrap();
-        assert!(planned
-            .rule_report
-            .findings
-            .iter()
-            .any(|finding| finding.rule == crate::commands::DANGLING_LINK_RULE));
+        assert!(planned.rule_report.findings.iter().any(|finding| {
+            finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
+        }));
     }
 
     #[test]
@@ -1617,7 +1625,7 @@ mod tests {
 
         let live = validate_live(&executor).unwrap();
         assert!(live.rule_report.findings.iter().any(|finding| {
-            finding.rule == crate::commands::DANGLING_LINK_RULE
+            finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
                 && finding.message.contains("'enforces:@/invariant/planned'")
         }));
     }
