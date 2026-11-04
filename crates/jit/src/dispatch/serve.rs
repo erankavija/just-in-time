@@ -117,10 +117,7 @@ fn serve<S: IssueStore>(
             ServeOutcome::AlreadyRunning { pid, port } => already_running(pid, port),
         }
     };
-    Ok(Outcome::Success {
-        response,
-        message: None,
-    })
+    Ok(Outcome::success(response))
 }
 
 command_group! {

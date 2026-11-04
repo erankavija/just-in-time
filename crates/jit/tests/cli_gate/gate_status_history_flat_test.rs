@@ -39,7 +39,7 @@ fn test_gate_status_reused_verdict_names_source_issue_and_run() {
     let summary = temp.run_json(["gate", "status", &id, "tests"]).unwrap();
     let run_id = serde_json::from_value(summary["run_id"].clone()).unwrap();
     let path = temp.root().join(".jit").join(
-        jit::repository_state::VirtualPath::gate_run_record(&run_id)
+        jit::repository_state::VirtualPath::gate_run_record(&id.parse().unwrap(), &run_id)
             .relative()
             .as_path(),
     );

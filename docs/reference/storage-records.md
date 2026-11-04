@@ -58,12 +58,12 @@ page does not restate.
 
 ## Gate Run Records
 
-Running a gate records its result at `.jit/gate-runs/<run-id>/result.json`.
+Running a gate records its result at `.jit/gate-runs/<issue-id>/<run-id>.json`.
 The `<run-id>` is a UUID v4 minted per execution, so runs accumulate: a rerun
-writes a new directory beside the old one, and the history of a gate on an issue
-is the set of run directories whose record names that issue. The record is
-written as pretty-printed JSON in the same redo record as
-its coupled issue and event updates.
+writes a new record beside the old one in its issue's directory, and an issue's
+run history is one listing of that directory. The record is written as
+pretty-printed JSON in the same redo record as its coupled issue and event
+updates.
 
 ```json
 {
@@ -121,10 +121,10 @@ a `null` one alike.
 | Field | Presence | Meaning |
 | --- | --- | --- |
 | `schema_version` | always | Record-format version of this run record; this binary writes `1`. It versions the run record alone, independently of the repository format version in `index.json`. |
-| `run_id` | always | The run's identifier, and the name of its directory under `gate-runs/`. Each execution mints a fresh UUID v4, so a rerun records a new directory instead of overwriting the previous run. |
+| `run_id` | always | The run's identifier, and the stem of its record's file name. Each execution mints a fresh UUID v4, so a rerun records a new file instead of overwriting the previous run. |
 | `gate_key` | always | Key of the gate that ran, as registered in `.jit/gates.toml`. |
 | `stage` | always | Stage the gate ran at: `precheck` or `postcheck`. |
-| `issue_id` | always | Full id of the issue the run is about. An issue's runs are selected by matching this field across the run directories, so `gate-runs/` is flat rather than nested per issue. |
+| `issue_id` | always | Full id of the issue the run is about, and the name of the directory under `gate-runs/` that holds the record. |
 | `commit` | `null` when unset | Git commit the checker was launched at, when the working directory is a git repository. Unset for a run that launched no checker: a verdict taken from an earlier run ran at no commit of its own, and `origin` names the run that carries one. |
 | `branch` | `null` when unset | Git branch the checker was launched on, under the same conditions as `commit`. |
 | `status` | always | The run's verdict: `passed`, `failed`, `error`, or `pending`. For an executed checker the exit status decides it, as [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines. |

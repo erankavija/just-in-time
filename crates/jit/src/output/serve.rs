@@ -1,6 +1,6 @@
 //! The `jit serve` response and its human rendering.
 
-use super::HumanRender;
+use super::{HumanRender, OutputMode};
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -50,7 +50,7 @@ pub enum ServeResponse {
 }
 
 impl HumanRender for ServeResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _mode: OutputMode) -> String {
         match self {
             Self::Stopped { pid, port } => {
                 format!("Server stopped (was PID {pid} on port {port})\n")
