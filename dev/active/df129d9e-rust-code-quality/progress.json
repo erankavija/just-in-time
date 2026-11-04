@@ -1305,7 +1305,7 @@
       "review": "lead PASS: Arc image + token, token-based apply check, conformance test both backends; +42 lines (b697a3f7 ledger)"
     },
     "f56bad8d": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Codex gpt-6-astra",
       "reason": "b697a3f7 one-file domain, small",
       "epic": "b697a3f7 (executed by df129d9e lead; own ledger)",
