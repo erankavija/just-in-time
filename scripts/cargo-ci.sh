@@ -23,17 +23,23 @@ set -euo pipefail
 #   2 — environment problem: Cargo prerequisites are missing or mismatched
 #  75 — infrastructure fault (EX_TEMPFAIL): a compiler wrapper Cargo would use
 #       cannot run, so no step ran; or every failing step is
-#       environment-sensitive and the host was loaded while the suite ran
+#       environment-sensitive and either a step ran out of disk space (ENOSPC)
+#       or the host was loaded while the suite ran
 #
 # Exit 75 is the exec-checker convention that records an `error` gate run
 # instead of `failed`. An `error` run never passes and is never reused through
 # digest reuse, so such a failure is rerun rather than carried to another
 # issue as a verdict. A step is environment-sensitive only when it is
+#   - any step whose output reports ENOSPC ("No space left on device" or
+#     os error 28), except a `test` step that also has a FAIL or ABORT result
+#     for a test whose own output does not report ENOSPC; ENOSPC makes the run
+#     exit 75 whatever the load baseline,
 #   - `test` with at least one nextest TIMEOUT result and no FAIL or ABORT
 #     result, or
 #   - `budget` whose only violation is the suite-duration budget.
 # Any other failing step (fmt, clippy, doctest, excluded-tests, a test FAIL, a
 # footprint budget violation, a reporter failure) makes the run a verdict.
+# The load rule below applies to the TIMEOUT and duration cases only.
 # "Loaded" means the 1-minute load average from /proc/loadavg, sampled before
 # the run's first step, is at least LOAD_THRESHOLD_PER_CPU x `nproc`. The
 # baseline predates the run's own fmt, clippy and build fan-out, so it measures
@@ -69,6 +75,37 @@ sample_load1() {
   awk 'NR == 1 { print $1 }' /proc/loadavg 2>/dev/null || true
 }
 
+# The output reports the disk was full.
+reports_enospc() {
+  [ -f "$1" ] && grep -qE 'No space left on device|os error 28' "$1"
+}
+
+# nextest FAIL or ABORT results whose own output does not report ENOSPC. A
+# result's output runs from its status line to the next status line.
+count_non_enospc_test_failures() {
+  awk '
+    /^[[:space:]]*(TRY [0-9]+ )?[A-Z]+ \[/ {
+      cur = ""
+      if ($0 ~ /^[[:space:]]*(FAIL|ABORT) \[/) {
+        cur = $0
+        sub(/^[[:space:]]*[A-Z]+ \[[^]]*\][[:space:]]*/, "", cur)
+        failed[cur] = 1
+      }
+      next
+    }
+    /No space left on device|os error 28/ { if (cur != "") enospc[cur] = 1 }
+    END { for (name in failed) if (!(name in enospc)) n++; print n + 0 }
+  ' "$1"
+}
+
+# The step failed because the disk was full: its output reports ENOSPC and no
+# test failed for another reason.
+step_failed_by_enospc() {
+  local out="$WORK/$1.out"
+  reports_enospc "$out" || return 1
+  [ "$1" != test ] || [ "$(count_non_enospc_test_failures "$out")" -eq 0 ]
+}
+
 # nextest reported a TIMEOUT and nothing that is a verdict on the test itself.
 test_failed_only_by_timeout() {
   grep -qE '^[[:space:]]*TIMEOUT \[' "$1" &&
@@ -84,9 +121,15 @@ budget_failed_only_by_duration() {
 # Judges the failed steps in $failed_steps against the outputs in $WORK and the
 # baseline load in $baseline_load1 over $cpu_count CPUs; prints the diagnosis and returns
 # the exit status the run takes: 75 for an infrastructure fault, 1 for a verdict.
+# ENOSPC steps need no load; the other environment-sensitive steps do.
 classify_failure() {
   local step threshold
+  local enospc_steps=() load_steps=()
   for step in "${failed_steps[@]}"; do
+    if step_failed_by_enospc "$step"; then
+      enospc_steps+=("$step")
+      continue
+    fi
     case "$step" in
       test) test_failed_only_by_timeout "$WORK/test.out" ;;
       budget) budget_failed_only_by_duration "$WORK/budget.out" ;;
@@ -95,14 +138,19 @@ classify_failure() {
       echo "cargo-ci: verdict (exit 1): step '$step' failed on repository content"
       return 1
     }
+    load_steps+=("$step")
   done
+  if [ "${#load_steps[@]}" -eq 0 ]; then
+    echo "cargo-ci: infrastructure fault (exit 75): failing steps (${failed_steps[*]}) ran out of disk space (ENOSPC: No space left on device); free space and rerun"
+    return 75
+  fi
   threshold=$(awk -v n="$cpu_count" -v r="$LOAD_THRESHOLD_PER_CPU" 'BEGIN { printf "%.2f", n * r }')
   if [ -n "$baseline_load1" ] &&
     awk -v l="$baseline_load1" -v t="$threshold" 'BEGIN { exit !(l + 0 >= t + 0) }'; then
-    echo "cargo-ci: infrastructure fault (exit 75): failing steps (${failed_steps[*]}) are environment-sensitive; baseline load1=${baseline_load1} >= threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); rerun when the host is quiet"
+    echo "cargo-ci: infrastructure fault (exit 75): failing steps (${failed_steps[*]}) are environment-sensitive${enospc_steps[*]:+ (ENOSPC: ${enospc_steps[*]})}; baseline load1=${baseline_load1} >= threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); rerun when the host is quiet"
     return 75
   fi
-  echo "cargo-ci: verdict (exit 1): failing steps (${failed_steps[*]}) are environment-sensitive but baseline load1=${baseline_load1:-unknown} < threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); a quiet-host failure is a real regression to investigate"
+  echo "cargo-ci: verdict (exit 1): failing steps (${load_steps[*]}) are environment-sensitive but baseline load1=${baseline_load1:-unknown} < threshold ${threshold} (${LOAD_THRESHOLD_PER_CPU} x ${cpu_count} CPUs); a quiet-host failure is a real regression to investigate"
   return 1
 }
 
