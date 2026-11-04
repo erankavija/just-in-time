@@ -104,6 +104,7 @@ flowchart LR
 
 | Risk / decision | Resolution and rationale |
 |---|---|
+| External-edge publication | The native manifest contains internal edges. After batch creation, the existing `jit dep add` command attaches each external UUID below to its mapped semantic key before B can pass coverage/review or release work. This is the prescribed [breakdown step 4](../../../.agents/skills/jit-breakdown/SKILL.md) and [bracket-spine protocol](../../../.agents/skills/jit-breakdown/references/bracket-spine.md), not a missing batch feature. Verify the exact stored external edges against these mappings as part of B fidelity; no product/schema extension is required. |
 | Startup overlap | c5062e21-331d-4ab8-8468-3535d16d634f owns startup's adoption of `commands/bootstrap::open_repository`, including recovery; breakdown must re-home its external dependency to `core-story`, which aggregates REQ-01. a807e699 already delivered bootstrap. No duplicate startup leaf. |
 | Git document overlap | `documents` consumes 933ff852 (which transitively consumes 1acfa592 and 83c8632f); d48e28bf and a273667c own reader/path primitives. Re-home 933ff852-7cc9-4902-a424-626b882df531 to `documents`; do not recreate Git operations. |
 | Concurrent peer changes | Re-home fb38bf1f-a4b0-4acf-9b5b-bda244d0ee09 to `api-pruning` and `documents` for moved result types; 487f45a9-bd42-47f8-8dd1-6487ad287793 to `executor-offload` for error classification; f35c86de-e4fa-4ce9-bf48-ee1378115355 to `documents` for dispatch repair. Preserve independent browser, watcher, layout and capture frontier. |
