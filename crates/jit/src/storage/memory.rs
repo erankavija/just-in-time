@@ -334,6 +334,18 @@ impl InMemoryStorage {
         Ok(())
     }
 
+    /// Seed an object of a kind no repository path holds (a FIFO, a socket) at
+    /// `path`.
+    #[cfg(test)]
+    pub(crate) fn add_repository_special(&self, path: VirtualPath) {
+        self.insert_repo_entry(path, b"special", |object| RepositoryEntry::Unsupported {
+            identity: object.identity().clone(),
+            reason: "special object".to_string(),
+            mode: FileMode::Regular,
+        })
+        .expect("add_repository_special requires a canonical repository path");
+    }
+
     /// Seed a symlink at `path` whose link text names `target`.
     #[cfg(test)]
     pub(crate) fn add_repository_symlink(&self, path: VirtualPath, target: &VirtualPath) {
