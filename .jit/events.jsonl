@@ -24241,3 +24241,4 @@
 {"from":"in_progress","id":"07dfd127-b3c8-4904-8195-4f8d67e49958","issue_id":"ce221384-7b46-41b6-968a-cbeee7b600d3","timestamp":"2026-11-04T12:58:57.564556909Z","to":"done","type":"issue_state_changed"}
 {"id":"38ae04be-02ac-4168-8ce3-576202523769","issue_id":"ce221384-7b46-41b6-968a-cbeee7b600d3","timestamp":"2026-11-04T12:58:57.564556909Z","type":"issue_completed"}
 {"from":"backlog","id":"ecb44a46-c245-4264-b48c-059038c900ec","issue_id":"91edfa5c-2663-4fcb-a9d0-2817bc60664b","timestamp":"2026-11-04T12:58:57.677634791Z","to":"ready","type":"issue_state_changed"}
+{"assignee":"agent:9876a23a-lead","id":"b4615f74-83cd-47a9-bca1-aee763c2f117","issue_id":"91edfa5c-2663-4fcb-a9d0-2817bc60664b","timestamp":"2026-11-04T12:59:04.246688216Z","type":"issue_claimed"}
