@@ -23,7 +23,7 @@ use jit::cli::{
 use jit::commands::{
     parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
 };
-use jit::dispatch::{invariant, validate, CommandContext};
+use jit::dispatch::{invariant, resolve_issue, resolve_issue_filter, validate, CommandContext};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{claim_json_error, classify, command_json_error, profile_json_error};
@@ -51,6 +51,28 @@ fn exit_recovery_failed(error: &anyhow::Error, json: bool) -> ! {
     }
     eprintln!("Recovery failed: {error}");
     std::process::exit(1);
+}
+
+/// Render completed findings under the machine-readable contract.
+///
+/// Success keeps its command-specific report shape. A failure moves that same report under the canonical envelope's
+/// `error.details`; the registered code is the sole authority for the process
+/// status. The owning command writes exactly one payload, so the top-level
+/// renderer cannot append a second document.
+fn render_findings_json(
+    details: serde_json::Value,
+    message: String,
+    failure_code: Option<ErrorCode>,
+) -> Result<()> {
+    if let Some(code) = failure_code {
+        let output = JsonError::new(code, message).with_details(details);
+        println!("{}", output.to_json_string()?);
+        std::process::exit(output.exit_code().code());
+    }
+
+    let output = JsonOutput::success(details).with_message(message);
+    println!("{}", output.to_json_string()?);
+    Ok(())
 }
 
 /// Render a failed `gate evaluate` / `gate evaluate-all` outcome and terminate appropriately.
@@ -449,14 +471,11 @@ fn render_profile_difference(
                 plans.count()
             )
         };
-        if conflicted > 0 {
-            let output = JsonError::new(ErrorCode::ValidationFailed, message).with_details(details);
-            println!("{}", output.to_json_string()?);
-            std::process::exit(output.exit_code().code());
-        }
-        let output = JsonOutput::success(details).with_message(message);
-        println!("{}", output.to_json_string()?);
-        return Ok(());
+        return render_findings_json(
+            details,
+            message,
+            (conflicted > 0).then_some(ErrorCode::ValidationFailed),
+        );
     }
 
     print_profile_results(plans);
@@ -796,17 +815,6 @@ fn print_dependency_tree(nodes: &[jit::output::DependencyTreeNode], prefix: &str
     }
 }
 
-/// Parse and resolve one user-supplied issue-id argument: the CLI's single
-/// prefix boundary, applied before any executor call.
-///
-/// # Errors
-///
-/// [`InvalidIdPrefixError`](jit::domain::identity::InvalidIdPrefixError) before
-/// any read, then the resolver's not-found or ambiguous-id error.
-fn resolve_issue_arg<S: IssueStore>(storage: &S, requested: &str) -> Result<IssueId> {
-    storage.resolve_issue_id(&requested.parse::<IssueIdPrefix>()?)
-}
-
 /// Resolve a `jit dep add` batch's targets, naming every unresolvable one in a
 /// single [`DependencyBatchRejectedError`](jit::errors::DependencyBatchRejectedError).
 fn resolve_dependency_args<S: IssueStore>(
@@ -816,7 +824,7 @@ fn resolve_dependency_args<S: IssueStore>(
 ) -> Result<Vec<IssueId>> {
     let (resolved, rejected): (Vec<_>, Vec<_>) = requested
         .iter()
-        .map(|id| (id, resolve_issue_arg(storage, id)))
+        .map(|id| (id, resolve_issue(storage, id)))
         .partition(|(_, result)| result.is_ok());
     if rejected.is_empty() {
         resolved.into_iter().map(|(_, result)| result).collect()
@@ -869,23 +877,6 @@ fn resolve_dependency_removal_args<S: IssueStore>(
             Ok((matched, unmatched))
         },
     )
-}
-
-/// Parse an issue-id filter into the prefix that matches stored ids: the
-/// canonical id it resolves to or, when it names no live issue, the parsed
-/// input itself, so records of a deleted issue still match.
-///
-/// # Errors
-///
-/// [`InvalidIdPrefixError`](jit::domain::identity::InvalidIdPrefixError) before
-/// any read, or [`AmbiguousIdError`](jit::storage::AmbiguousIdError).
-fn resolve_issue_filter_arg<S: IssueStore>(storage: &S, requested: &str) -> Result<IssueIdPrefix> {
-    let prefix = requested.parse::<IssueIdPrefix>()?;
-    match storage.resolve_issue_id(&prefix) {
-        Ok(id) => Ok(IssueIdPrefix::from(&id)),
-        Err(error) if error.is::<jit::storage::IssueNotFoundError>() => Ok(prefix),
-        Err(error) => Err(error),
-    }
 }
 
 /// Build the [`IssueShowResponse`](jit::output::IssueShowResponse) for a single
@@ -1922,10 +1913,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                         let responses = ids
                             .iter()
                             .map(|id| {
-                                build_issue_show_response(
-                                    &executor,
-                                    &resolve_issue_arg(&storage, id)?,
-                                )
+                                build_issue_show_response(&executor, &resolve_issue(&storage, id)?)
                             })
                             .collect::<Result<Vec<_>>>()?;
                         let output = jit::output::JsonOutput::success(serde_json::to_value(
@@ -1940,7 +1928,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                         for id in &ids {
                             let response = build_issue_show_response(
                                 &executor,
-                                &resolve_issue_arg(&storage, id)?,
+                                &resolve_issue(&storage, id)?,
                             )?;
                             print_issue_show_human(&response);
                         }
@@ -1972,7 +1960,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                         }
                     }
 
-                    match resolve_issue_arg(&storage, requested)
+                    match resolve_issue(&storage, requested)
                         .and_then(|id| executor.issues().show_issue(&id))
                     {
                         Ok(issue) => {
@@ -2056,7 +2044,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     // multi-id run fails fast on the first bad id.
                     let mut statuses = Vec::with_capacity(ids.len());
                     for id in &ids {
-                        match resolve_issue_arg(&storage, id)
+                        match resolve_issue(&storage, id)
                             .and_then(|full_id| executor.issues().show_issue(&full_id))
                         {
                             Ok(issue) => {
@@ -2094,7 +2082,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     // lives in `IssueOps::issue_children`; this arm only
                     // dispatches, renders, and routes an id failure through the
                     // JSON error path.
-                    match resolve_issue_arg(&storage, &id)
+                    match resolve_issue(&storage, &id)
                         .and_then(|full_id| executor.issues().issue_children(&full_id))
                     {
                         Ok(response) => {
@@ -2132,7 +2120,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     // Orchestration lives in `IssueOps::issue_progress`;
                     // this arm dispatches, renders, and routes an id failure
                     // through the JSON error path.
-                    match resolve_issue_arg(&storage, &id)
+                    match resolve_issue(&storage, &id)
                         .and_then(|full_id| executor.issues().issue_progress(&full_id))
                     {
                         Ok(response) => {
@@ -2428,7 +2416,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     //
                     let allow_deletion =
                         std::env::var("JIT_ALLOW_DELETION").unwrap_or_default() == "1";
-                    let id = resolve_issue_arg(&storage, &id)?;
+                    let id = resolve_issue(&storage, &id)?;
                     if let Err(e) = executor
                         .issues()
                         .confirm_deletion_allowed(&id, allow_deletion)
@@ -2676,10 +2664,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                         "malformed --anchor '{pair}'; the role (left of '=') must not be empty"
                     ));
                 }
-                bindings.insert(role.to_string(), resolve_issue_arg(&storage, id)?);
+                bindings.insert(role.to_string(), resolve_issue(&storage, id)?);
             }
 
-            let container = resolve_issue_arg(&storage, &container)?;
+            let container = resolve_issue(&storage, &container)?;
             let (result, warnings) = executor
                 .templates()
                 .apply_template(&template, &container, &bindings, force)?;
@@ -2701,7 +2689,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     RedundancyPolicy::Reject
                 };
                 let output_ctx = OutputContext::new(quiet, json);
-                let from_id = match resolve_issue_arg(&storage, &from_id) {
+                let from_id = match resolve_issue(&storage, &from_id) {
                     Ok(id) => id,
                     Err(e) => handle_json_error!(
                         json,
@@ -2783,7 +2771,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             }
             DepCommands::Rm { from_id, to_ids } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let from_id = match resolve_issue_arg(&storage, &from_id) {
+                let from_id = match resolve_issue(&storage, &from_id) {
                     Ok(id) => id,
                     Err(e) => handle_json_error!(
                         json,
@@ -3300,7 +3288,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     // Findings view selects exactly one gate's latest run and
                     // reports only its structured findings + verdict.
                     let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate status", json)?;
-                    let id = resolve_issue_arg(&storage, &id)
+                    let id = resolve_issue(&storage, &id)
                         .or_else(|e| report_gate_check_error(e, json))?;
                     match executor.gates().get_last_gate_run(&id, &gate_key) {
                         Ok(Some(result)) => {
@@ -3361,7 +3349,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                         None => None,
                     };
 
-                    let id = resolve_issue_arg(&storage, &id)
+                    let id = resolve_issue(&storage, &id)
                         .or_else(|e| report_gate_check_error(e, json))?;
                     let runs = executor
                         .gates()
@@ -3403,7 +3391,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     // form, where neither stream flag is set) includes stdout.
                     let want_stdout = stdout || !stderr;
                     let want_stderr = stderr;
-                    let id = resolve_issue_arg(&storage, &id)
+                    let id = resolve_issue(&storage, &id)
                         .or_else(|e| report_gate_check_error(e, json))?;
 
                     match executor.gates().get_last_gate_run(&id, &gate_key) {
@@ -3468,7 +3456,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     // two positionals are almost certainly swapped, so emit an
                     // actionable did-you-mean rather than misparsing into
                     // "issue not found".
-                    let id = match resolve_issue_arg(&storage, &id) {
+                    let id = match resolve_issue(&storage, &id) {
                         Ok(full_id) => full_id,
                         Err(e) => {
                             let id_is_gate = executor
@@ -3476,7 +3464,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                                 .list_gates()
                                 .map(|gates| gates.iter().any(|g| g.key.as_str() == id))
                                 .unwrap_or(false);
-                            if id_is_gate && resolve_issue_arg(&storage, &gate_key).is_ok() {
+                            if id_is_gate && resolve_issue(&storage, &gate_key).is_ok() {
                                 let transposed =
                                     jit::commands::GateStatusArgumentsTransposedError {
                                         issue: gate_key,
@@ -3539,7 +3527,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             GateCommands::StatusAll { id, full } => {
                 use jit::domain::GateStatus;
                 let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue_arg(&storage, &id)?;
+                let id = resolve_issue(&storage, &id)?;
                 // Latest recorded run of each required gate.
                 let (results, _) = executor.gates().get_last_gate_runs_for_issue(&id)?;
                 // Readiness across EVERY required gate (auto + manual).
@@ -3647,7 +3635,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 let gate_keys = parse_gate_keys(gate_keys, json)?;
 
                 let output_ctx = OutputContext::new(quiet, json);
-                match resolve_issue_arg(&storage, &id)
+                match resolve_issue(&storage, &id)
                     .and_then(|full_id| executor.gates().add_gates(&full_id, &gate_keys))
                 {
                     Ok((result, warnings)) => {
@@ -3722,7 +3710,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             } => {
                 let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate evaluate", json)?;
                 let output_ctx = OutputContext::new(quiet, json);
-                match resolve_issue_arg(&storage, &id)
+                match resolve_issue(&storage, &id)
                     .and_then(|full_id| executor.gates().pass_gate(&full_id, &gate_key, by, force))
                 {
                     Ok(outcome) => {
@@ -3758,7 +3746,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             }
             GateCommands::EvaluateAll { id, by, force } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                match resolve_issue_arg(&storage, &id)
+                match resolve_issue(&storage, &id)
                     .and_then(|full_id| executor.gates().pass_all_gates(&full_id, by, force))
                 {
                     Ok(outcome) => {
@@ -3831,7 +3819,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 let resolved: Vec<(String, Result<IssueId>)> = ids
                     .into_iter()
                     .map(|requested| {
-                        let id = resolve_issue_arg(&storage, &requested);
+                        let id = resolve_issue(&storage, &requested);
                         (requested, id)
                     })
                     .collect();
@@ -3946,7 +3934,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 let gate_key = parse_gate_key(gate_key, json)?;
 
                 let output_ctx = OutputContext::new(quiet, json);
-                match resolve_issue_arg(&storage, &id)
+                match resolve_issue(&storage, &id)
                     .and_then(|full_id| executor.gates().fail_gate(&full_id, &gate_key, by))
                 {
                     Ok(warnings) => {
@@ -4112,7 +4100,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     let mut lock_timed_out = false;
 
                     for id in &ids {
-                        match resolve_issue_arg(&storage, id).and_then(|full_id| {
+                        match resolve_issue(&storage, id).and_then(|full_id| {
                             executor.gates().apply_gate_preset(
                                 &full_id,
                                 &name,
@@ -4202,7 +4190,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
                 jit::cli::PresetCommands::Create { from_issue, name } => {
                     use jit::output::JsonOutput;
-                    match resolve_issue_arg(&storage, &from_issue).and_then(|from_issue| {
+                    match resolve_issue(&storage, &from_issue).and_then(|from_issue| {
                         executor.gates().create_gate_preset(&name, &from_issue)
                     }) {
                         Ok(path) => {
@@ -4232,7 +4220,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         Commands::Graph(graph_cmd) => match graph_cmd {
             GraphCommands::Deps { id, depth } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue_arg(&storage, &id)?;
+                let id = resolve_issue(&storage, &id)?;
 
                 if json {
                     // For JSON output, use tree structure
@@ -4282,7 +4270,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             }
             GraphCommands::Rdeps { id, depth } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue_arg(&storage, &id)?;
+                let id = resolve_issue(&storage, &id)?;
                 let issues = executor.graph().show_rdeps_with_depth(&id, depth)?;
                 if json {
                     use jit::domain::MinimalIssue;
@@ -4333,7 +4321,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             GraphCommands::Tree { root } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 let root = root
-                    .map(|root| resolve_issue_arg(&storage, &root))
+                    .map(|root| resolve_issue(&storage, &root))
                     .transpose()?;
                 let response = executor.graph().resolve_hierarchy_tree(root.as_ref())?;
 
@@ -4405,7 +4393,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
                 let output_ctx = OutputContext::new(quiet, false);
                 let scope = scope
-                    .map(|scope| resolve_issue_arg(&storage, &scope))
+                    .map(|scope| resolve_issue(&storage, &scope))
                     .transpose()?;
 
                 // `batch` runs a distinct projection (issue definitions plus
@@ -4464,7 +4452,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 limit,
             } => {
                 let issue = issue_id
-                    .map(|id| resolve_issue_filter_arg(&storage, &id))
+                    .map(|id| resolve_issue_filter(&storage, &id))
                     .transpose()?;
                 let events = executor.queries().query_events(event_type, issue, limit)?;
                 if json {
@@ -4490,7 +4478,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 skip_scan,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue_arg(&storage, &id)?;
+                let id = resolve_issue(&storage, &id)?;
                 let (result, warnings) = executor.documents().add_document_reference(
                     &id,
                     &path,
@@ -4533,7 +4521,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 use jit::output::JsonOutput;
 
                 let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue_arg(&storage, &id)?;
+                let id = resolve_issue(&storage, &id)?;
                 let result = executor.documents().list_document_references(&id)?;
 
                 if json {
@@ -4569,7 +4557,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
             DocCommands::Remove { id, path } => {
-                let id = resolve_issue_arg(&storage, &id)?;
+                let id = resolve_issue(&storage, &id)?;
                 let (result, warnings) =
                     executor.documents().remove_document_reference(&id, &path)?;
                 let output_ctx = OutputContext::new(quiet, json);
@@ -4593,7 +4581,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
             DocCommands::Show { id, path, at } => {
-                let id = resolve_issue_arg(&storage, &id)?;
+                let id = resolve_issue(&storage, &id)?;
                 let result =
                     executor
                         .documents()
@@ -4620,7 +4608,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             DocCommands::Dir { id, area } => {
                 let output_ctx = OutputContext::new(quiet, json);
 
-                match resolve_issue_arg(&storage, &id).and_then(|full_id| {
+                match resolve_issue(&storage, &id).and_then(|full_id| {
                     executor
                         .documents()
                         .resolve_issue_artifact_directory(&full_id, &area)
@@ -4731,7 +4719,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 use jit::output::JsonOutput;
 
                 let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue_arg(&storage, &id)?;
+                let id = resolve_issue(&storage, &id)?;
                 let result = executor.documents().document_history(&id, &path)?;
 
                 if json {
@@ -4751,7 +4739,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
             DocCommands::Diff { id, path, from, to } => {
-                let id = resolve_issue_arg(&storage, &id)?;
+                let id = resolve_issue(&storage, &id)?;
                 let result =
                     executor
                         .documents()
@@ -4772,7 +4760,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     use jit::output::JsonOutput;
 
                     let output_ctx = OutputContext::new(quiet, json);
-                    let id = resolve_issue_arg(&storage, &id)?;
+                    let id = resolve_issue(&storage, &id)?;
                     let result = executor
                         .documents()
                         .list_document_assets(&id, &path, rescan)?;
@@ -4908,7 +4896,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 use jit::output::JsonOutput;
 
                 let output_ctx = OutputContext::new(quiet, json);
-                let scope = DocumentScope::parse(&scope, |id| resolve_issue_arg(&storage, id))?;
+                let scope = DocumentScope::parse(&scope, |id| resolve_issue(&storage, id))?;
                 let result = executor.documents().check_document_links(&scope)?;
 
                 if json {
@@ -4997,7 +4985,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
             ArchiveCommands::Container { id, execute } => {
-                let id = resolve_issue_arg(&storage, &id)?;
+                let id = resolve_issue(&storage, &id)?;
                 if execute {
                     let result = executor.archive().execute_archive_container(&id)?;
                     if json {
@@ -5426,14 +5414,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     } else {
                         "Configuration is valid".to_string()
                     };
-                    if has_errors {
-                        let output = JsonError::new(ErrorCode::ValidationFailed, message)
-                            .with_details(details);
-                        println!("{}", output.to_json_string()?);
-                        std::process::exit(output.exit_code().code());
-                    }
-                    let output = JsonOutput::success(details).with_message(message);
-                    println!("{}", output.to_json_string()?);
+                    render_findings_json(
+                        details,
+                        message,
+                        has_errors.then_some(ErrorCode::ValidationFailed),
+                    )?;
                 } else {
                     let findings: Vec<_> = result
                         .errors
@@ -5651,33 +5636,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 output_ctx.print_data(format!("  blocked: {}", summary.blocked))?;
             }
         }
-        Commands::Validate {
-            id,
-            explain,
-            fix,
-            dry_run,
-            branch_drift,
-            divergence,
-            leases,
-            scope,
-            rule,
-        } => {
-            return validate::dispatch(
-                validate::ValidateCommand::Validate {
-                    id,
-                    explain,
-                    fix,
-                    dry_run,
-                    branch_drift,
-                    divergence,
-                    leases,
-                    scope,
-                    rule,
-                },
-                &ctx,
-                &mut io::stdout(),
-                &mut io::stderr(),
-            );
+        Commands::Validate(args) => {
+            return validate::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Recover => {
             use jit::output::{JsonOutput, OutputContext};
@@ -5989,7 +5949,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match resolve_issue_arg(&storage, &issue_id).and_then(|full_id| {
+                match resolve_issue(&storage, &issue_id).and_then(|full_id| {
                     executor
                         .claims()
                         .acquire(&full_id, ttl, agent_id.as_deref(), reason.as_deref())
@@ -6029,7 +5989,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             ClaimCommands::Release { issue_id } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match resolve_issue_arg(&storage, &issue_id)
+                match resolve_issue(&storage, &issue_id)
                     .and_then(|full_id| executor.claims().release_by_issue(&full_id))
                 {
                     Ok((released, warnings)) => {
@@ -6148,7 +6108,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 use jit::output::{JsonOutput, LeaseListResponse};
 
                 match issue
-                    .map(|id| resolve_issue_filter_arg(&storage, &id))
+                    .map(|id| resolve_issue_filter(&storage, &id))
                     .transpose()
                     .and_then(|issue| executor.claims().status(issue.as_ref(), agent.as_deref()))
                 {
@@ -6430,7 +6390,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
 
                 // Parse scope
                 let snapshot_scope =
-                    SnapshotScope::parse(&scope, |id| resolve_issue_arg(&storage, id))?;
+                    SnapshotScope::parse(&scope, |id| resolve_issue(&storage, id))?;
 
                 // Parse format
                 let snapshot_format = SnapshotFormat::parse(&format)

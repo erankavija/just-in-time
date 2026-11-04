@@ -167,6 +167,8 @@ fn test_validate_id_json_reports_findings_and_exits_nonzero() {
     let out = assert.get_output().stdout.clone();
     assert_eq!(assert.get_output().status.code(), Some(4));
     let json: Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert!(assert.get_output().stderr.is_empty());
     let findings = json["error"]["details"]["findings"].as_array().unwrap();
     assert!(findings.iter().any(|f| f["rule"] == "epic-needs-component"));
     assert!(findings.iter().any(|f| f["severity"] == "error"));
@@ -695,7 +697,10 @@ fn test_validate_explain_marks_unresolved_container_pointer_as_failed() {
         .assert()
         .failure();
     let out = assert.get_output().stdout.clone();
+    assert_eq!(assert.get_output().status.code(), Some(4));
     let json: Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
+    assert!(assert.get_output().stderr.is_empty());
     let outcomes = json["error"]["details"]["outcomes"].as_array().unwrap();
     let outcome = outcomes
         .iter()
@@ -755,6 +760,9 @@ fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application(
         .assert()
         .failure();
     let failed_json: Value = serde_json::from_slice(&failed.get_output().stdout).unwrap();
+    assert_eq!(failed.get_output().status.code(), Some(4));
+    assert_eq!(failed_json["error"]["code"], "VALIDATION_FAILED");
+    assert!(failed.get_output().stderr.is_empty());
     let findings = failed_json["error"]["details"]["findings"]
         .as_array()
         .unwrap();

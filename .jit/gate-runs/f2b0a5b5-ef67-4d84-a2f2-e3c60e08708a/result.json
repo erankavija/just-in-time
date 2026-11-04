@@ -1,0 +1,85 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "554cfa8c632931de4576b8df9d9f7ee24610d37d",
+  "completed_at": "2026-11-04T03:02:31.819340260Z",
+  "duration_ms": 408084,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": ".jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json",
+        "id": "F1",
+        "line": 7,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The container retains the harmless archived 2195c98f dependency after its specific prerequisites were re-homed to roots."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F2",
+        "line": 1800,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "gate-and-search-command-docs carries history-boundary membership although only the per-key-gate-runs sink consumes it."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F3",
+        "line": 1850,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f8a6b298/requirement/REQ-01",
+          "@/inv/canonical-cutover"
+        ],
+        "severity": "medium",
+        "summary": "The multi-format rewrite tooling is borderline large but remains one cohesive non-release rewrite with one validation boundary."
+      },
+      {
+        "disposition": "advisory",
+        "id": "F4",
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "Forty-six footprint overlaps across shared files require serialization or rebasing during execution."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F5",
+        "line": 840,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "After DEC-24 absorption, lease-per-issue-records retains the original four-file footprint and sizing rationale, omitting the absorbed validation, recovery, CLI, test, and documentation footprint."
+      },
+      {
+        "disposition": "advisory",
+        "file": ".jit/issues/97f5f2b7-5c95-441f-ae03-d8feeedc8420.json",
+        "id": "F6",
+        "line": 10,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The stored torn-tail-marker-removal description contains an additional steward-decision section absent from the authoritative manifest."
+      }
+    ],
+    "summary": "All mandatory checks pass and the 40-entry active graph is structurally faithful; six non-blocking geometry, sizing, footprint, overlap, and prose-fidelity advisories remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "b06cee74-7635-49c0-bc13-448bcfa28324",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f2b0a5b5-ef67-4d84-a2f2-e3c60e08708a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:55:43.735143036Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "No blocking findings. The authoritative 40-entry manifest validates with zero warnings; render check, native batch dry-run (40 issues, 59 edges), and `jit validate` all pass. All 40 key→UUID mappings resolve, intra-manifest edges match, nine roots attach to the breakdown node, and the container attaches to all three sinks. `planning` was neither persisted nor emitted by the dry-run.\n\nFinest-tier assignment simulation:\n\n| Key / issue | Coherent change | Observable test boundary | Footprint credible | One focused cycle | Not a chain link | Result |\n|---|---|---|---|---|---|---|\n| gate-state-last-run | Yes | Gate evaluation unit tests | Yes | Yes | Yes | Pass |\n| gate-run-latest-captures | Yes | Gate capture tests | Yes | Yes | Yes | Pass |\n| gate-run-load-by-issue | Yes | Storage conformance | Yes | Yes | Yes | Pass |\n| gate-latest-run-reads | Yes | CLI gate integration | Yes | Yes | Yes | Pass |\n| gate-verdict-provenance | Yes | Gate reuse unit tests | Yes | Yes | Yes | Pass |\n| gate-verdict-record-writes | Yes | Mutation finalizer tests | Yes | Yes | Yes | Pass |\n| gate-verdict-reuse-lookup | Yes | Gate reuse unit tests | Yes | Yes | Yes | Pass |\n| gate-run-shared-reader | Yes | Storage conformance | Yes | Yes | Yes | Pass |\n| gate-run-per-issue-layout | Yes | Storage conformance | Yes | Yes | Yes | Pass |\n| lease-test-only-api-removal | Yes | Claim coordinator tests | Yes | Yes | Yes | Pass |\n| lease-reader-migration | Yes | Lease reader tests | Yes | Yes | Yes | Pass |\n| lease-ops-through-lock | Yes | Claim coordinator tests | Yes | Yes | Yes | Pass |\n| lease-mutation-guard-through-lock | Yes | CLI lease enforcement | Yes | Yes | Yes | Pass |\n| lease-recover-through-lock | Yes | Claim CLI integration | Yes | Yes | Yes | Pass |\n| lease-store-fixtures | Yes | Claim CLI integration | Yes | Yes | Yes | Pass |\n| lease-per-issue-records | Yes, per DEC-24 | Claim coordinator tests | Metadata incomplete | Yes | Yes | Advisory |\n| lease-issue-addressed-ops | Yes | Claim CLI integration | Yes | Yes | Yes | Pass |\n| lease-interruption-matrix | Yes | Claim coordinator tests | Yes | Yes | Yes | Pass |\n| claim-acquire-event-from-assignee | Yes | Mutation finalizer tests | Yes | Yes | Yes | Pass |\n| event-log-read-rule | Yes | Event-log parser tests | Yes | Yes | Yes | Pass |\n| torn-tail-marker-removal | Yes | Mutation finalizer tests | Yes | Yes | Yes | Pass |\n| validation-skips-event-log | Yes | Validation unit tests | Yes | Yes | Yes | Pass |\n| mutation-event-tail-captures | Yes | Mutation capture tests | Yes | Yes | Yes | Pass |\n| archive-execution-record-type | Yes | Archive domain tests | Yes | Yes | Yes | Pass |\n| archive-evidence-writes | Yes | Archive finalizer tests | Yes | Yes | Yes | Pass |\n| archive-execute-reads-evidence | Yes | Archive finalizer tests | Yes | Yes | Yes | Pass |\n| archive-preview-reads-evidence | Yes | Archive command tests | Yes | Yes | Yes | Pass |\n| capture-refuses-whole-event-log | Yes | Capture-spec tests | Yes | Yes | Yes | Pass |\n| redo-record-refuses-log-rewrite | Yes | Redo-record tests | Yes | Yes | Yes | Pass |\n| search-excludes-history | Yes | Search unit tests | Yes | Yes | Yes | Pass |\n| storage-records-per-key-reference | Yes | Reference golden test | Yes | Yes | Yes | Pass |\n| history-isolation-test | Yes | CLI integration | Yes | Yes | Yes | Pass |\n| storage-format-history-docs | Yes | Documentation review | Yes | Yes | Yes | Pass |\n| lease-operator-docs | Yes | Documentation review | Yes | Yes | Yes | Pass |\n| gate-and-search-command-docs | Yes | Documentation review | Yes | Yes | Yes | Pass |\n| format-rewrite-tooling | Yes | Validation on copies | Yes | Borderline but cohesive | Yes | Advisory |\n| format-cutover | Yes | Validation per repository | Yes | Yes; cutover only | Yes | Pass |\n\n1. **F1 — Low; advisory; issue-impact.** The container retains the harmless archived `2195c98f` dependency after its specific prerequisites were re-homed to roots. Location: `.jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json:7`.\n\n2. **F2 — Low; advisory; issue-impact.** `gate-and-search-command-docs` carries `story:history-boundary`, although only the `per-key-gate-runs` sink consumes it. Location: `dev/active/f8a6b298-history-independent-reads/breakdown.json:1800`.\n\n3. **F3 — Medium; advisory; issue-impact.** `format-rewrite-tooling` remains borderline large, but it is one cohesive, non-release rewrite with one validation boundary. Location: `dev/active/f8a6b298-history-independent-reads/breakdown.json:1850`. References: `@/issue/f8a6b298/requirement/REQ-01`, `@/inv/canonical-cutover`.\n\n4. **F4 — Low; advisory; issue-impact.** The validator reports 46 shared-file footprint overlaps; execution must serialize or rebase those edits.\n\n5. **F5 — Medium; advisory; issue-impact.** After DEC-24 absorbed `lease-index-machinery-removal` into `lease-per-issue-records`, the surviving planning footprint and sizing rationale still describe only the original four-file store change. They omit the absorbed validation, recovery, CLI, test, and documentation footprint, so overlap reporting is incomplete. The settled merge itself is not challenged. Location: `dev/active/f8a6b298-history-independent-reads/breakdown.json:840`.\n\n6. **F6 — Low; advisory; issue-impact.** The stored `torn-tail-marker-removal` description contains an additional steward-decision section absent from the authoritative manifest. Titles, criteria, labels, gates, priority, and edges still match, so this is a prose-fidelity mismatch. Location: `.jit/issues/97f5f2b7-5c95-441f-ae03-d8feeedc8420.json:10`.\n\nTotal findings: 6\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All mandatory checks pass and the 40-entry active graph is structurally faithful; six non-blocking geometry, sizing, footprint, overlap, and prose-fidelity advisories remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The container retains the harmless archived 2195c98f dependency after its specific prerequisites were re-homed to roots.\",\"file\":\".jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json\",\"line\":7},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"gate-and-search-command-docs carries history-boundary membership although only the per-key-gate-runs sink consumes it.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":1800},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The multi-format rewrite tooling is borderline large but remains one cohesive non-release rewrite with one validation boundary.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":1850,\"references\":[\"@/issue/f8a6b298/requirement/REQ-01\",\"@/inv/canonical-cutover\"]},{\"id\":\"F4\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Forty-six footprint overlaps across shared files require serialization or rebasing during execution.\"},{\"id\":\"F5\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"After DEC-24 absorption, lease-per-issue-records retains the original four-file footprint and sizing rationale, omitting the absorbed validation, recovery, CLI, test, and documentation footprint.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":840},{\"id\":\"F6\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The stored torn-tail-marker-removal description contains an additional steward-decision section absent from the authoritative manifest.\",\"file\":\".jit/issues/97f5f2b7-5c95-441f-ae03-d8feeedc8420.json\",\"line\":10}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

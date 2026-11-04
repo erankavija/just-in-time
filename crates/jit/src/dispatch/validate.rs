@@ -1,7 +1,7 @@
 //! `jit validate` handlers.
 
-use super::{CommandContext, Outcome};
-use crate::domain::identity::IssueIdPrefix;
+use super::{resolve_issue, CommandContext, Outcome};
+use crate::cli::ValidateArgs;
 use crate::output::{
     ErrorCode, RepositoryValidationResponse, ValidateResponse, ValidationCheck,
     ValidationChecksResponse, ValidationFixResponse, ValidationWarning,
@@ -9,26 +9,11 @@ use crate::output::{
 use crate::storage::{IssueStore, RepositoryStateStore};
 use crate::validation::report::RuleReport;
 
-/// The validate leaf passed from the CLI's top-level command match.
-pub enum ValidateCommand {
-    Validate {
-        id: Option<String>,
-        explain: bool,
-        fix: bool,
-        dry_run: bool,
-        branch_drift: bool,
-        divergence: bool,
-        leases: bool,
-        scope: Option<String>,
-        rule: Option<String>,
-    },
-}
-
 fn validate<S: IssueStore + RepositoryStateStore>(
     ctx: &CommandContext<'_, S>,
-    command: ValidateCommand,
+    args: ValidateArgs,
 ) -> anyhow::Result<Outcome<ValidateResponse>> {
-    let ValidateCommand::Validate {
+    let ValidateArgs {
         id,
         explain,
         fix,
@@ -38,7 +23,7 @@ fn validate<S: IssueStore + RepositoryStateStore>(
         leases,
         scope,
         rule,
-    } = command;
+    } = args;
     if divergence {
         anyhow::bail!(crate::errors::InvalidArgumentError::new(
             "`--divergence` is not a `jit validate` flag. Use \
@@ -82,15 +67,12 @@ fn validate<S: IssueStore + RepositoryStateStore>(
     }
 
     let id = id
-        .map(|requested| {
-            let prefix = requested.parse::<IssueIdPrefix>()?;
-            ctx.executor.storage().resolve_issue_id(&prefix)
-        })
+        .as_deref()
+        .map(|requested| resolve_issue(ctx.executor.storage(), requested))
         .transpose()?;
 
     if let Some(container) = scope {
-        let prefix = container.parse::<IssueIdPrefix>()?;
-        let container = ctx.executor.storage().resolve_issue_id(&prefix)?;
+        let container = resolve_issue(ctx.executor.storage(), &container)?;
         let report = ctx.executor.validation().validate_scope(&container)?;
         return Ok(validation_findings(report, ValidationMode::Scope));
     }
@@ -116,10 +98,7 @@ fn validate<S: IssueStore + RepositoryStateStore>(
                 report: Box::new(response),
             }
         } else {
-            Outcome::Success {
-                response: ValidateResponse::Explanation(response),
-                message: Some("Validation passed".to_owned()),
-            }
+            Outcome::success_with(ValidateResponse::Explanation(response), "Validation passed")
         };
         return Ok(outcome);
     }
@@ -171,10 +150,7 @@ fn validate<S: IssueStore + RepositoryStateStore>(
             "Validation failed".to_owned()
         };
         return Ok(if response.valid {
-            Outcome::Success {
-                response: ValidateResponse::Checks(response),
-                message: Some(message),
-            }
+            Outcome::success_with(ValidateResponse::Checks(response), message)
         } else {
             Outcome::Findings {
                 code: ErrorCode::ValidationFailed,
@@ -188,10 +164,7 @@ fn validate<S: IssueStore + RepositoryStateStore>(
         let (fixes_applied, messages) =
             ctx.executor.validation().validate_with_fix(true, dry_run)?;
         let response = ValidationFixResponse::new(fixes_applied, dry_run, messages);
-        return Ok(Outcome::Success {
-            response: ValidateResponse::Fix(response),
-            message: None,
-        });
+        return Ok(Outcome::success(ValidateResponse::Fix(response)));
     }
 
     let (validation_report, divergence_report) = ctx
@@ -254,10 +227,18 @@ fn validate<S: IssueStore + RepositoryStateStore>(
             report: Box::new(response),
         }
     } else {
-        Outcome::Success {
-            response: ValidateResponse::Repository(response),
-            message: Some(message),
+        let mut warnings = Vec::new();
+        if response.warning_count > 0 {
+            warnings.push(format!("{} warning finding(s)", response.warning_count));
         }
+        if response.divergence_count > 0 {
+            warnings.push(format!(
+                "{} membership label(s) not backed by the DAG (run `jit query divergence` for details)",
+                response.divergence_count
+            ));
+        }
+        Outcome::success_with(ValidateResponse::Repository(response), message)
+            .with_warnings(warnings)
     })
 }
 
@@ -278,10 +259,7 @@ fn validation_findings(report: RuleReport, mode: ValidationMode) -> Outcome<Vali
             ValidationMode::Rule => ValidateResponse::Rule(report),
             ValidationMode::Issue => ValidateResponse::Issue(report),
         };
-        Outcome::Success {
-            response,
-            message: Some(mode.success_message().to_owned()),
-        }
+        Outcome::success_with(response, mode.success_message())
     }
 }
 
@@ -311,30 +289,17 @@ impl ValidationMode {
 }
 
 command_group! {
-    command: ValidateCommand,
+    command: ValidateArgs,
     storage: [IssueStore + RepositoryStateStore],
     leaves: {
-        "validate" => ValidateCommand::Validate {
-            id,
-            explain,
-            fix,
-            dry_run,
-            branch_drift,
-            divergence,
-            leases,
-            scope,
-            rule,
-        } => validate(ValidateCommand::Validate {
-            id,
-            explain,
-            fix,
-            dry_run,
-            branch_drift,
-            divergence,
-            leases,
-            scope,
-            rule,
-        }) -> ValidateResponse,
+        "validate" => args => validate(args) -> ValidateResponse
+            as union [
+                RuleReport,
+                crate::validation::report::ExplainReport,
+                ValidationChecksResponse,
+                ValidationFixResponse,
+                RepositoryValidationResponse,
+            ] "The validation report for the selected mode",
     }
 }
 
@@ -344,7 +309,12 @@ mod tests {
     fn test_registered_output_schema_validate_names_the_response_union() {
         let registered = crate::dispatch::registered_output_schema("validate").unwrap();
 
-        assert_eq!(registered.success, "ValidateResponse");
-        assert!(registered.success_schema.is_some());
+        assert_eq!(registered.success, "RuleReport");
+        let schema = registered.success_schema.unwrap();
+        assert!(schema["oneOf"].is_array());
+        assert_eq!(
+            schema["description"],
+            "The validation report for the selected mode"
+        );
     }
 }

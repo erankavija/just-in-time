@@ -81,6 +81,58 @@ impl IssueFilterArgs {
     }
 }
 
+/// Arguments for the `validate` command.
+#[derive(Args)]
+pub struct ValidateArgs {
+    /// Issue id to validate (runs local + graph rules for this issue only).
+    /// When omitted, validates the whole repository.
+    pub id: Option<String>,
+
+    /// Explain rule outcomes for the issue: which rules matched and whether
+    /// each passed or failed (requires an issue id)
+    #[arg(long)]
+    pub explain: bool,
+
+    /// Validate a container's bracket subtree as a deterministic gate
+    /// checker: evaluate the rules whose selector matches each issue in the
+    /// container's transitive dependency closure (including the
+    /// `type:breakdown` node, bounded there), excluding whole-repo rules.
+    /// Exits 4 with findings shown when an enforcing rule fails, 0 when
+    /// clean. Mutually exclusive with a positional id and with
+    /// `--fix`/`--branch-drift`/`--leases`/`--explain`.
+    #[arg(long, value_name = "ID")]
+    pub scope: Option<String>,
+
+    /// Evaluate one configured graph rule with the positional issue as its
+    /// sole firing subject. Repository issues remain resolution context.
+    #[arg(long, value_name = "RULE")]
+    pub rule: Option<String>,
+
+    /// Repair safe findings; derived-state repairs publish through one redo
+    /// record
+    #[arg(long)]
+    pub fix: bool,
+
+    /// Show what would be fixed without applying changes (requires --fix)
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Validate that git's `origin/main` is an ancestor of the current
+    /// branch, so the branch still sits on top of it. This is the git
+    /// concern; membership labels the DAG does not back are reported by
+    /// `jit query divergence`. Requires git.
+    #[arg(long)]
+    pub branch_drift: bool,
+
+    /// Hidden stub: fails with a hint naming `--branch-drift`
+    #[arg(long, hide = true)]
+    pub divergence: bool,
+
+    /// Validate active leases are consistent and not stale
+    #[arg(long)]
+    pub leases: bool,
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Initialize through one recoverable publication; an absent data root is
@@ -348,55 +400,7 @@ pub enum Commands {
     Status,
 
     /// Validate repository integrity and diagnose declared derived-state drift
-    Validate {
-        /// Issue id to validate (runs local + graph rules for this issue only).
-        /// When omitted, validates the whole repository.
-        id: Option<String>,
-
-        /// Explain rule outcomes for the issue: which rules matched and whether
-        /// each passed or failed (requires an issue id)
-        #[arg(long)]
-        explain: bool,
-
-        /// Validate a container's bracket subtree as a deterministic gate
-        /// checker: evaluate the rules whose selector matches each issue in the
-        /// container's transitive dependency closure (including the
-        /// `type:breakdown` node, bounded there), excluding whole-repo rules.
-        /// Exits 4 with findings shown when an enforcing rule fails, 0 when
-        /// clean. Mutually exclusive with a positional id and with
-        /// `--fix`/`--branch-drift`/`--leases`/`--explain`.
-        #[arg(long, value_name = "ID")]
-        scope: Option<String>,
-
-        /// Evaluate one configured graph rule with the positional issue as its
-        /// sole firing subject. Repository issues remain resolution context.
-        #[arg(long, value_name = "RULE")]
-        rule: Option<String>,
-
-        /// Repair safe findings; derived-state repairs publish through one redo
-        /// record
-        #[arg(long)]
-        fix: bool,
-
-        /// Show what would be fixed without applying changes (requires --fix)
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Validate that git's `origin/main` is an ancestor of the current
-        /// branch, so the branch still sits on top of it. This is the git
-        /// concern; membership labels the DAG does not back are reported by
-        /// `jit query divergence`. Requires git.
-        #[arg(long)]
-        branch_drift: bool,
-
-        /// Hidden stub: fails with a hint naming `--branch-drift`
-        #[arg(long, hide = true)]
-        divergence: bool,
-
-        /// Validate active leases are consistent and not stale
-        #[arg(long)]
-        leases: bool,
-    },
+    Validate(ValidateArgs),
 
     /// Run recovery: apply a leftover redo record, then the repair routines
     ///
@@ -2669,7 +2673,7 @@ impl Commands {
             Self::Invariant(command) => command.requires_recovery_dispatch(),
             Self::Project(command) => command.requires_recovery_dispatch(),
             Self::Snapshot(command) => command.requires_recovery_dispatch(),
-            Self::Validate { fix, dry_run, .. } => *fix && !*dry_run,
+            Self::Validate(args) => args.fix && !args.dry_run,
             Self::Serve { status, .. } => !*status,
             Self::List { .. }
             | Self::Events(_)
@@ -2723,7 +2727,7 @@ impl Commands {
                 subcommand: None, ..
             }
             | Self::Search { .. }
-            | Self::Validate { .. }
+            | Self::Validate(_)
             | Self::Serve { .. }
             | Self::Version { .. }
             | Self::Status { .. } => false,
@@ -3352,7 +3356,7 @@ mod recovery_dispatch_tests {
             set: Vec::new(),
         }
         .requires_recovery_dispatch());
-        assert!(Commands::Validate {
+        assert!(Commands::Validate(ValidateArgs {
             id: None,
             explain: false,
             scope: None,
@@ -3362,7 +3366,7 @@ mod recovery_dispatch_tests {
             branch_drift: false,
             divergence: false,
             leases: false,
-        }
+        })
         .requires_recovery_dispatch());
         assert!(!Commands::Status.requires_recovery_dispatch());
         assert!(!Commands::Issue(IssueCommands::BatchCreate {
