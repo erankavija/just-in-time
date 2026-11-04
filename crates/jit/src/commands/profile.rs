@@ -1,4 +1,4 @@
-use super::{with_mutation_session, CommandExecutor, SessionStep};
+use super::{with_mutation_session, with_read_session, CommandExecutor, SessionStep};
 use crate::domain::identity::ProfileId;
 use crate::domain::relative_path::RootRelativePath;
 use crate::domain::ProfileLifecycleOperation;
@@ -20,7 +20,7 @@ use crate::repository_state::{
     RepositoryExportIntent, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryStateError, VirtualPath,
 };
-use crate::storage::{IssueStore, RepositoryMutationSession, RepositoryStateStore, WorktreePaths};
+use crate::storage::{IssueStore, RepositoryReadSession, RepositoryStateStore, WorktreePaths};
 use anyhow::Result;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -550,7 +550,8 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
     /// The destination must be absent, which is enforced against the same
     /// captured image the plan is derived from. One that becomes occupied
     /// afterwards is refused at apply, because the plan creates it with an absent
-    /// preimage.
+    /// preimage. Unless `publish`, the plan is derived through the read driver
+    /// and only answered.
     fn publish_package_tree(
         &self,
         layout: &RepositoryLayout,
@@ -574,46 +575,49 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
         let budget = package_tree_capture_budget(destination);
         let context = super::production_mutation_context();
 
-        with_mutation_session(
-            self.exec.storage(),
-            layout,
-            "profile package tree",
-            |session| {
-                let Some(image) =
-                    super::capture_or_retry(session.capture(capture.capture_spec(budget)?))?
-                else {
-                    return Ok(SessionStep::Retry);
-                };
-                if !matches!(image.entry(destination)?, RepositoryEntry::Absent) {
-                    return Err(ProfileApplyError::PackageDestinationOccupied {
-                        path: destination.repository_relative(),
+        let derive = |session: &mut dyn RepositoryReadSession| -> Result<Option<_>> {
+            let Some(image) =
+                super::capture_or_retry(session.capture(capture.capture_spec(budget)?))?
+            else {
+                return Ok(None);
+            };
+            if !matches!(image.entry(destination)?, RepositoryEntry::Absent) {
+                return Err(ProfileApplyError::PackageDestinationOccupied {
+                    path: destination.repository_relative(),
+                }
+                .into());
+            }
+            let plan = finalize_package_tree_capture(&image, &context, &capture)?;
+            let targets = plan
+                .delta()
+                .file_writes()
+                .filter_map(|action| match action {
+                    RepositoryAction::WriteFile { path, mode, .. } => {
+                        Some(ProfileTargetChange::new(
+                            path.repository_relative(),
+                            ProfileTargetAction::Create,
+                            *mode,
+                            None,
+                        ))
                     }
-                    .into());
-                }
-
-                let plan = finalize_package_tree_capture(&image, &context, &capture)?;
-                let targets = plan
-                    .delta()
-                    .file_writes()
-                    .filter_map(|action| match action {
-                        RepositoryAction::WriteFile { path, mode, .. } => {
-                            Some(ProfileTargetChange::new(
-                                path.repository_relative(),
-                                ProfileTargetAction::Create,
-                                *mode,
-                                None,
-                            ))
-                        }
-                        _ => None,
-                    })
-                    .collect();
-                if publish {
-                    Ok(SessionStep::Apply(plan, targets))
-                } else {
-                    Ok(SessionStep::Done(targets))
-                }
-            },
-        )
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            Ok(Some((plan, targets)))
+        };
+        let store = self.exec.storage();
+        let operation = "profile package tree";
+        if !publish {
+            return with_read_session(store, layout, operation, |session| {
+                Ok(derive(session)?.map(|(_, targets)| targets))
+            });
+        }
+        with_mutation_session(store, layout, operation, |session| {
+            Ok(match derive(session)? {
+                Some((plan, targets)) => SessionStep::Apply(plan, targets),
+                None => SessionStep::Retry,
+            })
+        })
     }
 
     /// Publish one built archive at the output path the caller named.
@@ -808,9 +812,9 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
     /// included, without publishing any of it.
     ///
     /// A package that is not installed is reported as readily as one that is,
-    /// so an adopter inspects a package before applying it. The capture runs
-    /// under the same session guard the publication would, so the answer
-    /// describes the repository the publication would act on.
+    /// so an adopter inspects a package before applying it. The report derives
+    /// from the capture the publication would, admitted as one repository
+    /// version.
     ///
     /// # Errors
     ///
@@ -822,8 +826,9 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
         self.run_profile_selection(selection, ProfileRunMode::Report)
     }
 
-    /// Run `selection`'s dependency-first unique closure through one mutation
-    /// session and, when publishing, one `session.apply` call at most.
+    /// Derive `selection`'s dependency-first unique closure from one capture:
+    /// a publication's through one mutation session and one `session.apply`
+    /// call at most, a preview's through the read driver.
     fn run_profile_selection(
         &self,
         selection: &ProfileSelection,
@@ -841,10 +846,10 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
             ProfileRunMode::Publish => "profile application",
             ProfileRunMode::Rehearse | ProfileRunMode::Report => "profile planning",
         };
-        let closure = with_mutation_session(self.exec.storage(), &layout, label, |session| {
+        let derive = |session: &mut dyn RepositoryReadSession| -> Result<Option<_>> {
             let Some(plan) = self.prepare_profile_selection(session, selection, &context, mode)?
             else {
-                return Ok(SessionStep::Retry);
+                return Ok(None);
             };
             // A plan its decisions already refuse never reaches final validation
             // in the publication this reports on, and its overlay omits what
@@ -868,12 +873,26 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                     })
                 })
                 .collect::<Result<Vec<_>>>()?;
-            if mode == ProfileRunMode::Publish && !plan.delta().actions().is_empty() {
-                Ok(SessionStep::Apply(plan, entries))
-            } else {
-                Ok(SessionStep::Done(entries))
+            Ok(Some((plan, entries)))
+        };
+        let closure = match mode {
+            ProfileRunMode::Publish => {
+                with_mutation_session(self.exec.storage(), &layout, label, |session| {
+                    Ok(match derive(session)? {
+                        None => SessionStep::Retry,
+                        Some((plan, entries)) if !plan.delta().actions().is_empty() => {
+                            SessionStep::Apply(plan, entries)
+                        }
+                        Some((_, entries)) => SessionStep::Done(entries),
+                    })
+                })
             }
-        })?;
+            ProfileRunMode::Rehearse | ProfileRunMode::Report => {
+                with_read_session(self.exec.storage(), &layout, label, |session| {
+                    Ok(derive(session)?.map(|(_, entries)| entries))
+                })
+            }
+        }?;
         selection_profile_results(closure, &selection.roots)
     }
 
@@ -976,7 +995,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
     }
 
     /// Capture and close the complete selection once. A retry restarts from a
-    /// fresh held session image; no member of the selection is published until
+    /// fresh session image; no member of the selection is published until
     /// the final aggregate plan reaches `session.apply`.
     ///
     /// `mode` decides what a decision that cannot be published does here. A
@@ -984,7 +1003,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
     /// the difference report alone carries it through.
     fn prepare_profile_selection(
         &self,
-        session: &mut (dyn RepositoryMutationSession + '_),
+        session: &mut (dyn RepositoryReadSession + '_),
         selection: &ProfileSelection,
         context: &MutationContext,
         mode: ProfileRunMode,
@@ -1658,7 +1677,7 @@ mod tests {
     /// `package` decides in it.
     fn prepared_plan(
         executor: &CommandExecutor<JsonFileStorage>,
-        session: &mut (dyn RepositoryMutationSession + '_),
+        session: &mut (dyn RepositoryReadSession + '_),
         package: &ProfilePackage,
         context: &MutationContext,
     ) -> (MaterializationPlan, Vec<ProfileTargetChange>) {
@@ -2958,6 +2977,49 @@ template = true
 
         assert_eq!(first.0.delta(), second.0.delta());
         assert_eq!(first.1, second.1);
+    }
+
+    #[test]
+    fn test_plan_profiles_completes_beside_a_held_mutation_session() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        package_read_from(&temp, FIXTURE_LOCATION);
+        let selectors = [PathBuf::from(FIXTURE_LOCATION)];
+        let options = ProfileVariableOptions::default();
+        let alone = plan_selected(&executor, &selectors, &options).unwrap();
+
+        let beside = crate::commands::test_helpers::read_beside_held_mutation_session(
+            executor.storage(),
+            &executor.require_layout().unwrap(),
+            || plan_selected(&executor, &selectors, &options).unwrap(),
+        );
+
+        assert!(!beside.items.is_empty());
+        assert_eq!(beside, alone);
+    }
+
+    #[test]
+    fn test_plan_profile_add_completes_beside_a_held_mutation_session() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let executor = file_executor(temp.path()).unwrap();
+        let package = package_read_from(&temp, FIXTURE_LOCATION);
+        let archive = temp.path().join("planner.jitpkg");
+        fs::write(&archive, pack_package_archive(&package).unwrap()).unwrap();
+        let destination = Path::new("packages/added");
+
+        let planned = crate::commands::test_helpers::read_beside_held_mutation_session(
+            executor.storage(),
+            &executor.require_layout().unwrap(),
+            || {
+                executor
+                    .profiles()
+                    .plan_profile_add(temp.path(), &archive, destination)
+                    .unwrap()
+            },
+        );
+
+        assert_eq!(planned.items[0].targets.len(), package.file_count());
+        assert!(!temp.path().join(destination).exists());
     }
 
     #[test]

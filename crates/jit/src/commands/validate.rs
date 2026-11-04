@@ -21,6 +21,13 @@ enum BaseCapturePurpose<'a> {
 /// A capture's parsed issues and, for validation, the JSON value each decoded from.
 type ParsedIssues = (Result<Vec<Issue>>, Vec<serde_json::Value>);
 
+/// The `--fix` count and messages and, unless the issue records do not parse,
+/// the plan publishing them.
+type DerivedFixes = (
+    (usize, Vec<String>),
+    Option<crate::repository_state::MaterializationPlan>,
+);
+
 struct CapturedRepairPlan {
     declarations: crate::repository_state::CapturedRepositoryDeclarations,
     plan: Option<crate::repository_state::MaterializationPlan>,
@@ -65,6 +72,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
 impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> {
     /// Derive all repairs from one capture, publish once, then report the resulting repository.
+    ///
+    /// A dry run derives through the read driver and publishes nothing.
     pub fn validate_with_fix(
         &self,
         dry_run: bool,
@@ -74,92 +83,37 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         crate::validation::ValidationReport,
         crate::output::DivergenceResponse,
     )> {
-        use crate::repository_state::{finalize, MaterializationPlan, RepositoryDelta};
         let layout = self.exec.require_layout()?;
         let context = production_mutation_context();
-        let (count, mut messages) = with_mutation_session(
-            self.exec.storage(),
-            &layout,
-            "validation repair",
-            |session| {
-                let Some(captured) = self.capture_validation(session)? else {
-                    return Ok(SessionStep::Retry);
-                };
-                let (Ok(original), Ok(_)) = (&captured.issues, &captured.index) else {
-                    return Ok(SessionStep::Done((0, Vec::new())));
-                };
-                let image = &captured.image;
-                let mut projected = original.to_vec();
-                let declarations =
-                    crate::repository_state::validation_declarations_from_image(image);
-                let mut fixes = match declarations {
-                    Ok(declarations) => {
-                        let fixes = self
-                            .plan_hierarchy_fixes(declarations.config(), &mut projected, dry_run)?
-                            .merge(plan_reduction_fixes(&mut projected)?);
-                        let graph = CapturedGraphEvidence {
-                            declarations,
-                            plan_content: plan_content_with_issues(image, &projected)?,
-                            context: &context,
-                        };
-                        let readiness = plan_readiness_fixes(original, &mut projected, &graph)?;
-                        let repairs = match graph.declarations.rules_load_error() {
-                            Some(error) => PlannedFixes::skipped(
-                                "derived-state repair",
-                                format_args!("rules.toml could not be loaded: {error:#}"),
-                            ),
-                            None => plan_derived_state_fixes(
-                                image,
-                                &context,
-                                graph.declarations.borrowed(),
-                            ),
-                        };
-                        fixes.merge(readiness).merge(repairs)
-                    }
-                    Err(error) => PlannedFixes::skipped(
-                        "hierarchy fixes, readiness repairs and derived-state repair",
-                        error,
+        let (count, mut messages) = if dry_run {
+            with_read_session(
+                self.exec.storage(),
+                &layout,
+                "validation repair preview",
+                |session| {
+                    Ok(self
+                        .derive_fixes(session, &layout, &context, dry_run)?
+                        .map(|(fixes, _)| fixes))
+                },
+            )?
+        } else {
+            with_mutation_session(
+                self.exec.storage(),
+                &layout,
+                "validation repair",
+                |session| {
+                    Ok(
+                        match self.derive_fixes(session, &layout, &context, dry_run)? {
+                            None => SessionStep::Retry,
+                            Some((fixes, Some(plan))) if !plan.delta().actions().is_empty() => {
+                                SessionStep::Apply(plan, fixes)
+                            }
+                            Some((fixes, _)) => SessionStep::Done(fixes),
+                        },
                     )
-                    .merge(plan_reduction_fixes(&mut projected)?),
-                };
-                fixes.intents.extend(
-                    projected
-                        .into_iter()
-                        .zip(original.iter())
-                        .filter(|(issue, before)| issue != *before)
-                        .map(|(issue, _)| MutationIntent::UpdateIssue {
-                            issue: Box::new(issue),
-                        }),
-                );
-                let issues = finalize(&layout, image, &context, &fixes.intents, Some(original))?;
-                let mut actions = issues.delta().actions().to_vec();
-                for action in fixes.actions {
-                    if let RepositoryAction::AppendEvents { bytes, .. } = &action {
-                        if let Some(RepositoryAction::AppendEvents {
-                            bytes: existing, ..
-                        }) = actions
-                            .iter_mut()
-                            .find(|action| matches!(action, RepositoryAction::AppendEvents { .. }))
-                        {
-                            existing.extend_from_slice(bytes);
-                            continue;
-                        }
-                    }
-                    actions.push(action);
-                }
-                let (count, messages) = (fixes.count, fixes.messages);
-                let plan = MaterializationPlan::new(
-                    image,
-                    RepositoryDelta::new(&layout, actions)?,
-                    &context,
-                )?;
-                if dry_run || plan.delta().actions().is_empty() {
-                    Ok(SessionStep::Done((count, messages)))
-                } else {
-                    Ok(SessionStep::Apply(plan, (count, messages)))
-                }
-            },
-        )?;
+                },
+            )?
+        };
         messages.push(if dry_run {
             format!("Dry run complete. {count} fixes would be applied.")
         } else if count > 0 {
@@ -169,6 +123,82 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         });
         let (report, divergences) = self.capture_validation_report()?;
         Ok((count, messages, report, divergences))
+    }
+
+    /// Every `--fix` repair from one validation capture; `None` is a retryable
+    /// conflict.
+    fn derive_fixes(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
+        layout: &crate::repository_state::RepositoryLayout,
+        context: &crate::repository_state::MutationContext,
+        dry_run: bool,
+    ) -> Result<Option<DerivedFixes>> {
+        use crate::repository_state::{finalize, MaterializationPlan, RepositoryDelta};
+        let Some(captured) = self.capture_validation(session)? else {
+            return Ok(None);
+        };
+        let (Ok(original), Ok(_)) = (&captured.issues, &captured.index) else {
+            return Ok(Some(((0, Vec::new()), None)));
+        };
+        let image = &captured.image;
+        let mut projected = original.to_vec();
+        let declarations = crate::repository_state::validation_declarations_from_image(image);
+        let mut fixes = match declarations {
+            Ok(declarations) => {
+                let fixes = self
+                    .plan_hierarchy_fixes(declarations.config(), &mut projected, dry_run)?
+                    .merge(plan_reduction_fixes(&mut projected)?);
+                let graph = CapturedGraphEvidence {
+                    declarations,
+                    plan_content: plan_content_with_issues(image, &projected)?,
+                    context,
+                };
+                let readiness = plan_readiness_fixes(original, &mut projected, &graph)?;
+                let repairs = match graph.declarations.rules_load_error() {
+                    Some(error) => PlannedFixes::skipped(
+                        "derived-state repair",
+                        format_args!("rules.toml could not be loaded: {error:#}"),
+                    ),
+                    None => plan_derived_state_fixes(image, context, graph.declarations.borrowed()),
+                };
+                fixes.merge(readiness).merge(repairs)
+            }
+            Err(error) => PlannedFixes::skipped(
+                "hierarchy fixes, readiness repairs and derived-state repair",
+                error,
+            )
+            .merge(plan_reduction_fixes(&mut projected)?),
+        };
+        fixes.intents.extend(
+            projected
+                .into_iter()
+                .zip(original.iter())
+                .filter(|(issue, before)| issue != *before)
+                .map(|(issue, _)| MutationIntent::UpdateIssue {
+                    issue: Box::new(issue),
+                }),
+        );
+        let issues = finalize(layout, image, context, &fixes.intents, Some(original))?;
+        let mut actions = issues.delta().actions().to_vec();
+        for action in fixes.actions {
+            if let RepositoryAction::AppendEvents { bytes, .. } = &action {
+                if let Some(RepositoryAction::AppendEvents {
+                    bytes: existing, ..
+                }) = actions
+                    .iter_mut()
+                    .find(|action| matches!(action, RepositoryAction::AppendEvents { .. }))
+                {
+                    existing.extend_from_slice(bytes);
+                    continue;
+                }
+            }
+            actions.push(action);
+        }
+        let (count, messages) = (fixes.count, fixes.messages);
+        let plan =
+            MaterializationPlan::new(image, RepositoryDelta::new(layout, actions)?, context)?;
+        Ok(Some(((count, messages), Some(plan))))
     }
 
     fn plan_hierarchy_fixes(
@@ -665,13 +695,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         crate::output::DivergenceResponse,
     )> {
         let layout = self.exec.require_layout()?;
-        with_mutation_session(
+        with_read_session(
             self.exec.storage(),
             &layout,
             "repository validation",
             |session| {
                 let Some(captured) = self.capture_validation(session)? else {
-                    return Ok(SessionStep::Retry);
+                    return Ok(None);
                 };
                 let issues = captured.issues.as_deref().unwrap_or_default();
                 let divergences =
@@ -684,11 +714,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 let Some(document_references) =
                     capture_document_reference_validation(session, issues)?
                 else {
-                    return Ok(SessionStep::Retry);
+                    return Ok(None);
                 };
                 let Some(record_fidelity) = capture_record_fidelity_validation(session, &captured)?
                 else {
-                    return Ok(SessionStep::Retry);
+                    return Ok(None);
                 };
                 let report = crate::validation::report(
                     &captured,
@@ -700,7 +730,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                         }),
                     },
                 );
-                Ok(SessionStep::Done((report, divergences)))
+                Ok(Some((report, divergences)))
             },
         )
     }
@@ -764,21 +794,20 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
     /// verdicts, the report every selection but `Whole` reads.
     pub fn selection_report(&self) -> Result<crate::validation::ValidationReport> {
         let layout = self.exec.require_layout()?;
-        with_mutation_session(
+        with_read_session(
             self.exec.storage(),
             &layout,
             "repository validation",
             |session| {
-                let Some(captured) = self.capture_validation(session)? else {
-                    return Ok(SessionStep::Retry);
-                };
-                Ok(SessionStep::Done(crate::validation::report(
-                    &captured,
-                    &crate::validation::ReportInputs {
-                        now: chrono::Utc::now(),
-                        history: None,
-                    },
-                )))
+                Ok(self.capture_validation(session)?.map(|captured| {
+                    crate::validation::report(
+                        &captured,
+                        &crate::validation::ReportInputs {
+                            now: chrono::Utc::now(),
+                            history: None,
+                        },
+                    )
+                }))
             },
         )
     }
@@ -787,7 +816,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
     /// closure planning parsed.
     pub(super) fn capture_validation(
         &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
     ) -> Result<Option<crate::validation::CapturedValidation<'static>>> {
         Ok(self
             .exec
@@ -805,7 +834,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
 
     /// Capture the repository's own validation closure: its registries, its
     /// event log, and the paths they plan.
-    fn capture_repair_base(
+    pub(super) fn capture_repair_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
@@ -1043,7 +1072,7 @@ pub(super) fn discover_document_references<'a>(
 /// Resolve each reference without retaining the other references' bytes.
 /// `None` restarts the enclosing capture after a read conflict.
 fn capture_document_reference_validation(
-    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    session: &mut (dyn crate::storage::RepositoryReadSession + '_),
     issues: &[Issue],
 ) -> Result<Option<std::result::Result<(), String>>> {
     use crate::repository_state::CaptureSpec;
@@ -1072,7 +1101,7 @@ fn capture_document_reference_validation(
 /// event log, and judge the stored records against `captured`.
 /// Whole-repository validation pays these reads; no other capture does.
 fn capture_record_fidelity_validation(
-    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    session: &mut (dyn crate::storage::RepositoryReadSession + '_),
     captured: &crate::validation::CapturedValidation<'_>,
 ) -> Result<Option<std::result::Result<(), String>>> {
     let spec = crate::repository_state::CaptureSpec::new([], RECORD_FIDELITY_CAPTURE_BUDGET)?;
@@ -1915,6 +1944,55 @@ mod tests {
             .contains("STALE"));
     }
 
+    /// An executor whose one issue carries a dependency its other dependency
+    /// already implies, a fix `--fix` derives.
+    fn executor_with_redundant_dependency() -> CommandExecutor<crate::storage::InMemoryStorage> {
+        let executor = crate::commands::test_helpers::setup();
+        let leaf = crate::test_utils::fixture_issue("leaf".into(), String::new());
+        let mut middle = crate::test_utils::fixture_issue("middle".into(), String::new());
+        middle.dependencies = vec![leaf.id.clone()];
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
+        source.dependencies = vec![middle.id.clone(), leaf.id.clone()];
+        [leaf, middle, source]
+            .into_iter()
+            .for_each(|issue| seed_issue(executor.storage(), issue));
+        executor
+    }
+
+    #[test]
+    fn test_validate_repository_report_completes_beside_a_held_mutation_session() {
+        let executor = executor_with_redundant_dependency();
+        let alone = executor.validation().validate_repository_report().unwrap();
+
+        let beside = crate::commands::test_helpers::read_beside_held_mutation_session(
+            executor.storage(),
+            &executor.require_layout().unwrap(),
+            || executor.validation().validate_repository_report().unwrap(),
+        );
+
+        let [alone, beside] = [alone, beside].map(|report| {
+            let (failure, rules) = report.into_parts();
+            (failure.map(|error| format!("{error:#}")), rules)
+        });
+        assert_eq!(beside, alone);
+    }
+
+    #[test]
+    fn test_validate_with_fix_dry_run_completes_beside_a_held_mutation_session() {
+        let executor = executor_with_redundant_dependency();
+        let (alone, _, _, _) = executor.validation().validate_with_fix(true).unwrap();
+
+        let (beside, messages, _, _) =
+            crate::commands::test_helpers::read_beside_held_mutation_session(
+                executor.storage(),
+                &executor.require_layout().unwrap(),
+                || executor.validation().validate_with_fix(true).unwrap(),
+            );
+
+        assert!(beside > 0, "{messages:?}");
+        assert_eq!(beside, alone);
+    }
+
     #[test]
     fn test_validate_type_fix_is_noop_after_captured_repair() {
         use crate::storage::{InMemoryStorage, IssueStore};
@@ -2385,6 +2463,10 @@ depends_on = ["planning"]
             ) -> Result<RepositoryImage, Error> {
                 self.0.extend(image, spec)
             }
+
+            fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, Error> {
+                self.0.read_history_log()
+            }
         }
 
         impl crate::storage::RepositoryMutationSession for RoundCounter {
@@ -2397,10 +2479,6 @@ depends_on = ["planning"]
                 plan: &MaterializationPlan,
             ) -> Result<RepositoryApplyOutcome, Error> {
                 self.0.apply(plan)
-            }
-
-            fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, Error> {
-                self.0.read_history_log()
             }
         }
     }

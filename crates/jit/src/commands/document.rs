@@ -1393,7 +1393,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     /// A pinned reference's link targets are only known once its pinned content
     /// has been scanned, so the capture expands once — the same discover-then-
     /// re-capture shape document scanning uses — and a re-scan that reveals a
-    /// target the expanded capture does not hold restarts the session.
+    /// target the expanded capture does not hold retries the read.
     fn read_documents_at_named_versions(
         &self,
         layout: &crate::repository_state::RepositoryLayout,
@@ -1403,18 +1403,11 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        with_mutation_session(
+        with_read_session(
             &self.exec.storage,
             layout,
             "document link check",
-            |session| {
-                Ok(
-                    match capture_link_check_readings(session, documents, link_validator)? {
-                        Some(readings) => SessionStep::Done(readings),
-                        None => SessionStep::Retry,
-                    },
-                )
-            },
+            |session| capture_link_check_readings(session, documents, link_validator),
         )
     }
 }
@@ -1422,7 +1415,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
 /// Capture and read every document reference at the version it names, in one
 /// discovering round of `session`. `None` is a retryable conflict.
 fn capture_link_check_readings(
-    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    session: &mut (dyn crate::storage::RepositoryReadSession + '_),
     documents: &[(IssueId, &crate::domain::DocumentReference)],
     link_validator: &crate::document::LinkValidator,
 ) -> Result<Option<Vec<CheckedDocument>>> {
@@ -2097,6 +2090,27 @@ mod tests {
             readings.as_slice(),
             [CheckedDocument::WorkingTree]
         ));
+    }
+
+    #[test]
+    fn test_check_document_links_for_one_issue_completes_beside_a_held_mutation_session() {
+        let executor = crate::commands::test_helpers::setup();
+        executor
+            .storage()
+            .add_worktree_file("docs/guide.md", "# Guide\n");
+        let mut issue = crate::test_utils::fixture_issue("Docs".into(), String::new());
+        issue.documents.push(document_reference("docs/guide.md"));
+        let scope = crate::document::DocumentScope::Issue(issue.id.clone());
+        crate::commands::test_helpers::seed_issue(executor.storage(), issue);
+
+        let checked = crate::commands::test_helpers::read_beside_held_mutation_session(
+            executor.storage(),
+            &executor.require_layout().unwrap(),
+            || executor.documents().check_document_links(&scope).unwrap(),
+        );
+
+        assert_eq!(checked.summary.total_documents, 1);
+        assert!(checked.valid, "{:?}", checked.errors);
     }
 
     #[test]
