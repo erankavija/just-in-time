@@ -7,17 +7,19 @@
 
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::GateRunId;
-use crate::domain::{Event, GateRunResult, Issue};
+use crate::domain::{Event, GateRunResult, GateVerdictRecord, Issue};
 use crate::repository_state::{
-    canonical_json, captured_gate_run_ids, captured_issue_ids, serialize_event, serialize_gate_run,
-    serialize_issue, RepositoryImage, RepositoryIndex, VirtualPath,
+    canonical_json, captured_gate_run_ids, captured_gate_verdict_records, captured_issue_ids,
+    serialize_event, serialize_gate_run, serialize_gate_verdict, serialize_issue, RepositoryImage,
+    RepositoryIndex, VirtualPath,
 };
 use anyhow::Result;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
 /// One message per stored record that does not decode or reproduce, over
-/// `image`'s records, `gate_runs`' runs and the event log's whole `events`.
+/// `image`'s records, `gate_runs`' runs and verdict records, and the event
+/// log's whole `events`.
 pub(crate) fn record_drift(
     image: &RepositoryImage,
     gate_runs: &RepositoryImage,
@@ -51,10 +53,19 @@ pub(crate) fn record_drift(
             Ok(report(&path, check))
         })
         .collect::<Result<Vec<_>>>()?;
+    let verdicts = captured_gate_verdict_records(gate_runs)
+        .iter()
+        .map(|path| {
+            Ok(gate_runs
+                .file_bytes(path)?
+                .and_then(|bytes| report(path, verdict_drift(bytes))))
+        })
+        .collect::<Result<Vec<_>>>()?;
     let events = events.map_or_else(Vec::new, event_log_drift);
     Ok(issues
         .into_iter()
         .chain(runs)
+        .chain(verdicts)
         .chain([index.and_then(|bytes| report(&VirtualPath::INDEX, index_drift(bytes)))])
         .flatten()
         .chain(
@@ -104,6 +115,12 @@ fn gate_run_drift(id: &GateRunId, bytes: &[u8]) -> Result<Option<String>> {
     })
 }
 
+fn verdict_drift(bytes: &[u8]) -> Result<Option<String>> {
+    let record: GateVerdictRecord = serde_json::from_slice(bytes)?;
+    Ok((serialize_gate_verdict(&record)? != bytes)
+        .then(|| "stored bytes are not canonical".to_string()))
+}
+
 /// Every committed line parses and reproduces its bytes, and every event id
 /// names one line.
 fn event_log_drift(bytes: &[u8]) -> Vec<String> {
@@ -143,7 +160,11 @@ mod tests {
     use super::*;
     use crate::declarations::GateStage;
     use crate::domain::event_catalog::EventTag;
+    use crate::domain::identity::GateKey;
+    use crate::domain::repository_inputs::InputsDigest;
     use crate::domain::GateStatus;
+    use crate::repository_state::{DirectoryListing, EntryIdentity, FileMode, RepositoryEntry};
+    use crate::test_harness::image::ImageBuilder;
 
     fn run_bytes(id: &GateRunId) -> Vec<u8> {
         serialize_gate_run(&GateRunResult::attestation(
@@ -230,6 +251,74 @@ mod tests {
         assert!(gate_run_drift(&id, &serde_json::to_vec(&raw).unwrap())
             .unwrap()
             .is_some());
+    }
+
+    fn directory() -> RepositoryEntry {
+        RepositoryEntry::Directory {
+            identity: EntryIdentity::for_bytes("dir", b"dir").unwrap(),
+            mode: FileMode::Regular,
+        }
+    }
+
+    fn drift_over(gate_runs: ImageBuilder) -> Vec<String> {
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::INDEX, RepositoryEntry::Absent)
+            .build();
+        record_drift(&image, &gate_runs.build(), None).unwrap()
+    }
+
+    #[test]
+    fn test_record_drift_reports_a_verdict_record_that_does_not_reproduce() {
+        let key: GateKey = "tests".parse().unwrap();
+        let digest = |fill: &str| InputsDigest::try_from(fill.repeat(64)).unwrap();
+        let record = GateVerdictRecord {
+            issue_id: crate::test_utils::issue_id(7),
+            run_id: crate::test_utils::gate_run_id(1),
+        };
+        let canonical = VirtualPath::gate_verdict_record(&key, &digest("a"));
+        let compact = VirtualPath::gate_verdict_record(&key, &digest("b"));
+        let directory_names = |names: &[&str]| {
+            DirectoryListing::new(names.iter().map(|name| name.to_string())).unwrap()
+        };
+
+        let drift = drift_over(
+            ImageBuilder::new()
+                .entry(VirtualPath::GATE_VERDICTS, directory())
+                .listing(VirtualPath::GATE_VERDICTS, directory_names(&["tests"]))
+                .entry(VirtualPath::gate_verdict_directory(&key), directory())
+                .listing(
+                    VirtualPath::gate_verdict_directory(&key),
+                    directory_names(&[
+                        canonical.file_name().unwrap(),
+                        compact.file_name().unwrap(),
+                    ]),
+                )
+                .file(canonical, serialize_gate_verdict(&record).unwrap())
+                .file(compact.clone(), serde_json::to_vec(&record).unwrap()),
+        );
+
+        assert_eq!(drift.len(), 1, "{drift:?}");
+        assert!(
+            drift[0].starts_with(&compact.repository_relative()),
+            "{drift:?}"
+        );
+    }
+
+    #[test]
+    fn test_record_drift_enumerates_no_gate_run_under_the_verdicts_directory() {
+        let verdicts = VirtualPath::GATE_VERDICTS.file_name().unwrap().to_string();
+
+        let drift = drift_over(
+            ImageBuilder::new()
+                .entry(VirtualPath::GATE_RUNS, directory())
+                .listing(
+                    VirtualPath::GATE_RUNS,
+                    DirectoryListing::new([verdicts]).unwrap(),
+                )
+                .entry(VirtualPath::GATE_VERDICTS, directory()),
+        );
+
+        assert_eq!(drift, Vec::<String>::new());
     }
 
     #[test]

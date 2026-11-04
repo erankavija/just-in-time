@@ -25,7 +25,8 @@ use crate::declarations::GateRegistry;
 use crate::domain::event_catalog::EventTag;
 use crate::domain::identity::{GateKey, GateRunId, IssueId};
 use crate::domain::{
-    Assignee, Event, EventBody, GateRunResult, GateStatus, Issue, LinkedCheckoutWriteStance, State,
+    Assignee, Event, EventBody, GateRunResult, GateStatus, GateVerdictRecord, Issue,
+    LinkedCheckoutWriteStance, State,
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -526,6 +527,53 @@ pub(crate) fn captured_gate_run_ids(image: &RepositoryImage) -> Option<Vec<GateR
     )
 }
 
+/// The gate key of each directory a captured `gate-runs/verdicts` listing names.
+/// Names that are not gate keys, and occupants not captured as directories, are
+/// ignored.
+pub(crate) fn captured_gate_verdict_keys(image: &RepositoryImage) -> Vec<GateKey> {
+    image
+        .directory_listings()
+        .get(&VirtualPath::GATE_VERDICTS)
+        .map(|listing| {
+            listing
+                .names()
+                .iter()
+                .filter_map(|name| GateKey::try_from(name.as_str()).ok())
+                .filter(|key| {
+                    matches!(
+                        image
+                            .entries()
+                            .get(&VirtualPath::gate_verdict_directory(key)),
+                        Some(RepositoryEntry::Directory { .. })
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The path of each verdict record the captured listings of
+/// [`captured_gate_verdict_keys`]' directories name. Names not of the form
+/// `<inputs-digest>.json` are ignored.
+pub(crate) fn captured_gate_verdict_records(image: &RepositoryImage) -> Vec<VirtualPath> {
+    captured_gate_verdict_keys(image)
+        .into_iter()
+        .flat_map(|key| {
+            image
+                .directory_listings()
+                .get(&VirtualPath::gate_verdict_directory(&key))
+                .into_iter()
+                .flat_map(|listing| listing.names().iter())
+                .filter_map(|name| {
+                    let digest = name.strip_suffix(".json")?;
+                    crate::domain::repository_inputs::InputsDigest::try_from(digest).ok()
+                })
+                .map(|digest| VirtualPath::gate_verdict_record(&key, &digest))
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
 /// Serialize an issue to its exact on-disk bytes (pretty, no trailing newline).
 pub fn serialize_issue(issue: &Issue) -> Result<Vec<u8>, MutationError> {
     Ok(canonical_json(issue, true)?)
@@ -534,6 +582,11 @@ pub fn serialize_issue(issue: &Issue) -> Result<Vec<u8>, MutationError> {
 /// Serialize a gate-run result to its exact on-disk bytes.
 pub fn serialize_gate_run(result: &GateRunResult) -> Result<Vec<u8>, MutationError> {
     Ok(canonical_json(result, true)?)
+}
+
+/// Serialize a gate verdict record to its exact on-disk bytes.
+pub fn serialize_gate_verdict(record: &GateVerdictRecord) -> Result<Vec<u8>, MutationError> {
+    Ok(canonical_json(record, true)?)
 }
 
 /// Serialize a fresh (empty) index to its exact on-disk bytes.
@@ -1020,6 +1073,34 @@ pub(super) fn finalize_delta(
             bytes: serialize_gate_run(&result)?,
             mode: FileMode::Regular,
         });
+        // A run holding a reusable verdict becomes its key's reuse source. The
+        // record sorts after the run directory it names, so it never names an
+        // unpublished run.
+        if let Some(digest) = result.reusable_digest() {
+            let path = VirtualPath::gate_verdict_record(&result.gate_key, digest);
+            for parent in path.ancestor_directories()? {
+                if matches!(image.entry(&parent)?, RepositoryEntry::Absent)
+                    && !actions.iter().any(|action| action.path() == &parent)
+                {
+                    actions.push(RepositoryAction::CreateDirectory {
+                        path: parent,
+                        owner: RepositoryActionOwner::RepositoryStateMutation,
+                        expected: ExpectedPreimage::Absent,
+                    });
+                }
+            }
+            let record = GateVerdictRecord {
+                issue_id: result.issue_id.clone(),
+                run_id: result.run_id.clone(),
+            };
+            actions.push(RepositoryAction::WriteFile {
+                expected: expected_of(image, &path)?,
+                path,
+                owner: RepositoryActionOwner::RepositoryStateMutation,
+                bytes: serialize_gate_verdict(&record)?,
+                mode: FileMode::Regular,
+            });
+        }
     }
 
     // Explicit provenance/audit events join the pending set.
@@ -1269,7 +1350,7 @@ fn event_identities(body: &EventBody) -> (Option<IssueId>, EventSecondaryIdentit
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{GateState, GateStatus};
+    use crate::domain::{GateRunStatus, GateState, GateStatus};
     use crate::repository_state::{
         CapturedBytes, RepositoryEntry, RepositoryImage, RepositoryIndex,
         SUPPORTED_INDEX_SCHEMA_VERSION,
@@ -2217,6 +2298,195 @@ mod tests {
             Some(expected_line.as_slice()),
             "provenance follows the gate-run allocation and carries its next identity"
         );
+    }
+
+    fn verdict_digest() -> crate::domain::repository_inputs::InputsDigest {
+        crate::domain::repository_inputs::InputsDigest::try_from("c".repeat(64)).unwrap()
+    }
+
+    /// A run of `cargo-ci` its derived id names, executed over [`verdict_digest`].
+    fn executed_run(context: &MutationContext, status: GateRunStatus) -> GateRunResult {
+        let mut run = GateRunResult::attestation(
+            &context.gate_run_id_at(0),
+            &crate::test_utils::issue_id(7),
+            &"cargo-ci".parse().unwrap(),
+            crate::declarations::GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        run.origin = crate::domain::GateVerdictOrigin::Executed;
+        run.status = status;
+        run.inputs_digest = Some(verdict_digest());
+        run
+    }
+
+    /// An image holding `gate-runs` and, when `prior` is set, a verdict record
+    /// for `cargo-ci` over [`verdict_digest`] naming `prior`.
+    fn verdict_image(
+        context: &MutationContext,
+        prior: Option<&GateVerdictRecord>,
+    ) -> RepositoryImage {
+        let gate_key = "cargo-ci".parse().unwrap();
+        let run_id = context.gate_run_id_at(0);
+        let directory = || RepositoryEntry::Directory {
+            identity: crate::repository_state::EntryIdentity::for_bytes("dir", b"dir").unwrap(),
+            mode: FileMode::Regular,
+        };
+        let builder = ImageBuilder::new()
+            .entry(VirtualPath::GATE_RUNS, directory())
+            .entry(
+                VirtualPath::gate_run_directory(&run_id),
+                RepositoryEntry::Absent,
+            )
+            .entry(
+                VirtualPath::gate_run_record(&run_id),
+                RepositoryEntry::Absent,
+            );
+        let record = VirtualPath::gate_verdict_record(&gate_key, &verdict_digest());
+        match prior {
+            None => builder
+                .entry(VirtualPath::GATE_VERDICTS, RepositoryEntry::Absent)
+                .entry(
+                    VirtualPath::gate_verdict_directory(&gate_key),
+                    RepositoryEntry::Absent,
+                )
+                .entry(record, RepositoryEntry::Absent),
+            Some(prior) => builder
+                .entry(VirtualPath::GATE_VERDICTS, directory())
+                .entry(VirtualPath::gate_verdict_directory(&gate_key), directory())
+                .entry(record, file_entry(&serialize_gate_verdict(prior).unwrap())),
+        }
+        .build()
+    }
+
+    /// The delta actions under `gate-runs/verdicts`.
+    fn verdict_actions(delta: &RepositoryDelta) -> Vec<&RepositoryAction> {
+        delta
+            .actions()
+            .iter()
+            .filter(|action| {
+                action
+                    .path()
+                    .relative()
+                    .as_path()
+                    .starts_with(VirtualPath::GATE_VERDICTS.relative().as_path())
+            })
+            .collect()
+    }
+
+    fn record_run(
+        image: &RepositoryImage,
+        context: &MutationContext,
+        run: GateRunResult,
+    ) -> RepositoryDelta {
+        finalize(
+            &synthetic_layout(),
+            image,
+            context,
+            &[MutationIntent::RecordGateRun {
+                draft: Box::new(run),
+            }],
+        )
+        .unwrap()
+        .delta()
+        .clone()
+    }
+
+    #[test]
+    fn test_finalize_gate_run_with_a_reusable_verdict_writes_its_verdict_record() {
+        let context = ctx();
+        let image = verdict_image(&context, None);
+        for status in [GateRunStatus::Passed, GateRunStatus::Failed] {
+            let run = executed_run(&context, status);
+            let delta = record_run(&image, &context, run.clone());
+
+            let record = VirtualPath::gate_verdict_record(&run.gate_key, &verdict_digest());
+            let expected = GateVerdictRecord {
+                issue_id: run.issue_id.clone(),
+                run_id: run.run_id.clone(),
+            };
+            assert!(
+                matches!(
+                    verdict_actions(&delta).as_slice(),
+                    [
+                        RepositoryAction::CreateDirectory { path: verdicts, expected: ExpectedPreimage::Absent, .. },
+                        RepositoryAction::CreateDirectory { path: gate, expected: ExpectedPreimage::Absent, .. },
+                        RepositoryAction::WriteFile { path, bytes, expected: ExpectedPreimage::Absent, .. },
+                    ] if *verdicts == VirtualPath::GATE_VERDICTS
+                        && *gate == VirtualPath::gate_verdict_directory(&run.gate_key)
+                        && *path == record
+                        && serde_json::from_slice::<GateVerdictRecord>(bytes).unwrap() == expected
+                ),
+                "{status:?}: {:?}",
+                delta.actions()
+            );
+        }
+    }
+
+    #[test]
+    fn test_finalize_gate_run_with_a_reusable_verdict_replaces_the_keys_prior_record() {
+        let context = ctx();
+        let prior = GateVerdictRecord {
+            issue_id: crate::test_utils::issue_id(3),
+            run_id: crate::test_utils::gate_run_id(9),
+        };
+        let image = verdict_image(&context, Some(&prior));
+        let run = executed_run(&context, GateRunStatus::Passed);
+        let record = VirtualPath::gate_verdict_record(&run.gate_key, &verdict_digest());
+
+        let delta = record_run(&image, &context, run.clone());
+
+        assert!(
+            matches!(
+                verdict_actions(&delta).as_slice(),
+                [RepositoryAction::WriteFile { path, bytes, expected, .. }]
+                    if *path == record
+                        && *expected == ExpectedPreimage::of(image.entry(&record).unwrap())
+                        && serde_json::from_slice::<GateVerdictRecord>(bytes).unwrap().run_id == run.run_id
+            ),
+            "{:?}",
+            delta.actions()
+        );
+    }
+
+    #[test]
+    fn test_finalize_gate_run_without_a_reusable_verdict_writes_no_verdict_record() {
+        let context = ctx();
+        let image = verdict_image(&context, None);
+        let executed = executed_run(&context, GateRunStatus::Passed);
+        let runs = [
+            GateRunResult {
+                inputs_digest: None,
+                ..executed.clone()
+            },
+            GateRunResult {
+                status: GateRunStatus::Error,
+                ..executed.clone()
+            },
+            GateRunResult {
+                origin: crate::domain::GateVerdictOrigin::Reused {
+                    source_issue: crate::test_utils::issue_id(3),
+                    source_run: crate::test_utils::gate_run_id(9),
+                },
+                ..executed.clone()
+            },
+            GateRunResult {
+                origin: crate::domain::GateVerdictOrigin::Attested,
+                ..executed
+            },
+        ];
+        for run in runs {
+            let delta = record_run(&image, &context, run.clone());
+            assert!(
+                verdict_actions(&delta).is_empty(),
+                "{run:?}: {:?}",
+                delta.actions()
+            );
+            assert!(delta
+                .actions()
+                .iter()
+                .any(|action| action.path() == &VirtualPath::gate_run_record(&run.run_id)));
+        }
     }
 
     #[test]
