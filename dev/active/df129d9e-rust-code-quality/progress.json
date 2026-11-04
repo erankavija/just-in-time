@@ -1481,6 +1481,14 @@
     "8b3cce62": {
       "status": "dispatched",
       "vendor": "Claude Opus"
+    },
+    "0bc448fb": {
+      "status": "dispatched",
+      "vendor": "Codex gpt-6.1-sol"
+    },
+    "6acd7a05": {
+      "status": "dispatched",
+      "vendor": "Codex gpt-6-luna"
     }
   },
   "handoff": {
