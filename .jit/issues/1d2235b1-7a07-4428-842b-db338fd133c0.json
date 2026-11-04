@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "f274c7b3-17cd-4e34-aead-e592f3fd9fc0",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:18:53.134076282Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1d2235b1-7a07-4428-842b-db338fd133c0",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Centralize watcher path selection",
-  "updated_at": "2026-11-04T23:08:48.206190229Z"
+  "updated_at": "2026-11-04T23:18:53.134076282Z"
 }
