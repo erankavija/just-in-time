@@ -47,6 +47,7 @@ pub enum Outcome<R> {
 /// also register the test-only group, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     invariant::output_schema,
+    item::output_schema,
     #[cfg(test)]
     test_group::output_schema,
 ];
@@ -109,5 +110,6 @@ macro_rules! command_group {
 }
 
 pub mod invariant;
+pub mod item;
 #[cfg(test)]
 mod test_group;

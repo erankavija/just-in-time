@@ -16,6 +16,7 @@ use thiserror::Error;
 mod emit;
 pub mod failure;
 mod invariant;
+mod item;
 
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 

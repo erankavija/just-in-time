@@ -23,6 +23,7 @@ pub enum ItemsKey {}
 
 impl CollectionKey for ItemsKey {
     const KEY: &'static str = "items";
+    const SCHEMA_NAME: Option<&'static str> = Some("ItemListResult");
 }
 
 /// Result of a `jit item list` / `search` query: the matched addressable items,
@@ -34,7 +35,7 @@ pub type ItemListResult = ListEnvelope<ItemsKey, AddressableItem>;
 /// `issue_full_id` / `issue_title` are populated only for an issue-scoped item;
 /// for a project-scoped item (`@/<kind>/<self-id>`) both are `None`, since no single
 /// issue owns it (REQ-01).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ItemShowResult {
     /// The resolved addressable item.
     pub item: AddressableItem,
@@ -456,9 +457,10 @@ impl<S: IssueStore> ItemOps<'_, S> {
         // against the issue-scoped kinds (project-scoped kinds have no sugar form).
         if !qualified.starts_with(PROJECT_SCOPE_SENTINEL) {
             let Some((issue_ref, self_id)) = qualified.split_once('/') else {
-                return Err(anyhow!(
+                return Err(crate::errors::InvalidArgumentError::new(format!(
                     "'{qualified}' is not a qualified id; expected '<short-id>/<self-id>'"
-                ));
+                ))
+                .into());
             };
             // A self-id whose shape names exactly one issue-scoped kind fixes the
             // kind (resolution filters by kind AND self-id). A pattern-ambiguous or

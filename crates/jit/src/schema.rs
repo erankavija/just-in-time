@@ -761,10 +761,6 @@ impl CommandSchema {
                 Some(schema_to_value::<crate::commands::AssetListResult>()),
                 "AssetListResult",
             ),
-            "item_list" | "item_search" => (
-                Some(schema_to_value::<crate::commands::ItemListResult>()),
-                "ItemListResult",
-            ),
             "project_render" => (
                 Some(schema_to_value::<crate::commands::ProjectRenderResult>()),
                 "ProjectRenderResult",
@@ -1073,6 +1069,13 @@ impl CommandSchema {
                 "Enforcement drift was found (declared enforcement not backed by \
                  an enforcing rule).",
                 true,
+            ),
+            row(
+                "item list, item search, item show, item resolve",
+                2,
+                "The repository configuration failed to load, or an item address \
+                 was not a qualified id.",
+                false,
             ),
             row(
                 "config validate",
