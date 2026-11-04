@@ -8,12 +8,26 @@
   ],
   "description": "Make a captured `RepositoryImage` cheap to share and let a mutation session recognise its own image by an identity token, so neither a capture round nor a materialization plan copies the image and apply never compares it byte for byte.\n\n## Background\n\n- `RepositoryImage` (`crates/jit/src/repository_state/image.rs:697-704`) owns its layout, capture spec, entry, listing and pinned-evidence maps, and `CapturedBytes` (`image.rs:104-108`) owns its `Vec<u8>`, so a clone copies every captured byte. `RepositoryImage::close` (`image.rs:708`) builds it; `into_answers` (`image.rs:844-860`) moves the maps out for the next capture round.\n- Each capture round keeps a deep copy for the session: `JsonMutationSession::capture_over` sets `self.captured = Some(image.clone())` (`crates/jit/src/storage/repository_state_store.rs:613`), and `MemoryMutationSession::capture_over` does the same (`:764`). The `captured: Option<RepositoryImage>` fields are at `:410` and `:420`, reset after apply at `:599` and `:750`.\n- That copy serves one check only: `ensure_session_image` (`repository_state_store.rs:846-857`), called from both `apply` methods (`:572`, `:731`), refuses a plan unless `captured != Some(image)` is false, a derived byte-for-byte `PartialEq` over the whole image.\n- `MaterializationPlan::new` (`crates/jit/src/repository_state/mod.rs:624-633`, `image: image.clone()` at `:626`) clones the image again into the plan.\n- The equality is also what the plan-ownership tests rely on (`test_json_plan_owns_exact_image_and_applies_only_against_it` and `test_memory_plan_owns_exact_image_and_applies_only_against_it`, `crates/jit/src/storage/repository_state_store_tests.rs:358`, `:393`), and the JSON and memory backends' images are compared for equality (`repository_state_store_tests.rs:2123`).\n- Because recognition is by bytes, a plan derived from another session's image applies whenever the two images happen to be byte-identical.\n- `dev/architecture/repository-state-materialization.md:143-145` and `:313` describe apply checking that the plan's image is the session's captured image.\n\n## Success Criteria\n\n- [hard] REQ-01: A `RepositoryImage` holds its captured data behind shared ownership and an identity token minted by `close`; cloning an image shares both, and `PartialEq` compares captured data only.\n- [hard] REQ-02: Capture rounds on both backends retain only the image's token, `MaterializationPlan::new` shares the image it is given, and `extend` reuses the captured maps without copying when no other holder keeps them; a unit test shows a plan's image shares storage with the session's capture.\n- [hard] REQ-03: Apply on both backends accepts a plan only when its image carries the session's token. A test that captures byte-identical images in two sessions and applies the first session's plan in the second fails today, because the second session applies it, and passes once the second session refuses it with a retryable conflict.\n\n## Notes\n\n- Behaviour change: a plan built over a byte-identical image captured by another session is refused as a retryable conflict; today it applies. No production path builds a plan from one session's image and applies it in another (preflight images are only read), so commands are unaffected.\n- The two architecture-note passages are updated in the same change to say the session recognises its image by token.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T13:14:46.990582445Z",
   "first_ready_at": "2026-10-24T21:22:37.717854234Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1fc9f56f-437a-4950-a633-250304c5b6d9",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:09:28.127757663Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2281cf27-81fd-4e4a-b446-13c24702cfa2",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:14:37.493805251Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f7a59f5f-ff7f-42e9-bd95-4f3d163f2d5b",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:b697a3f7/REQ-13"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Sessions share the captured image and recognise it by token",
-  "updated_at": "2026-11-04T12:43:03.724721976Z"
+  "updated_at": "2026-11-04T13:14:46.990582445Z"
 }

@@ -143,7 +143,8 @@ Planning converts semantic intent into a `MaterializationPlan`: an exact
 `RepositoryDelta` of normalized `RepositoryAction`s (`CreateDirectory`,
 `WriteFile`, `SetMode`, `DeleteFile`, `AppendEvents`), and the captured image.
 Each action carries an `ExpectedPreimage` of its target as captured; apply refuses
-a plan whose preimages disagree with the session's image.
+a plan whose preimages disagree with the session's image or whose image
+carries another session's token.
 
 ### One typed request enum, one shared tail
 
@@ -310,7 +311,8 @@ plan is published through:
   untouched repository. The repository write lock stays held for the session.
 - `capture` and `extend` revalidate the root capabilities and return the bounded
   `RepositoryImage`.
-- `apply` checks that the plan's image is the session's captured image and that
+- `apply` checks that the plan's image carries the token of the session's latest
+  capture (clones share the captured data and the token) and that
   every action's expected preimage matches it, then revalidates the root
   capabilities. It derives the redo record from the delta (`redo_record_for`) and
   runs `ensure_write_set_unchanged`: every path the record makes a directory at,

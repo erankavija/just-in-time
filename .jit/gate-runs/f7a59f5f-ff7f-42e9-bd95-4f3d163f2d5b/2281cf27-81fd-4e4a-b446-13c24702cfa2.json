@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4ac979229f196cbd7aded5b7b76afa908e692269",
+  "completed_at": "2026-11-04T13:14:37.492050221Z",
+  "duration_ms": 309239,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are implemented and covered across both storage backends; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f7a59f5f-ff7f-42e9-bd95-4f3d163f2d5b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2281cf27-81fd-4e4a-b446-13c24702cfa2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T13:09:28.252604209Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7be41635f feat(jit:f7a59f5f): sessions share the captured image and recognise it by token\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/b697a3f7/requirement/REQ-13 (.jit/issues/b697a3f7-ef84-4452-9b13-c8274f6abe4a.json); @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T13:07:39Z); code-review pending\nTruncation recovery: individual per-file patch reads; narrowed reads of image ownership, session apply/capture, conformance wiring, architecture documentation, and governing sources\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented and covered across both storage backends; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

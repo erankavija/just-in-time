@@ -5,6 +5,8 @@ use crate::domain::vocabulary::wire_vocabulary;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 /// Platform-neutral file mode.
 #[derive(
@@ -780,14 +782,48 @@ pub(crate) struct CapturedAnswers {
     pub(crate) pinned: BTreeMap<(String, String), PinnedDocumentEvidence>,
 }
 
-/// Complete immutable repository image consumed by pure producers.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct RepositoryImage {
+/// Identity minted when a capture closes; clones of an image share it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ImageToken(u64);
+
+impl ImageToken {
+    fn mint() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+struct ImageData {
     layout: RepositoryLayout,
     spec: CaptureSpec,
     entries: BTreeMap<VirtualPath, RepositoryEntry>,
     listings: BTreeMap<VirtualPath, DirectoryListing>,
     pinned: BTreeMap<(String, String), PinnedDocumentEvidence>,
+}
+
+/// Complete immutable repository image consumed by pure producers.
+///
+/// Clones share the captured data and the token. Equality compares the
+/// captured data only; a session recognises its own image by [`ImageToken`].
+#[derive(Debug, Clone)]
+pub struct RepositoryImage {
+    data: Arc<ImageData>,
+    token: ImageToken,
+}
+
+impl PartialEq for RepositoryImage {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.data, &other.data) || self.data == other.data
+    }
+}
+
+impl Eq for RepositoryImage {}
+
+impl Serialize for RepositoryImage {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.data.serialize(serializer)
+    }
 }
 
 impl RepositoryImage {
@@ -893,41 +929,54 @@ impl RepositoryImage {
             });
         }
         Ok(Self {
-            layout,
-            spec,
-            entries,
-            listings,
-            pinned,
+            data: Arc::new(ImageData {
+                layout,
+                spec,
+                entries,
+                listings,
+                pinned,
+            }),
+            token: ImageToken::mint(),
         })
+    }
+
+    pub(crate) fn token(&self) -> ImageToken {
+        self.token
+    }
+
+    /// Whether both images hold the same captured data allocation.
+    pub fn shares_data_with(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.data, &other.data)
     }
 
     /// Canonical layout captured by this image.
     pub fn layout(&self) -> &RepositoryLayout {
-        &self.layout
+        &self.data.layout
     }
 
     /// Closed capture declaration used to build this image.
     pub fn capture_spec(&self) -> &CaptureSpec {
-        &self.spec
+        &self.data.spec
     }
 
     /// Every exact captured path in canonical order.
     pub fn entries(&self) -> &BTreeMap<VirtualPath, RepositoryEntry> {
-        &self.entries
+        &self.data.entries
     }
 
     /// Every complete directory listing in canonical order.
     pub fn directory_listings(&self) -> &BTreeMap<VirtualPath, DirectoryListing> {
-        &self.listings
+        &self.data.listings
     }
 
     /// Read an exactly captured entry; uncaptured reads are always errors.
     pub fn entry(&self, path: &VirtualPath) -> Result<&RepositoryEntry, CaptureError> {
-        self.layout.ensure_canonical(path)?;
-        if !self.spec.contains_path(path) {
+        self.data.layout.ensure_canonical(path)?;
+        if !self.data.spec.contains_path(path) {
             return Err(CaptureError::UndiscoveredRepositoryPath(path.clone()));
         }
-        self.entries
+        self.data
+            .entries
             .get(path)
             .ok_or_else(|| CaptureError::IncompleteCapture(path.clone()))
     }
@@ -948,19 +997,25 @@ impl RepositoryImage {
     /// Every boundary-acquired pinned-document evidence, keyed by
     /// `(requested revision, requested path)`.
     pub fn pinned_evidence(&self) -> &BTreeMap<(String, String), PinnedDocumentEvidence> {
-        &self.pinned
+        &self.data.pinned
     }
 
     /// What this image read that `spec` requests the same way, for a capture
     /// of `spec` to keep rather than read again.
     pub(crate) fn into_answers(self, spec: &CaptureSpec) -> CapturedAnswers {
-        let Self {
+        let ImageData {
             spec: read,
             entries,
             listings,
             pinned,
             ..
-        } = self;
+        } = Arc::try_unwrap(self.data).unwrap_or_else(|shared| ImageData {
+            layout: shared.layout.clone(),
+            spec: shared.spec.clone(),
+            entries: shared.entries.clone(),
+            listings: shared.listings.clone(),
+            pinned: shared.pinned.clone(),
+        });
         CapturedAnswers {
             entries: entries
                 .into_iter()
@@ -1688,7 +1743,8 @@ mod tests {
     fn test_capture_rejects_undiscovered_repository_read() {
         let mut captured = image();
         let unrequested = VirtualPath::data("config.toml").unwrap();
-        captured
+        Arc::get_mut(&mut captured.data)
+            .unwrap()
             .entries
             .insert(unrequested.clone(), RepositoryEntry::Absent);
         assert!(matches!(

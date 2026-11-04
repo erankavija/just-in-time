@@ -419,12 +419,10 @@ do the actual merging; this procedure only sequences them safely.
    git add .jit/issues/ .jit/events.jsonl .jit/index.json && git commit --no-edit
    ```
 
-   Verify with plain `jit validate`, not `jit validate --fix`: `--fix` parses
-   no file that still holds conflict markers, and where it applies no fix it
-   reports `No fixes needed` and exits 0 without re-checking the repository.
-   Other rules can fail the same run for reasons this recovery did not cause,
-   such as issues reported as isolated in a repository whose graph has no edges
-   yet; read the findings rather than the exit code.
+   Verify with `jit validate`; `--fix` repairs no file that still holds
+   conflict markers. Other rules can fail the same run for reasons this
+   recovery did not cause, such as issues reported as isolated in a repository
+   whose graph has no edges yet; read the findings rather than the exit code.
 
    A `conflicting` finding that merges silently — the two edits touched
    different lines, so git needed no markers — still needs the decision from
