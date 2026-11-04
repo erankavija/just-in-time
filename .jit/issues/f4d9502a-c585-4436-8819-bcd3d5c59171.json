@@ -10,7 +10,57 @@
     "d28888f0-d189-49f5-899a-7e687bc219db"
   ],
   "description": "Move every git access into one storage-owned module that runs the git CLI, remove the libgit2 binding from the workspace, and detect repository layout facts once per invocation. Core commands keep working without git.\n\n## Background\n\nGit is reached three ways today: through libgit2 (`git2 = \"0.21\"` in `crates/jit/Cargo.toml:31` and, unused, `crates/server/Cargo.toml:57`), through the git CLI from storage, and through the git CLI directly from commands.\n\n- **libgit2 on every read.** `load_index_from_git` (`crates/jit/src/storage/json.rs:825-860`) opens the repository through libgit2 to read `HEAD:<data>/index.json`. It does this on every read, including in the primary checkout. The installed binary links the system `libgit2.so`, which links `libssl` and `libcrypto`. A `perf` profile of `jit query available` in this repository (about 55 ms wall) puts 28% of samples in `git_libgit2_init` and 21% in OpenSSL CA-bundle loading (`X509_STORE_set_default_paths_ex`). The audit measured about 30% of the command's CPU.\n- **Per-issue spawns.** The HEAD issue fallback spawns `git show` once for each missing issue and ignores the configured `git_program` (`json.rs:894-917`).\n- **Layout detection.** It spawns three separate `git rev-parse` processes on every invocation (`storage/worktree_paths.rs:64`, `87`, `112`): about 4 ms of a 30 ms command. Other code then detects the same facts again:\n  - `validate` (`commands/validate.rs:3044`)\n  - `claim` (`commands/claim.rs:24`)\n  - `init` (`commands/init.rs:540`)\n  - the main-history guard (`commands/worktree.rs:456`)\n- **Branch lookups.** Six separate branch-name lookups exist:\n  - `commands/claim.rs:45`\n  - `commands/worktree.rs:46`\n  - `storage/claim_coordinator.rs:986`\n  - `commands/mod.rs:3228`\n  - `gate_execution.rs:628`\n  - the libgit2-based `current_branch_name` in `commands/snapshot.rs:25`\n- **Direct spawns from commands.**\n  - The exec checker spawns git up to four times per run for commit, branch and tree evidence (`gate_execution.rs:529-664`).\n  - Lease validation spawns `git worktree list` once per lease (`commands/validate.rs:2824`, `2995-3035`).\n  - The branch-divergence checks run `git merge-base` and `git rev-parse` in the process working directory rather than the selected worktree (`commands/worktree.rs:389-470`, `commands/validate.rs:2735-2770`).\n- **libgit2 from commands.** Document show, history and diff (`commands/document.rs:383-815`), the document asset check (`document.rs:1099`, `1854`) and snapshot export (`commands/snapshot.rs:19-60`, `199`, `362`) call libgit2 from the commands layer.\n\n## Success Criteria\n\n- [hard] REQ-01: No workspace crate depends on `git2`, as a normal or a dev dependency. `Cargo.lock` holds no `git2` or `libgit2-sys`, and the built binary links neither libgit2 nor OpenSSL.\n- [hard] REQ-02: Exactly one storage-owned module starts git processes. No other production source file spawns git or names the git executable.\n- [hard] REQ-03: Every git call goes through the one configured git executable and runs against the invocation's selected worktree. No git call runs against the process working directory.\n- [hard] REQ-04: Layout facts are detected once per invocation, by at most one git process. Every consumer receives them: storage, claims and leases, validation, init, worktree commands and gate execution. No consumer detects them again.\n- [hard] REQ-05: Exactly one branch-name lookup exists.\n- [hard] REQ-06: In a primary checkout, read commands read no git objects. In a linked checkout, all HEAD-tree reads in one invocation go through at most one git process, whatever the number of issues read.\n- [hard] REQ-07: A test configures a counting stand-in as the git executable. It shows that `query available` and `issue show` start at most one git process in a primary checkout.\n- [hard] REQ-08: Lease validation lists worktrees at most once per run, whatever the number of leases.\n- [hard] REQ-09: Gate execution gets its commit and branch evidence through the module.\n- [hard] REQ-10: Document show, history and diff, document asset checks, snapshot export, and pinned artifact reads all go through the module. The commands layer holds no git code.\n- [hard] REQ-11: The module exposes only operations that production code calls.\n- [hard] REQ-12: Core commands succeed in a directory outside any git repository and with no git executable available. Claim and lease commands fail there with the typed git-requirement error. Tests cover both conditions.\n- [hard] REQ-13: Manifest comments, rustdoc and documentation that describe libgit2 or its OpenSSL linkage are removed or corrected.\n\n## Notes\n\n- Serves @/charter/D-21 and keeps @/charter/D-4. Removing the binding and its advisory surface supports @/charter/D-11 and @/charter/D-18.\n- One module for one concern satisfies @/inv/convention-convergence and @/inv/architecture-dependency-direction. Dropping the native dependency serves @/inv/bounded-rust-build-footprint.\n- The module's behaviour matrix is proven once against the module. Consumers prove only that they go through it (@/inv/orthogonal-tests).\n- This epic routes the main-history guard's git calls through the module. Whether that guard runs at all, and against which remote branch, is decided elsewhere.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://raw.githubusercontent.com/git/git/v2.17.0/builtin/rev-list.c",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://raw.githubusercontent.com/git/git/v2.16.0/builtin/rev-list.c",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://raw.githubusercontent.com/git/git/v2.39.5/builtin/rev-list.c",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://packages.debian.org/bookworm/git",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://raw.githubusercontent.com/git/git/v2.15.0/builtin/rev-list.c",
+          "resolved_path": null
+        }
+      ],
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Bounded head lookup decision",
+      "path": "dev/active/f4d9502a-git-cli-module/head-lookup-experiment.md"
+    }
+  ],
   "first_ready_at": "2026-10-20T20:12:37.009914436Z",
   "gates_required": [
     "repo-validate",
@@ -32,5 +82,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-10-24T18:42:27.871743691Z"
+  "updated_at": "2026-11-04T23:26:30.831299579Z"
 }

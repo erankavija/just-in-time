@@ -9,12 +9,26 @@
   ],
   "description": "Move the logic of commit resolution, pinned path reads and pinned target inspection from `storage/git_revision.rs` into the git module, and leave `GitRevisionResolver` as a bridge that delegates to it, so the logic exists once and its callers move one at a time.\n\n## Background\n\n- `crates/jit/src/storage/git_revision.rs` holds `GitRevisionResolver` (repository root plus program; `new` at `crates/jit/src/storage/git_revision.rs:130`, `with_git_program` at `:138`), `resolve_commit` (`crates/jit/src/storage/git_revision.rs:153`), `read_pinned_path` (`crates/jit/src/storage/git_revision.rs:170`), `inspect_pinned_targets` (`crates/jit/src/storage/git_revision.rs:213`), a `run` helper using `current_dir(repo_root)` (`crates/jit/src/storage/git_revision.rs:439-451`), and a write-all-then-read `git cat-file --batch` (`read_blob_batch`, `crates/jit/src/storage/git_revision.rs:508-606`; parser `parse_cat_file_batch`, `crates/jit/src/storage/git_revision.rs:640-691`). Its errors are `GitRevisionError` (`crates/jit/src/storage/git_revision.rs:25`), re-exported at `crates/jit/src/storage/mod.rs:58`.\n- Its users are storage's pinned inspection (`crates/jit/src/storage/json.rs:490-504`), the archive planner (`crates/jit/src/commands/archive.rs:190`) and the behaviour suite `crates/jit/tests/fast_docs_templates/git_revision_tests.rs`.\n- The module starts every process with `-C <dir>`. The suite and the storage capture tests count processes with the shared stand-in, which records arguments after that prefix.\n- Kept as one change for a convergence reason: moving the logic and making the old type delegate to it are one step, so the logic never exists twice (`@/inv/convention-convergence`).\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout` offers `resolve_commit`, `read_pinned_path` and `inspect_pinned_targets` with today's semantics and results, spawning through the module's helper with `-C` the worktree root, and the module's error type carries `GitRevisionError`'s variants.\n- [hard] REQ-02: `storage/git_revision.rs` holds only the bridge: `GitRevisionResolver` keeps its public methods and delegates each to a `GitCheckout` built from its program and root, `GitRevisionError` names the module's error type, and the file starts no process.\n- [hard] REQ-03: The behaviour suite, the storage capture tests and the archive tests pass unchanged through the bridge.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T23:35:23.054710125Z",
   "first_ready_at": "2026-11-01T14:05:18.333052352Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b768913f-35d2-4db0-a8d1-2819c0aec198",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:34:26.212688256Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a7e4e0e3-c3c6-459e-acdd-aa48f86d5ad9",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:21:07.686674480Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "46a89061-8383-42e0-b20a-a92406f33fcb",
   "labels": [
     "type:task",
@@ -28,7 +42,7 @@
     "satisfies:f4d9502a/REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Pinned revision reads move into the git module behind a bridge",
-  "updated_at": "2026-11-04T22:47:34.207484624Z"
+  "updated_at": "2026-11-04T23:35:23.054710125Z"
 }
