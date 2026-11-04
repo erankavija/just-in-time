@@ -304,7 +304,7 @@ pub fn expand_artifact_closure(
 
 /// The references of one parsed artifact that the plan's walk resolves.
 ///
-/// An artifact the policy retains outside the development root contributes
+/// An artifact the policy retains in place contributes
 /// none: the walk stops at it, so it names no edge and admits no descendant of
 /// it to the plan (`@/issue/8e071e18/decision/D-14`).
 fn followed_references<'a>(
@@ -314,7 +314,7 @@ fn followed_references<'a>(
 ) -> std::slice::Iter<'a, ParsedReference> {
     const BOUNDED: &[ParsedReference] = &[];
 
-    if policy.retains_outside_development_root(path) {
+    if policy.retains_source_in_place(path) {
         BOUNDED.iter()
     } else {
         artifact.references().iter()
