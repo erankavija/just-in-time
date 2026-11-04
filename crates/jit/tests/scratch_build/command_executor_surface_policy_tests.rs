@@ -116,3 +116,32 @@ fn test_surface_scan_distinguishes_facades_from_kernel_and_unrelated_methods() {
         ["storage", "bypass", "another_bypass"]
     );
 }
+
+#[test]
+fn test_command_modules_do_not_depend_on_output() {
+    fn scan(directory: &Path, offenders: &mut Vec<String>) {
+        for entry in std::fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                scan(&path, offenders);
+            } else if path.extension().is_some_and(|extension| extension == "rs")
+                && std::fs::read_to_string(&path)
+                    .unwrap()
+                    .contains("crate::output")
+            {
+                offenders.push(path.display().to_string());
+            }
+        }
+    }
+    let mut offenders = Vec::new();
+    scan(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src/commands"),
+        &mut offenders,
+    );
+    offenders.sort();
+    assert!(
+        offenders.is_empty(),
+        "commands must not name crate::output:\n{}",
+        offenders.join("\n")
+    );
+}

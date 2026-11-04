@@ -2,7 +2,396 @@
 
 use super::*;
 use crate::domain::identity::{GateKey, IssueIdPrefix};
+use crate::domain::list_envelope::{collection_keys, ListEnvelope};
+use crate::domain::{GateRunResult, MinimalIssue};
 use crate::errors::{DeletionNotConfirmedError, TransitionBlocker};
+use schemars::JsonSchema;
+use serde::Serialize;
+
+collection_keys! {
+    /// Collection key of [`IssueChildrenResponse`].
+    ChildrenKey = "issues" as "IssueChildrenResponse";
+}
+
+/// Per-gate view emitted in `issue show --json`.
+///
+/// One entry per gate in the issue's `gates_required`. `status` reflects the
+/// gate's [`GateState`] (or `pending` when none exists). `last_run_at` and
+/// `exit_code` come from the gate's latest [`GateRunResult`] and are both
+/// `null` when no run has been recorded; a manual gate's attestation is a run
+/// whose `exit_code` is `null`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateView {
+    /// Gate key.
+    pub key: GateKey,
+    /// Gate status.
+    pub status: crate::domain::GateStatus,
+    /// Timestamp of the gate's latest run, or `null` when never run.
+    pub last_run_at: Option<String>,
+    /// Exit code of the gate's latest run, or `null` when never run.
+    pub exit_code: Option<i32>,
+}
+
+impl GateView {
+    /// Build the per-gate view for a single required gate.
+    ///
+    /// `latest` is the run named by `state`, loaded by the latest-run accessor.
+    fn build(
+        key: &GateKey,
+        state: Option<&crate::domain::GateState>,
+        latest: Option<&GateRunResult>,
+    ) -> Self {
+        let status = state
+            .map(|s| s.status)
+            .unwrap_or(crate::domain::GateStatus::Pending);
+
+        GateView {
+            key: key.clone(),
+            status,
+            last_run_at: latest.map(|r| r.started_at.to_rfc3339()),
+            exit_code: latest.and_then(|r| r.exit_code),
+        }
+    }
+}
+
+/// A single unmet dependency, as projected into `issue show --json` and the
+/// compact `issue status` view.
+///
+/// A dependency is *unmet* when it is not effectively terminal (`Done`,
+/// `Rejected`, or `Archived` retired from one of those —
+/// [`Issue::is_effectively_terminal`]) — the exact same readiness test as
+/// [`Issue::is_blocked`] and
+/// [`query_ready`](crate::domain::queries::query_ready): an effectively terminal
+/// dependency unblocks its dependents, so it is never listed here. The shape is a subset of
+/// the enriched `dependencies` entries (`id`, `short_id`, `title`, `state`),
+/// carrying only what an orchestrator needs to see what is still blocking work.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct UnmetDependency {
+    pub id: IssueId,
+    /// Short ID (first 8 chars of the full UUID), for human-readable references.
+    pub short_id: String,
+    pub title: String,
+    pub state: State,
+}
+
+impl From<&MinimalIssue> for UnmetDependency {
+    fn from(dep: &MinimalIssue) -> Self {
+        Self {
+            id: dep.id.clone(),
+            short_id: dep.short_id(),
+            title: dep.title.clone(),
+            state: dep.state,
+        }
+    }
+}
+
+/// Response for `issue show` command with enriched dependencies
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueShowResponse {
+    pub id: IssueId,
+    /// Short ID (first 8 chars of the full UUID), for human-readable references.
+    pub short_id: String,
+    pub title: String,
+    pub description: String,
+    pub state: State,
+    pub priority: Priority,
+    pub assignee: Option<String>,
+    /// Enriched dependency list with full metadata
+    pub dependencies: Vec<MinimalIssue>,
+    /// Dependency ids from the issue's stored `dependencies` array that did
+    /// NOT resolve to an existing issue (e.g. a stale reference left by raw
+    /// storage mutation or legacy data predating the delete-cascade fix in
+    /// `IssueOps::delete_issue`, jit:f847df3f). Deleting an issue
+    /// through the CLI strips its own id from every dependent's
+    /// `dependencies`, so this is empty in a repository touched only through
+    /// the CLI; when non-empty, it means a dangling id exists and — unlike
+    /// `dependencies`, which silently omits ids it cannot resolve — is not
+    /// hidden.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dangling_dependency_ids: Vec<IssueId>,
+    /// The subset of `dependencies` that are not yet met (not effectively terminal),
+    /// consistent with readiness — see [`UnmetDependency`]. Always an array,
+    /// empty when every dependency is effectively terminal (`Done`, `Rejected`,
+    /// or `Archived` from one of those) or there are none.
+    pub unmet_dependencies: Vec<UnmetDependency>,
+    /// Per-gate view, one entry per required gate, enriched from each gate's
+    /// latest run.
+    pub gates: Vec<GateView>,
+    pub context: std::collections::HashMap<String, String>,
+    pub documents: Vec<crate::domain::DocumentReference>,
+    pub labels: Vec<String>,
+    /// Per-issue content format override; absent means the repo default applies.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_format: Option<crate::domain::ContentFormat>,
+    pub created_at: String,
+    pub updated_at: String,
+    /// When the issue FIRST entered `ready` (RFC 3339); absent when unset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_ready_at: Option<String>,
+    /// When the issue was FIRST claimed/assigned (RFC 3339); absent when unset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claimed_at: Option<String>,
+    /// When the issue FIRST reached `done` (RFC 3339); absent when unset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub done_at: Option<String>,
+}
+
+impl IssueShowResponse {
+    /// Create from Issue with enriched dependencies and the issue's gate runs.
+    ///
+    /// `gate_runs` contains one latest run per gate, supplied by
+    /// [`GateOps::get_last_gate_runs_for_issue`](crate::commands::GateOps::get_last_gate_runs_for_issue).
+    /// Pass an empty slice when no gate state names a run.
+    ///
+    /// `enriched_deps` normally holds one [`MinimalIssue`] per entry in
+    /// `issue.dependencies`, but an id that no longer resolves to a stored
+    /// issue is left out of it by
+    /// [`get_dependencies_enriched`](crate::commands::IssueOps::get_dependencies_enriched).
+    /// This constructor recovers any such id by diffing `enriched_deps`
+    /// against `issue.dependencies` and reports it via
+    /// `dangling_dependency_ids` instead of dropping it silently
+    /// (jit:f847df3f).
+    pub fn from_issue(
+        issue: crate::domain::Issue,
+        enriched_deps: Vec<MinimalIssue>,
+        gate_runs: &[GateRunResult],
+    ) -> Self {
+        let latest_runs: std::collections::HashMap<_, _> =
+            gate_runs.iter().map(|run| (&run.gate_key, run)).collect();
+        let gates = issue
+            .gates_required
+            .iter()
+            .map(|key| {
+                GateView::build(
+                    key,
+                    issue.gates_status.get(key),
+                    latest_runs.get(key).copied(),
+                )
+            })
+            .collect();
+
+        // See the doc comment above: recover ids `enriched_deps` couldn't
+        // resolve so they surface instead of vanishing from the response.
+        let resolved_ids: std::collections::HashSet<&IssueId> =
+            enriched_deps.iter().map(|dep| &dep.id).collect();
+        let dangling_dependency_ids: Vec<IssueId> = issue
+            .dependencies
+            .iter()
+            .filter(|dep_id| !resolved_ids.contains(dep_id))
+            .cloned()
+            .collect();
+
+        // Unmet by the one predicate `Issue::is_blocked` and the transition
+        // blockers apply. Dangling ids are reported separately above rather than
+        // projected here.
+        let unmet_dependencies: Vec<UnmetDependency> = enriched_deps
+            .iter()
+            .filter(|dep| !crate::domain::is_dependency_met(dep.state, dep.archived_from))
+            .map(UnmetDependency::from)
+            .collect();
+
+        Self {
+            short_id: issue.short_id(),
+            id: issue.id,
+            title: issue.title,
+            description: issue.description,
+            state: issue.state,
+            priority: issue.priority,
+            assignee: issue
+                .assignee
+                .as_ref()
+                .map(crate::domain::Assignee::to_string),
+            dependencies: enriched_deps,
+            dangling_dependency_ids,
+            unmet_dependencies,
+            gates,
+            context: issue.context,
+            documents: issue.documents,
+            labels: issue.labels,
+            content_format: issue.content_format,
+            created_at: issue.created_at.to_rfc3339(),
+            updated_at: issue.updated_at.to_rfc3339(),
+            first_ready_at: issue.first_ready_at.map(|t| t.to_rfc3339()),
+            claimed_at: issue.claimed_at.map(|t| t.to_rfc3339()),
+            done_at: issue.done_at.map(|t| t.to_rfc3339()),
+        }
+    }
+}
+
+/// Compact orchestration status for one issue: where it stands in one glance.
+///
+/// This is the small shape behind `jit issue status` (text one-liner and
+/// `--json` object). It projects an [`IssueShowResponse`] down to the fields an
+/// agent reconstructs by hand when it only needs "state, per-gate status, and
+/// what is still blocking": `state`, a `{key, status}` entry per required gate
+/// (b1586c0d convention), and the `short_id`s of the [unmet
+/// dependencies](UnmetDependency). It carries no run history, description, or
+/// enriched dependency metadata.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::identity::GateKey;
+/// use jit::domain::{GateStatus, Issue, State};
+/// use jit::commands::{IssueShowResponse, IssueStatusResponse};
+///
+/// let id = jit::test_utils::issue_id(1);
+/// let mut issue = Issue::draft(id, "Build parser".into(), "Body".into());
+/// issue.state = State::Ready;
+/// let gate: GateKey = "tests".parse().unwrap();
+/// issue.gates_required = vec![gate.clone()];
+/// let show = IssueShowResponse::from_issue(issue, vec![], &[]);
+///
+/// let status = IssueStatusResponse::from_show(&show);
+/// assert_eq!(status.state, State::Ready);
+/// assert_eq!(status.gates.len(), 1);
+/// assert_eq!(status.gates[0].key, gate);
+/// assert_eq!(status.gates[0].status, GateStatus::Pending);
+/// assert!(status.unmet_dependencies.is_empty());
+///
+/// // The one-line render is stable and greppable; empty sections read `none`.
+/// let line = status.to_line();
+/// assert!(line.contains("[ready]"));
+/// assert!(line.contains("gates: tests=pending"));
+/// assert!(line.contains("unmet: none"));
+/// assert!(line.ends_with("title: Build parser"));
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueStatusResponse {
+    /// Short ID (first 8 chars of the full UUID).
+    pub short_id: String,
+    pub state: State,
+    /// One entry per required gate, `{key, status}` only.
+    pub gates: Vec<GateStatusEntry>,
+    /// Short ids of the dependencies that are not yet met (not effectively terminal),
+    /// consistent with readiness. Empty when nothing is blocking.
+    pub unmet_dependencies: Vec<String>,
+    pub title: String,
+}
+
+impl IssueStatusResponse {
+    /// Project a full [`IssueShowResponse`] down to the compact status shape.
+    pub fn from_show(show: &IssueShowResponse) -> Self {
+        Self {
+            short_id: show.short_id.clone(),
+            state: show.state,
+            gates: show
+                .gates
+                .iter()
+                .map(|g| GateStatusEntry {
+                    key: g.key.clone(),
+                    status: g.status,
+                })
+                .collect(),
+            unmet_dependencies: show
+                .unmet_dependencies
+                .iter()
+                .map(|d| d.short_id.clone())
+                .collect(),
+            title: show.title.clone(),
+        }
+    }
+}
+
+/// Compact container header — `{short_id, title, state}` — carried at the top of
+/// `jit issue children` and `jit issue progress` JSON so a consumer sees which
+/// container the child listing or rollup is for without a second lookup.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ContainerHeader {
+    /// Short ID (first 8 chars of the full UUID).
+    pub short_id: String,
+    /// The container's title.
+    pub title: String,
+    /// The container's own lifecycle state.
+    pub state: State,
+}
+
+impl From<&Issue> for ContainerHeader {
+    fn from(issue: &Issue) -> Self {
+        Self {
+            short_id: issue.short_id(),
+            title: issue.title.clone(),
+            state: issue.state,
+        }
+    }
+}
+
+/// Response for `jit issue children`: a container header plus one compact
+/// [`IssueStatusResponse`] per resolvable direct child (its immediate
+/// dependencies, depth 1), and the ids of any child edges that no longer
+/// resolve.
+///
+/// `issues` and `count` form the standard `{count, issues}` list envelope, with
+/// `container` added on top. `dangling` follows
+/// the [`IssueShowResponse::dangling_dependency_ids`] precedent: a dependency id
+/// that points at no stored issue is surfaced here rather than silently dropped,
+/// and is omitted from the JSON when empty. Children are ordered by ascending
+/// short id (stored dependency order is set-derived and not meaningful).
+///
+/// `issues` holds one compact status projection per resolvable direct child,
+/// ascending short id.
+pub type IssueChildrenResponse = ListEnvelope<ChildrenKey, IssueStatusResponse, ChildrenScope>;
+
+/// Fields of [`IssueChildrenResponse`] beside its `issues`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ChildrenScope {
+    /// `{short_id, title, state}` of the queried container.
+    pub container: ContainerHeader,
+    /// Dependency ids that resolve to no stored issue (dangling edges), omitted
+    /// when empty. `count`/`issues` cover resolvable children only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dangling: Vec<IssueId>,
+}
+
+/// Response for `jit issue progress`: a container header, the counts-by-state
+/// [`StateRollup`] over its resolvable direct children, and any dangling child
+/// edges.
+///
+/// The [`StateRollup`] fields are flattened to the top level, so the JSON is the `StateRollup`
+/// shape plus `container` (and `dangling` when non-empty). `total` and every
+/// count are over **resolvable** children only; a dependency id resolving to no
+/// stored issue is surfaced in `dangling` (the [`IssueShowResponse`] precedent)
+/// rather than counted or dropped.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ContainerProgressResponse {
+    /// `{short_id, title, state}` of the queried container.
+    pub container: ContainerHeader,
+    /// The counts-by-state rollup over resolvable direct children, flattened to
+    /// the top level.
+    #[serde(flatten)]
+    pub rollup: StateRollup,
+    /// Dependency ids that resolve to no stored issue (dangling edges), omitted
+    /// when empty. The rollup counts resolvable children only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dangling: Vec<IssueId>,
+}
+
+/// Per-required-gate readiness entry in `gate status-all`.
+///
+/// Reports one required gate's authoritative per-issue [`GateStatus`] so a
+/// `--json` consumer can distinguish a gate that
+/// ran and failed from one that has never run/attested, both of which map to
+/// the single nonzero exit code of `gate status-all`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateStatusEntry {
+    pub key: GateKey,
+    pub status: GateStatus,
+}
+
+impl GateStatusEntry {
+    /// Build the `{key, status}` entry for one required gate: its recorded
+    /// [`GateState`] status, or `pending` when no run or attestation exists.
+    ///
+    /// Centralizes the pending-default so the compact `gates` projection shared
+    /// by `issue status` and `issue show --summary` matches the status the full
+    /// [`GateView`] reports for the same gate.
+    pub fn for_required(key: &GateKey, state: Option<&GateState>) -> Self {
+        Self {
+            key: key.clone(),
+            status: state.map(|s| s.status).unwrap_or(GateStatus::Pending),
+        }
+    }
+}
 
 /// How `update_issue` should apply a new description value.
 ///
@@ -253,7 +642,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// that no longer resolves (e.g. a dangling reference left by raw storage
     /// mutation or legacy data — normal deletion no longer produces one, see
     /// `delete_issue`) is left out here. That is not a loss of information:
-    /// [`IssueShowResponse::from_issue`](crate::output::IssueShowResponse::from_issue)
+    /// [`IssueShowResponse::from_issue`](crate::commands::IssueShowResponse::from_issue)
     /// diffs its own `enriched_deps` argument against the issue's full
     /// `dependencies` list to recover any id missing here and surfaces it via
     /// `dangling_dependency_ids`, so `jit issue show --json` never silently
@@ -272,10 +661,10 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .collect()
     }
 
-    /// Build the [`IssueShowResponse`](crate::output::IssueShowResponse) for one
+    /// Build the [`IssueShowResponse`](crate::commands::IssueShowResponse) for one
     /// already-loaded issue: enriched dependencies, gate runs, and the
     /// documents every reader reports ([`DocumentOps::issue_documents`]).
-    pub fn show_response(&self, issue: Issue) -> Result<crate::output::IssueShowResponse> {
+    pub fn show_response(&self, issue: Issue) -> Result<crate::commands::IssueShowResponse> {
         let enriched_deps = self.get_dependencies_enriched(&issue);
         let (gate_runs, _) = self
             .exec
@@ -283,17 +672,17 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .get_last_gate_runs_for_issue(&issue.id)
             .with_context(|| format!("Failed to load gate runs for issue {}", issue.id))?;
         let documents = self.exec.documents().issue_documents(&issue)?;
-        Ok(crate::output::IssueShowResponse {
+        Ok(crate::commands::IssueShowResponse {
             documents,
-            ..crate::output::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs)
+            ..crate::commands::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs)
         })
     }
 
-    /// Build the compact [`IssueStatusResponse`](crate::output::IssueStatusResponse)
+    /// Build the compact [`IssueStatusResponse`](crate::commands::IssueStatusResponse)
     /// for one already-loaded issue.
     ///
     /// Loads the issue's enriched dependencies and gate runs, builds the full
-    /// [`IssueShowResponse`](crate::output::IssueShowResponse), and projects it
+    /// [`IssueShowResponse`](crate::commands::IssueShowResponse), and projects it
     /// down to the compact status shape — so the projection is byte-for-byte the
     /// same one `jit issue show`/`jit issue status` produce. Shared by
     /// `issue status` and `issue children` (the latter is this projection over a
@@ -301,11 +690,11 @@ impl<S: IssueStore> IssueOps<'_, S> {
     pub fn issue_status_response(
         &self,
         issue: Issue,
-    ) -> Result<crate::output::IssueStatusResponse> {
+    ) -> Result<crate::commands::IssueStatusResponse> {
         let enriched_deps = self.get_dependencies_enriched(&issue);
         let (gate_runs, _) = self.exec.gates().get_last_gate_runs_for_issue(&issue.id)?;
-        let show = crate::output::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs);
-        Ok(crate::output::IssueStatusResponse::from_show(&show))
+        let show = crate::commands::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs);
+        Ok(crate::commands::IssueStatusResponse::from_show(&show))
     }
 
     /// Resolve a container's direct dependency edges (its depth-1 children) into
@@ -313,7 +702,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     ///
     /// A dependency id resolving to no stored issue is a *dangling* edge and is
     /// collected separately (following the `issue show`
-    /// [`dangling_dependency_ids`](crate::output::IssueShowResponse::dangling_dependency_ids)
+    /// [`dangling_dependency_ids`](crate::commands::IssueShowResponse::dangling_dependency_ids)
     /// precedent) rather than silently dropped. Only a not-found id is treated
     /// as dangling: any genuine storage error (I/O, deserialization) propagates
     /// via `?` instead of being swallowed. Dangling ids are returned sorted.
@@ -378,7 +767,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// assert_eq!(response.items[0].title, "Child");
     /// assert!(response.extras.dangling.is_empty());
     /// ```
-    pub fn issue_children(&self, id: &IssueId) -> Result<crate::output::IssueChildrenResponse> {
+    pub fn issue_children(&self, id: &IssueId) -> Result<crate::commands::IssueChildrenResponse> {
         let container = self.show_issue(id)?;
         let (children, dangling) = self.resolve_direct_children(&container)?;
 
@@ -388,10 +777,10 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .collect::<Result<Vec<_>>>()?;
         issues.sort_by(|a, b| a.short_id.cmp(&b.short_id));
 
-        Ok(crate::output::IssueChildrenResponse::with_extras(
+        Ok(crate::commands::IssueChildrenResponse::with_extras(
             issues,
-            crate::output::ChildrenScope {
-                container: crate::output::ContainerHeader::from(&container),
+            crate::commands::ChildrenScope {
+                container: crate::commands::ContainerHeader::from(&container),
                 dangling,
             },
         ))
@@ -453,13 +842,16 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// assert_eq!(progress.rollup.extras.percent, 50);
     /// assert!(progress.dangling.is_empty());
     /// ```
-    pub fn issue_progress(&self, id: &IssueId) -> Result<crate::output::ContainerProgressResponse> {
+    pub fn issue_progress(
+        &self,
+        id: &IssueId,
+    ) -> Result<crate::commands::ContainerProgressResponse> {
         let container = self.show_issue(id)?;
         let (children, dangling) = self.resolve_direct_children(&container)?;
 
-        Ok(crate::output::ContainerProgressResponse {
-            container: crate::output::ContainerHeader::from(&container),
-            rollup: crate::output::StateRollup::from_issues(&children),
+        Ok(crate::commands::ContainerProgressResponse {
+            container: crate::commands::ContainerHeader::from(&container),
+            rollup: crate::commands::StateRollup::from_issues(&children),
             dangling,
         })
     }

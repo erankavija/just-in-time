@@ -534,7 +534,10 @@ impl CommandSchema {
                     "error": {
                         "type": "object",
                         "properties": {
-                            "code": { "type": "string" },
+                            "code": {
+                                "type": "string",
+                                "enum": crate::output::ErrorCode::ALL.iter().map(|code| code.as_str()).collect::<Vec<_>>()
+                            },
                             "message": { "type": "string" },
                             "suggestion": { "type": ["string", "null"] }
                         }
@@ -805,6 +808,22 @@ mod tests {
             let name = command.get_name();
             walk(command, &schema.commands[name], name);
         }
+    }
+
+    #[test]
+    fn test_generate_types_error_codes_match_runtime_vocabulary() {
+        let types = CommandSchema::generate_types();
+        let codes = types["ErrorResponse"]["properties"]["error"]["properties"]["code"]["enum"]
+            .as_array()
+            .expect("error codes declare their closed vocabulary")
+            .iter()
+            .map(|code| code.as_str().unwrap())
+            .collect::<std::collections::BTreeSet<_>>();
+        let expected = ErrorCode::ALL
+            .iter()
+            .map(|code| code.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(codes, expected);
     }
 
     #[test]

@@ -20,10 +20,16 @@
   "first_ready_at": "2026-11-04T09:40:58.219593245Z",
   "gates_required": [
     "cargo-ci",
-    "code-review",
-    "mcp-ci"
+    "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9be5aafe-d638-4d4c-b43f-9b778a9c7c36",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:05:17.612097945Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fb38bf1f-a4b0-4acf-9b5b-bda244d0ee09",
   "labels": [
     "epic:rust-code-quality",
@@ -35,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Commands import nothing from the output layer",
-  "updated_at": "2026-11-04T21:46:31.204948913Z"
+  "updated_at": "2026-11-04T22:05:17.612097945Z"
 }

@@ -3,9 +3,9 @@
 //! A dependency is met when its target reached a terminal state (`Done` or
 //! `Rejected`). Every surface reads that one rule: state transitions, `issue
 //! show` rendering, claim-next's candidates, and the Ready-issue demotion that guards a newly added edge.
+use jit::commands::IssueShowResponse;
 use jit::domain::identity::IssueId;
 use jit::domain::State;
-use jit::output::IssueShowResponse;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 use jit::test_utils::add_reducing_edge;

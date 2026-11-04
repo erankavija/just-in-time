@@ -1,6 +1,7 @@
 //! Gate checking and execution operations
 
 use super::*;
+use crate::commands::IssueShowResponse;
 use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
 use crate::domain::gate_findings::{
     FindingDisposition, FindingOrigin, FindingSeverity, GateFinding, GateFindings,
@@ -12,7 +13,6 @@ use crate::domain::{
 };
 use crate::errors::TransitionBlockedError;
 use crate::gate_execution::{self, GateRunSubject};
-use crate::output::IssueShowResponse;
 use std::collections::HashMap;
 
 /// Maximum prompt file size in bytes (~1000 lines of 80 chars).
@@ -1471,14 +1471,15 @@ mod tests {
         compact_run_history_for_context, omit_current_gate_projection, replace_named_run,
         IssueIdPrefix,
     };
+    use crate::commands::test_helpers::gate_reuse::{seed_gate_issue, ReuseFixture};
     use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file, setup};
+    use crate::commands::IssueShowResponse;
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::gate_findings::GateFindings;
     use crate::domain::identity::{GateKey, GateRunId, IssueId};
     use crate::domain::{GateRunResult, GateRunStatus, GateStatus, State, GATE_RUN_SCHEMA_VERSION};
     use crate::gate_execution::GateRunSubject;
-    use crate::output::IssueShowResponse;
     use crate::repository_state::VirtualPath;
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
     use crate::test_utils::add_reducing_edge;
@@ -2019,32 +2020,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         )
     }
 
-    fn seed_gate_issue(
-        executor: &CommandExecutor<JsonFileStorage>,
-        taxonomy: &crate::test_taxonomy::TestTaxonomy,
-        gate_key: &GateKey,
-        issue_title: &str,
-        issue_description: &str,
-    ) -> IssueId {
-        let issue_id = executor
-            .issues()
-            .create_issue(
-                issue_title.to_string(),
-                issue_description.to_string(),
-                crate::domain::Priority::Normal,
-                Vec::new(),
-                vec![format!("type:{}", taxonomy.type_at_level(4))],
-                None,
-                None,
-                false,
-            )
-            .unwrap()
-            .issue
-            .id;
-        executor.gates().add_gate(&issue_id, gate_key).unwrap();
-        issue_id
-    }
-
     fn seed_file_repository(
         executor: &CommandExecutor<JsonFileStorage>,
         taxonomy: &crate::test_taxonomy::TestTaxonomy,
@@ -2120,129 +2095,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             run.stdout,
             run.stderr
         );
-    }
-
-    struct ReuseFixture {
-        repo: tempfile::TempDir,
-        executor: CommandExecutor<JsonFileStorage>,
-        gate_key: GateKey,
-    }
-
-    impl ReuseFixture {
-        fn seed(&self, declaration: Option<(&[&str], &[&str])>, verdict_exit: u8) {
-            std::fs::create_dir_all(self.repo.path().join("workspace/src"))
-                .expect("create workspace");
-            std::fs::write(
-                self.repo.path().join("workspace/src/lib.rs"),
-                "fn main() {}\n",
-            )
-            .expect("write source");
-            std::fs::write(self.repo.path().join("elsewhere.txt"), "unread\n")
-                .expect("write outsider");
-
-            let log = self.repo.path().join("executions.log");
-            let mut registry = self
-                .executor
-                .storage
-                .load_gate_registry()
-                .expect("the seeded registry");
-            registry.gates.insert(
-                self.gate_key.clone(),
-                crate::declarations::GateDefinition {
-                    version: 1,
-                    key: self.gate_key.clone(),
-                    title: "Workspace check".to_string(),
-                    description: "Workspace check".to_string(),
-                    stage: GateStage::Postcheck,
-                    mode: GateMode::Auto,
-                    checker: Some(GateChecker::Exec {
-                        command: format!(
-                            "printf x >> '{}'; exit {verdict_exit}",
-                            log.to_string_lossy()
-                        ),
-                        timeout_seconds: 30,
-                        working_dir: None,
-                        env: HashMap::new(),
-                        pass_context: false,
-                        prompt: None,
-                        prompt_file: None,
-                    }),
-                    inputs: declaration.map(|(roots, exclude)| {
-                        crate::domain::repository_inputs::RepositoryInputs::parse(roots, exclude)
-                            .expect("a declarable input set")
-                    }),
-                    priority: 100,
-                    reserved: HashMap::new(),
-                },
-            );
-            let bytes = crate::declarations::serialize_gate_registry(&registry)
-                .expect("the registry serializes");
-            std::fs::write(self.repo.path().join(".jit/gates.toml"), bytes)
-                .expect("write registry");
-        }
-
-        fn issue(&self, title: &str, description: &str) -> IssueId {
-            let taxonomy = crate::test_taxonomy::test_taxonomy();
-            seed_gate_issue(
-                &self.executor,
-                &taxonomy,
-                &self.gate_key,
-                title,
-                description,
-            )
-        }
-
-        fn evaluate(&self, issue_id: &IssueId) -> GateRunResult {
-            self.executor
-                .gates()
-                .check_gate(issue_id, &self.gate_key)
-                .expect("the gate evaluates")
-        }
-
-        fn executions(&self) -> usize {
-            std::fs::read(self.repo.path().join("executions.log"))
-                .map(|bytes| bytes.len())
-                .unwrap_or(0)
-        }
-
-        fn write(&self, relative: &str, contents: &str) {
-            let path = self.repo.path().join(relative);
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent).expect("create parent");
-            }
-            std::fs::write(path, contents).expect("write file");
-        }
-
-        fn remove(&self, relative: &str) {
-            std::fs::remove_file(self.repo.path().join(relative)).expect("remove file");
-        }
-
-        /// Replace the gate's checker command, leaving its declared inputs and
-        /// every repository file alone.
-        fn rewrite_checker_command(&self, command: &str) {
-            let mut registry = self
-                .executor
-                .storage
-                .load_gate_registry()
-                .expect("the registry loads");
-            let gate = registry
-                .gates
-                .get_mut(&self.gate_key)
-                .expect("the gate under test is registered");
-            gate.checker = Some(GateChecker::Exec {
-                command: command.to_string(),
-                timeout_seconds: 30,
-                working_dir: None,
-                env: HashMap::new(),
-                pass_context: false,
-                prompt: None,
-                prompt_file: None,
-            });
-            let bytes = crate::declarations::serialize_gate_registry(&registry)
-                .expect("the registry serializes");
-            std::fs::write(self.repo.path().join(".jit/gates.toml"), bytes)
-                .expect("write registry");
-        }
     }
 
     /// REQ-03/REQ-04: a second issue's evaluation over an unchanged declared
@@ -2734,48 +2586,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
         assert!(after.origin.is_executed());
         assert_ne!(after.inputs_digest, before.inputs_digest);
-    }
-
-    /// REQ-05: the machine-readable status of a reused verdict is
-    /// distinguishable from a derived one and names the run behind it.
-    #[test]
-    fn test_gate_run_summary_distinguishes_a_reused_verdict_from_a_derived_one() {
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        let config = format!(
-            "[worktree]\nenforce_leases = \"off\"\n\n{}",
-            taxonomy.config_fragment()
-        );
-        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
-        let fixture = ReuseFixture {
-            repo,
-            executor,
-            gate_key: "workspace-check".parse().unwrap(),
-        };
-        fixture.seed(Some((&["workspace"], &[])), 0);
-        let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
-        let reused = fixture.evaluate(&fixture.issue("Test", "Test"));
-
-        let rendered = |run: &GateRunResult| {
-            serde_json::to_value(crate::output::GateRunSummary::lean(run))
-                .expect("the summary serializes")
-        };
-        let executed_json = rendered(&executed);
-        let reused_json = rendered(&reused);
-
-        assert_ne!(
-            executed_json["origin"], reused_json["origin"],
-            "the two derivations must not read identically"
-        );
-        assert!(
-            reused_json["origin"]
-                .to_string()
-                .contains(executed.run_id.as_str()),
-            "the reused summary must name the run it was taken from: {reused_json}"
-        );
-        assert_eq!(
-            executed_json["inputs_digest"], reused_json["inputs_digest"],
-            "both summaries describe the same declared input content"
-        );
     }
 
     fn add_exec_gate<S: IssueStore + crate::storage::RepositoryStateStore>(

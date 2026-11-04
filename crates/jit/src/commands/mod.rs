@@ -84,6 +84,10 @@ pub use config::{
     ConfigValidationReport,
 };
 pub use document::DocumentOps;
+pub use document::{
+    ArtifactConformanceEntry, ArtifactConformanceResponse, ArtifactDirectoryResponse, ArtifactsKey,
+    ConformanceScope,
+};
 pub use gate::{
     FieldEdit, GateNotRequiredError, GateOps, GatePassAllEntry, GatePassFailed, GatePassOutcome,
     GateStatusArgumentsTransposedError, GateUpdate, ManualGateAttestationRequiredError,
@@ -91,8 +95,18 @@ pub use gate::{
 };
 pub use gate_check::VerdictSource;
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat, GraphOps};
+pub use graph::{
+    DependencySummary, DependencyTreeNode, DependencyTreeScope, DivergenceResponse, DivergenceView,
+    GraphDepsNodesKey, GraphDepsTreeResponse, GraphExportOutput, GraphExportText,
+    GraphExportWritten, GraphRootsResponse, GraphTreeNodesKey, GraphTreeResponse,
+    HierarchyNodeView, MembershipDivergencesKey, RootsKey, TreeRoot,
+};
 pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
+pub use issue::{
+    ChildrenKey, ChildrenScope, ContainerHeader, ContainerProgressResponse, GateStatusEntry,
+    GateView, IssueChildrenResponse, IssueShowResponse, IssueStatusResponse, UnmetDependency,
+};
 pub use issue::{
     DescriptionUpdate, IssueCreation, IssueDeletion, IssueLocalUpdate, IssueMutation, IssueOps,
 };
@@ -104,6 +118,7 @@ pub use profile::{
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use query::QueryOps;
+pub use query::{ByStateKey, RollupTotals, StateCount, StateRollup};
 pub use search::ContentMatch;
 pub use template::{TemplateApplyResult, TemplateOps};
 pub use template_expand::{

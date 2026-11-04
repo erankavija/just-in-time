@@ -2,9 +2,284 @@
 
 use super::*;
 use crate::domain::identity::IssueId;
+use crate::domain::list_envelope::{collection_keys, ListEnvelope};
+use crate::domain::MinimalIssue;
 use crate::graph::Direction;
-use crate::output::{DependencyTreeNode, GraphExportOutput, GraphExportText};
+use crate::visualization::{pretty_document, GraphExportFullResponse, GraphExportSummaryResponse};
+use schemars::JsonSchema;
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
+
+collection_keys! {
+    /// Collection key of [`GraphDepsTreeResponse`].
+    GraphDepsNodesKey = "nodes" as "GraphDepsTreeResponse";
+    /// Collection key of [`GraphRootsResponse`].
+    RootsKey = "roots" as "GraphRootsResponse";
+    /// Collection key of [`GraphTreeResponse`].
+    GraphTreeNodesKey = "nodes" as "GraphTreeResponse";
+    /// Collection key of [`DivergenceResponse`].
+    MembershipDivergencesKey = "divergences" as "DivergenceResponse";
+}
+
+/// Tree node for hierarchical dependency display
+#[derive(Debug, Serialize, JsonSchema, Clone)]
+pub struct DependencyTreeNode {
+    /// Issue ID
+    pub id: IssueId,
+    /// Short ID (first 8 chars)
+    pub short_id: String,
+    /// Issue title
+    pub title: String,
+    /// Current state
+    pub state: State,
+    /// Priority
+    pub priority: Priority,
+    /// Depth level in tree (1 = immediate child, 2 = grandchild, etc.)
+    pub level: u32,
+    /// Whether this node appears multiple times in the tree (shared dependency)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shared: Option<bool>,
+    /// Pre-archive origin state, present exactly for an `Archived` node.
+    /// Carried so dependency consumers can compute effective
+    /// terminality (`jit:45a140ae`): an `archived` node with a terminal origin
+    /// still satisfies its dependents.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archived_from: Option<State>,
+    /// Child dependencies
+    pub children: Vec<DependencyTreeNode>,
+}
+
+impl DependencyTreeNode {
+    /// Create from MinimalIssue
+    pub fn from_minimal(issue: &MinimalIssue, level: u32) -> Self {
+        Self {
+            short_id: issue.short_id(),
+            id: issue.id.clone(),
+            title: issue.title.clone(),
+            state: issue.state,
+            priority: issue.priority,
+            level,
+            shared: None,
+            archived_from: issue.archived_from,
+            children: Vec::new(),
+        }
+    }
+}
+
+/// Response for `graph deps` with tree structure.
+///
+/// `count` is the number of top-level entries in `nodes` (the immediate
+/// dependency nodes; each may carry nested `children`). This differs from
+/// `summary.total`, which counts every unique dependency across the whole tree.
+pub type GraphDepsTreeResponse =
+    ListEnvelope<GraphDepsNodesKey, DependencyTreeNode, DependencyTreeScope>;
+
+/// Fields of [`GraphDepsTreeResponse`] beside its `nodes`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DependencyTreeScope {
+    pub issue_id: IssueId,
+    /// Depth of traversal (1 = immediate, 0 = unlimited)
+    pub depth: u32,
+    /// Summary statistics
+    pub summary: DependencySummary,
+}
+
+/// Summary statistics for dependencies
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DependencySummary {
+    /// Total number of unique dependencies
+    pub total: usize,
+    /// Count by state (keys are canonical snake_case state names)
+    pub by_state: std::collections::HashMap<State, usize>,
+}
+
+/// Response for `graph roots` command
+pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
+
+/// One node's resolved hierarchy facts, as rendered by `graph tree`.
+///
+/// The `type` key is the value of the node's `type:` label (absent when it has
+/// none). The `parent`, `children`, `cluster`, and `rank` keys are flattened
+/// from [`NodeHierarchy`](crate::graph::hierarchy::NodeHierarchy), the
+/// DAG-authoritative resolution produced by
+/// [`resolve_hierarchy`](crate::graph::hierarchy::resolve_hierarchy).
+///
+/// # Examples
+///
+/// ```
+/// use jit::graph::hierarchy::NodeHierarchy;
+/// use jit::commands::HierarchyNodeView;
+///
+/// let epic_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678);
+/// let task_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0002_8765_4321);
+/// let view = HierarchyNodeView {
+///     id: epic_id.clone(),
+///     short_id: epic_id.short_id().to_string(),
+///     title: "Auth epic".into(),
+///     type_name: Some("epic".into()),
+///     hierarchy: NodeHierarchy {
+///         parent: None,
+///         children: vec![task_id.clone()],
+///         cluster: Some(epic_id.clone()),
+///         rank: 1,
+///     },
+/// };
+/// let json = serde_json::to_value(&view).unwrap();
+/// // `type_name` serializes under the `type` key.
+/// assert_eq!(json["type"], "epic");
+/// // The resolution fields sit flat on the node.
+/// assert_eq!(json["children"][0], task_id.as_str());
+/// assert_eq!(json["cluster"], epic_id.as_str());
+/// assert_eq!(json["rank"], 1);
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct HierarchyNodeView {
+    /// Full issue id.
+    pub id: IssueId,
+    /// Short id (first 8 chars).
+    pub short_id: String,
+    /// Issue title.
+    pub title: String,
+    /// The node's `type:` label value, if any.
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub type_name: Option<String>,
+    /// DAG-resolved parent, children, cluster, and rank, flattened onto the node.
+    #[serde(flatten)]
+    pub hierarchy: crate::graph::hierarchy::NodeHierarchy,
+}
+
+/// Response for `graph tree` command.
+///
+/// `count` is the number of entries in `nodes`. `root` echoes the optional root
+/// id the view was scoped to (`null` for the whole repository). Each node
+/// carries its DAG-resolved parent, children, cluster, and rank.
+///
+/// # Examples
+///
+/// ```
+/// use jit::graph::hierarchy::NodeHierarchy;
+/// use jit::commands::{GraphTreeResponse, HierarchyNodeView, TreeRoot};
+///
+/// let epic_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0001_1234_5678);
+/// let task_id = jit::test_utils::issue_id(0x4000_8000_0000_0000_0002_8765_4321);
+/// let response = GraphTreeResponse::with_extras(
+///     vec![HierarchyNodeView {
+///         id: task_id.clone(),
+///         short_id: task_id.short_id().to_string(),
+///         title: "A task".into(),
+///         type_name: Some("task".into()),
+///         hierarchy: NodeHierarchy {
+///             parent: Some(epic_id.clone()),
+///             children: vec![],
+///             cluster: Some(epic_id.clone()),
+///             rank: 0,
+///         },
+///     }],
+///     TreeRoot { root: None },
+/// );
+/// let json = serde_json::to_value(&response).unwrap();
+/// assert_eq!(json["count"], 1);
+/// assert_eq!(json["root"], serde_json::Value::Null);
+/// assert_eq!(json["nodes"][0]["parent"], epic_id.as_str());
+/// ```
+pub type GraphTreeResponse = ListEnvelope<GraphTreeNodesKey, HierarchyNodeView, TreeRoot>;
+
+/// The scope of a [`GraphTreeResponse`]. `nodes` are ordered by ascending short id.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct TreeRoot {
+    /// The root id the tree was scoped to, or `null` for the whole repository.
+    pub root: Option<IssueId>,
+}
+
+/// One reported membership-vs-DAG divergence, as rendered by `query divergence`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DivergenceView {
+    /// Full id of the issue carrying the unsupported membership label.
+    pub id: IssueId,
+    /// Short id (first 8 chars).
+    pub short_id: String,
+    /// Issue title.
+    pub title: String,
+    /// The full `namespace:value` membership label.
+    pub label: String,
+    /// The label namespace.
+    pub namespace: String,
+    /// The label value.
+    pub value: String,
+}
+
+/// Response for `query divergence` command.
+///
+/// Each entry in `divergences` is a membership label whose claim the dependency
+/// DAG does not back (the issue carries the label but is not in the closure of
+/// the container that owns it), ordered by `(issue_id, label)`.
+pub type DivergenceResponse = ListEnvelope<MembershipDivergencesKey, DivergenceView>;
+
+impl DivergenceResponse {
+    pub(crate) fn from_issues(
+        issues: &[Issue],
+        config: &crate::domain::type_taxonomy::HierarchyConfig,
+    ) -> Self {
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let divergences =
+            crate::graph::hierarchy::detect_membership_divergences(&issue_refs, config);
+
+        let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|i| (&i.id, i)).collect();
+        let views = divergences
+            .into_iter()
+            .map(|d| {
+                let issue = by_id.get(&d.issue_id);
+                DivergenceView {
+                    short_id: d.issue_id.short_id().to_string(),
+                    title: issue.map(|i| i.title.clone()).unwrap_or_default(),
+                    id: d.issue_id,
+                    label: d.label,
+                    namespace: d.namespace,
+                    value: d.value,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Self::new(views)
+    }
+}
+
+/// The success response of `jit graph export`: one of the JSON documents, the
+/// written-file report under `--output`, or the text of a DOT, Mermaid or batch
+/// export. Text is only ever rendered in human mode, since `--json` selects a
+/// JSON format.
+#[derive(Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum GraphExportOutput {
+    Summary(GraphExportSummaryResponse),
+    Full(GraphExportFullResponse),
+    Written(GraphExportWritten),
+    Text(GraphExportText),
+}
+
+/// The document text of a DOT, Mermaid or batch export.
+#[derive(Serialize, JsonSchema)]
+#[serde(transparent)]
+pub struct GraphExportText(pub String);
+
+/// The `--output` report: the path the export was written to.
+#[derive(Serialize, JsonSchema)]
+pub struct GraphExportWritten {
+    pub path: String,
+}
+
+impl GraphExportOutput {
+    /// The exact bytes an `--output` file receives: the document text without
+    /// its trailing newline. A written report has no document.
+    pub fn document_text(&self) -> Option<String> {
+        match self {
+            Self::Summary(document) => Some(pretty_document(document)),
+            Self::Full(document) => Some(pretty_document(document)),
+            Self::Text(text) => Some(text.0.clone()),
+            Self::Written(_) => None,
+        }
+    }
+}
 
 /// Serialization format for `jit graph export`.
 ///
@@ -121,7 +396,6 @@ impl<S: IssueStore> GraphOps<'_, S> {
         issue_id: &IssueId,
         depth: u32,
     ) -> Result<Vec<DependencyTreeNode>> {
-        use crate::domain::MinimalIssue;
         use crate::graph::Expansion;
 
         let full_id = issue_id.clone();
@@ -515,8 +789,8 @@ impl<S: IssueStore> GraphOps<'_, S> {
     pub fn resolve_hierarchy_tree(
         &self,
         root: Option<&IssueId>,
-    ) -> Result<crate::output::GraphTreeResponse> {
-        use crate::output::{GraphTreeResponse, HierarchyNodeView};
+    ) -> Result<crate::commands::GraphTreeResponse> {
+        use crate::commands::{GraphTreeResponse, HierarchyNodeView};
 
         let issues = self.exec.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
@@ -554,7 +828,7 @@ impl<S: IssueStore> GraphOps<'_, S> {
 
         Ok(GraphTreeResponse::with_extras(
             nodes,
-            crate::output::TreeRoot { root: root_id },
+            crate::commands::TreeRoot { root: root_id },
         ))
     }
 
@@ -599,43 +873,23 @@ impl<S: IssueStore> GraphOps<'_, S> {
     /// assert_eq!(report.items.len(), 1);
     /// assert_eq!(report.items[0].label, membership);
     /// ```
-    pub fn detect_divergences(&self) -> Result<crate::output::DivergenceResponse> {
-        use crate::output::{DivergenceResponse, DivergenceView};
-
+    pub fn detect_divergences(&self) -> Result<DivergenceResponse> {
         let issues = self.exec.storage.list_issues()?;
-        let issue_refs: Vec<&Issue> = issues.iter().collect();
         let config = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
-        let divergences =
-            crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &config);
-
-        let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|i| (&i.id, i)).collect();
-        let views = divergences
-            .into_iter()
-            .map(|d| {
-                let issue = by_id.get(&d.issue_id);
-                DivergenceView {
-                    short_id: d.issue_id.short_id().to_string(),
-                    title: issue.map(|i| i.title.clone()).unwrap_or_default(),
-                    id: d.issue_id,
-                    label: d.label,
-                    namespace: d.namespace,
-                    value: d.value,
-                }
-            })
-            .collect::<Vec<_>>();
-
-        Ok(DivergenceResponse::new(views))
+        Ok(DivergenceResponse::from_issues(&issues, &config))
     }
 }
 
 /// Compute summary statistics from a dependency tree
-pub fn compute_dependency_summary(tree: &[DependencyTreeNode]) -> crate::output::DependencySummary {
+pub fn compute_dependency_summary(
+    tree: &[DependencyTreeNode],
+) -> crate::commands::DependencySummary {
     let mut unique_ids = HashSet::new();
     let mut by_state: HashMap<crate::domain::State, usize> = HashMap::new();
 
     collect_stats(tree, &mut unique_ids, &mut by_state);
 
-    crate::output::DependencySummary {
+    crate::commands::DependencySummary {
         total: unique_ids.len(),
         by_state,
     }
@@ -659,8 +913,8 @@ fn collect_stats(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::DependencyTreeNode;
     use crate::domain::{Priority, State};
-    use crate::output::DependencyTreeNode;
 
     #[test]
     fn test_resolve_hierarchy_tree_propagates_invalid_hierarchy_error() {

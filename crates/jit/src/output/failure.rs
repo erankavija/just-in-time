@@ -413,13 +413,11 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     {
         return ErrorCode::InvalidArgument;
     }
-    // Claim/lease commands require git; running them outside a git repository is
-    // an external-dependency failure (exit 10).
     if error
-        .downcast_ref::<crate::errors::ClaimRequiresGitError>()
+        .downcast_ref::<crate::errors::RequiresGitError>()
         .is_some()
     {
-        return ErrorCode::ClaimRequiresGit;
+        return ErrorCode::RequiresGit;
     }
 
     // A repository whose on-disk format this binary does not accept is an
@@ -899,7 +897,7 @@ mod exit_code_projection_tests {
                 2,
             ),
             (
-                crate::errors::ClaimRequiresGitError::new(
+                crate::errors::RequiresGitError::new(
                     crate::errors::GitRequirementGap::NoRepository,
                 )
                 .into(),
@@ -1844,6 +1842,47 @@ mod malformed_identity_classification_tests {
         assert_eq!(
             classify(&error.into()).error.code,
             ErrorCode::InvalidArgument
+        );
+    }
+    #[test]
+    fn test_with_read_session_reports_an_unappliable_leftover_record_as_recovery_failed() {
+        use crate::commands::with_read_session;
+        use crate::storage::repository_state_store::test_fixtures::{
+            leftover_record, leftover_target, InterruptAtMoment, MemorySessionBackend,
+            SessionRecordBackend,
+        };
+        use crate::storage::{MutationPoint, RedoPoint};
+
+        let backend = MemorySessionBackend::seeded();
+        backend.commit(&leftover_record());
+        let interrupted = backend
+            .0
+            .with_mutation_interruption_view(InterruptAtMoment::new(MutationPoint::Redo(
+                RedoPoint::BeforeApply,
+            )));
+
+        let error = with_read_session(&interrupted, &backend.layout(), "blocked", |session| {
+            let image = session.capture(crate::repository_state::CaptureSpec::new(
+                [leftover_target()],
+                crate::repository_state::CaptureBudget {
+                    max_listings: 0,
+                    max_bytes: 1024 * 1024,
+                    max_depth: 8,
+                },
+            )?)?;
+            Ok(Some(
+                image.file_bytes(&leftover_target())?.map(<[u8]>::to_vec),
+            ))
+        })
+        .unwrap_err();
+
+        assert!(error
+            .downcast_ref::<crate::errors::RecoveryFailedError>()
+            .is_some());
+        assert!(error.to_string().contains("jit recover"), "{error}");
+        assert_eq!(
+            crate::output::failure::classify(&error).error.code,
+            crate::output::ErrorCode::RecoveryFailed
         );
     }
 }

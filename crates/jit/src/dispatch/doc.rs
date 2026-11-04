@@ -2,13 +2,14 @@
 
 use super::{count_message, resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::{AssetCommands, DocCommands};
+use crate::commands::{ArtifactConformanceResponse, ArtifactDirectoryResponse};
 use crate::commands::{
     AssetListResult, DocumentAddResult, DocumentContentResult, DocumentDiffResult, DocumentHistory,
     DocumentListResult, DocumentRemoveResult, LinkCheckResult,
 };
 use crate::document::DocumentScope;
 use crate::domain::identity::IssueId;
-use crate::output::{ArtifactConformanceResponse, ArtifactDirectoryResponse, ErrorCode};
+use crate::output::ErrorCode;
 use crate::storage::IssueStore;
 
 fn issue<S: IssueStore>(ctx: &CommandContext<'_, S>, id: &str) -> anyhow::Result<IssueId> {

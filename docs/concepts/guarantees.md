@@ -228,7 +228,7 @@ jit events query --event-type issue_state_changed
 
 JIT is designed as a standalone issue tracker that *enhances* git workflows but doesn't require them. This supports use cases beyond software development.
 
-Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` / `jit issue unassign`) is bookkeeping on the issue record and works fully without git. Advisory work leases (`jit claim acquire` and its sibling `jit claim` subcommands) coordinate exclusive, time-boxed access across worktrees; they need a git repository with a resolvable `HEAD` for worktree identity and branch tracking. A missing repository and a repository with zero commits both fail with a typed `ClaimRequiresGitError` (exit code 10): `git init` alone is not enough, since `HEAD` does not resolve to a branch until the first commit exists.
+Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` / `jit issue unassign`) is bookkeeping on the issue record and works fully without git. Advisory work leases (`jit claim acquire` and its sibling `jit claim` subcommands) coordinate exclusive, time-boxed access across worktrees; they need a git repository with a resolvable `HEAD` for worktree identity and branch tracking. A missing repository and a repository with zero commits both fail with a typed `RequiresGitError` (exit code 10): `git init` alone is not enough, since `HEAD` does not resolve to a branch until the first commit exists.
 
 **What works without git:**
 
@@ -242,7 +242,7 @@ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` /
 
 **What requires git:**
 
-❌ `jit claim acquire` / `release` / `renew` / `heartbeat` / `status` / `list` / `force-evict` - Advisory work leases (`ClaimRequiresGitError`, exit code 10)  
+❌ `jit claim acquire` / `release` / `renew` / `heartbeat` / `status` / `list` / `force-evict` - Advisory work leases (`RequiresGitError`, exit code 10)\
 ❌ `jit doc show --at <commit>` - View document at specific git revision  
 ❌ `jit snapshot export --at <tag>` - Export from specific git revision  
 ❌ Document asset validation from git history  
@@ -257,7 +257,7 @@ When git is unavailable:
   history, diff, and commit-specific reads require git
 - **Snapshot export:** Export from current working tree
 - **History commands:** Return error with helpful message
-- **Advisory leases:** Fail outright with `ClaimRequiresGitError` (exit code 10) instead of falling back; use issue assignment (`jit issue claim`) as the git-free alternative
+- **Advisory leases:** Fail outright with `RequiresGitError` (exit code 10) instead of falling back; use issue assignment (`jit issue claim`) as the git-free alternative
 
 **Example:**
 
@@ -273,7 +273,7 @@ jit issue claim <task2> agent:worker-1
 # All basic operations and issue assignment work (task2 has no unmet dependencies)
 
 jit claim acquire <task2> --agent-id agent:worker-1
-# fails with exit code 10: Claims and leases require a git repository
+# fails with exit code 10: This command requires a git repository
 
 # git init alone is not enough - HEAD must resolve to a commit
 git init

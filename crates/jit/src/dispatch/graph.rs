@@ -4,12 +4,13 @@ use super::{count_message, resolve_issue, CommandContext, HandlerResult, Handler
 use crate::cli::GraphCommands;
 use crate::commands::graph::compute_dependency_summary;
 use crate::commands::GraphExportFormat;
+use crate::commands::{
+    DependencyTreeScope, GraphDepsTreeResponse, GraphExportOutput, GraphExportText,
+    GraphExportWritten, GraphRootsResponse, GraphTreeResponse,
+};
 use crate::domain::MinimalIssue;
 use crate::errors::InvalidArgumentError;
-use crate::output::{
-    DependencyTreeScope, GraphDepsTreeResponse, GraphDownstreamResponse, GraphExportOutput,
-    GraphExportText, GraphExportWritten, GraphRootsResponse, GraphTreeResponse, IssueScope,
-};
+use crate::output::{GraphDownstreamResponse, IssueScope};
 use crate::storage::IssueStore;
 use crate::visualization::{GraphExportFullResponse, GraphExportSummaryResponse};
 use std::path::Path;

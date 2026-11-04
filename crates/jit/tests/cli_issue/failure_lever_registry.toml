@@ -823,8 +823,8 @@ confirmation = "invoked"
 path = "hooks install"
 argv = ["hooks", "install", "--json"]
 setup = ["init", "git:absent"]
-expected_failure = "Not in a git repository (no .git directory found)"
-expected_code = "INVALID_ARGUMENT"
+expected_failure = "This command requires a git repository"
+expected_code = "REQUIRES_GIT"
 confirmation = "invoked"
 
 [[arms]]

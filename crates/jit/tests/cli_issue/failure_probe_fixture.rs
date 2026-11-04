@@ -969,8 +969,10 @@ fn test_failure_probe_fixture_keeps_git_absent_from_inheriting_tmp_ancestor() {
             assert!(!result.status.success());
             let envelope: serde_json::Value = serde_json::from_slice(&result.stdout)
                 .expect("git-absent hook probe emits a JSON error envelope");
-            assert_eq!(envelope["error"]["code"], "INVALID_ARGUMENT");
-            assert_eq!(result.status.code(), Some(2));
+            assert_eq!(envelope["error"]["code"], "REQUIRES_GIT");
+            assert_eq!(result.status.code(), Some(10));
+            let message = envelope["error"]["message"].as_str().unwrap();
+            assert!(message.contains("git init"));
 
             let human = drive_named_failure_with_args(
                 "hooks install",
@@ -980,7 +982,7 @@ fn test_failure_probe_fixture_keeps_git_absent_from_inheriting_tmp_ancestor() {
             assert_eq!(human.status.code(), result.status.code());
             assert_eq!(
                 String::from_utf8(human.stderr).unwrap(),
-                "Error: Not in a git repository (no .git directory found)\n"
+                format!("Error: {message}\n")
             );
         }
         RecordedFailure::Exempt { .. } => panic!("hooks install has a recorded invocation"),

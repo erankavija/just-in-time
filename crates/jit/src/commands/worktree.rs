@@ -4,7 +4,6 @@
 
 use crate::domain::identity::WorktreeId;
 use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
-use crate::output::ExitCode;
 use crate::repository_state::{RepositoryLayout, RECORD_SCRATCH_DIR};
 use crate::storage::claim_coordinator::{read_active_leases, Lease};
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
@@ -14,7 +13,7 @@ use anyhow::{anyhow, ensure, Context, Result};
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, ExitStatus};
 
 /// Worktree information for display
 #[derive(Debug, Serialize, JsonSchema)]
@@ -59,7 +58,7 @@ pub fn execute_worktree_exec<S: IssueStore>(
     layout: &RepositoryLayout,
     program: &str,
     args: &[String],
-) -> Result<i32> {
+) -> Result<ExitStatus> {
     let _guard = storage.acquire_repo_write_lock()?;
     let record = layout
         .data_root()
@@ -70,11 +69,10 @@ pub fn execute_worktree_exec<S: IssueStore>(
         "Refusing to run over a leftover redo record at {}: run `jit recover` first",
         record.display()
     );
-    let status = Command::new(program)
+    Command::new(program)
         .args(args)
         .status()
-        .map_err(|error| anyhow!("Failed to run {program}: {error}"))?;
-    Ok(status.code().unwrap_or(ExitCode::GenericError.code()))
+        .map_err(|error| anyhow!("Failed to run {program}: {error}"))
 }
 
 /// Get current git branch name.

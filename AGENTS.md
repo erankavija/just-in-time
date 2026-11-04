@@ -120,6 +120,7 @@ The v1.0 vision charter's decision log is projected from `dev/vision/9db27a3a-ch
 - **D-20** — One computation per capability; previews, scoped views, and checkers are views over it
 - **D-21** — Reach git only through the git CLI, from one storage-owned module
 - **D-22** — Reads never wait on writers; a lock-free capture is admitted only when no commit crossed it
+- **D-23** — Retire the bundled MCP server and its support surfaces; the CLI remains the machine interface
 <!-- jit:charter:end -->
 
 <!-- jit:dogfood-guidance:begin -->
