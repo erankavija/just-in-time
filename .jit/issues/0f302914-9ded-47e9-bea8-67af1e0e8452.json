@@ -24,7 +24,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Offload executor work in server handlers",
-  "updated_at": "2026-11-04T22:25:10.546109706Z"
+  "updated_at": "2026-11-04T23:15:25.498116899Z"
 }
