@@ -23,7 +23,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "One requires-Git error for every command family",
-  "updated_at": "2026-11-04T07:35:59.801212936Z"
+  "updated_at": "2026-11-04T09:38:21.015159219Z"
 }

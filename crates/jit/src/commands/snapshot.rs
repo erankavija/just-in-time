@@ -308,15 +308,15 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
             .collect();
 
         let issues_info = IssuesInfo {
-            count: issues.len(),
-            states,
-            files: issue_files,
+            files: crate::domain::list_envelope::ListEnvelope::with_extras(
+                issue_files,
+                crate::snapshot::IssueStates { states },
+            ),
         };
 
         // Build documents info
         let documents_info = crate::snapshot::DocumentsInfo {
-            count: docs.len(),
-            items: docs.to_vec(),
+            items: crate::domain::list_envelope::ListEnvelope::new(docs.to_vec()),
         };
 
         // Calculate total size
@@ -440,8 +440,8 @@ This is a read-only export. Future versions may support:
             repo_path = manifest.repo.path,
             commit = manifest.repo.commit.as_deref().unwrap_or("working-tree"),
             scope = manifest.scope,
-            issue_count = manifest.issues.count,
-            doc_count = manifest.documents.count,
+            issue_count = manifest.issues.files.count(),
+            doc_count = manifest.documents.items.count(),
         )
     }
 
@@ -758,8 +758,8 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
         Ok((
             SnapshotExportResult {
                 path: output_path.to_string_lossy().into_owned(),
-                issue_count: manifest.issues.count,
-                document_count: manifest.documents.count,
+                issue_count: manifest.issues.files.count(),
+                document_count: manifest.documents.items.count(),
                 format: match format {
                     SnapshotFormat::Directory => "directory",
                     SnapshotFormat::Tar => "tar",
@@ -775,7 +775,10 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::snapshot::{IssuesInfo, MetadataInfo, RepoInfo, SnapshotManifest, VerificationInfo};
+    use crate::snapshot::{
+        DocumentSnapshot, IssuesInfo, MetadataInfo, RepoInfo, SnapshotManifest, SourceInfo,
+        VerificationInfo,
+    };
     use crate::storage::InMemoryStorage;
     use crate::test_utils::document_reference;
     use std::collections::HashMap;
@@ -954,13 +957,32 @@ mod tests {
             },
             scope: "all".to_string(),
             issues: IssuesInfo {
-                count: 5,
-                states: HashMap::new(),
-                files: vec![],
+                files: crate::domain::list_envelope::ListEnvelope::with_extras(
+                    (0..5)
+                        .map(|index| format!(".jit/issues/{index}.json"))
+                        .collect(),
+                    crate::snapshot::IssueStates {
+                        states: HashMap::new(),
+                    },
+                ),
             },
             documents: crate::snapshot::DocumentsInfo {
-                count: 10,
-                items: vec![],
+                items: crate::domain::list_envelope::ListEnvelope::new(
+                    (0..10)
+                        .map(|index| DocumentSnapshot {
+                            path: format!("docs/{index}.md"),
+                            format: "markdown".to_owned(),
+                            size_bytes: 0,
+                            source: SourceInfo {
+                                type_: "filesystem".to_owned(),
+                                commit: None,
+                                blob_sha: None,
+                            },
+                            hash_sha256: String::new(),
+                            assets: vec![],
+                        })
+                        .collect(),
+                ),
             },
             metadata: MetadataInfo {
                 link_policy: "preserve".to_string(),

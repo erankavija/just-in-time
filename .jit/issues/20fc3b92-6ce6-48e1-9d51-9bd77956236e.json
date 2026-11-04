@@ -10,13 +10,33 @@
   ],
   "description": "The graph arms build responses inline, call a graph helper directly and are mistyped in the schema. This moves the graph group and the `rdeps` alias to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `GraphCommands::{Deps, Rdeps, Roots}` build `GraphDepsTreeResponse`, `GraphDownstreamResponse` and `GraphRootsResponse` inline and call `jit::commands::graph::compute_dependency_summary` directly; `GraphCommands::{Tree, Export}` render inline, and `export` prints its document raw, as the schema declares. `Rdeps` and `Roots` print issue lists through the shared issue-list renderer. The legacy schema table keys `graph rdeps` as `\"graph_downstream\"`, a path that does not exist, so `graph rdeps` and the top-level `rdeps` alias fall back to `CommandResponse`.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `graph deps|rdeps|roots|tree|export` and the top-level `rdeps` alias to a handler in `crates/jit/src/dispatch/graph.rs`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: Each leaf returns its registered response type, list payloads are `ListEnvelope` instantiations, and a test asserts that the schema names `GraphDownstreamResponse`'s envelope for `graph rdeps` and `rdeps`.\n- [hard] REQ-03: `graph export` keeps its declared document shapes, emitted through the one success emitter.\n- [hard] REQ-04: The handler returns failures as errors with no substituted code or `std::process::exit`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: REQ-06's unchanged human output excludes two changes to the batch-export boundary-edge block (`Excluded N edge(s) crossing the scope boundary:` and its edge lines): it is now one outcome warning, so its first line carries the `Warning: ` prefix and `-q` suppresses it. Under `--json` it reaches the response's `warnings` array (uniform warnings rule; steward ruling, 2026-11-04).\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.\n",
   "documents": [],
+  "done_at": "2026-11-04T09:38:21.648259697Z",
   "first_ready_at": "2026-11-03T23:08:01.382250220Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c1680bbe-fa51-458a-bede-6e5eeef538f8",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:15:00.314000544Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2ab40ded-5074-46d7-9ffa-7b09e23a6db3",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:38:05.638592416Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "4603b9bf-32c8-4064-9314-a2cb175731d4",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:15:00.437740275Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "20fc3b92-6ce6-48e1-9d51-9bd77956236e",
   "labels": [
     "type:task",
@@ -32,7 +52,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Graph commands move to library handlers",
-  "updated_at": "2026-11-04T04:03:13.245823189Z"
+  "updated_at": "2026-11-04T09:38:21.648259697Z"
 }

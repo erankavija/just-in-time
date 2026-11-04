@@ -156,6 +156,9 @@ pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     init::output_schema,
     invariant::output_schema,
     profile::output_schema,
+    issue::output_schema,
+    issue::alias_output_schema,
+    snapshot::output_schema,
     item::output_schema,
     label::output_schema,
     project::output_schema,
@@ -163,6 +166,7 @@ pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     serve::output_schema,
     validate::output_schema,
     version::output_schema,
+    worktree::output_schema,
     #[cfg(test)]
     test_group::output_schema,
     #[cfg(test)]
@@ -359,15 +363,18 @@ pub mod graph;
 pub mod hooks;
 pub mod init;
 pub mod invariant;
+pub mod issue;
 pub mod item;
 pub mod label;
 pub mod profile;
 pub mod project;
 pub mod search;
 pub mod serve;
+pub mod snapshot;
 #[cfg(test)]
 mod test_forms;
 #[cfg(test)]
 mod test_group;
 pub mod validate;
 pub mod version;
+pub mod worktree;

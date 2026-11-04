@@ -3272,13 +3272,18 @@ jit validate --branch-drift [--leases] [--json]
 | Mode | What it does |
 |------|--------------|
 | (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, readiness coherence) plus every local and graph rule. |
-| `<ID>` | The local and graph rules for that issue only. |
-| `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`, a rule failure exits `1`, and invalid combinations exit `2`. |
+| `<ID>` | The findings concerning that issue. |
+| `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`; findings use `VALIDATION_FAILED` and exit `4` ([exit-code reference](exit-codes.md#command-specific-mappings)); invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
-| `--scope <ID>` | Reports the findings of the issues in a container's transitive dependency closure, bounded at its template's breakdown node, excluding whole-repository rules. Rules evaluate over the whole repository, so coverage children and dependency targets outside the closure count. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
+| `--scope <ID>` | Reports the findings of the issues in a container's transitive dependency closure, bounded at its template's breakdown node, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
 | `--fix` | Apply automatic rule/graph/state fixes and derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. A repository that still fails validation after nothing was repaired exits `4` with `VALIDATION_FAILED`, naming the findings `--fix` cannot repair; `--fix` and plain `validate` never disagree on validity. |
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
 | `--leases` | Check lease records for expiry and references to missing worktrees or issues. Plain validation does not check leases. |
+
+The per-issue, `--rule`, `--explain`, and `--scope` modes are views: selections
+of the one whole-repository report, with rules evaluated over the whole
+repository. What each view admits and how it fails is specified under
+[views](worktree-validate.md#views).
 
 **Mode exclusivity.** `--scope` may not be combined with a positional id or with
 `--fix`/`--branch-drift`/`--leases`/`--explain`/`--rule`. `--rule` requires a
@@ -3303,7 +3308,7 @@ a whole-repository rule failure reports:
 ```json
 {
   "error": {
-    "code": "GENERIC_ERROR",
+    "code": "VALIDATION_FAILED",
     "message": "Repository validation failed with 1 rule error(s)",
     "details": {
       "valid": false,
@@ -3322,12 +3327,11 @@ a whole-repository rule failure reports:
 }
 ```
 
-Whole-repository, per-issue, and `--explain` rule failures keep their established
-exit `1` through the registered `GENERIC_ERROR` mapping, as do failed
-`--branch-drift` and `--leases` checks. A repository-integrity failure or failed
-`--scope` gate check uses `VALIDATION_FAILED` and exits `4`. In every case the
-code's registered mapping, not a separate literal, determines the process
-status.
+Every `jit validate` mode reports error-severity findings, including
+whole-repository rule failures, and repository-integrity failures as
+`VALIDATION_FAILED` with exit code `4`. See the [exit-code
+reference](exit-codes.md#command-specific-mappings). In every case the code's
+registered mapping, not a separate literal, determines the process status.
 
 `divergence_count` and `membership_divergences` mirror
 [`jit query divergence`](#membership-divergence-jit-query-divergence). They are
@@ -3525,7 +3529,8 @@ jit invariant check [--json]
 
 Reports enforcement drift in the declared-but-unenforced direction: an invariant
 whose `enforced-by` names a rule or gate that does not load. Bindings are
-declarations, and this check never executes them. Exits `4` when any drift is
+declarations, and this check never executes them. An unloadable rule set makes
+every rule binding drift; an unloadable gate registry fails the command. Exits `4` when any drift is
 present (see the [exit-code reference](exit-codes.md#command-specific-mappings)).
 With no drift, JSON uses the list envelope `{"count": 0, "findings": []}`. Drift
 under `--json` returns the `VALIDATION_FAILED` error envelope and preserves the

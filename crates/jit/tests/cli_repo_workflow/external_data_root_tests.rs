@@ -196,7 +196,11 @@ fn relocations(document: &Value) -> usize {
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|warning| warning["kind"] == "worktree_relocated")
+        .filter(|warning| {
+            warning
+                .as_str()
+                .is_some_and(|text| text.contains("Worktree relocated"))
+        })
         .count()
 }
 

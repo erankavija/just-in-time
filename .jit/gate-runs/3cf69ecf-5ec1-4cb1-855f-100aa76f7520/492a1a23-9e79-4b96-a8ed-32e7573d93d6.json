@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3f047ea6b60b9fb05c9c2eeeb63a0421d7483c8",
+  "completed_at": "2026-11-04T09:32:53.453112826Z",
+  "duration_ms": 290952,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The tagged archive-handler migration satisfies the issue-scoped criteria with no unresolved issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3cf69ecf-5ec1-4cb1-855f-100aa76f7520",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "492a1a23-9e79-4b96-a8ed-32e7573d93d6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:28:02.500800776Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 81a032501, 9feb532e (jit:3cf69ecf)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (.jit/issues/df129d9e-c795-4d92-9ee5-ffd776339252.json); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-types (.jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-11-04T09:14:58Z; exit code not recorded); mcp-ci passed (2026-11-04T09:14:58Z; exit code not recorded)\nTruncation recovery: narrowed the tagged merge to archive paths and directly read current handlers, emitter, list envelope, schema, tests, and generated exit-code reference.\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged archive-handler migration satisfies the issue-scoped criteria with no unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

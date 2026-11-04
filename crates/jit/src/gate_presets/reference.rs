@@ -124,21 +124,26 @@ pub fn render_reference_markdown() -> String {
            being unable to load or read what it needs records `error`. Its verdict is never\n\
            reused, and declared inputs do not enable reuse, because it depends on records\n\
            the input digest excludes.\n\
-         - `issue_validation` runs declarative validation for the gated issue.\n\
+         - `issue_validation` reports the gated issue's per-issue view.\n\
          - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label\n\
            from the gated issue, where the target is a full issue id or unique prefix, and\n\
-           runs scoped validation for that target. Its checker table must set\n\
-           `label_namespace`.\n\
-         - `rule_validation` names one configured graph rule with `rule` and evaluates it\n\
-           with the gated issue as its sole firing subject. The complete repository may be\n\
-           used for graph and identifier-resolution context, but unrelated issues cannot\n\
-           contribute findings. A missing, disabled, or non-matching rule is a fault.\n\
+           reports that target's scope view. Its checker table must set `label_namespace`.\n\
+         - `rule_validation` names one configured graph rule with `rule` and reports its\n\
+           selected-rule view with the gated issue as the sole firing subject. A missing,\n\
+           disabled, or non-matching rule is a fault.\n\
          - `review_placeholder` passes so a workflow can be installed before an external\n\
            reviewer is selected, but records an advisory structured finding and prints\n\
            `WARNING: EXTERNAL REVIEW PLACEHOLDER`. Whole-repository validation also warns\n\
            while any gate uses it. Replace it with an `exec` checker (for example, `jit gate\n\
            update <key> --checker-command <command>`) before treating the gate as review\n\
            evidence.\n\
+         \n\
+         Each validation checker reports what `jit validate` reports for its selection\n\
+         of the one whole-repository report: `repository_validation` the whole report,\n\
+         the others their [view](worktree-validate.md#views). Rules therefore evaluate\n\
+         over the whole repository for every checker, and the view decides which\n\
+         findings, including configuration errors, the checker sees. A rule pass that\n\
+         fails records an `error` run, never a clean selection.\n\
          \n\
          An in-process checker that cannot judge the repository records an `error` run:\n\
          configuration or declarations that do not load, a broken repository structure, or\n\

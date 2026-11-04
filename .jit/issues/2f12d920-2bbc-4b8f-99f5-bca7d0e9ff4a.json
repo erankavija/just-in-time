@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T08:28:31.008066960Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -9,12 +9,26 @@
   ],
   "description": "Make `CaptureSpec`'s growth methods validate only the entries they add, and apply a capture's base requests once, so growing a spec one request at a time is linear.\n\n## Background\n\n- `discover_paths`, `discover_tail`, `discover_kinds` and `discover_listings` (`crates/jit/src/repository_state/image.rs:586-652`) clone the whole spec, add the request and re-run `validate` (`:732-753`) over every held path, listing and pinned request. `discover_pinned` and `discover_pinned_kind` (`:660-685`) already validate only their request.\n- Every check in `validate` is per entry (depth within `max_depth`, `ensure_semantic`, `validate_pinned_request`) or a count (`listings.len()` within `max_listings`), and every mutator goes through these methods, so every held entry is already valid. `RepositoryImage::close` validates the spec once (`:787`).\n- `capture_proposed_base_inner` (`crates/jit/src/commands/validate.rs:334-486`) applies its base requests (configuration, registries, index, the issue listing and the event-log tail) before the first capture (`:479-483`) and again at the start of every discovery round (`:408-411`), returning early when that changed the spec. A capture grown from a start image (`grow_discovering`, `crates/jit/src/commands/mod.rs:356-374`) receives them only through that round.\n- Document-reference resolution captures each reference in its own bounded spec (`capture_document_reference_validation`, `validate.rs:940-964`, test `:3514`), so no capture grows by one reference at a time. The round-count tests over `counted_session` (`validate.rs:3618-3637`) are at `:3642,3655,3669`.\n\n## Success Criteria\n\n- [hard] REQ-01: `discover_paths`, `discover_tail`, `discover_kinds` and `discover_listings` validate only the entries a call adds plus the listing count, and clone nothing; a refused call leaves the spec unchanged.\n- [hard] REQ-02: A capture applies its base requests once, to its initial spec or to its start image's spec, and no discovery round re-applies them.\n- [hard] REQ-03: A proptest shows that, for generated specs and batches, a batch is accepted exactly when whole-spec validation of the grown spec succeeds, and that the grown spec is the same either way; a unit test shows that a refused batch leaves the spec equal to its prior value.\n- [hard] REQ-04: The existing capture and round-count suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T09:32:39.707428162Z",
   "first_ready_at": "2026-10-21T20:31:28.613451335Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e6c91915-62d5-49b3-aebc-0d352519833d",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:27:47.170158836Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "701cb822-b953-4b28-8035-cd286aca64b6",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:32:27.934344431Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2f12d920-2bbc-4b8f-99f5-bca7d0e9ff4a",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:9876a23a/REQ-09"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Capture specs validate only added entries",
-  "updated_at": "2026-11-04T08:28:31.008066960Z"
+  "updated_at": "2026-11-04T09:32:39.707428162Z"
 }

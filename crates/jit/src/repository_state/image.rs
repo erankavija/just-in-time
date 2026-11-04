@@ -591,28 +591,31 @@ impl CaptureSpec {
         &mut self,
         paths: impl IntoIterator<Item = VirtualPath>,
     ) -> Result<(), CaptureError> {
-        let mut candidate = self.clone();
-        for path in paths {
-            if path == VirtualPath::EVENTS {
-                return Err(CaptureError::WholeEventLogCapture);
-            }
-            candidate.tails.remove(&path);
-            candidate.kinds.remove(&path);
-            candidate.paths.insert(path);
+        let paths = paths.into_iter().collect::<BTreeSet<_>>();
+        if paths.contains(&VirtualPath::EVENTS) {
+            return Err(CaptureError::WholeEventLogCapture);
         }
-        candidate.validate()?;
-        *self = candidate;
+        for path in &paths {
+            if !self.paths.contains(path) {
+                self.validate_path(path)?;
+            }
+        }
+        for path in paths {
+            self.tails.remove(&path);
+            self.kinds.remove(&path);
+            self.paths.insert(path);
+        }
         Ok(())
     }
 
     /// Request a path's length and tail.
     pub fn discover_tail(&mut self, path: VirtualPath) -> Result<(), CaptureError> {
-        let mut candidate = self.clone();
-        candidate.paths.insert(path.clone());
-        candidate.kinds.remove(&path);
-        candidate.tails.insert(path);
-        candidate.validate()?;
-        *self = candidate;
+        if !self.paths.contains(&path) {
+            self.validate_path(&path)?;
+        }
+        self.paths.insert(path.clone());
+        self.kinds.remove(&path);
+        self.tails.insert(path);
         Ok(())
     }
 
@@ -622,14 +625,17 @@ impl CaptureSpec {
         &mut self,
         paths: impl IntoIterator<Item = VirtualPath>,
     ) -> Result<(), CaptureError> {
-        let mut candidate = self.clone();
-        for path in paths {
-            if candidate.paths.insert(path.clone()) {
-                candidate.kinds.insert(path);
+        let paths = paths.into_iter().collect::<BTreeSet<_>>();
+        for path in &paths {
+            if !self.paths.contains(path) {
+                self.validate_path(path)?;
             }
         }
-        candidate.validate()?;
-        *self = candidate;
+        for path in paths {
+            if self.paths.insert(path.clone()) {
+                self.kinds.insert(path);
+            }
+        }
         Ok(())
     }
 
@@ -640,20 +646,17 @@ impl CaptureSpec {
 
     /// Require complete non-recursive listings, validating the declaration once
     /// for the whole batch.
-    ///
-    /// A caller that learns a listing at a time can add them one at a time
-    /// through [`discover_listing`](Self::discover_listing); a caller expanding
-    /// a whole subtree cannot, because each call clones and revalidates the
-    /// declaration it is growing, and a destination holding a directory per file
-    /// makes that quadratic in the tree's size.
     pub fn discover_listings(
         &mut self,
         paths: impl IntoIterator<Item = VirtualPath>,
     ) -> Result<(), CaptureError> {
-        let mut candidate = self.clone();
-        candidate.listings.extend(paths);
-        candidate.validate()?;
-        *self = candidate;
+        let paths = paths.into_iter().collect::<BTreeSet<_>>();
+        let added = paths.difference(&self.listings).count();
+        self.validate_listing_count(self.listings.len() + added)?;
+        for path in paths.difference(&self.listings) {
+            self.validate_path(path)?;
+        }
+        self.listings.extend(paths);
         Ok(())
     }
 
@@ -735,22 +738,28 @@ impl CaptureSpec {
         self.budget
     }
 
-    fn validate(&self) -> Result<(), CaptureError> {
-        if self.listings.len() > self.budget.max_listings {
+    fn validate_path(&self, path: &VirtualPath) -> Result<(), CaptureError> {
+        if path.relative().depth() > self.budget.max_depth {
+            return Err(CaptureError::DepthBudgetExceeded(path.clone()));
+        }
+        path.ensure_semantic()?;
+        Ok(())
+    }
+
+    fn validate_listing_count(&self, count: usize) -> Result<(), CaptureError> {
+        if count > self.budget.max_listings {
             return Err(CaptureError::ListingBudgetExceeded {
-                actual: self.listings.len(),
+                actual: count,
                 maximum: self.budget.max_listings,
             });
         }
-        if let Some(path) = self
-            .paths()
-            .chain(self.listings.iter())
-            .find(|path| path.relative().depth() > self.budget.max_depth)
-        {
-            return Err(CaptureError::DepthBudgetExceeded(path.clone()));
-        }
+        Ok(())
+    }
+
+    fn validate(&self) -> Result<(), CaptureError> {
+        self.validate_listing_count(self.listings.len())?;
         for path in self.paths().chain(self.listings.iter()) {
-            path.ensure_semantic()?;
+            self.validate_path(path)?;
         }
         for (revision, path) in &self.pinned {
             validate_pinned_request(revision, path)?;
@@ -1623,6 +1632,58 @@ mod tests {
         .unwrap()
     }
 
+    fn generated_data_path(depth: usize, id: usize) -> VirtualPath {
+        let path = match depth {
+            0 => String::new(),
+            1 => format!("leaf-{id}"),
+            depth => format!("{}{id}", "segment/".repeat(depth - 1)),
+        };
+        VirtualPath::data(path).unwrap()
+    }
+
+    fn grown_spec(mut spec: CaptureSpec, operation: u8, paths: &[VirtualPath]) -> CaptureSpec {
+        match operation {
+            0 => paths.iter().for_each(|path| {
+                spec.tails.remove(path);
+                spec.kinds.remove(path);
+                spec.paths.insert(path.clone());
+            }),
+            1 => {
+                let path = paths.first().unwrap();
+                spec.paths.insert(path.clone());
+                spec.kinds.remove(path);
+                spec.tails.insert(path.clone());
+            }
+            2 => paths.iter().for_each(|path| {
+                if spec.paths.insert(path.clone()) {
+                    spec.kinds.insert(path.clone());
+                }
+            }),
+            3 => spec.listings.extend(paths.iter().cloned()),
+            _ => unreachable!(),
+        }
+        spec
+    }
+
+    fn assert_growth_matches_whole_validation(
+        prior: &CaptureSpec,
+        grown: CaptureSpec,
+        actual: CaptureSpec,
+        batch_accepted: bool,
+    ) -> Result<(), proptest::test_runner::TestCaseError> {
+        let whole_spec_accepts = grown.validate().is_ok();
+        proptest::prop_assert_eq!(batch_accepted, whole_spec_accepts);
+        proptest::prop_assert_eq!(
+            actual,
+            if whole_spec_accepts {
+                grown
+            } else {
+                prior.clone()
+            }
+        );
+        Ok(())
+    }
+
     #[test]
     fn test_capture_rejects_undiscovered_repository_read() {
         let mut captured = image();
@@ -1802,8 +1863,9 @@ mod tests {
         let mut spec = CaptureSpec::new([], budget).unwrap();
         spec.discover_tail(VirtualPath::EVENTS).unwrap();
         let prior = spec.clone();
+        let too_deep = VirtualPath::data("a/b/c/d/e").unwrap();
         assert!(matches!(
-            spec.discover_paths([VirtualPath::EVENTS]),
+            spec.discover_paths([too_deep, VirtualPath::EVENTS]),
             Err(CaptureError::WholeEventLogCapture)
         ));
         assert_eq!(spec, prior);
@@ -2059,11 +2121,15 @@ mod tests {
             },
         )
         .unwrap();
+        let prior = spec.clone();
         assert!(matches!(
-            spec.discover_paths([VirtualPath::data("nested/config.toml").unwrap()]),
+            spec.discover_paths([
+                VirtualPath::data("new.json").unwrap(),
+                VirtualPath::data("nested/config.toml").unwrap(),
+            ]),
             Err(CaptureError::DepthBudgetExceeded(_))
         ));
-        assert_eq!(spec.paths().collect::<Vec<_>>(), vec![&fixed]);
+        assert_eq!(spec, prior);
     }
 
     #[test]
@@ -2396,6 +2462,76 @@ mod tests {
     }
 
     proptest::proptest! {
+        /// Growth agrees with validating the complete resulting declaration.
+        #[test]
+        fn prop_capture_spec_growth_matches_whole_spec_validation(
+            max_depth in 0usize..6,
+            max_listings in 0usize..6,
+            existing_paths in proptest::collection::vec((0usize..6, 0usize..16, 0u8..3), 0..8),
+            existing_listings in proptest::collection::vec((0usize..6, 0usize..16), 0..8),
+            whole_batch in proptest::collection::vec((0usize..8, 0usize..16), 0..8),
+            tail_request in (0usize..8, 0usize..16),
+            kind_batch in proptest::collection::vec((0usize..8, 0usize..16), 0..8),
+            listing_batch in proptest::collection::vec((0usize..8, 0usize..16), 0..8),
+        ) {
+            let budget = CaptureBudget {
+                max_listings,
+                max_bytes: 0,
+                max_depth,
+            };
+            let mut prior = CaptureSpec::new([], budget).unwrap();
+            for (depth, id, mode) in existing_paths {
+                if depth <= max_depth {
+                    let path = generated_data_path(depth, id);
+                    prior.paths.insert(path.clone());
+                    match mode {
+                        1 => { prior.tails.insert(path); }
+                        2 => { prior.kinds.insert(path); }
+                        _ => {}
+                    }
+                }
+            }
+            for (depth, id) in existing_listings.into_iter().take(max_listings) {
+                if depth <= max_depth {
+                    prior.listings.insert(generated_data_path(depth, id));
+                }
+            }
+            proptest::prop_assert!(prior.validate().is_ok());
+
+            let whole_batch = whole_batch
+                .into_iter()
+                .map(|(depth, id)| generated_data_path(depth, id))
+                .collect::<Vec<_>>();
+            let mut expected = grown_spec(prior.clone(), 0, &whole_batch);
+            let mut actual = prior.clone();
+            let accepted = actual.discover_paths(whole_batch).is_ok();
+            assert_growth_matches_whole_validation(&prior, expected, actual, accepted)?;
+
+            let tail_request = generated_data_path(tail_request.0, tail_request.1);
+            expected = grown_spec(prior.clone(), 1, std::slice::from_ref(&tail_request));
+            actual = prior.clone();
+            let accepted = actual.discover_tail(tail_request).is_ok();
+            assert_growth_matches_whole_validation(&prior, expected, actual, accepted)?;
+
+            let kind_batch = kind_batch
+                .into_iter()
+                .map(|(depth, id)| generated_data_path(depth, id))
+                .collect::<Vec<_>>();
+            expected = grown_spec(prior.clone(), 2, &kind_batch);
+            actual = prior.clone();
+            let accepted = actual.discover_kinds(kind_batch).is_ok();
+            assert_growth_matches_whole_validation(&prior, expected, actual, accepted)?;
+
+            let listing_batch = listing_batch
+                .into_iter()
+                .map(|(depth, id)| generated_data_path(depth, id))
+                .collect::<Vec<_>>();
+            expected = grown_spec(prior.clone(), 3, &listing_batch);
+            actual = prior.clone();
+            let accepted = actual.discover_listings(listing_batch).is_ok();
+            assert_growth_matches_whole_validation(&prior, expected, actual, accepted)?;
+        }
+
         /// Captured bytes carry exactly the identity their bytes hash to.
         #[test]
         fn prop_captured_bytes_identity_matches_its_bytes(

@@ -50,7 +50,7 @@ for g in $gates; do
     ci_tmp_begin
     out=$(TMPDIR=$CI_TMP flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock jit gate evaluate $id $g ${=FORCE:-} 2>&1 | tail -1)
     echo "$id gate $g: $out"
-    r=$(ls -t $repo/.jit/gate-runs/*/result.json | head -20 | xargs grep -l "\"issue_id\": \"$id" | head -1)
+    r=$(ls -t $repo/.jit/gate-runs/$(jit issue show $id --json | jq -r .id)/*.json(N) | head -1)
     [ -n "$r" ] && jq -r .stdout $r | grep -q "No space left on device" && { echo "$id ENOSPC in cargo-ci gate run $r"; touch $STOP; exit 2; }
   else
     echo "$id gate $g: $(jit gate evaluate $id $g 2>&1 | tail -1)"

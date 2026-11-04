@@ -9,13 +9,33 @@
   ],
   "description": "`init` builds its response inline and `apply` reloads created issues through storage. This moves both repository-instantiation commands to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `Commands::Init` is handled before repository validation and builds its response inline. `Commands::Apply` calls `print_apply_result`, which reloads each created issue with `storage.load_issue`. Template application now returns the created issues by role.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `init` and `apply` to handlers in `crates/jit/src/dispatch/`, with `init` still running before repository bootstrap, and `main.rs` keeps neither arm body nor `print_apply_result`.\n- [hard] REQ-02: The `apply` handler reports the created issues that template application returns and makes no `storage` call.\n- [hard] REQ-03: Each leaf returns its registered output-owned response type, and the schema names that type for both leaves.\n- [hard] REQ-04: The handlers return failures as errors with no substituted code or `std::process::exit`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T09:38:18.954308039Z",
   "first_ready_at": "2026-11-03T23:08:01.889242124Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "b76b9902-8e99-4508-844d-3aff48bbf8a0",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:56.742531382Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "52e58de7-249b-44bb-a132-88ac03a8c4d0",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:21:23.187051833Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "5d16d174-86d7-4635-b24b-b9963c6fb922",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:56.880039052Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8f297e60-a74e-4efa-bdcc-54659f9959a4",
   "labels": [
     "type:task",
@@ -32,7 +52,7 @@
     "satisfies:df129d9e/REQ-19"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Init and apply commands move to library handlers",
-  "updated_at": "2026-11-04T02:59:44.425967042Z"
+  "updated_at": "2026-11-04T09:38:18.954308039Z"
 }

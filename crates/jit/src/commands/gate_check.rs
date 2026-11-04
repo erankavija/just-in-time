@@ -3443,8 +3443,18 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let image = executor
             .capture_validation_image_with(&std::collections::BTreeMap::new())
             .unwrap();
-        let validate = executor.validation().selection_report().unwrap();
+        let validate = crate::validation::report(
+            &crate::validation::CapturedValidation::from_image(&image),
+            &crate::validation::ReportInputs {
+                now: chrono::Utc::now(),
+                history: None,
+            },
+        );
+        // The repository checker judges its own history-reading capture, not
+        // `image`; its expected side is that capture of the same unchanged
+        // repository, whose findings match the report over `image`.
         let whole = executor.validation().validate_repository_report().unwrap();
+        assert_eq!(whole.rule_report(), validate.rule_report());
         let cases = [
             (
                 GateChecker::IssueValidation,

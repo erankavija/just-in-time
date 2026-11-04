@@ -16,6 +16,7 @@ mod gate_field_contract_test;
 mod issue_create_description_file_tests;
 mod issue_create_json_contract_test;
 mod issue_create_positional_type_tests;
+mod issue_read_failure_tests;
 mod issue_search_json_tests;
 mod issue_search_label_filter_tests;
 mod issue_show_projection_test;

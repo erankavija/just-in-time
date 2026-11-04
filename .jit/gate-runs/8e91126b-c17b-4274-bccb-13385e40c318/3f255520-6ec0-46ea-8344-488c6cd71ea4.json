@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3f047ea6b60b9fb05c9c2eeeb63a0421d7483c8",
+  "completed_at": "2026-11-04T09:37:26.489161488Z",
+  "duration_ms": 272828,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Project render handler migration meets the scoped success criteria; no unresolved issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8e91126b-c17b-4274-bccb-13385e40c318",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3f255520-6ec0-46ea-8344-488c6cd71ea4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:32:53.660697082Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6e664ea89, b5fda64b5, 0102810ac (all `jit:8e91126b`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e91126b/requirement/REQ-01–REQ-05 and @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (markdown-first issue descriptions); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-11-04T09:14:59Z); mcp-ci passed (2026-11-04T09:14:59Z); code-review pending\nTruncation recovery: re-read project-specific patches, merge-resolution paths, current handler/schema/test sources, and exit-code projection in bounded calls\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Project render handler migration meets the scoped success criteria; no unresolved issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

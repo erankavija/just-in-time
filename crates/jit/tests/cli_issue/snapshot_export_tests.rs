@@ -66,6 +66,20 @@ fn test_snapshot_export_all_directory() {
     assert!(snapshot_dir.join("checksums.txt").exists());
     assert!(snapshot_dir.join(".jit").exists());
     assert!(snapshot_dir.join(".jit/issues").exists());
+
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(snapshot_dir.join("manifest.json")).unwrap()).unwrap();
+    let issues = &manifest["issues"];
+    let documents = &manifest["documents"];
+    assert_eq!(
+        issues["count"].as_u64().unwrap(),
+        issues["files"].as_array().unwrap().len() as u64
+    );
+    assert!(issues["states"].is_object());
+    assert_eq!(
+        documents["count"].as_u64().unwrap(),
+        documents["items"].as_array().unwrap().len() as u64
+    );
 }
 
 #[test]
@@ -166,10 +180,18 @@ fn test_snapshot_export_json_output() {
     // Export with --json
     let mut cmd = temp.command(["snapshot", "export", "--out", "test-json", "--json"]);
 
-    cmd.assert()
+    let output = cmd
+        .assert()
         .success()
         .stdout(predicate::str::contains("{"))
         .stdout(predicate::str::contains("\"path\""));
+    let response: serde_json::Value = serde_json::from_slice(&output.get_output().stdout).unwrap();
+    assert!(response["path"].is_string());
+    assert!(response["message"]
+        .as_str()
+        .unwrap()
+        .starts_with("Exported 1 issues to "));
+    assert!(output.get_output().stderr.is_empty());
 }
 
 #[test]
