@@ -225,7 +225,8 @@ where
 impl<S: IssueStore> ClaimOps<'_, S> {
     /// Execute `jit claim heartbeat` command.
     ///
-    /// Sends a heartbeat for an indefinite lease to prevent staleness.
+    /// Sends a heartbeat for the caller's lease on `issue_id` to prevent
+    /// staleness.
     ///
     /// # Returns
     ///
@@ -235,8 +236,8 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     /// # Errors
     ///
     /// Returns an error if the selected worktree's branch cannot be resolved or the
-    /// heartbeat cannot be recorded (e.g. the lease does not exist).
-    pub fn heartbeat(&self, lease_id: &LeaseId) -> Result<Vec<StorageWarning>> {
+    /// heartbeat cannot be recorded (e.g. the issue has no active lease).
+    pub fn heartbeat(&self, issue_id: &IssueId) -> Result<(Lease, Vec<StorageWarning>)> {
         let paths = self.exec.require_worktree_paths()?;
         use crate::agent_config::resolve_agent_id;
 
@@ -253,10 +254,8 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         let locker = FileLocker::with_configured_timeout();
         let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
 
-        // Send heartbeat
-        coordinator.heartbeat(lease_id)?;
-
-        Ok(warnings)
+        let lease = coordinator.heartbeat(issue_id)?;
+        Ok((lease, warnings))
     }
 }
 
@@ -383,11 +382,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
             )
         })?;
 
-        let no_active_lease = || {
-            anyhow::Error::from(crate::errors::LeaseNotFoundError::new(
-                &crate::errors::no_active_lease(&full_id),
-            ))
-        };
+        let no_active_lease = || crate::storage::claim_coordinator::no_active_lease(&full_id);
         let mut lock = coordinator.lock()?;
         let lease = lock.load(&full_id)?.ok_or_else(no_active_lease)?;
         let reason = format!("released by {} via claim release", actor);
@@ -408,12 +403,8 @@ impl<S: IssueStore> ClaimOps<'_, S> {
 }
 
 impl<S: IssueStore> ClaimOps<'_, S> {
-    /// Renews an existing lease, extending its expiry time.
-    ///
-    /// # Arguments
-    ///
-    /// * `lease_id` - ID of the lease to renew
-    /// * `extension_secs` - How many seconds to extend the lease by
+    /// Renews the caller's lease on `issue_id`, extending its expiry time by
+    /// `extension_secs`.
     ///
     /// # Returns
     ///
@@ -425,10 +416,10 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     /// # Errors
     ///
     /// Returns an error if the selected worktree's branch cannot be resolved or the
-    /// lease cannot be renewed (e.g. it does not exist).
+    /// lease cannot be renewed (e.g. the issue has no active lease).
     pub fn renew(
         &self,
-        lease_id: &LeaseId,
+        issue_id: &IssueId,
         extension_secs: u64,
     ) -> Result<(Lease, Vec<StorageWarning>)> {
         let paths = self.exec.require_worktree_paths()?;
@@ -452,8 +443,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
             agent.clone(),
         );
 
-        // Renew the lease
-        let lease = coordinator.renew_lease(lease_id, extension_secs)?;
+        let lease = coordinator.renew_lease(issue_id, extension_secs)?;
         Ok((lease, warnings))
     }
 }
@@ -536,16 +526,14 @@ impl<S: IssueStore> ClaimOps<'_, S> {
 }
 
 impl<S: IssueStore> ClaimOps<'_, S> {
-    /// Force-evicts a lease (admin operation).
-    ///
-    /// # Arguments
-    ///
-    /// * `lease_id` - ID of the lease to evict
-    /// * `reason` - Reason for eviction (for audit trail)
+    /// Force-evicts the lease on the issue among the stored lease records that
+    /// `issue` names (admin operation), recording `reason` in the audit trail.
+    /// The issue store is not consulted, so a lease on a deleted issue stays
+    /// evictable.
     ///
     /// # Returns
     ///
-    /// Any non-fatal [`StorageWarning`]s observed while loading the worktree
+    /// The evicted lease and any non-fatal [`StorageWarning`]s observed while loading the worktree
     /// identity (e.g. a relocation), for the caller's output layer to render. This
     /// function never writes to stderr itself.
     ///
@@ -553,7 +541,11 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     ///
     /// Returns an error if the selected worktree's branch cannot be resolved or the
     /// lease cannot be evicted.
-    pub fn force_evict(&self, lease_id: &LeaseId, reason: &str) -> Result<Vec<StorageWarning>> {
+    pub fn force_evict(
+        &self,
+        issue: &IssueIdPrefix,
+        reason: &str,
+    ) -> Result<(Lease, Vec<StorageWarning>)> {
         let paths = self.exec.require_worktree_paths()?;
         // Get current branch for identity
         let branch = get_current_branch(&paths.worktree_root)?;
@@ -569,9 +561,8 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
         coordinator.init()?;
 
-        // Force evict the lease
-        coordinator.force_evict_lease(lease_id, reason)?;
-        Ok(warnings)
+        let lease = coordinator.force_evict_lease(issue, reason)?;
+        Ok((lease, warnings))
     }
 }
 
@@ -1190,7 +1181,7 @@ mod tests {
     /// Helper to execute claim renew in tests
     fn execute_claim_renew_test(
         temp: &TempDir,
-        lease_id: &LeaseId,
+        issue_id: &IssueId,
         extension_secs: u64,
         agent_id: &str,
     ) -> Result<Lease> {
@@ -1205,7 +1196,7 @@ mod tests {
         let coordinator =
             ClaimCoordinator::new(paths, locker, identity.worktree_id, agent_id.parse()?);
 
-        coordinator.renew_lease(lease_id, extension_secs)
+        coordinator.renew_lease(issue_id, extension_secs)
     }
 
     // Tests for claim renew command
@@ -1240,7 +1231,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(10));
 
         // Renew with 1200 second extension
-        let renewed = execute_claim_renew_test(&temp, &lease_id, 1200, "agent:test")?;
+        let renewed = execute_claim_renew_test(&temp, &issue_id, 1200, "agent:test")?;
 
         assert_eq!(renewed.lease_id, lease_id);
         // Note: ttl_secs stays the same (original 600), but expires_at is extended by extension_secs
@@ -1258,12 +1249,8 @@ mod tests {
         let control_plane = temp.path().join(".git/jit");
         fs::create_dir_all(control_plane.join("locks"))?;
 
-        let result = execute_claim_renew_test(
-            &temp,
-            &"00000000-0000-4000-8000-000000000007".parse().unwrap(),
-            600,
-            "agent:test",
-        );
+        let result =
+            execute_claim_renew_test(&temp, &crate::test_utils::issue_id(7), 600, "agent:test");
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -1296,10 +1283,10 @@ mod tests {
             .id;
 
         // Acquire with agent1
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
 
         // Try to renew with agent2
-        let result = execute_claim_renew_test(&temp, &lease_id, 600, "agent:second");
+        let result = execute_claim_renew_test(&temp, &issue_id, 600, "agent:second");
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not agent:second"));
@@ -1327,13 +1314,13 @@ mod tests {
             .id;
 
         // Acquire indefinite lease (TTL=0)
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:test")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:test")?;
 
         // Sleep to ensure heartbeat changes
         std::thread::sleep(Duration::from_millis(10));
 
         // Renew indefinite lease
-        let renewed = execute_claim_renew_test(&temp, &lease_id, 0, "agent:test")?;
+        let renewed = execute_claim_renew_test(&temp, &issue_id, 0, "agent:test")?;
 
         assert_eq!(renewed.ttl_secs, 0);
         assert!(renewed.expires_at.is_none());
@@ -1734,14 +1721,14 @@ mod tests {
             .id;
 
         // Acquire a lease
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:test")?;
 
         // Verify lease exists
         let leases_before = execute_claim_list_test(&temp)?;
         assert_eq!(leases_before.len(), 1);
 
         // Force evict it
-        let result = execute_claim_force_evict_test(&temp, &lease_id, "Test eviction");
+        let result = execute_claim_force_evict_test(&temp, &issue_id, "Test eviction");
         assert!(result.is_ok(), "Force evict should succeed");
 
         // Verify lease is gone
@@ -1759,11 +1746,8 @@ mod tests {
         let control_plane = temp.path().join(".git/jit");
         fs::create_dir_all(control_plane.join("locks"))?;
 
-        let result = execute_claim_force_evict_test(
-            &temp,
-            &"00000000-0000-4000-8000-000000000007".parse().unwrap(),
-            "Test reason",
-        );
+        let result =
+            execute_claim_force_evict_test(&temp, &crate::test_utils::issue_id(7), "Test reason");
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -1796,10 +1780,10 @@ mod tests {
             .id;
 
         // Agent 1 acquires
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:first")?;
 
         // Admin evicts
-        execute_claim_force_evict_test(&temp, &lease_id, "Admin intervention")?;
+        execute_claim_force_evict_test(&temp, &issue_id, "Admin intervention")?;
 
         // Agent 2 should be able to acquire
         let result = execute_claim_acquire_test(&temp, &storage, &issue_id, 600, "agent:second");
@@ -1813,14 +1797,14 @@ mod tests {
 
     fn execute_claim_force_evict_test(
         temp: &TempDir,
-        lease_id: &LeaseId,
+        issue_id: &IssueId,
         reason: &str,
     ) -> Result<()> {
         ensure_git_checkout(temp)?;
         CommandExecutor::new(JsonFileStorage::new(temp.path().join(".jit")))
             .with_worktree_paths(create_test_paths(temp))
             .claims()
-            .force_evict(lease_id, reason)
+            .force_evict(&IssueIdPrefix::from(issue_id), reason)
             .map(drop)
     }
 
@@ -2072,7 +2056,7 @@ mod tests {
             .issue
             .id;
 
-        let lease_id = execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:worker")?;
+        execute_claim_acquire_test(&temp, &storage, &issue_id, 0, "agent:worker")?;
 
         // Snapshot repository-owned state after the acquire.
         let issue_before = storage.load_issue(&issue_id)?;
@@ -2090,9 +2074,9 @@ mod tests {
             identity.worktree_id,
             "agent:worker".parse()?,
         );
-        coordinator.heartbeat(&lease_id)?;
-        coordinator.renew_lease(&lease_id, 0)?;
-        execute_claim_force_evict_test(&temp, &lease_id, "released")?;
+        coordinator.heartbeat(&issue_id)?;
+        coordinator.renew_lease(&issue_id, 0)?;
+        execute_claim_force_evict_test(&temp, &issue_id, "released")?;
 
         let issue_after = storage.load_issue(&issue_id)?;
         let events_after = storage.read_events()?;

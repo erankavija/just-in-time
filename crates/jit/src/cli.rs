@@ -2349,36 +2349,37 @@ pub enum ClaimCommands {
         issue_id: String,
     },
 
-    /// Renew a lease
+    /// Renew your lease on an issue
     ///
-    /// Extends the expiry time of an existing lease. Allows agents to continue
-    /// working on an issue beyond the original TTL.
+    /// Extends the expiry time of your lease on the issue. Allows agents to
+    /// continue working on an issue beyond the original TTL. An indefinite
+    /// lease gets a heartbeat instead.
     ///
     /// Examples:
-    ///   jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41 --extension 600   # Extend by 10 minutes
-    ///   jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41 --extension 3600  # Extend by 1 hour
-    ///   jit claim renew b53beeba-32f2-4671-a407-2d94e4d13d41                   # Extend by the default TTL
+    ///   jit claim renew abc123 --extension 600   # Extend by 10 minutes
+    ///   jit claim renew abc123 --extension 3600  # Extend by 1 hour
+    ///   jit claim renew abc123                   # Extend by the default TTL
     Renew {
-        /// Lease ID to renew
-        lease_id: crate::domain::identity::LeaseId,
+        /// Issue ID whose lease to renew (short ids accepted)
+        issue_id: String,
 
         /// How many seconds to extend the lease by
         #[arg(long, default_value_t = crate::runtime_defaults::CLAIM_TTL_SECS)]
         extension: u64,
     },
 
-    /// Send heartbeat for an indefinite lease
+    /// Send a heartbeat for your lease on an issue
     ///
     /// Updates the last_beat timestamp without changing expiration.
     /// Used to signal the agent is still actively working on the issue.
     /// Only needed for TTL=0 (indefinite) leases to prevent staleness.
     ///
     /// Examples:
-    ///   jit claim heartbeat b53beeba-32f2-4671-a407-2d94e4d13d41       # Send heartbeat
-    ///   jit claim heartbeat b53beeba-32f2-4671-a407-2d94e4d13d41 --json
+    ///   jit claim heartbeat abc123       # Send heartbeat
+    ///   jit claim heartbeat abc123 --json
     Heartbeat {
-        /// Lease ID to heartbeat
-        lease_id: crate::domain::identity::LeaseId,
+        /// Issue ID whose lease to heartbeat (short ids accepted)
+        issue_id: String,
     },
 
     /// Show active lease status
@@ -2415,18 +2416,20 @@ pub enum ClaimCommands {
     /// JSON output uses the list envelope `{"count": N, "leases": [...]}`.
     List,
 
-    /// Force-evict a lease (admin operation)
+    /// Force-evict the lease on an issue (admin operation)
     ///
-    /// Removes a lease immediately, regardless of who owns it. This is an
-    /// administrative operation for handling stale leases or emergency situations.
-    /// The eviction is logged with the provided reason for audit trail.
+    /// Removes the issue's lease immediately, regardless of who owns it. This is
+    /// an administrative operation for handling stale leases or emergency
+    /// situations. The issue ID is matched against stored leases, not issues,
+    /// so a lease whose issue was deleted can still be evicted. The eviction is
+    /// logged with the provided reason for audit trail.
     ///
     /// Examples:
-    ///   jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "Stale after crash"
-    ///   jit claim force-evict b53beeba-32f2-4671-a407-2d94e4d13d41 --reason "Admin override" --json
+    ///   jit claim force-evict abc123 --reason "Stale after crash"
+    ///   jit claim force-evict abc123 --reason "Admin override" --json
     ForceEvict {
-        /// Lease ID to evict
-        lease_id: crate::domain::identity::LeaseId,
+        /// Issue ID whose lease to evict (short ids accepted)
+        issue_id: String,
 
         /// Reason for eviction (required for audit trail)
         #[arg(long)]
@@ -3128,38 +3131,6 @@ mod recovery_dispatch_tests {
     use super::*;
     use clap::{CommandFactory, Parser};
     use std::collections::BTreeSet;
-
-    #[test]
-    fn test_claim_lease_arguments_parse_to_lease_ids_before_dispatch() {
-        let canonical = "b53beeba-32f2-4671-a407-2d94e4d13d41";
-        for command in ["renew", "heartbeat", "force-evict"] {
-            let suffix = if command == "force-evict" {
-                vec!["--reason", "test"]
-            } else {
-                vec![]
-            };
-            let args = |id| {
-                ["jit", "claim", command, id]
-                    .into_iter()
-                    .chain(suffix.iter().copied())
-            };
-            let cli = Cli::try_parse_from(args(canonical)).unwrap();
-            let Some(Commands::Claim(command)) = cli.command else {
-                panic!("expected claim command")
-            };
-            let lease_id = match command {
-                ClaimCommands::Renew { lease_id, .. }
-                | ClaimCommands::Heartbeat { lease_id }
-                | ClaimCommands::ForceEvict { lease_id, .. } => lease_id,
-                _ => panic!("expected lease argument"),
-            };
-            assert_eq!(lease_id.as_str(), canonical);
-            assert_eq!(
-                Cli::try_parse_from(args("lease-id")).err().unwrap().kind(),
-                clap::error::ErrorKind::ValueValidation
-            );
-        }
-    }
 
     const CLI_LEAF_COMMANDS: &[&str] = &[
         "apply",

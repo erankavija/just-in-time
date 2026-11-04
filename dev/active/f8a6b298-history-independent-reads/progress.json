@@ -737,6 +737,7 @@
     "a7314585 added LeaseChange::Reclaim and edited the lease-sequence contract in plan.md; batch a plan-review rerun after the wave.",
     "gf2 quiet window 03:52-04:09 held the full-CI lock; released by 6a.",
     "Window bracket (6a): give 6a 15 min warning; 6a stops all tracker writers (88, a4, gf2-4e) and confirms; then rewrite all five, reinstall jit once, verify each with jit validate, report to 6a who releases everyone and lifts the install freeze. Stop and report before reinstalling if any rewrite or validation fails.",
-    "Window blocked 07:3x by Claude Code permission (Modify Shared Resources); awaiting user. 6a released writers; repeat stop sequence after user allows. Bracket script: scratchpad/f8a6-lead/bracket.sh; re-verify green sha before rerun."
+    "Window blocked 07:3x by Claude Code permission (Modify Shared Resources); awaiting user. 6a released writers; repeat stop sequence after user allows. Bracket script: scratchpad/f8a6-lead/bracket.sh; re-verify green sha before rerun.",
+    "Session paused at usage limit 07:35; see handoff.md."
   ]
 }

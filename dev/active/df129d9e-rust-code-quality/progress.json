@@ -877,7 +877,8 @@
     "98cc2097": 2,
     "20fc3b92": 1,
     "10751360": 1,
-    "8a14e8e9": 2
+    "8a14e8e9": 2,
+    "9529b9ac": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1026,7 +1027,7 @@
       "note": "lead review: top-level rdeps left in legacy table (REQ-01/02); batch boundary-edge human text changed (REQ-06); +162 lines"
     },
     "153c9851": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "lead review: non-UTF-8 config path no longer serializes under --json (REQ-06)"
@@ -1116,9 +1117,10 @@
       "reason": "shared handler contract forms (D-38..D-41); one worker, lands before its dependents"
     },
     "9529b9ac": {
-      "status": "in_progress",
+      "status": "rework",
       "vendor": "Claude Sonnet",
-      "reason": "emitter-level JSON success warnings (D-42); 182f4c03 and cd8e04cc depend on it"
+      "reason": "emitter-level JSON success warnings (D-42); 182f4c03 and cd8e04cc depend on it",
+      "note": "on main f1e434642; code-review F1/F2; rework 1 drops AssetListScope.warnings and the exemption list (D-49)"
     },
     "4a01ccba": {
       "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43)."
