@@ -17,6 +17,7 @@ use jit::test_lease_store::{corrupt_lease, LeaseCorruption};
 use std::fs;
 use std::io::Read;
 use std::process::{Output, Stdio};
+use tempfile::TempDir;
 
 /// Define the auto gate `projection-gate` over `checker_command` and create an
 /// issue requiring it.
@@ -742,6 +743,37 @@ fn invoke_claim_without_git(json: bool) -> Vec<Output> {
     vec![output_in_form(&cli, &["claim", "status"], json)]
 }
 
+/// `search`/1: ripgrep is not on `PATH`, so the search classifies to
+/// `RIPGREP_NOT_FOUND`, which exits 1.
+fn invoke_search_missing_ripgrep(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let empty_path = TempDir::new().unwrap();
+    let mut command = cli.command_with_env(
+        ["search", "needle"],
+        [("PATH", empty_path.path().as_os_str())],
+    );
+    if json {
+        command.arg("--json");
+    }
+    vec![command.output().unwrap()]
+}
+
+/// `search`/10: an executable `rg` the kernel cannot run (no shebang, so
+/// `ENOEXEC`) passes the `PATH` lookup and fails at spawn, an I/O failure that
+/// classifies to `IO_ERROR`, which exits 10.
+#[cfg(unix)]
+fn invoke_search_unspawnable_ripgrep(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let tools = TempDir::new().unwrap();
+    jit::test_utils::write_executable(&tools.path().join("rg"), "not a program\n").unwrap();
+    let mut command =
+        cli.command_with_env(["search", "needle"], [("PATH", tools.path().as_os_str())]);
+    if json {
+        command.arg("--json");
+    }
+    vec![command.output().unwrap()]
+}
+
 row_bindings! {
     test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
     test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
@@ -777,6 +809,9 @@ row_bindings! {
     test_command_exit_codes_batch_create_prevalidation_emits_2: ("issue batch-create", 2, false) => invoke_batch_create_prevalidation;
     test_command_exit_codes_snapshot_export_occupied_emits_6: ("snapshot export", 6, false) => invoke_snapshot_export_occupied;
     test_command_exit_codes_claim_without_git_emits_10: ("claim", 10, false) => invoke_claim_without_git;
+    test_command_exit_codes_search_missing_ripgrep_emits_1: ("search", 1, false) => invoke_search_missing_ripgrep;
+    #[cfg(unix)]
+    test_command_exit_codes_search_unspawnable_ripgrep_emits_10: ("search", 10, false) => invoke_search_unspawnable_ripgrep;
 }
 
 /// Guard: **every** projected row, exception and standard alike, has exactly one

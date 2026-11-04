@@ -22,6 +22,7 @@ pub mod failure;
 mod init;
 mod invariant;
 mod item;
+mod search;
 mod serve;
 mod version;
 
@@ -30,6 +31,7 @@ pub use claim::{
     ClaimRenewResponse, LeaseListResponse, LeasesKey, RecoverResponse,
 };
 pub use emit::{emit_outcome, HumanRender, Report, Response};
+pub use search::{SearchHit, SearchKey, SearchQuery, SearchResponse};
 pub use serve::{ServeResponse, WebUiSource};
 
 use crate::declarations::{GateMode, GateStage};
@@ -2809,15 +2811,6 @@ impl From<crate::domain::artifact_conformance::ReportedArtifact> for ArtifactCon
 
 /// Response for `label namespaces` command
 pub type NamespacesResponse = ListEnvelope<NamespacesKey, String>;
-
-/// Response for top-level `search` command
-pub type SearchResponse = ListEnvelope<ResultsKey, crate::search::SearchResult, SearchQuery>;
-
-/// The query a [`SearchResponse`] echoes.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct SearchQuery {
-    pub query: String,
-}
 
 /// Response for `gate preset list` command
 pub type GatePresetListResponse = ListEnvelope<PresetsKey, crate::gate_presets::PresetInfo>;

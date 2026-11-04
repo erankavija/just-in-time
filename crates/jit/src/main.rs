@@ -22,7 +22,7 @@ use jit::cli::{
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
-    apply, claim, config, events, init, invariant, item, resolve_issue, serve, version,
+    apply, claim, config, events, init, invariant, item, resolve_issue, search, serve, version,
     CommandContext,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
@@ -5021,85 +5021,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         Commands::Project(project_cmd) => {
             run_project(&executor, project_cmd, mode)?;
         }
-        Commands::Search {
-            query,
-            regex,
-            case_sensitive,
-            context,
-            limit,
-            glob,
-        } => {
-            let output_ctx = OutputContext::new(quiet, json);
-            use jit::search::SearchOptions;
-
-            let options = SearchOptions {
-                case_sensitive,
-                regex,
-                context_lines: context,
-                max_results: limit,
-                file_pattern: glob.clone(),
-                file_patterns: Vec::new(),
-            };
-
-            match executor.queries().search_content(&query, options) {
-                Ok(matches) => {
-                    if json {
-                        use jit::output::{JsonOutput, SearchResponse};
-
-                        let msg = format!("Found {} result(s)", matches.len());
-                        let results = matches.into_iter().map(|m| m.result).collect();
-                        let response = SearchResponse::with_extras(
-                            results,
-                            jit::output::SearchQuery { query },
-                        );
-                        let output = JsonOutput::success(response).with_message(msg);
-                        println!("{}", output.to_json_string()?);
-                    } else if matches.is_empty() {
-                        let _ =
-                            output_ctx.print_info(format!("No matches found for \"{}\"", query));
-                    } else {
-                        let _ = output_ctx.print_info(format!(
-                            "Search results for \"{}\" ({} matches):\n",
-                            query,
-                            matches.len()
-                        ));
-
-                        let mut current_file = String::new();
-                        for m in &matches {
-                            let result = &m.result;
-                            if result.path != current_file {
-                                current_file = result.path.clone();
-
-                                match (&result.issue_id, &m.issue_title) {
-                                    (Some(issue_id), Some(title)) => {
-                                        println!("Issue {} | {}", issue_id, title)
-                                    }
-                                    (Some(issue_id), None) => println!("Issue {}", issue_id),
-                                    (None, _) => println!("Document {}", result.path),
-                                }
-                            }
-
-                            println!("  Line {}: {}", result.line_number, result.line_text.trim());
-                        }
-                        println!();
-                    }
-                }
-                Err(e) => {
-                    if json {
-                        // A typed SearchError classifies itself; any other failure
-                        // (an io/spawn error, say) is the generic search failure.
-                        let json_error = if e.is::<jit::search::SearchError>() {
-                            classify(&e)
-                        } else {
-                            command_json_error(&e, jit::output::ErrorCode::SearchFailed)
-                        };
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    } else {
-                        return Err(e);
-                    }
-                }
-            }
+        Commands::Search(args) => {
+            return search::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Status => {
             let output_ctx = OutputContext::new(quiet, json);

@@ -742,7 +742,6 @@ impl CommandSchema {
                 Some(schema_to_value::<NamespacesResponse>()),
                 "NamespacesResponse",
             ),
-            "search" => (Some(schema_to_value::<SearchResponse>()), "SearchResponse"),
             "gate_preset_list" => (
                 Some(schema_to_value::<GatePresetListResponse>()),
                 "GatePresetListResponse",
@@ -957,6 +956,20 @@ impl CommandSchema {
                 "A lock wait expired while another jit process held the lock \
                  (`JIT_LOCK_TIMEOUT`); the command changed nothing and may be \
                  retried.",
+                false,
+            ),
+            // `search` leaf: ripgrep missing or failing exits 1; a spawn or
+            // path I/O failure exits 10, on both --json and human paths.
+            row(
+                "search",
+                1,
+                "ripgrep is not installed (RIPGREP_NOT_FOUND) or ran and failed (SEARCH_FAILED).",
+                false,
+            ),
+            row(
+                "search",
+                10,
+                "ripgrep could not be spawned or the search root could not be resolved (I/O failure).",
                 false,
             ),
             // Command-family classification (standard taxonomy meaning).
