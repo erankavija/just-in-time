@@ -13,7 +13,20 @@
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "68aded08-89b2-4278-afeb-660cbfc161ad",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:16:31.175947667Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "run_id": "6ae2180d-70f4-48c2-a562-e5384971ac67",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:15:11.151639715Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1cdf5965-226b-4eb0-8707-33b35a7854d5",
   "labels": [
     "type:task",
@@ -26,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Index graph layout and refresh passes",
-  "updated_at": "2026-11-04T23:08:48.403721968Z"
+  "updated_at": "2026-11-04T23:16:31.175947667Z"
 }
