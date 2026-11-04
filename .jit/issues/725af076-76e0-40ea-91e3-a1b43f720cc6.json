@@ -28,7 +28,7 @@
     "component:testing"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Captures refuse a whole read of the event log",
-  "updated_at": "2026-11-03T22:37:40.026132480Z"
+  "updated_at": "2026-11-04T02:50:38.999636596Z"
 }
