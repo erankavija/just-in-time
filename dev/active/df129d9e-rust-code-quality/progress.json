@@ -1364,6 +1364,17 @@
       "status": "dispatched",
       "vendor": "Claude Sonnet",
       "reason": "gate status handler move; first of the four remaining moves"
+    },
+    "24a982b7": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "query/status handler move; parallel with f87f9b00 (disjoint arms)"
+    },
+    "ceaaf0ab": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 track B after 4575a03d; worker checks criteria first",
+      "epic": "b697a3f7"
     }
   },
   "handoff": {
@@ -1407,7 +1418,7 @@
         "7cd27db8 (30334066)"
       ]
     },
-    "status": "f56bad8d, f7a59f5f done; 1ade3e6f, 4575a03d dispatched; next track A 945f9181 (after 3f816619 sequencing) and ceaaf0ab after 4575a03d",
+    "status": "done: f56bad8d, f7a59f5f, 4575a03d; landing: 1ade3e6f; running: ceaaf0ab; track A 945f9181 waits for 3f816619",
     "criteria_check_2026_11_04": {
       "945f9181": "valid; line cites drifted; large; touches commands/{issue,dependency,template,mod}, overlaps 3f816619/5687e281 files",
       "1ade3e6f": "valid; cites drifted; large; misses ConfigManager::load/EffectiveConfig::load callers",
