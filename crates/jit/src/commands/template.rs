@@ -287,7 +287,14 @@ impl<S: IssueStore> TemplateOps<'_, S> {
                 crate::repository_state::action_overrides(plan.delta().actions()),
             )?;
             captured.derived.result.populate_created_issues(&proposed)?;
-            classify_apply(session.apply(&plan), (captured.derived.result, warnings))
+            let error_after_apply = captured.derived.error_after_apply;
+            match classify_apply(session.apply(&plan), (captured.derived.result, warnings))? {
+                AttemptOutcome::Done(applied) => match error_after_apply {
+                    Some(error) => Err(error.into()),
+                    None => Ok(AttemptOutcome::Done(applied)),
+                },
+                retry => Ok(retry),
+            }
         })
     }
 }
@@ -321,6 +328,7 @@ struct DerivedTemplateApply {
     registry: crate::declarations::GateRegistry,
     intents: Vec<MutationIntent>,
     lease_targets: Vec<IssueId>,
+    error_after_apply: Option<crate::errors::TransitionBlockedError>,
 }
 
 struct CapturedTemplateApply {
@@ -344,6 +352,7 @@ fn derive_captured_template_apply(
     let issues = parse_template_issues(image)?;
     let presets = parse_template_presets(image)?;
     let registry = parse_template_gate_registry(image)?;
+    let graph = super::CapturedGraphEvidence::capture(image, &issues, context)?;
     let derived = derive_template_apply(
         &template,
         container_id,
@@ -355,7 +364,7 @@ fn derive_captured_template_apply(
         &presets,
         config,
         &declarations.rules,
-        context,
+        &graph,
     )?;
     Ok(CapturedTemplateApply {
         declarations,
@@ -369,6 +378,7 @@ struct FreshTemplateDerivation {
     candidate: BTreeMap<IssueId, Issue>,
     created_order: Vec<IssueId>,
     lease_targets: Vec<IssueId>,
+    error_after_apply: Option<crate::errors::TransitionBlockedError>,
 }
 
 fn template_fixed_paths() -> Vec<VirtualPath> {
@@ -452,6 +462,7 @@ fn template_operation_capture_paths(
                 .collect::<Vec<_>>(),
         );
     }
+    paths.extend(super::validate::plan_document_paths(&issues, &config)?);
     paths.extend(template_document_parent_paths(&paths)?);
     paths.sort();
     paths.dedup();
@@ -618,7 +629,7 @@ fn derive_template_apply(
     presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
-    context: &MutationContext,
+    graph: &super::CapturedGraphEvidence<'_>,
 ) -> Result<DerivedTemplateApply> {
     let original_registry = registry.clone();
     let full_container_id = super::require_issue_in_capture(issues, container_id)?;
@@ -705,6 +716,7 @@ fn derive_template_apply(
         candidate,
         created_order,
         lease_targets,
+        error_after_apply,
     } = if let Some(breakdown_id) = existing_breakdown {
         let (mapping, updates) = derive_template_refresh(
             template,
@@ -720,6 +732,7 @@ fn derive_template_apply(
             candidate: updates,
             created_order: Vec::new(),
             lease_targets: Vec::new(),
+            error_after_apply: None,
         }
     } else {
         let delta = expand_template(
@@ -739,7 +752,7 @@ fn derive_template_apply(
             presets,
             config,
             rules,
-            context,
+            graph,
             &mut events,
         )?
     };
@@ -796,6 +809,7 @@ fn derive_template_apply(
         registry,
         intents,
         lease_targets,
+        error_after_apply,
     })
 }
 
@@ -923,9 +937,10 @@ fn derive_fresh_template(
     presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
-    context: &MutationContext,
+    graph: &super::CapturedGraphEvidence<'_>,
     events: &mut Vec<(u8, EventBody)>,
 ) -> Result<FreshTemplateDerivation> {
+    let context = graph.context;
     let created_order = (0..delta.creates.len())
         .map(|index| context.issue_id_at(index as u64))
         .collect::<Vec<_>>();
@@ -1017,11 +1032,30 @@ fn derive_fresh_template(
             )
         })?;
     }
+    let readiness = super::derive_readiness_intents(
+        issues,
+        &candidate.values().cloned().collect::<Vec<_>>(),
+        graph,
+    )?;
+    for intent in readiness.intents {
+        match intent {
+            MutationIntent::UpdateIssue { issue } => {
+                candidate.insert(issue.id.clone(), *issue);
+            }
+            MutationIntent::RecordEvent { phase, event } => events.push((phase, *event)),
+            _ => {
+                return Err(anyhow!(
+                    "readiness derived an intent other than a record or event"
+                ))
+            }
+        }
+    }
     Ok(FreshTemplateDerivation {
         created,
         candidate,
         created_order,
         lease_targets,
+        error_after_apply: readiness.error_after_apply,
     })
 }
 
@@ -1162,8 +1196,7 @@ fn add_captured_template_edge(
     // Publish the reduced dependency set of every issue the new edge reshaped.
     // The dependent `from` is exempt from the unchanged-set shortcut: its own set
     // grew by `to` above, so a reduction that gives back the same set still means
-    // the edge landed, and the readiness derivation and the dependency-add event
-    // below are still owed.
+    // the edge landed, and the dependency-add event below is still owed.
     for (id, reduced) in reductions {
         let issue = issues
             .get_mut(&id)
@@ -1184,32 +1217,6 @@ fn add_captured_template_edge(
         }
     }
 
-    // Readiness derives from the FINAL graph through the shared domain helper, the
-    // same one `jit dep add` consults, so the two paths cannot drift
-    // (`@/invariant/derived-state-coherence`). An edge addition owns only the
-    // demotion direction; promotion belongs to the paths that remove an edge or
-    // retire a dependency.
-    let demoted = {
-        let resolved = issues
-            .iter()
-            .map(|(id, issue)| (id.clone(), issue))
-            .collect::<HashMap<_, _>>();
-        issues
-            .get(from)
-            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
-            .derive_readiness_correction(&resolved)
-            == Some(ReadinessCorrection::Demote)
-    };
-    let issue = issues
-        .get_mut(from)
-        .ok_or_else(|| IssueNotFoundError::new(from.clone()))?;
-    if demoted {
-        issue.state = State::Backlog;
-        events.push((
-            1,
-            EventBody::draft_issue_state_changed(from.clone(), State::Ready, State::Backlog),
-        ));
-    }
     events.push((
         2,
         EventBody::draft_issue_updated(
@@ -1229,46 +1236,19 @@ fn remove_captured_template_edge(
     lease_targets: &mut Vec<IssueId>,
 ) -> Result<()> {
     lease_targets.push(from.clone());
-    {
-        let issue = issues
-            .get_mut(from)
-            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?;
-        let before = issue.dependencies.len();
-        issue.dependencies.retain(|dependency| dependency != to);
-        if issue.dependencies.len() == before {
-            return Ok(());
-        }
-    }
-    events.push((
-        2,
-        EventBody::draft_issue_updated(
-            from.clone(),
-            "dependency-remove".to_string(),
-            vec!["dependencies".to_string()],
-        ),
-    ));
-
-    // The removal direction of the same shared derivation the addition path uses:
-    // an edge removal can only promote, never demote.
-    let promoted = {
-        let resolved = issues
-            .iter()
-            .map(|(id, issue)| (id.clone(), issue))
-            .collect::<HashMap<_, _>>();
-        issues
-            .get(from)
-            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
-            .derive_readiness_correction(&resolved)
-            == Some(ReadinessCorrection::Promote)
-    };
-    if promoted {
-        issues
-            .get_mut(from)
-            .ok_or_else(|| IssueNotFoundError::new(from.clone()))?
-            .state = State::Ready;
+    let issue = issues
+        .get_mut(from)
+        .ok_or_else(|| IssueNotFoundError::new(from.clone()))?;
+    let before = issue.dependencies.len();
+    issue.dependencies.retain(|dependency| dependency != to);
+    if issue.dependencies.len() != before {
         events.push((
-            3,
-            EventBody::draft_issue_state_changed(from.clone(), State::Backlog, State::Ready),
+            2,
+            EventBody::draft_issue_updated(
+                from.clone(),
+                "dependency-remove".to_string(),
+                vec!["dependencies".to_string()],
+            ),
         ));
     }
     Ok(())

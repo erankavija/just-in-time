@@ -62,44 +62,6 @@ struct DerivedIssueDeletion {
     error_after_apply: Option<crate::errors::TransitionBlockedError>,
 }
 
-/// Derive `dependent`'s promotion to `Ready` from the captured graph: the
-/// promoted record, the events to publish, and the graph-rule refusal, if any.
-/// Deletion and rejection share it so each publishes promotions in its own plan.
-pub(super) fn derive_ready_promotion(
-    dependent: Issue,
-    evidence: CapturedTransitionEvidence<'_>,
-) -> Result<(
-    Issue,
-    Vec<crate::repository_state::MutationIntent>,
-    Option<crate::errors::TransitionBlockedError>,
-)> {
-    use crate::repository_state::MutationIntent;
-
-    let record = |events: Vec<(u8, EventBody)>| {
-        events
-            .into_iter()
-            .map(|(phase, event)| MutationIntent::RecordEvent {
-                phase,
-                event: Box::new(event),
-            })
-            .collect::<Vec<_>>()
-    };
-    Ok(
-        match derive_state_transition(dependent.clone(), State::Ready, false, evidence)? {
-            DerivedStateTransition::Applied {
-                issue,
-                events,
-                changed: true,
-                ..
-            } => (*issue, record(events), None),
-            DerivedStateTransition::GraphBlocked { error, events } => {
-                (dependent, record(events), Some(error))
-            }
-            DerivedStateTransition::Applied { changed: false, .. } => (dependent, Vec::new(), None),
-        },
-    )
-}
-
 /// Derive deletion, dependent-edge cleanup, and resulting automatic readiness
 /// transitions from one captured active graph.
 fn derive_issue_deletion(
@@ -116,59 +78,48 @@ fn derive_issue_deletion(
         .filter(|issue| &issue.id != target_id)
         .cloned()
         .collect::<Vec<_>>();
-    let dependent_ids = projected
+    let dependents = projected
         .iter_mut()
         .filter(|issue| issue.dependencies.iter().any(|id| id == target_id))
         .map(|issue| {
             issue.dependencies.retain(|id| id != target_id);
-            issue.id.clone()
+            issue.clone()
         })
         .collect::<Vec<_>>();
-    let ready_ids = crate::domain::queries::issues_becoming_ready(&projected);
+    let readiness = derive_readiness_intents(issues, &projected, &graph)?;
 
-    let mut intents = vec![MutationIntent::DeleteIssue {
+    let mut intents = std::iter::once(MutationIntent::DeleteIssue {
         issue_id: target_id.clone(),
-    }];
-    let mut error_after_apply = None;
-    for dependent_id in dependent_ids {
-        let position = projected
+    })
+    .chain(
+        dependents
             .iter()
-            .position(|issue| issue.id == dependent_id)
-            .ok_or_else(|| anyhow!("captured dependent {dependent_id} disappeared"))?;
-        let dependent = projected[position].clone();
-        let (dependent, promotion, blocked) = if ready_ids.contains(&dependent_id) {
-            derive_ready_promotion(
-                dependent,
-                CapturedTransitionEvidence {
-                    issues: &projected,
-                    graph: &graph,
-                },
-            )?
-        } else {
-            (dependent, Vec::new(), None)
-        };
-        error_after_apply = error_after_apply.or(blocked);
-        intents.extend(promotion);
-        projected[position] = dependent.clone();
-        intents.push(MutationIntent::UpdateIssue {
-            issue: Box::new(dependent),
-        });
-        intents.push(MutationIntent::RecordEvent {
-            phase: 2,
-            event: Box::new(EventBody::draft_issue_updated(
-                dependent_id,
-                "dependency-cascade-delete".to_string(),
-                vec!["dependencies".to_string()],
-            )),
-        });
-    }
-    intents.push(MutationIntent::RecordEvent {
+            .filter(|dependent| !readiness.corrects(&dependent.id))
+            .map(|dependent| MutationIntent::UpdateIssue {
+                issue: Box::new(dependent.clone()),
+            }),
+    )
+    .chain(
+        dependents
+            .iter()
+            .map(|dependent| MutationIntent::RecordEvent {
+                phase: 2,
+                event: Box::new(EventBody::draft_issue_updated(
+                    dependent.id.clone(),
+                    "dependency-cascade-delete".to_string(),
+                    vec!["dependencies".to_string()],
+                )),
+            }),
+    )
+    .chain(std::iter::once(MutationIntent::RecordEvent {
         phase: 1,
         event: Box::new(EventBody::draft_issue_deleted(target_id.clone())),
-    });
+    }))
+    .collect::<Vec<_>>();
+    intents.extend(readiness.intents);
     Ok(DerivedIssueDeletion {
         intents,
-        error_after_apply,
+        error_after_apply: readiness.error_after_apply,
     })
 }
 

@@ -260,44 +260,36 @@ fn plan_reduction_fixes(projected: &mut [Issue]) -> Result<PlannedFixes> {
 }
 
 fn plan_readiness_fixes(projected: &mut [Issue]) -> PlannedFixes {
-    let mut fixes = PlannedFixes::default();
-    loop {
-        let resolved = crate::domain::queries::build_issue_map(projected);
-        let corrections = projected
-            .iter()
-            .enumerate()
-            .filter_map(|(index, issue)| {
-                issue
-                    .derive_readiness_correction(&resolved)
-                    .map(|correction| (index, correction))
-            })
-            .collect::<Vec<_>>();
-        if corrections.is_empty() {
-            return fixes;
-        }
-        fixes.count += corrections.len();
-        for (index, correction) in corrections {
-            let issue = &mut projected[index];
-            let from = issue.state;
-            issue.state = match correction {
-                ReadinessCorrection::Promote => State::Ready,
-                ReadinessCorrection::Demote => State::Backlog,
-            };
-            fixes.messages.push(format!(
-                "  → Transitioning {} to {}",
-                issue.short_id(),
-                issue.state.as_str()
-            ));
-            fixes.intents.push(MutationIntent::RecordEvent {
-                phase: 4,
-                event: Box::new(EventBody::draft_issue_state_changed(
-                    issue.id.clone(),
-                    from,
-                    issue.state,
-                )),
-            });
-        }
+    use crate::domain::queries::{derive_readiness_corrections, ReadinessScope};
+    let corrections = derive_readiness_corrections(projected, projected, ReadinessScope::All);
+    let mut fixes = PlannedFixes {
+        count: corrections.len(),
+        ..PlannedFixes::default()
+    };
+    for (id, correction) in corrections {
+        let Some(issue) = projected.iter_mut().find(|issue| issue.id == id) else {
+            continue;
+        };
+        let from = issue.state;
+        issue.state = match correction {
+            ReadinessCorrection::Promote => State::Ready,
+            ReadinessCorrection::Demote => State::Backlog,
+        };
+        fixes.messages.push(format!(
+            "  → Transitioning {} to {}",
+            issue.short_id(),
+            issue.state.as_str()
+        ));
+        fixes.intents.push(MutationIntent::RecordEvent {
+            phase: 4,
+            event: Box::new(EventBody::draft_issue_state_changed(
+                issue.id.clone(),
+                from,
+                issue.state,
+            )),
+        });
     }
+    fixes
 }
 
 fn plan_derived_state_fixes(
@@ -1115,7 +1107,7 @@ fn discover_archive_evidence_records(
 }
 
 /// Each breakable container's linked plan-document path.
-fn plan_document_paths(
+pub(super) fn plan_document_paths(
     issues: &[Issue],
     config: &JitConfig,
 ) -> Result<Vec<crate::repository_state::VirtualPath>> {
