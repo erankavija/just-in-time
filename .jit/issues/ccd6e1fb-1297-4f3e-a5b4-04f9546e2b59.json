@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "0023e2a4-c4e1-403c-a227-8688433df951",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:04:08.253764559Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ccd6e1fb-1297-4f3e-a5b4-04f9546e2b59",
   "labels": [
     "type:task",
@@ -27,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Local rules compile each schema once per report",
-  "updated_at": "2026-11-04T00:03:01.751947176Z"
+  "updated_at": "2026-11-04T00:04:08.253764559Z"
 }
