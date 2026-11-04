@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3723af5ca2339e0ebbd7d82bbfd93ff5e89434b5",
+  "completed_at": "2026-11-04T03:06:27.768282118Z",
+  "duration_ms": 235484,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Shared sugar resolution and focused index tests satisfy all hard criteria; no issue-impact defect found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e2082ba9-76ed-4137-ba57-7103f0f78943",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2ecca0d6-bfc2-4edd-82d9-2f64e1202712",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T03:02:32.284228604Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8084d808b, 18ade4431\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/invariant/architecture-dependency-direction, @/invariant/domain-agnostic, @/invariant/semantic-types, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/convention-convergence, @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci=failed (exit 75, 2026-11-04T02:57:43Z); code-review=pending\nTruncation recovery: Narrow reads of item.rs address resolution/index tests, commands/item.rs link resolution/tests, and validation report item-link collection after broad-output truncation.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Shared sugar resolution and focused index tests satisfy all hard criteria; no issue-impact defect found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

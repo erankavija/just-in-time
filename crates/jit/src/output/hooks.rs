@@ -1,6 +1,6 @@
 //! Human rendering for `jit hooks` responses.
 
-use super::HumanRender;
+use super::{HumanRender, OutputMode};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -21,7 +21,7 @@ fn section(title: &str, bullet: &str, items: &[String]) -> String {
 }
 
 impl HumanRender for HooksInstallResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!(
             "Installed hooks to: {}\n{}{}\nHooks are now active. Leases are enforced when a mutation is written, not at commit.\n",
             self.hooks_dir,

@@ -220,12 +220,22 @@ impl<'a> ItemAddressIndex<'a> {
         kinds: &[ItemKind],
         local_project_name: Option<&str>,
     ) -> Result<bool, ItemError> {
-        let address = if value.starts_with('@') {
-            parse_kind_segmented_address(value)?
+        let (scope, kind, self_id) = if value.starts_with('@') {
+            let address = parse_kind_segmented_address(value)?;
+            (
+                address.scope.bind_local(local_project_name)?,
+                Some(address.kind),
+                address.self_id,
+            )
         } else {
-            expand_sugar_address(value, kinds)?
+            let address = resolve_sugar_address(value, kinds)?;
+            (
+                Scope::Issue(address.issue_ref),
+                address.kind,
+                address.self_id,
+            )
         };
-        let scope = match address.scope.bind_local(local_project_name)? {
+        let scope = match scope {
             Scope::Project => Scope::Project,
             Scope::Issue(prefix) => {
                 match self
@@ -247,10 +257,25 @@ impl<'a> ItemAddressIndex<'a> {
                 }
             }
         };
-        let kind = resolve_kind_alias(kinds, &address.kind).unwrap_or(&address.kind);
-        Ok(self
-            .addresses
-            .contains(&qualified_id(&scope, kind, &address.self_id)))
+        Ok(match kind {
+            Some(kind) => {
+                let kind = resolve_kind_alias(kinds, &kind).unwrap_or(&kind);
+                self.addresses
+                    .contains(&qualified_id(&scope, kind, &self_id))
+            }
+            None => {
+                kinds
+                    .iter()
+                    .filter(|kind| kind.kind_scope() == KindScope::Issue)
+                    .filter(|kind| {
+                        self.addresses
+                            .contains(&qualified_id(&scope, kind.name(), &self_id))
+                    })
+                    .take(2)
+                    .count()
+                    == 1
+            }
+        })
     }
 }
 
@@ -444,6 +469,33 @@ pub fn expand_sugar_address(
                 .collect(),
         }),
     }
+}
+
+/// An issue-item address; an open kind is resolved against actual items.
+pub(crate) struct IssueItemAddress {
+    pub issue_ref: IssueIdPrefix,
+    pub kind: Option<String>,
+    pub self_id: String,
+}
+
+/// Infer a sugar address's kind when unique, otherwise defer to actual-item matching.
+pub(crate) fn resolve_sugar_address(
+    address: &str,
+    kinds: &[ItemKind],
+) -> Result<IssueItemAddress, ItemError> {
+    let (kind, self_id) = match expand_sugar_address(address, kinds) {
+        Ok(parsed) => (Some(parsed.kind), parsed.self_id),
+        Err(
+            ItemError::SugarKindNotFound { self_id, .. }
+            | ItemError::SugarKindAmbiguous { self_id, .. },
+        ) => (None, self_id),
+        Err(err) => return Err(err),
+    };
+    Ok(IssueItemAddress {
+        issue_ref: address.split('/').next().unwrap_or_default().parse()?,
+        kind,
+        self_id,
+    })
 }
 
 wire_vocabulary! {
@@ -1716,6 +1768,62 @@ mod tests {
         ] {
             assert!(index.contains(&address, &kinds, None).unwrap());
         }
+    }
+
+    #[test]
+    fn test_address_index_resolves_sugar_with_overlapping_kind_patterns() {
+        let issue = crate::test_utils::fixture_issue(
+            "Owner".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: a\n\n\
+             ## Decisions\n\n- D-01: a\n\n## Risks\n\n- RISK-01: a\n"
+                .to_string(),
+        );
+        let kinds = canonical_kinds();
+        let items = index_items(&issue, &kinds, &MarkdownContentParser).unwrap();
+        let issues = [issue];
+        let mut index = ItemAddressIndex::new(&issues);
+        index.extend(items.into_iter().map(|item| item.qualified_id));
+
+        for self_id in ["REQ-01", "D-01", "RISK-01"] {
+            let address = format!("{}/{self_id}", issues[0].short_id());
+            assert!(index.contains(&address, &kinds, None).unwrap(), "{address}");
+        }
+    }
+
+    #[test]
+    fn test_address_index_rejects_sugar_with_overlapping_patterns_and_no_item() {
+        let issues = [crate::test_utils::fixture_issue(
+            "Owner".to_string(),
+            String::new(),
+        )];
+        let index = ItemAddressIndex::new(&issues);
+        assert!(!index
+            .contains(
+                &format!("{}/D-01", issues[0].short_id()),
+                &canonical_kinds(),
+                None
+            )
+            .unwrap());
+    }
+
+    #[test]
+    fn test_address_index_rejects_sugar_with_multiple_existing_items() {
+        let issues = [crate::test_utils::fixture_issue(
+            "Owner".to_string(),
+            String::new(),
+        )];
+        let mut index = ItemAddressIndex::new(&issues);
+        index.extend(
+            ["requirement", "decision"]
+                .map(|kind| format!("@/issue/{}/{kind}/D-01", issues[0].short_id())),
+        );
+        assert!(!index
+            .contains(
+                &format!("{}/D-01", issues[0].short_id()),
+                &canonical_kinds(),
+                None
+            )
+            .unwrap());
     }
 
     #[test]

@@ -14,14 +14,14 @@ fn install<S: IssueStore>(
     let result = crate::commands::hooks::install_hooks(&paths.common_dir)?;
     let (hooks_dir, installed, skipped) = (result.hooks_dir, result.installed, result.skipped);
     let message = format!("Installed {} hook(s) to {}", installed.len(), hooks_dir);
-    Ok(Outcome::Success {
-        message: Some(message),
-        response: HooksInstallResponse {
+    Ok(Outcome::success_with(
+        HooksInstallResponse {
             hooks_dir,
             installed,
             skipped,
         },
-    })
+        message,
+    ))
 }
 
 command_group! { command: HooksCommands, storage: [IssueStore], leaves: {
@@ -65,8 +65,9 @@ mod tests {
             },
         };
         let mut out = Vec::new();
+        let mut err = Vec::new();
 
-        let status = dispatch(HooksCommands::Install, &ctx, &mut out, &mut Vec::new()).unwrap();
+        let status = dispatch(HooksCommands::Install, &ctx, &mut out, &mut err).unwrap();
 
         let printed: serde_json::Value = serde_json::from_slice(&out).unwrap();
         let hooks_dir = temp.path().join("hooks").display().to_string();
@@ -78,6 +79,7 @@ mod tests {
             printed["message"],
             format!("Installed 1 hook(s) to {hooks_dir}")
         );
+        assert!(err.is_empty());
     }
 
     #[test]
