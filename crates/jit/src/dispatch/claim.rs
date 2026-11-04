@@ -6,7 +6,7 @@ use crate::commands::RecoveryFailedError;
 use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId};
 use crate::output::{
     ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
-    ClaimRenewResponse, LeaseListResponse, LeaseListing, OutputContext, RecoverResponse,
+    ClaimRenewResponse, LeaseListResponse, OutputContext, RecoverResponse,
 };
 use crate::storage::{IssueStore, RepositoryStateStore, StorageWarning};
 
@@ -125,7 +125,7 @@ fn status<S: IssueStore + RepositoryStateStore>(
         .status(issue.as_ref(), agent.as_deref())?;
     Ok(Outcome::Success {
         message: Some(format!("{} active lease(s)", leases.len())),
-        response: LeaseListResponse::listing(leases, LeaseListing::Status),
+        response: LeaseListResponse::listing(leases, false),
     })
 }
 
@@ -135,7 +135,7 @@ fn list<S: IssueStore + RepositoryStateStore>(
     let leases = ctx.executor.claims().list()?;
     Ok(Outcome::Success {
         message: Some(format!("{} lease(s) found", leases.len())),
-        response: LeaseListResponse::listing(leases, LeaseListing::All),
+        response: LeaseListResponse::listing(leases, true),
     })
 }
 
@@ -239,8 +239,8 @@ mod tests {
 
     #[test]
     fn test_render_human_lease_listings_word_an_empty_result_per_command() {
-        let render = |listing| LeaseListResponse::listing(Vec::new(), listing).render_human();
+        let render = |all| LeaseListResponse::listing(Vec::new(), all).render_human();
 
-        assert_ne!(render(LeaseListing::Status), render(LeaseListing::All));
+        assert_ne!(render(false), render(true));
     }
 }

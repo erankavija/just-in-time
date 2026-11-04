@@ -20,7 +20,7 @@ mod invariant;
 
 pub use claim::{
     ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
-    ClaimRenewResponse, LeaseListResponse, LeaseListing, LeasesKey, RecoverResponse,
+    ClaimRenewResponse, LeaseListResponse, LeasesKey, RecoverResponse,
 };
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 
@@ -3892,9 +3892,7 @@ mod tests {
             lease,
             stale: false,
         };
-        let value =
-            serde_json::to_value(LeaseListResponse::listing(vec![listed], LeaseListing::All))
-                .unwrap();
+        let value = serde_json::to_value(LeaseListResponse::listing(vec![listed], true)).unwrap();
         assert_envelope_value(&value, "leases", 1);
         assert!(value["leases"][0]["expires_at"].is_null());
         assert!(value["leases"][0]["branch"].is_null());

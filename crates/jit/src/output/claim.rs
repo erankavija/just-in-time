@@ -108,38 +108,29 @@ impl CollectionKey for LeasesKey {
     const SCHEMA_NAME: Option<&'static str> = Some("LeaseListResponse");
 }
 
-/// Which lease listing a [`LeaseListResponse`] is; selects the human wording
-/// only and is not serialized.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum LeaseListing {
-    /// `claim status`, optionally filtered.
-    #[default]
-    Status,
-    /// `claim list`.
-    All,
-}
-
 /// The unserialized extras of a [`LeaseListResponse`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct LeaseListingKind {
+    /// `claim list` rather than `claim status`; selects the human wording.
     #[serde(skip)]
-    pub listing: LeaseListing,
+    pub all: bool,
 }
 
 /// Response for `claim status` and `claim list`.
 pub type LeaseListResponse = ListEnvelope<LeasesKey, ListedLease, LeaseListingKind>;
 
 impl LeaseListResponse {
-    pub fn listing(leases: Vec<ListedLease>, listing: LeaseListing) -> Self {
-        Self::with_extras(leases, LeaseListingKind { listing })
+    pub fn listing(leases: Vec<ListedLease>, all: bool) -> Self {
+        Self::with_extras(leases, LeaseListingKind { all })
     }
 }
 
 impl HumanRender for LeaseListResponse {
     fn render_human(&self) -> String {
-        let (none, heading) = match self.extras.listing {
-            LeaseListing::Status => ("No active leases found.", "Active leases"),
-            LeaseListing::All => ("No active leases.", "All active leases"),
+        let (none, heading) = if self.extras.all {
+            ("No active leases.", "All active leases")
+        } else {
+            ("No active leases found.", "Active leases")
         };
         if self.items.is_empty() {
             return format!("{none}\n");
