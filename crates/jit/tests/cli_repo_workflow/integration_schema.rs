@@ -100,7 +100,11 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
                     .keys()
                     .cloned()
                     .collect::<std::collections::BTreeSet<_>>(),
-                std::collections::BTreeSet::from(["count".to_string(), "profiles".to_string()]),
+                std::collections::BTreeSet::from([
+                    "count".to_string(),
+                    "profiles".to_string(),
+                    "warnings".to_string()
+                ]),
                 "profile {command} must use the shared collection envelope"
             );
         }

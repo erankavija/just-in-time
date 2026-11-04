@@ -33,8 +33,8 @@ impl<T: Serialize + HumanRender> Report for T {
 
 /// Render `outcome` under `mode` and return the process exit status.
 ///
-/// Success writes the success envelope with the outcome's `message`
-/// (`--json`) or the response's human rendering to `out`, then, in human
+/// Success writes the success envelope with the outcome's `message` and
+/// non-empty `warnings` (`--json`) or the response's human rendering to `out`, then, in human
 /// non-quiet mode, one `Warning: <w>` line per outcome warning to `err`, and
 /// returns [`ExitCode::Success`]. Findings write the failure envelope with the report
 /// as `error.details` (`--json`), or the report's rendering to `out` and the
@@ -48,11 +48,14 @@ pub fn emit_outcome<R: Response>(
 ) -> anyhow::Result<ExitCode> {
     let (written, status) = match outcome {
         Outcome::Success {
-            response, message, ..
+            response,
+            message,
+            warnings,
         } if mode.json => {
             let envelope = JsonOutput {
                 data: response,
                 message: message.clone(),
+                warnings: warnings.clone(),
             };
             (
                 writeln!(out, "{}", envelope.to_json_string()?),
@@ -150,6 +153,32 @@ mod tests {
         let printed: serde_json::Value = serde_json::from_slice(&out).unwrap();
         assert_eq!(printed["message"], "done");
         assert_eq!(printed["name"], "n");
+    }
+
+    #[test]
+    fn test_emit_outcome_success_json_lists_warnings_only_when_present() {
+        #[derive(Serialize, JsonSchema)]
+        struct Object {}
+        impl HumanRender for Object {
+            fn render_human(&self, _: OutputMode) -> String {
+                String::new()
+            }
+        }
+        let json = OutputMode {
+            json: true,
+            quiet: false,
+        };
+        let printed = |outcome: &Outcome<Object>| {
+            let mut out = Vec::new();
+            emit_outcome(outcome, json, &mut out, &mut io::sink()).unwrap();
+            serde_json::from_slice::<serde_json::Value>(&out).unwrap()
+        };
+
+        let warned = printed(&Outcome::success(Object {}).with_warnings(["a", "b"]));
+        let clean = printed(&Outcome::success(Object {}));
+
+        assert_eq!(warned["warnings"], serde_json::json!(["a", "b"]));
+        assert!(clean.get("warnings").is_none());
     }
 
     #[test]

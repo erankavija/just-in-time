@@ -256,7 +256,7 @@ fn test_executor_free_form_dispatches_with_output_mode_and_registers_schema() {
 
     assert_eq!(
         serde_json::from_str::<Value>(&json.out).unwrap(),
-        json!({ "word": "hi" })
+        json!({ "word": "hi", "warnings": ["careful"] })
     );
     assert!(json.err.is_empty());
     assert_eq!(status, ExitCode::Success);
@@ -286,8 +286,14 @@ fn test_single_leaf_form_registers_args_and_unit_variants_with_and_without_an_ex
     let (exec_unit, _) = captured(|o, e| with_executor::single_unit::dispatch((), &ctx, o, e));
 
     let printed = |run: &Run| serde_json::from_str::<Value>(&run.out).unwrap();
-    assert_eq!(printed(&free_args), json!({ "word": "w" }));
-    assert_eq!(printed(&exec_args), json!({ "word": "w" }));
+    assert_eq!(
+        printed(&free_args),
+        json!({ "word": "w", "warnings": ["careful"] })
+    );
+    assert_eq!(
+        printed(&exec_args),
+        json!({ "word": "w", "warnings": ["careful"] })
+    );
     assert_eq!(
         printed(&free_unit),
         json!({ "issues": 0, "message": "pong" })

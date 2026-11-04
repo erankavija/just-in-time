@@ -13,7 +13,7 @@
 //! status in `main()`. Handlers build successes with [`Outcome::success`] and
 //! [`Outcome::success_with`]; a `message` becomes the `--json` envelope's
 //! top-level `message`, and [`Outcome::with_warnings`] attaches warnings the
-//! emitter renders. Handlers resolve issue-id arguments with
+//! emitter renders (human) or lists (`--json`). Handlers resolve issue-id arguments with
 //! [`resolve_issue`].
 
 use crate::commands::CommandExecutor;
@@ -32,8 +32,8 @@ pub struct CommandContext<'a, S: IssueStore> {
 pub enum Outcome<R> {
     /// `message`, when present, is the `--json` success envelope's top-level
     /// `message`; the human rendering ignores it. `warnings` print as
-    /// `Warning:` lines on stderr in human, non-quiet mode and are dropped
-    /// otherwise.
+    /// `Warning:` lines on stderr in human, non-quiet mode; under `--json`,
+    /// non-empty `warnings` are the envelope's top-level `warnings` array.
     Success {
         response: R,
         message: Option<String>,
