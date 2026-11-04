@@ -424,9 +424,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 // parsed once, with the strict reader, and handed back with the
                 // image. Validation parses the overlaid set leniently and reports
                 // defects as findings; it keeps each record's JSON value for
-                // record fidelity.
+                // record fidelity. Repair derives from the declarations alone and
+                // decodes no record.
                 let (parsed, values) = if mutation {
                     (super::captured_active_issues(image)?, Vec::new())
+                } else if matches!(purpose, BaseCapturePurpose::Repair) {
+                    (Vec::new(), Vec::new())
                 } else {
                     // Effective bytes: the override (create/replace or proposed
                     // absence) when present, otherwise the captured base bytes.
@@ -2432,6 +2435,38 @@ mod tests {
             format!("{error:#}").contains("index.json"),
             "missing index must fail through captured-image validation: {error:#}"
         );
+    }
+
+    #[test]
+    fn test_repair_derived_state_plans_without_decoding_issue_records() {
+        let (repo, storage, taxonomy) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let jit_dir = repo.path().join(".jit");
+        let config = format!(
+            "{}\n\
+            {}\n\
+            [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n",
+            taxonomy.config_fragment(),
+            crate::test_utils::shipped_item_kinds_toml()
+        );
+        std::fs::write(jit_dir.join("config.toml"), config).unwrap();
+        std::fs::write(
+            repo.path().join("AGENTS.md"),
+            "# Doc\n\n<!-- jit:invariants:begin -->\nSTALE\n<!-- jit:invariants:end -->\n",
+        )
+        .unwrap();
+        // An undecodable record: planning that decoded it would fail.
+        std::fs::write(
+            jit_dir.join(format!("issues/{}.json", crate::test_utils::issue_id(1))),
+            "{",
+        )
+        .unwrap();
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
+
+        let (repaired, _) = executor.validation().repair_derived_state(true).unwrap();
+
+        assert!(repaired >= 1, "the stale projection region must be planned");
     }
 
     #[test]
