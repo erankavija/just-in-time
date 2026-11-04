@@ -5047,7 +5047,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 ));
             }
 
-            let id = id.map(|id| resolve_issue(&storage, &id)).transpose()?;
+            let id = id.map(|id| id.parse::<IssueIdPrefix>()).transpose()?;
 
             // --scope path: evaluate the container's bracket subtree as a
             // deterministic gate checker. Exit 4 (ValidationFailed) on any
@@ -5091,7 +5091,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             // positional issue as its sole firing subject. The command keeps the
             // same report and exit contract as per-issue validation.
             if let (Some(rule_name), Some(issue_id)) = (rule.as_deref(), id.as_ref()) {
-                let report = executor.validation().validate_rule(issue_id, rule_name)?;
+                let issue_id = resolve_issue(&storage, issue_id.as_str())?;
+                let report = executor.validation().validate_rule(&issue_id, rule_name)?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -5131,7 +5132,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
 
             // --explain path: report matched selectors -> rule names -> outcomes.
             if let (true, Some(issue_id)) = (explain, id.as_ref()) {
-                let report = executor.validation().explain_rules(issue_id)?;
+                let report = executor
+                    .validation()
+                    .selection_report()?
+                    .explain(issue_id)?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
@@ -5196,8 +5200,11 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             // Per-issue rule run: `jit validate <id>`. Incompatible flag combos
             // (`--fix`/`--branch-drift`/`--leases` + id) were already rejected above,
             // so a present id here is always a pure per-issue rule run.
-            if id.is_some() {
-                let report = executor.validation().run_rules(id.as_ref())?;
+            if let Some(issue_id) = id {
+                let report = executor
+                    .validation()
+                    .selection_report()?
+                    .select(&jit::validation::report::Selection::Issue(issue_id))?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;
