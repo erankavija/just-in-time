@@ -23474,3 +23474,8 @@
 {"assignee":"agent:worker","id":"f910a9ed-5796-4b61-96a0-f274abef6e05","issue_id":"5e1ba005-b066-4473-9a23-d414a17038c7","timestamp":"2026-11-04T02:11:18.833120692Z","type":"issue_claimed"}
 {"id":"94ea541e-b2b8-4e9b-b942-4f183debc75c","issue_id":"26307dfd-9eac-4f43-90dd-183ad38d1814","priority":"normal","timestamp":"2026-11-04T02:11:28.470668322Z","title":"mcp-ci tests the jit built from the commit under evaluation","type":"issue_created"}
 {"fields":["dependencies"],"id":"a0ab44b0-7f07-4301-a227-050f47c07814","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-11-04T02:11:34.123552209Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:9876a23a-lead","id":"d4a8b253-bc76-41d5-a018-b5af2fca4872","issue_id":"6ba4f623-99fb-420a-9c47-3f3655db3815","timestamp":"2026-11-04T02:15:29.095800072Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"734029b0-0563-4584-a10d-9b80280ee0df","issue_id":"b23faa59-8451-4fc4-97b8-a139d1b210e6","timestamp":"2026-11-04T02:17:17.303806828Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"3f7e44e8-ad30-4832-a0ba-477252b02d42","issue_id":"b23faa59-8451-4fc4-97b8-a139d1b210e6","timestamp":"2026-11-04T02:17:34.956984983Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"91bbde13-5814-4627-bdaa-38fb8b0812ae","issue_id":"b23faa59-8451-4fc4-97b8-a139d1b210e6","timestamp":"2026-11-04T02:17:58.727464570Z","type":"gate_failed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"6cb759a7-7560-4ea4-8840-d13d146a92ad","issue_id":"26307dfd-9eac-4f43-90dd-183ad38d1814","timestamp":"2026-11-04T02:18:55.212769826Z","type":"issue_updated","updated_by":"issue-update"}

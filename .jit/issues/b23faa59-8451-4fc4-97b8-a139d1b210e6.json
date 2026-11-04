@@ -14,7 +14,20 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c51b293a-6fa8-41df-b536-2c64aa8a47c9",
+      "status": "passed",
+      "updated_at": "2026-11-04T02:17:17.303806828Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "78a7a267-5eb3-4edc-b520-7491c03bda48",
+      "status": "failed",
+      "updated_at": "2026-11-04T02:17:58.727464570Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b23faa59-8451-4fc4-97b8-a139d1b210e6",
   "labels": [
     "type:task",
@@ -32,5 +45,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Invariant command moves to a library handler",
-  "updated_at": "2026-11-03T23:14:58.568306433Z"
+  "updated_at": "2026-11-04T02:17:58.727464570Z"
 }
