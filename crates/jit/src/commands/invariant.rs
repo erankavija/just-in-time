@@ -18,6 +18,7 @@ pub enum FindingsKey {}
 
 impl CollectionKey for FindingsKey {
     const KEY: &'static str = "findings";
+    const SCHEMA_NAME: Option<&'static str> = Some("InvariantCheckResult");
 }
 
 /// Result of a `jit invariant check` enforcement-drift run: every
