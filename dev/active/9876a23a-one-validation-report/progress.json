@@ -207,23 +207,33 @@
         {
           "short_id": "2c8c13b2",
           "classification": "implementation",
-          "status": "landing (eae1c56a2, -166)",
+          "status": "done 87b38351c (-166)",
           "worker": "claude opus",
           "worker_reason": "adds the shared capture-and-report function; DEC-19"
         },
         {
           "short_id": "728ecfb0",
           "classification": "implementation",
-          "status": "reviewed d9ff90562; landing after pipeline edit",
+          "status": "done d95ef1858 (0)",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "property test with independent oracle"
         },
         {
           "short_id": "1f24e3e9",
           "classification": "implementation",
-          "status": "rework 2 (duplicate config load; accumulator growth: r1 +67, cumulative -42)",
+          "status": "landed 9af61dd1f (-61); cargo-ci re-run (42 s budget overrun was host noise: 728ecfb0 gate on the same tree 18.2 s)",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "multi-file fix derivation over one capture"
+        },
+        {
+          "short_id": "86f7e6eb",
+          "status": "landing (-5)",
+          "worker": "codex gpt-6-luna xhigh"
+        },
+        {
+          "short_id": "208edf4c",
+          "status": "reviewed (-100; D-02, REQ-05); lands after 86f7e6eb",
+          "worker": "claude opus"
         }
       ]
     }
@@ -390,7 +400,8 @@
     "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch",
     "jit-server graceful_shutdown_tests::test_the_drain_assertion_rejects_a_server_that_force_closes_early failed once under load ~10 (5d5a1794 CI); passes alone",
     "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording.",
-    "2b5f452c: issue records now decode bytes->Value->Issue once; a duplicated JSON key in a record now loads (last wins) instead of failing, and field-type errors lose line/column. Accepted (no criterion); flag to steward."
+    "2b5f452c: issue records now decode bytes->Value->Issue once; a duplicated JSON key in a record now loads (last wins) instead of failing, and field-type errors lose line/column. Accepted (no criterion); flag to steward.",
+    "728ecfb0 selection proptest: per the 208edf4c worker, about 23 of 24 random images fail the integrity pass first, so the oracle rarely sees a structurally clean report; check against story b3ef68b5 REQ-04 before its gate."
   ],
   "started_at": "2026-11-03T23:40:00+02:00",
   "rejected": [
