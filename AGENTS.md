@@ -93,7 +93,7 @@ Test names follow `test_<function>_<scenario>` and describe the scenario in full
 - **Naming** — Verbs for actions (`add_dependency`, `claim_issue`), `is_`/`has_` for predicates (`is_blocked`, `has_passing_gates`).
 - **Comments and rustdoc** — Terse, and limited to what is essential to understand the code (`@/inv/essential-code-prose`): purpose and material contracts, including relevant errors and invariants. Add an example only when it clarifies non-obvious behavior; prefer one type- or module-level walkthrough over repetitive method examples.
 - **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
-- **Git is optional** — Core jit commands must work without Git; claims and leases are the documented exception (`@/charter/D-4`).
+- **Git is optional** — Core tracker operations work without Git. Claims and leases require Git for worktree coordination, and `jit hooks install` requires a Git checkout (`@/charter/D-4`, `@/charter/D-24`).
 
 ## Charter Decisions
 

@@ -454,10 +454,8 @@ packages were applied: once applied, every value is repository content.
 
 These repository-state guarantees do not change Git requirements. Core commands,
 including init, profile application, project rendering, and validation, work
-without Git. Claim leases remain the documented exception: their shared
-coordination state lives in the Git control plane the [Storage
-Format](storage-format.md) reference specifies, so claim acquire/renew/release
-require a Git repository. Profiles do not add or alter that lease surface.
+without Git. Profiles do not add or alter the documented Git requirements; see
+the canonical [Git Optional](../concepts/guarantees.md#git-optional) guarantee.
 
 ## Advanced customization
 
