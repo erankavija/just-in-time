@@ -3,6 +3,7 @@
 //! This backend stores all data in RAM using HashMaps, providing 10-100x faster
 //! test execution compared to JSON file I/O. Thread-safe for concurrent access.
 
+use super::gate_run_reader::TreeNode;
 use crate::declarations::{parse_gate_registry, GateRegistry};
 use crate::domain::artifact_execution::ArchiveEvidenceRecord;
 use crate::domain::artifact_plan::PlanTarget;
@@ -15,9 +16,9 @@ use crate::repository_state::{
 };
 use crate::storage::redo_apply::{check_interruption, occupied_directory};
 use crate::storage::{
-    EventAppend, GateRunNotFoundError, IssueNotFoundError, IssueStore, PresetNotFoundError,
-    PutFile, RedoApplyError, RedoInterruptionInjector, RedoPoint, RedoRecord, RepoWriteGuard,
-    RepoWriteLock, RepositoryStateStoreError,
+    EventAppend, IssueNotFoundError, IssueStore, PresetNotFoundError, PutFile, RedoApplyError,
+    RedoInterruptionInjector, RedoPoint, RedoRecord, RepoWriteGuard, RepoWriteLock,
+    RepositoryStateStoreError,
 };
 use anyhow::{anyhow, Context, Result};
 use std::collections::BTreeMap;
@@ -300,7 +301,20 @@ impl InMemoryStorage {
         vpath: VirtualPath,
         content: &[u8],
     ) -> Result<(), crate::storage::PathReadError> {
-        use crate::repository_state::{FileMode, RepositoryEntry};
+        self.insert_repo_entry(vpath, content, |content| RepositoryEntry::File {
+            content,
+            mode: FileMode::Regular,
+        })
+    }
+
+    /// Store the entry `entry` builds from `content`'s captured bytes at `vpath`,
+    /// modelling the data root and every ancestor directory.
+    fn insert_repo_entry(
+        &self,
+        vpath: VirtualPath,
+        content: &[u8],
+        entry: impl FnOnce(CapturedBytes) -> RepositoryEntry,
+    ) -> Result<(), crate::storage::PathReadError> {
         self.repository_layout()
             .ensure_canonical(&vpath)
             .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
@@ -318,14 +332,32 @@ impl InMemoryStorage {
             Self::mark_data_root_existing(&mut state);
         }
         Self::ensure_ancestor_dirs(&mut state, &vpath);
-        state.entries.insert(
-            vpath,
-            RepositoryEntry::File {
-                content,
-                mode: FileMode::Regular,
-            },
-        );
+        state.entries.insert(vpath, entry(content));
         Ok(())
+    }
+
+    /// Seed an object of a kind no repository path holds (a FIFO, a socket) at
+    /// `path`.
+    #[cfg(test)]
+    pub(crate) fn add_repository_special(&self, path: VirtualPath) {
+        self.insert_repo_entry(path, b"special", |object| RepositoryEntry::Unsupported {
+            identity: object.identity().clone(),
+            reason: "special object".to_string(),
+            mode: FileMode::Regular,
+        })
+        .expect("add_repository_special requires a canonical repository path");
+    }
+
+    /// Seed a symlink at `path` whose link text names `target`.
+    #[cfg(test)]
+    pub(crate) fn add_repository_symlink(&self, path: VirtualPath, target: &VirtualPath) {
+        self.insert_repo_entry(path, target.repository_relative().as_bytes(), |target| {
+            RepositoryEntry::Symlink {
+                target,
+                mode: FileMode::Regular,
+            }
+        })
+        .expect("add_repository_symlink requires a canonical repository path");
     }
 
     /// Seed an in-memory data-root file at `relative` with `content`.
@@ -367,26 +399,6 @@ impl InMemoryStorage {
         id
     }
 
-    /// The id of the gate-run directory at `vpath`, if it is one.
-    fn gate_run_directory_id(vpath: &VirtualPath) -> Option<GateRunId> {
-        let run_id = GateRunId::try_from(vpath.file_name()?).ok()?;
-        (&VirtualPath::gate_run_directory(&run_id) == vpath).then_some(run_id)
-    }
-
-    fn gate_run_parent_is_directory(
-        state: &MemoryRepositoryState,
-        path: &VirtualPath,
-    ) -> Result<bool> {
-        match state.entries.get(path) {
-            None | Some(RepositoryEntry::Absent) => Ok(false),
-            Some(RepositoryEntry::Directory { .. }) => Ok(true),
-            Some(_) => anyhow::bail!(
-                "Gate run directory at {} must be an ordinary directory",
-                path.relative().as_path().display()
-            ),
-        }
-    }
-
     /// Model a `Directory` entry for every ancestor of `vpath` up to (but not
     /// including) the data root, so the aggregate image reflects the directory
     /// tree a real repository carries. A mutation session verifies that
@@ -421,8 +433,8 @@ impl InMemoryStorage {
 
     /// Enumerate the captured `Data(...)` file entries whose relative path lies
     /// directly under `dir` (one segment deep) and ends with `suffix`, returning
-    /// `(leaf, bytes)` for each. Backs the issue and gate-run scans without a
-    /// parallel typed index.
+    /// `(leaf, bytes)` for each. Backs the issue scan without a parallel typed
+    /// index.
     fn data_files_in<'a>(
         state: &'a MemoryRepositoryState,
         dir: &'a str,
@@ -747,62 +759,72 @@ impl Default for InMemoryStorage {
     }
 }
 
-impl InMemoryStorage {
-    /// Read every recorded gate run the predicate keeps.
-    ///
-    /// One enumeration of the gate-run entries behind every whole-history
-    /// question, matching the file backend's own
-    /// (`@/invariant/convention-convergence`).
-    fn read_gate_runs(
-        &self,
-        mut keep: impl FnMut(&GateRunResult) -> bool,
-    ) -> Result<Vec<GateRunResult>> {
+impl super::gate_run_reader::GateRunTree for InMemoryStorage {
+    fn list_directory(&self, directory: &VirtualPath) -> Result<TreeNode<Vec<String>>> {
         let state = self.repository_state();
-        if !Self::gate_run_parent_is_directory(&state, &VirtualPath::GATE_RUNS)? {
-            return Ok(Vec::new());
-        }
-        let run_ids = state
-            .entries
-            .iter()
-            .filter_map(|(vpath, entry)| match entry {
-                RepositoryEntry::Directory { .. } => Self::gate_run_directory_id(vpath),
-                RepositoryEntry::Absent
-                | RepositoryEntry::File { .. }
-                | RepositoryEntry::FileTail { .. }
-                | RepositoryEntry::FileKind { .. }
-                | RepositoryEntry::Symlink { .. }
-                | RepositoryEntry::Unsupported { .. } => None,
-            })
-            .collect::<Vec<_>>();
-        run_ids
-            .into_iter()
-            .filter_map(|run_id| {
-                let vpath = VirtualPath::gate_run_record(&run_id);
-                match state.entries.get(&vpath) {
-                    None | Some(RepositoryEntry::Absent) => None,
-                    Some(RepositoryEntry::File { content, .. }) => Some(
-                        serde_json::from_slice::<GateRunResult>(content.bytes()).with_context(
-                            || {
-                                format!(
-                                    "Failed to deserialize gate-run result at {}",
-                                    vpath.relative().as_path().display()
-                                )
-                            },
-                        ),
-                    ),
-                    Some(_) => Some(Err(anyhow!(
-                        "Gate run result at {} must be an ordinary file",
-                        vpath.relative().as_path().display()
-                    ))),
-                }
-            })
-            .filter_map(|result| match result {
-                Ok(run) if keep(&run) => Some(Ok(run)),
-                Ok(_) => None,
-                Err(error) => Some(Err(error)),
-            })
-            .collect()
+        Ok(match entry_without_following(&state, directory) {
+            TreeNode::Present(RepositoryEntry::Directory { .. }) => TreeNode::Present(
+                state
+                    .entries
+                    .iter()
+                    .filter(|(path, entry)| {
+                        path.root_class() == directory.root_class()
+                            && path.relative().as_path().parent()
+                                == Some(directory.relative().as_path())
+                            && !matches!(entry, RepositoryEntry::Absent)
+                    })
+                    .filter_map(|(path, _)| path.file_name().map(str::to_owned))
+                    .collect(),
+            ),
+            TreeNode::Present(_) | TreeNode::OtherKind => TreeNode::OtherKind,
+            TreeNode::Absent => TreeNode::Absent,
+        })
     }
+
+    fn read_regular_file(&self, file: &VirtualPath) -> Result<TreeNode<Vec<u8>>> {
+        Ok(
+            match entry_without_following(&self.repository_state(), file) {
+                TreeNode::Present(RepositoryEntry::File { content, .. }) => {
+                    TreeNode::Present(content.bytes().to_vec())
+                }
+                TreeNode::Present(_) | TreeNode::OtherKind => TreeNode::OtherKind,
+                TreeNode::Absent => TreeNode::Absent,
+            },
+        )
+    }
+}
+
+/// The entry at `path`, reached the way a no-follow walk reaches it: an absent
+/// ancestor hides it, and an ancestor other than a directory is another kind.
+fn entry_without_following<'a>(
+    state: &'a MemoryRepositoryState,
+    path: &VirtualPath,
+) -> TreeNode<&'a RepositoryEntry> {
+    let ancestor_kinds = path
+        .relative()
+        .as_path()
+        .ancestors()
+        .skip(1)
+        .filter(|ancestor| !ancestor.as_os_str().is_empty())
+        .map(|ancestor| {
+            RootRelativePath::parse(ancestor)
+                .and_then(|relative| VirtualPath::from_root(path.root_class(), relative))
+                .ok()
+                .and_then(|ancestor| state.entries.get(&ancestor))
+        })
+        .collect::<Vec<_>>();
+    let blocked = ancestor_kinds
+        .into_iter()
+        .rev()
+        .find_map(|entry| match entry {
+            Some(RepositoryEntry::Directory { .. }) => None,
+            None | Some(RepositoryEntry::Absent) => Some(TreeNode::Absent),
+            Some(_) => Some(TreeNode::OtherKind),
+        });
+    blocked.unwrap_or_else(|| match state.entries.get(path) {
+        None | Some(RepositoryEntry::Absent) => TreeNode::Absent,
+        Some(entry) => TreeNode::Present(entry),
+    })
 }
 
 impl IssueStore for InMemoryStorage {
@@ -889,38 +911,11 @@ impl IssueStore for InMemoryStorage {
         issue_id: &IssueId,
         run_id: &GateRunId,
     ) -> Result<GateRunResult> {
-        let path = VirtualPath::gate_run_record(run_id);
-        let run_dir = VirtualPath::gate_run_directory(run_id);
-        let state = self.repository_state();
-        if !Self::gate_run_parent_is_directory(&state, &VirtualPath::GATE_RUNS)?
-            || !Self::gate_run_parent_is_directory(&state, &run_dir)?
-        {
-            return Err(GateRunNotFoundError::new(run_id.clone()).into());
-        }
-        let result: GateRunResult = match state.entries.get(&path) {
-            None | Some(RepositoryEntry::Absent) => {
-                Err(GateRunNotFoundError::new(run_id.clone()).into())
-            }
-            Some(RepositoryEntry::File { content, .. }) => serde_json::from_slice(content.bytes())
-                .with_context(|| {
-                    format!(
-                        "Failed to deserialize gate-run result at {}",
-                        path.relative().as_path().display()
-                    )
-                }),
-            Some(_) => anyhow::bail!(
-                "Gate run result at {} must be an ordinary file",
-                path.relative().as_path().display()
-            ),
-        }?;
-        if &result.issue_id != issue_id {
-            return Err(GateRunNotFoundError::new(run_id.clone()).into());
-        }
-        Ok(result)
+        super::gate_run_reader::load_gate_run_result(self, issue_id, run_id)
     }
 
     fn list_gate_runs_for_issue(&self, issue_id: &IssueId) -> Result<Vec<GateRunResult>> {
-        self.read_gate_runs(|result| &result.issue_id == issue_id)
+        super::gate_run_reader::list_gate_runs_for_issue(self, issue_id)
     }
 
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
@@ -1004,91 +999,6 @@ impl IssueStore for InMemoryStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn gate_run_parent_entry(kind: &str) -> RepositoryEntry {
-        let identity =
-            || EntryIdentity::for_bytes(format!("parent-{kind}"), kind.as_bytes()).unwrap();
-        let captured =
-            |bytes: &[u8]| CapturedBytes::new(format!("parent-{kind}"), bytes.to_vec()).unwrap();
-        match kind {
-            "absent" => RepositoryEntry::Absent,
-            "directory" => RepositoryEntry::Directory {
-                identity: identity(),
-                mode: FileMode::Executable,
-            },
-            "symlink" => RepositoryEntry::Symlink {
-                target: captured(b"elsewhere"),
-                mode: FileMode::Regular,
-            },
-            "unsupported" => RepositoryEntry::Unsupported {
-                identity: identity(),
-                reason: "special object".to_string(),
-                mode: FileMode::Regular,
-            },
-            _ => unreachable!("test parent kind is closed"),
-        }
-    }
-
-    #[test]
-    fn test_gate_run_readers_validate_gate_runs_root_parent_kinds() {
-        for kind in ["absent", "symlink", "unsupported"] {
-            let storage = InMemoryStorage::new();
-            storage
-                .repository_state()
-                .entries
-                .insert(VirtualPath::GATE_RUNS, gate_run_parent_entry(kind));
-
-            let loaded = storage.load_gate_run_result(
-                &crate::test_utils::issue_id(2),
-                &crate::test_utils::gate_run_id(1),
-            );
-            let listed = storage.list_gate_runs_for_issue(&crate::test_utils::issue_id(2));
-            if kind == "absent" {
-                assert!(loaded
-                    .unwrap_err()
-                    .downcast_ref::<GateRunNotFoundError>()
-                    .is_some());
-                assert!(listed.unwrap().is_empty());
-            } else {
-                assert!(format!("{:#}", loaded.unwrap_err()).contains("ordinary directory"));
-                assert!(format!("{:#}", listed.unwrap_err()).contains("ordinary directory"));
-            }
-        }
-    }
-
-    #[test]
-    fn test_gate_run_readers_validate_canonical_run_directory_parent_kinds() {
-        for kind in ["absent", "directory", "symlink", "unsupported"] {
-            let storage = InMemoryStorage::new();
-            let root = VirtualPath::GATE_RUNS;
-            let run_dir = VirtualPath::gate_run_directory(&crate::test_utils::gate_run_id(1));
-            let mut state = storage.repository_state();
-            state
-                .entries
-                .insert(root, gate_run_parent_entry("directory"));
-            state.entries.insert(run_dir, gate_run_parent_entry(kind));
-            drop(state);
-
-            let loaded = storage.load_gate_run_result(
-                &crate::test_utils::issue_id(2),
-                &crate::test_utils::gate_run_id(1),
-            );
-            let listed = storage.list_gate_runs_for_issue(&crate::test_utils::issue_id(2));
-            if matches!(kind, "absent" | "directory") {
-                assert!(loaded
-                    .unwrap_err()
-                    .downcast_ref::<GateRunNotFoundError>()
-                    .is_some());
-                assert!(listed.unwrap().is_empty());
-            } else {
-                assert!(format!("{:#}", loaded.unwrap_err()).contains("ordinary directory"));
-                assert!(
-                    listed.unwrap().is_empty(),
-                    "non-directory direct gate-runs children are ignored as root clutter"
-                );
-            }
-        }
-    }
 
     #[test]
     fn test_unseeded_store_models_absent_root_seeding_marks_existing() {

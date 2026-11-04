@@ -19,7 +19,6 @@ enum BaseCapturePurpose<'a> {
 }
 
 struct CapturedRepairPlan {
-    image: crate::repository_state::RepositoryImage,
     declarations: crate::repository_state::CapturedRepositoryDeclarations,
     plan: Option<crate::repository_state::MaterializationPlan>,
 }
@@ -118,13 +117,16 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
     ///
     /// Declaration and rule passes share the repair image; document references
     /// resolve in separate bounded images under the same session. Every pass
-    /// reads captured evidence, with the repair plan supplying derived-state
-    /// expectations for validation and `--fix`.
+    /// reads captured evidence.
     pub fn validate_silent(&self) -> Result<()> {
-        let report = self.capture_validation_report()?.0?;
-        if report.rule_report.has_errors() {
-            let messages = report
-                .rule_report
+        let (failure, rule_report) = self.validate_repository_report()?.into_parts();
+        if let Some(error) = failure {
+            // Callers render only the outermost message; it carries every cause.
+            let message = format!("{error:#}");
+            return Err(error.context(message));
+        }
+        if rule_report.has_errors() {
+            let messages = rule_report
                 .findings
                 .iter()
                 .filter(|finding| finding.is_error())
@@ -133,7 +135,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 .join("\n");
             return Err(anyhow!(
                 "Validation failed with {} rule error(s):\n{}",
-                report.rule_report.error_count(),
+                rule_report.error_count(),
                 messages
             ));
         }
@@ -159,7 +161,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// it covers what the proposed state's passes read — the base is captured over
     /// that closure, and the overlay is applied
     /// ([`apply_overlay`](crate::repository_state::apply_overlay)) so
-    /// `validate_repository` judges one coherent proposed repository under the same
+    /// the validation report judges one coherent proposed repository under the same
     /// closed-read discipline.
     pub(crate) fn capture_validation_image_with(
         &self,
@@ -380,7 +382,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             // the capture, because validation itself is the authority that
             // reports it. A bad config/listing/rules yields a conservative closure
             // (its projection, item-kind, issue, and schema entries drop out),
-            // and the subsequent `validate_repository` pass surfaces the parse
+            // and the subsequent validation report surfaces the parse
             // error as a finding.
             let config = effective_config(image, &effective_virtual_path)
                 .unwrap_or_else(|_| empty_materialization_config());
@@ -459,22 +461,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> {
-    /// Capture the validation image and return the full whole-repository report.
-    ///
-    /// The outer `Result` carries a capture/IO failure; the inner result is the
-    /// validation outcome — `Ok(report)` when clean, or the
-    /// [`RepositoryValidationFailure`](crate::validation::repository::RepositoryValidationFailure)
-    /// carrying its structural error and partial report. Rendering callers (the
-    /// `validate` command's non-fix path) consume the report's warnings and rule
-    /// findings even on failure.
-    pub fn validate_repository_report(
-        &self,
-    ) -> Result<
-        std::result::Result<
-            crate::validation::repository::RepositoryValidationReport,
-            crate::validation::repository::RepositoryValidationFailure,
-        >,
-    > {
+    /// Capture the validation image and compute its whole-repository report.
+    pub fn validate_repository_report(&self) -> Result<crate::validation::ValidationReport> {
         Ok(self.capture_validation_report()?.0)
     }
 
@@ -482,10 +470,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
     pub fn validate_repository_report_with_divergences(
         &self,
     ) -> Result<(
-        std::result::Result<
-            crate::validation::repository::RepositoryValidationReport,
-            crate::validation::repository::RepositoryValidationFailure,
-        >,
+        crate::validation::ValidationReport,
         crate::output::DivergenceResponse,
     )> {
         self.capture_validation_report()
@@ -494,10 +479,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
     fn capture_validation_report(
         &self,
     ) -> Result<(
-        std::result::Result<
-            crate::validation::repository::RepositoryValidationReport,
-            crate::validation::repository::RepositoryValidationFailure,
-        >,
+        crate::validation::ValidationReport,
         crate::output::DivergenceResponse,
     )> {
         let layout = self.exec.require_layout()?;
@@ -506,50 +488,45 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
             &layout,
             "repository validation",
             |session| {
-                let Some(derived) = self.capture_repair_plan(session)? else {
+                let Some(image) = self.capture_repair_base(session)? else {
                     return Ok(SessionStep::Retry);
-                };
-                let mut captured = match derived {
-                    Ok(derived) => derived,
-                    Err(failure) => {
-                        return Ok(SessionStep::Done((
-                            Err(failure),
-                            crate::output::DivergenceResponse::new(Vec::new()),
-                        )));
-                    }
                 };
                 let Some(image) = self.exec.capture_proposed_base(
                     session,
                     &std::collections::BTreeMap::new(),
                     &[],
-                    Some(captured.image),
+                    Some(image),
                 )?
                 else {
                     return Ok(SessionStep::Retry);
                 };
-                captured.image = image;
                 let divergences =
-                    captured_divergences(&captured.image, captured.declarations.config())
+                    crate::repository_state::validation_declarations_from_image(&image)
+                        .map_err(anyhow::Error::from)
+                        .and_then(|declarations| {
+                            captured_divergences(&image, declarations.config())
+                        })
                         .unwrap_or_else(|_| crate::output::DivergenceResponse::new(Vec::new()));
-                let issues = captured_active_issues(&captured.image).unwrap_or_default();
+                let issues = captured_active_issues(&image).unwrap_or_default();
                 let Some(document_references) =
                     capture_document_reference_validation(session, &issues)?
                 else {
                     return Ok(SessionStep::Retry);
                 };
-                let Some(record_fidelity) =
-                    capture_record_fidelity_validation(session, &captured.image)?
+                let Some(record_fidelity) = capture_record_fidelity_validation(session, &image)?
                 else {
                     return Ok(SessionStep::Retry);
                 };
-                let report =
-                    crate::validation::repository::validate_repository_with_materializations(
-                        &captured.image,
-                        &captured.declarations,
-                        captured.plan.as_ref(),
-                        document_references,
-                        record_fidelity,
-                    );
+                let report = crate::validation::report(
+                    &crate::validation::CapturedValidation::from_image(&image),
+                    &crate::validation::ReportInputs {
+                        now: chrono::Utc::now(),
+                        history: Some(crate::validation::HistoryVerdicts {
+                            record_fidelity,
+                            document_references,
+                        }),
+                    },
+                );
                 Ok(SessionStep::Done((report, divergences)))
             },
         )
@@ -578,8 +555,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 let Some(derived) = self.capture_repair_plan(session)? else {
                     return Ok(SessionStep::Retry);
                 };
-                let mut captured = derived.map_err(|failure| {
-                    crate::errors::ValidationFailedError::new(failure.to_string())
+                let mut captured = derived.map_err(|error| {
+                    crate::errors::ValidationFailedError::new(format!("{error:#}"))
                 })?;
                 if let Some(error) = captured.declarations.take_rules_load_error() {
                     return Err(
@@ -619,32 +596,36 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         )
     }
 
-    /// Capture one complete validation closure and derive its exact repair plan.
+    /// Capture the repository's own validation closure: its registries, its
+    /// event log, and the paths they plan.
+    fn capture_repair_base(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
+        Ok(self
+            .exec
+            .capture_proposed_base_inner(
+                session,
+                None,
+                &std::collections::BTreeMap::new(),
+                &[],
+                BaseCapturePurpose::Repair,
+            )?
+            .map(|(image, _)| image))
+    }
+
+    /// Capture the repair base and derive its exact repair plan.
     ///
-    /// The closure is the repository's own: its registries, its event log, and
-    /// the paths they plan. Repair derives from the declarations alone, so it
-    /// restores what the repository declares and never a profile-owned target.
+    /// Repair derives from the declarations alone, so it restores what the
+    /// repository declares and never a profile-owned target. The inner `Err` is a
+    /// declaration or materialization failure.
     fn capture_repair_plan(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-    ) -> Result<
-        Option<
-            std::result::Result<
-                CapturedRepairPlan,
-                crate::validation::repository::RepositoryValidationFailure,
-            >,
-        >,
-    > {
+    ) -> Result<Option<Result<CapturedRepairPlan>>> {
         use crate::repository_state::{derive_materialization, MaterializationRequest};
 
-        let Some((image, _)) = self.exec.capture_proposed_base_inner(
-            session,
-            None,
-            &std::collections::BTreeMap::new(),
-            &[],
-            BaseCapturePurpose::Repair,
-        )?
-        else {
+        let Some(image) = self.capture_repair_base(session)? else {
             return Ok(None);
         };
         let declarations = match crate::repository_state::validation_declarations_from_image(&image)
@@ -652,35 +633,25 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
             Ok(declarations) => declarations,
             Err(error) => {
                 return Ok(Some(Err(
-                    crate::validation::repository::RepositoryValidationFailure::declaration(
-                        error.into(),
-                    ),
+                    anyhow!(error).context("declaration validation pass")
                 )))
             }
         };
-        let plan =
-            if declarations.rules_loaded() {
-                match derive_materialization(
+        let plan = declarations
+            .rules_loaded()
+            .then(|| {
+                derive_materialization(
                     &image,
                     MaterializationRequest::RepairDerivedState {
                         declarations: declarations.borrowed(),
                     },
-                ) {
-                    Ok(plan) => Some(plan),
-                    Err(error) => return Ok(Some(Err(
-                        crate::validation::repository::RepositoryValidationFailure::materialization(
-                            error.into(),
-                        ),
-                    ))),
-                }
-            } else {
-                None
-            };
-        Ok(Some(Ok(CapturedRepairPlan {
-            image,
-            declarations,
-            plan,
-        })))
+                )
+            })
+            .transpose();
+        Ok(Some(match plan {
+            Ok(plan) => Ok(CapturedRepairPlan { declarations, plan }),
+            Err(error) => Err(anyhow!(error).context("derived-materialization validation pass")),
+        }))
     }
 }
 
@@ -756,7 +727,7 @@ fn empty_materialization_config() -> JitConfig {
 ///
 /// Best-effort like the rest of closure planning: a malformed `templates.toml`
 /// yields an empty registry (no plan-document paths), and the subsequent
-/// `validate_repository` pass surfaces the parse error as a validation failure.
+/// validation report surfaces the parse error as a validation failure.
 fn effective_templates(
     image: &crate::repository_state::RepositoryImage,
     config: &JitConfig,
@@ -899,7 +870,7 @@ pub(super) fn discover_document_references<'a>(
 fn capture_document_reference_validation(
     session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
     issues: &[Issue],
-) -> Result<Option<Result<()>>> {
+) -> Result<Option<std::result::Result<(), String>>> {
     use crate::repository_state::CaptureSpec;
 
     for issue in issues {
@@ -912,7 +883,7 @@ fn capture_document_reference_validation(
             if let Some(reason) =
                 crate::document::resolve_document_reference(&image, document)?.unresolved()
             {
-                return Ok(Some(Err(anyhow!(
+                return Ok(Some(Err(format!(
                     "Invalid document reference in issue '{}': {reason}",
                     issue.id
                 ))));
@@ -929,7 +900,7 @@ fn capture_document_reference_validation(
 fn capture_record_fidelity_validation(
     session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
     image: &crate::repository_state::RepositoryImage,
-) -> Result<Option<Result<()>>> {
+) -> Result<Option<std::result::Result<(), String>>> {
     let spec = crate::repository_state::CaptureSpec::new([], MUTATION_CAPTURE_BUDGET)?;
     let Some(records) = super::capture_discovering(session, spec, |image, spec| {
         super::discover_gate_records(image, spec)?;
@@ -943,14 +914,11 @@ fn capture_record_fidelity_validation(
         crate::validation::record_fidelity::record_drift(image, &records, events.as_deref())?;
     Ok(Some(match drift.is_empty() {
         true => Ok(()),
-        false => Err(
-            crate::validation::repository::RepositoryJudgedInvalid(format!(
-                "{} stored record(s) do not reproduce what the writer would publish:\n  {}",
-                drift.len(),
-                drift.join("\n  ")
-            ))
-            .into(),
-        ),
+        false => Err(format!(
+            "{} stored record(s) do not reproduce what the writer would publish:\n  {}",
+            drift.len(),
+            drift.join("\n  ")
+        )),
     }))
 }
 
@@ -1001,7 +969,7 @@ fn plan_document_paths(
 /// Plan-document content for `emit_for` from a captured image, whose closure
 /// holds every path [`plan_document_paths`] derives; `all_issues` is the image's
 /// complete issue set. A missing or malformed configuration yields no plan
-/// documents, and `validate_repository` reports it.
+/// documents, and the validation report reports it.
 pub(crate) fn plan_content_with_issues(
     image: &crate::repository_state::RepositoryImage,
     all_issues: &[Issue],
@@ -1318,37 +1286,8 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         Ok(findings)
     }
 
-    /// Built-in validate pass: report enforcement drift between the invariant
-    /// registry and the declared rules/gates (REQ-01/REQ-02).
-    ///
-    /// This runs as part of every validate path — NOT behind an opt-in
-    /// `.jit/rules.toml` rule — mirroring
-    /// [`dangling_link_findings`](Self::dangling_link_findings). It is gated only
-    /// on the presence of declared invariants: when `.jit/invariants.toml` is
-    /// absent or empty the pass returns no findings (graceful degradation), so a
-    /// repository that declares no invariants — including the live repo — is
-    /// totally unaffected and `jit validate` surfaces nothing new.
-    ///
-    /// When invariants ARE declared, drift is reported as unattributed
-    /// [`GraphFinding`]s (drift pertains to the project's declarations, not a
-    /// single issue) via
-    /// [`compute_drift_findings`](crate::commands::ValidationOps::compute_drift_findings),
-    /// the SAME tolerant drift computation shared with
-    /// [`check_invariants`](crate::commands::ItemOps::check_invariants). The
-    /// sole direction is **declared-but-unenforced** — an invariant whose
-    /// `enforced-by` names a missing/unloadable rule or gate — emitted at
-    /// [`Severity::Error`](crate::declarations::rules::Severity::Error), so it FAILS
-    /// `jit validate` (the broken binding is a real defect). An unclaimed rule or
-    /// gate is NOT drift (the enforced-but-undeclared direction was removed in
-    /// REQ-05).
-    ///
-    /// The rule name on every finding is [`BuiltInPass::EnforcementDrift`]. A `rules.toml`
-    /// (or gate registry) load failure is tolerated, NOT propagated as an `Err`:
-    /// [`compute_drift_findings`](crate::commands::ValidationOps::compute_drift_findings)
-    /// resolves it defensively to
-    /// [`SourceState::Unloadable`](crate::validation::drift::SourceState::Unloadable),
-    /// so it surfaces as a declared-but-unenforced finding rather than aborting
-    /// validation.
+    /// Report unresolved invariant enforcement bindings as unattributed errors.
+    /// An unloadable rule set remains reportable; gate load errors propagate.
     pub fn enforcement_drift_findings(
         &self,
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
@@ -1372,23 +1311,8 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         Ok(findings)
     }
 
-    /// Compute the enforcement-drift findings, tolerating an unloadable rule set /
-    /// gate registry (REQ-01 "missing OR unloadable").
-    ///
-    /// This is the SINGLE drift computation shared by the built-in validate pass
-    /// ([`enforcement_drift_findings`](Self::enforcement_drift_findings), which
-    /// assigns per-direction severity) and the
-    /// [`check_invariants`](crate::commands::ItemOps::check_invariants)
-    /// command (which serializes the raw findings), so both surfaces report
-    /// IDENTICALLY. Returns an empty list when no invariants are declared (the
-    /// pass is dormant — a repo without `.jit/invariants.toml` is unaffected).
-    ///
-    /// Each enforcement SOURCE is loaded defensively: a parse/load failure is NOT
-    /// propagated (it would crash the run) but treated as
-    /// [`SourceState::Unloadable`](crate::validation::drift::SourceState::Unloadable),
-    /// so a binding into it surfaces as a declared-but-unenforced finding flagged
-    /// `unloadable` instead of an error. Only `cached_config` (the invariant
-    /// registry itself) can still error.
+    /// Compute drift with tolerant rule loading and strict gate loading.
+    /// Returns no findings when no invariants are declared.
     pub fn compute_drift_findings(&self) -> Result<Vec<crate::validation::drift::DriftFinding>> {
         use crate::validation::drift::{enforcement_drift, SourceState};
         use std::collections::BTreeSet;
@@ -1400,14 +1324,14 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             return Ok(Vec::new());
         }
 
-        // Defensive (tolerant) loads: a failure -> unloadable, not an error.
         let rule_names_owned = self.loadable_rule_names();
-        let gate_set: Option<BTreeSet<GateKey>> = self
+        let gate_set: BTreeSet<GateKey> = self
             .exec
             .storage
-            .load_gate_registry()
-            .ok()
-            .map(|registry| registry.gates.into_keys().collect());
+            .load_gate_registry()?
+            .gates
+            .into_keys()
+            .collect();
 
         let rule_set: Option<BTreeSet<&str>> = rule_names_owned
             .as_ref()
@@ -1417,12 +1341,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             Some(set) => SourceState::Loaded(set),
             None => SourceState::Unloadable,
         };
-        let gates_state = match &gate_set {
-            Some(set) => SourceState::Loaded(set),
-            None => SourceState::Unloadable,
-        };
-
-        Ok(enforcement_drift(invariants, rules_state, gates_state))
+        Ok(enforcement_drift(invariants, rules_state, &gate_set))
     }
 
     /// Defensively resolve the names of every LOADABLE rule, returning `None` when
@@ -1532,7 +1451,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         let image = self.exec.capture_validation_image()?;
-        // Undecodable issue records yield no plan content; `validate_repository`
+        // Undecodable issue records yield no plan content; the validation report
         // reports them.
         let all_issues = super::captured_active_issues(&image).unwrap_or_default();
         plan_content_with_issues(&image, &all_issues, emit_for)
@@ -3384,11 +3303,11 @@ depends_on = ["planning"]
             .unwrap()
             .expect("settled capture")
             .unwrap();
-        assert!(!captured.image.capture_spec().contains_path(
+        let plan = captured.plan.unwrap();
+        assert!(!plan.image().capture_spec().contains_path(
             &crate::repository_state::VirtualPath::worktree("receipts/large.log").unwrap()
         ));
-        assert!(captured.image.capture_spec().pinned().is_empty());
-        let plan = captured.plan.unwrap();
+        assert!(plan.image().capture_spec().pinned().is_empty());
         assert!(
             !plan.delta().actions().is_empty(),
             "the stale schema needs repair"

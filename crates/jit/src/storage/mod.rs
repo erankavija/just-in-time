@@ -20,6 +20,7 @@ pub(crate) mod contention_probe;
 pub mod discovery;
 pub mod errors;
 pub(crate) mod external_publish;
+pub(crate) mod gate_run_reader;
 pub mod gate_runs;
 pub mod gate_store;
 pub mod git;

@@ -434,7 +434,8 @@
     "f9bf70a5": 1,
     "dd53527f": 2,
     "2117739f": 1,
-    "2f563673": 1
+    "2f563673": 1,
+    "0851fae4": 1
   },
   "surfaced_pitfalls": [
     {
@@ -657,6 +658,12 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "archive preview reads evidence record; well-specified"
+    },
+    {
+      "id": "0851fae4-r1",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "code-review F1: unsupported-entry conformance cases"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",

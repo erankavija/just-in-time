@@ -170,11 +170,13 @@ fn test_scaffold_declaring_no_taxonomy_names_nothing_the_repository_did_not_decl
 fn test_scaffold_declaring_no_taxonomy_still_validates() {
     let (_temp, executor) = setup_test_repo_with_config(DECLARES_NOTHING).unwrap();
 
-    let report = executor
-        .validation()
-        .validate_repository_report()
-        .unwrap()
-        .expect("a repository declaring no taxonomy must validate");
+    let report = executor.validation().validate_repository_report().unwrap();
+
+    assert!(
+        report.structural_failure.is_none(),
+        "a repository declaring no taxonomy must validate: {:?}",
+        report.structural_failure,
+    );
 
     assert!(
         !report.rule_report.has_errors(),

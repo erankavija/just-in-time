@@ -460,11 +460,14 @@ fn omit_current_gate_projection(issue: &mut IssueShowResponse, gate_key: &GateKe
 fn repository_rule_report(
     image: &crate::repository_state::RepositoryImage,
 ) -> crate::validation::report::RuleReport {
-    let report = match crate::validation::repository::validate_repository(image) {
-        Ok(report) => report,
-        Err(error) => error.into_parts().1,
-    };
-    report.rule_report
+    crate::validation::report(
+        &crate::validation::CapturedValidation::from_image(image),
+        &crate::validation::ReportInputs {
+            now: chrono::Utc::now(),
+            history: None,
+        },
+    )
+    .rule_report
 }
 
 fn captured_issue_rule_report(
@@ -644,33 +647,29 @@ fn gate_findings_from_rule_report(
 /// findings. Failing to load or read what it needed, an unloadable rules declaration
 /// included, is a fault the checker cannot judge through, so it returns `Err`.
 fn gate_findings_from_report(
-    result: std::result::Result<
-        crate::validation::repository::RepositoryValidationReport,
-        crate::validation::repository::RepositoryValidationFailure,
-    >,
+    report: crate::validation::ValidationReport,
 ) -> Result<(Vec<GateFinding>, bool)> {
-    let report = match result {
-        Ok(report) => report,
-        Err(failure) if failure.is_judged_invalid() => {
-            let (error, report) = failure.into_parts();
-            let mut findings = gate_findings_from_rule_report(&report.rule_report);
-            findings.push(GateFinding::builtin(
-                "repository-invalid",
-                FindingSeverity::High,
-                FindingDisposition::Blocking,
-                FindingOrigin::PreExisting,
-                format!("{error:#}"),
-            ));
-            return Ok((findings, true));
-        }
-        Err(failure) => return Err(failure.into_error()),
-    };
-    if !report
+    let judged_invalid = report.is_judged_invalid();
+    let rules_loaded = report
         .passes
-        .contains(&crate::validation::repository::RepositoryValidationPass::RulesAndSchemas)
-    {
-        let causes = report
-            .rule_report
+        .contains(&crate::validation::repository::RepositoryValidationPass::RulesAndSchemas);
+    let (failure, rule_report) = report.into_parts();
+    if let Some(error) = failure {
+        if !judged_invalid {
+            return Err(error);
+        }
+        let mut findings = gate_findings_from_rule_report(&rule_report);
+        findings.push(GateFinding::builtin(
+            "repository-invalid",
+            FindingSeverity::High,
+            FindingDisposition::Blocking,
+            FindingOrigin::PreExisting,
+            format!("{error:#}"),
+        ));
+        return Ok((findings, true));
+    }
+    if !rules_loaded {
+        let causes = rule_report
             .findings
             .iter()
             .filter(|finding| finding.is_error())
@@ -679,8 +678,10 @@ fn gate_findings_from_report(
             .join("; ");
         anyhow::bail!("rules declaration did not load: {causes}");
     }
-    let failed = report.rule_report.has_errors();
-    Ok((gate_findings_from_rule_report(&report.rule_report), failed))
+    Ok((
+        gate_findings_from_rule_report(&rule_report),
+        rule_report.has_errors(),
+    ))
 }
 
 /// Validate the scope named by the issue's single `<namespace>:<target-id>` label.
@@ -3357,8 +3358,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let validate = executor
             .validation()
             .validate_repository_report()
-            .unwrap()
-            .is_ok_and(|report| !report.rule_report.has_errors());
+            .map(|report| report.structural_failure.is_none() && !report.rule_report.has_errors())
+            .unwrap();
         let run = executor
             .execute_builtin_checker_with_repository_view(
                 GateRunSubject {

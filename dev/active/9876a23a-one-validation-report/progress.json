@@ -1,7 +1,7 @@
 {
   "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
   "epic_short_id": "9876a23a",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -159,9 +159,39 @@
       "issues": [
         {
           "short_id": "6ba4f623",
-          "status": "rework 1 done 673c5daaa (-32 prod); lead review PASS; awaiting host release for CI, land, gates",
+          "status": "done 92aa09e0c (rework 1; merge fix for a main test)",
           "worker": "claude opus",
           "worker_reason": "central contract validation-report"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "base": "3e20f87bc",
+      "issues": [
+        {
+          "short_id": "612ee9d4",
+          "status": "dispatched",
+          "worker": "claude opus",
+          "worker_reason": "report-selection contract"
+        },
+        {
+          "short_id": "2b5f452c",
+          "status": "rework 1 a55545bcf accepted; pipeline running",
+          "worker": "claude opus",
+          "worker_reason": "fidelity on parsed records (REQ-10)"
+        },
+        {
+          "short_id": "3acaa5a3",
+          "status": "reviewed (-228 diff); pipeline running",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "drift through report function"
+        },
+        {
+          "short_id": "c1af05ac",
+          "status": "dispatched",
+          "worker": "codex gpt-6-luna xhigh",
+          "worker_reason": "test relocation"
         }
       ]
     }
@@ -220,6 +250,13 @@
           "03c59566": -24,
           "001a9c46": 79
         }
+      },
+      {
+        "wave": 6,
+        "test_support_as_test": -32,
+        "by_issue": {
+          "6ba4f623": -32
+        }
       }
     ]
   },
@@ -274,14 +311,16 @@
     "ea843d26": 1,
     "f968dfe1": 1,
     "5d5a1794": 2,
-    "6ba4f623": 1
+    "6ba4f623": 1,
+    "2b5f452c": 1
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
     "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566",
     "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch",
     "jit-server graceful_shutdown_tests::test_the_drain_assertion_rejects_a_server_that_force_closes_early failed once under load ~10 (5d5a1794 CI); passes alone",
-    "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording."
+    "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording.",
+    "2b5f452c: issue records now decode bytes->Value->Issue once; a duplicated JSON key in a record now loads (last wins) instead of failing, and field-type errors lose line/column. Accepted (no criterion); flag to steward."
   ],
   "started_at": "2026-11-03T23:40:00+02:00",
   "rejected": [
@@ -293,7 +332,8 @@
     "Never wrap land.sh in `jit worktree exec`: it takes the repository lock itself, so nesting waits on its own parent.",
     "Plan and manifest edits in main's checkout block other leads' land.sh; edit in scratch, then copy and commit in one command.",
     "User principle: each code, criterion or wording change is justified on its own merit, never to pre-empt a review.",
-    "Unquoted heredocs (<<EOF) in brief generation command-substitute backticked names; use <<'EOF' for any text holding backticks (6ba4f623 brief)."
+    "Unquoted heredocs (<<EOF) in brief generation command-substitute backticked names; use <<'EOF' for any text holding backticks (6ba4f623 brief).",
+    "dispatch-worker-worktree.sh refuses whenever main's checkout has any tracked change, including other leads' tracker files: commit a tracker sync immediately before dispatching, and check the [ok] line before writing briefs (03c59566, wave 7)."
   ],
   "plan_reviews": {
     "plan-review 2df01664": "passed after amendment (0 findings)",

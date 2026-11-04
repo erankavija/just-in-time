@@ -15,7 +15,7 @@ use crate::gate_presets::{GatePresetDefinition, GateTemplate};
 use crate::repository_state::{
     serialize_gate_run, serialize_issue, CaptureBudget, CaptureSpec, ExpectedPreimage, FileMode,
     MaterializationPlan, RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryIndex,
-    RepositoryLayout, RepositoryRootClass, VirtualPath, GATE_RUN_RECORD_FILE,
+    RepositoryLayout, RepositoryRootClass, VirtualPath,
 };
 use crate::storage::{
     discover_repository_layout, AmbiguousIdError, GateRunNotFoundError, InMemoryStorage,
@@ -43,14 +43,24 @@ trait Backend: IssueStore + RepositoryStateStore {
 
     /// Record the repository's current state as a commit and return its id.
     fn commit(&self, worktree: &Path) -> String;
+
+    /// Place a symlink at `path` naming `target`.
+    fn link(&self, worktree: &Path, path: &VirtualPath, target: &VirtualPath);
+
+    /// Place an object of a kind no repository path holds at `path`.
+    fn plant_special(&self, worktree: &Path, path: &VirtualPath);
 }
 
-fn write_json_file(worktree: &Path, path: &VirtualPath, content: &[u8]) {
-    let target = match path.root_class() {
+fn physical_path(worktree: &Path, path: &VirtualPath) -> std::path::PathBuf {
+    match path.root_class() {
         RepositoryRootClass::Data => worktree.join(".jit"),
         RepositoryRootClass::Worktree => worktree.to_path_buf(),
     }
-    .join(path.relative().as_path());
+    .join(path.relative().as_path())
+}
+
+fn write_json_file(worktree: &Path, path: &VirtualPath, content: &[u8]) {
+    let target = physical_path(worktree, path);
     std::fs::create_dir_all(target.parent().unwrap()).unwrap();
     std::fs::write(target, content).unwrap();
 }
@@ -72,6 +82,31 @@ impl Backend for JsonFileStorage {
     fn commit(&self, worktree: &Path) -> String {
         GitRepository::init(worktree).commit("conformance")
     }
+
+    fn link(&self, worktree: &Path, path: &VirtualPath, target: &VirtualPath) {
+        let (link, target) = (
+            physical_path(worktree, path),
+            physical_path(worktree, target),
+        );
+        std::fs::create_dir_all(link.parent().unwrap()).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(target, link).unwrap();
+        #[cfg(windows)]
+        if target.is_dir() {
+            std::os::windows::fs::symlink_dir(target, link).unwrap();
+        } else {
+            std::os::windows::fs::symlink_file(target, link).unwrap();
+        }
+    }
+
+    fn plant_special(&self, worktree: &Path, path: &VirtualPath) {
+        let special = physical_path(worktree, path);
+        std::fs::create_dir_all(special.parent().unwrap()).unwrap();
+        #[cfg(unix)]
+        nix::unistd::mkfifo(&special, nix::sys::stat::Mode::S_IRWXU).unwrap();
+        #[cfg(not(unix))]
+        unimplemented!("no special object to plant at {}", special.display());
+    }
 }
 
 impl Backend for InMemoryStorage {
@@ -89,6 +124,14 @@ impl Backend for InMemoryStorage {
 
     fn commit(&self, _worktree: &Path) -> String {
         self.record_commit()
+    }
+
+    fn link(&self, _worktree: &Path, path: &VirtualPath, target: &VirtualPath) {
+        self.add_repository_symlink(path.clone(), target);
+    }
+
+    fn plant_special(&self, _worktree: &Path, path: &VirtualPath) {
+        self.add_repository_special(path.clone());
     }
 }
 
@@ -115,6 +158,14 @@ impl<B: Backend> Repository<B> {
 
     fn commit(&self) -> String {
         self.store.commit(self.worktree.path())
+    }
+
+    fn link(&self, path: &VirtualPath, target: &VirtualPath) {
+        self.store.link(self.worktree.path(), path, target);
+    }
+
+    fn plant_special(&self, path: &VirtualPath) {
+        self.store.plant_special(self.worktree.path(), path);
     }
 
     fn layout(&self) -> RepositoryLayout {
@@ -686,20 +737,29 @@ fn test_gate_run_readers_name_a_malformed_result<B: Backend>() {
 /// refused.
 fn test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape<B: Backend>() {
     let direct_file = crate::test_utils::gate_run_id(2);
+    let nested = VirtualPath::gate_run_record(&crate::test_utils::gate_run_id(1));
+    let nested = nested.relative().as_path();
     let repository = Repository::<B>::seeded(&[
         (
             VirtualPath::data(
-                VirtualPath::gate_run_directory(&crate::test_utils::gate_run_id(1))
-                    .relative()
-                    .as_path()
+                nested
+                    .parent()
+                    .unwrap()
                     .join("nested")
-                    .join(GATE_RUN_RECORD_FILE),
+                    .join(nested.file_name().unwrap()),
             )
             .unwrap(),
             "{ corrupt".to_string(),
         ),
         (
-            VirtualPath::gate_run_directory(&direct_file),
+            VirtualPath::data(
+                VirtualPath::gate_run_record(&direct_file)
+                    .relative()
+                    .as_path()
+                    .parent()
+                    .unwrap(),
+            )
+            .unwrap(),
             "root clutter".to_string(),
         ),
     ]);
@@ -765,6 +825,189 @@ fn test_gate_run_readers_refuse_a_directory_as_a_result<B: Backend>() {
         assert!(message.contains(record.relative().as_str()), "{message}");
         assert!(message.contains("ordinary file"), "{message}");
     }
+}
+
+/// A recorded run of `issue` placed outside the gate-run root, for a symlink
+/// to name: a reader that followed the link would read it.
+fn record_outside_gate_runs<B: Backend>(
+    issue: &IssueId,
+    run_id: &GateRunId,
+) -> (Repository<B>, VirtualPath) {
+    let record = VirtualPath::gate_run_record(run_id);
+    let outside =
+        VirtualPath::data(Path::new("outside").join(record.relative().as_path())).unwrap();
+    let run = executed_run(run_id, issue, &"tests".parse().unwrap(), 10);
+    let repository = Repository::<B>::seeded(&[(
+        outside.clone(),
+        String::from_utf8(serialize_gate_run(&run).unwrap()).unwrap(),
+    )]);
+    (repository, outside)
+}
+
+/// The leading `depth` components of `path`, under the same root.
+fn path_prefix(path: &VirtualPath, depth: usize) -> VirtualPath {
+    VirtualPath::data(
+        path.relative()
+            .as_path()
+            .components()
+            .take(depth)
+            .collect::<std::path::PathBuf>(),
+    )
+    .unwrap()
+}
+
+fn test_gate_run_readers_refuse_a_symlink_as_the_gate_run_root<B: Backend>() {
+    let (issue, run_id) = (
+        crate::test_utils::issue_id(1),
+        crate::test_utils::gate_run_id(1),
+    );
+    let (repository, outside) = record_outside_gate_runs::<B>(&issue, &run_id);
+    let depth = VirtualPath::GATE_RUNS
+        .relative()
+        .as_path()
+        .components()
+        .count();
+    repository.link(&VirtualPath::GATE_RUNS, &path_prefix(&outside, depth + 1));
+
+    for error in [
+        repository
+            .store
+            .load_gate_run_result(&issue, &run_id)
+            .unwrap_err(),
+        repository
+            .store
+            .list_gate_runs_for_issue(&issue)
+            .unwrap_err(),
+    ] {
+        assert!(
+            format!("{error:#}").contains("ordinary directory"),
+            "{error:#}"
+        );
+    }
+}
+
+/// A symlinked run directory is refused when named and skipped when listed.
+fn test_gate_run_readers_refuse_a_named_symlinked_run_directory_that_listing_skips<B: Backend>() {
+    let (issue, run_id) = (
+        crate::test_utils::issue_id(1),
+        crate::test_utils::gate_run_id(1),
+    );
+    let (repository, outside) = record_outside_gate_runs::<B>(&issue, &run_id);
+    let run_directory = VirtualPath::gate_run_directory(&run_id);
+    let depth = run_directory.relative().as_path().components().count();
+    repository.link(&run_directory, &path_prefix(&outside, depth + 1));
+
+    let named = repository
+        .store
+        .load_gate_run_result(&issue, &run_id)
+        .unwrap_err();
+    assert!(
+        format!("{named:#}").contains("ordinary directory"),
+        "{named:#}"
+    );
+    assert!(repository
+        .store
+        .list_gate_runs_for_issue(&issue)
+        .unwrap()
+        .is_empty());
+}
+
+fn test_gate_run_readers_refuse_a_symlink_as_a_result<B: Backend>() {
+    let (issue, run_id) = (
+        crate::test_utils::issue_id(1),
+        crate::test_utils::gate_run_id(1),
+    );
+    let (repository, outside) = record_outside_gate_runs::<B>(&issue, &run_id);
+    let record = VirtualPath::gate_run_record(&run_id);
+    repository.link(&record, &outside);
+
+    for error in [
+        repository
+            .store
+            .load_gate_run_result(&issue, &run_id)
+            .unwrap_err(),
+        repository
+            .store
+            .list_gate_runs_for_issue(&issue)
+            .unwrap_err(),
+    ] {
+        let message = format!("{error:#}");
+        assert!(message.contains(record.relative().as_str()), "{message}");
+        assert!(message.contains("ordinary file"), "{message}");
+    }
+}
+
+fn test_gate_run_readers_refuse_a_special_object_as_the_gate_run_root<B: Backend>() {
+    let repository = Repository::<B>::seeded(&initialized());
+    repository.plant_special(&VirtualPath::GATE_RUNS);
+
+    for error in [
+        repository
+            .store
+            .load_gate_run_result(
+                &crate::test_utils::issue_id(2),
+                &crate::test_utils::gate_run_id(1),
+            )
+            .unwrap_err(),
+        repository
+            .store
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(2))
+            .unwrap_err(),
+    ] {
+        assert!(
+            format!("{error:#}").contains("ordinary directory"),
+            "{error:#}"
+        );
+    }
+}
+
+/// A special object in a run directory's place is refused when named and
+/// skipped when listed.
+fn test_gate_run_readers_refuse_a_named_special_run_directory_that_listing_skips<B: Backend>() {
+    let run_id = crate::test_utils::gate_run_id(1);
+    let repository = Repository::<B>::seeded(&initialized());
+    repository.plant_special(
+        &VirtualPath::data(
+            VirtualPath::gate_run_record(&run_id)
+                .relative()
+                .as_path()
+                .parent()
+                .unwrap(),
+        )
+        .unwrap(),
+    );
+
+    let named = repository
+        .store
+        .load_gate_run_result(&crate::test_utils::issue_id(2), &run_id)
+        .unwrap_err();
+    assert!(
+        format!("{named:#}").contains("ordinary directory"),
+        "{named:#}"
+    );
+    assert!(repository
+        .store
+        .list_gate_runs_for_issue(&crate::test_utils::issue_id(2))
+        .unwrap()
+        .is_empty());
+}
+
+/// A run directory holding no record holds no run.
+fn test_load_gate_run_result_reports_a_run_directory_without_a_record_as_not_found<B: Backend>() {
+    let run_id = crate::test_utils::gate_run_id(1);
+    let record = VirtualPath::gate_run_record(&run_id);
+    let beside =
+        VirtualPath::data(record.relative().as_path().with_file_name("other.json")).unwrap();
+    let repository = Repository::<B>::seeded(&[(beside, "{}".to_string())]);
+
+    let error = repository
+        .store
+        .load_gate_run_result(&crate::test_utils::issue_id(1), &run_id)
+        .unwrap_err();
+    assert!(
+        error.downcast_ref::<GateRunNotFoundError>().is_some(),
+        "{error:#}"
+    );
 }
 
 /// A plan applies only against the image it was built over, even when the
@@ -1164,6 +1407,12 @@ conformance_suite!(
         test_gate_run_readers_ignore_entries_outside_the_canonical_result_shape,
         test_gate_run_readers_refuse_a_file_as_the_gate_run_root,
         test_gate_run_readers_refuse_a_directory_as_a_result,
+        test_gate_run_readers_refuse_a_symlink_as_the_gate_run_root,
+        test_gate_run_readers_refuse_a_named_symlinked_run_directory_that_listing_skips,
+        test_gate_run_readers_refuse_a_symlink_as_a_result,
+        test_gate_run_readers_refuse_a_special_object_as_the_gate_run_root,
+        test_gate_run_readers_refuse_a_named_special_run_directory_that_listing_skips,
+        test_load_gate_run_result_reports_a_run_directory_without_a_record_as_not_found,
         test_apply_admits_a_plan_only_against_its_exact_image,
         test_root_is_shared_by_clones_and_names_the_data_root_when_file_backed,
         test_read_repo_file_reads_present_files_and_refuses_unsafe_paths,
