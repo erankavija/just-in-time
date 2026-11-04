@@ -8,6 +8,7 @@
 //! long after `jit init` baked the registry schema, and the first `enforces:`
 //! label failed `namespace-registry` against the frozen file.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::domain::identity::IssueIdPrefix;
 use jit::domain::{ContentFormat, Issue, Priority};
 use jit::test_utils::{file_executor, setup_test_repo_with_config};

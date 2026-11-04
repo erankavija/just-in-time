@@ -240,7 +240,7 @@ fn resolve_issue_path_id<S: IssueStore>(
     requested: &str,
 ) -> Result<IssueId, StatusCode> {
     let prefix = requested.parse::<IssueIdPrefix>().map_err(reject)?;
-    executor.storage().resolve_issue_id(&prefix).map_err(reject)
+    executor.issues().resolve_issue_id(&prefix).map_err(reject)
 }
 
 /// Get single issue by ID, its `documents` explicit and derived.
@@ -332,8 +332,11 @@ async fn get_graph<S: IssueStore>(
 
     // Resolve the hierarchy with the core resolver, over the repo's type levels.
     let issue_refs: Vec<&Issue> = issues.iter().collect();
-    let config =
-        jit::config_manager::get_hierarchy_config(state.executor.storage()).map_err(reject)?;
+    let config = state
+        .executor
+        .config()
+        .get_hierarchy_config()
+        .map_err(reject)?;
     let resolution = jit::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
 
     // Create nodes
@@ -441,7 +444,8 @@ async fn search_issues<S: IssueStore>(
         .get_issue_document_paths()
         .map_err(reject)?;
 
-    let layout = state.executor.repository_layout().map_err(reject)?;
+    let config = state.executor.config();
+    let layout = config.repository_layout().map_err(reject)?;
     // An empty glob list would search every worktree file, so documents are searched only when linked.
     let mut results = if document_paths.is_empty() {
         Vec::new()
@@ -1056,11 +1060,7 @@ struct StrategicTypesResponse {
 async fn get_strategic_types<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<StrategicTypesResponse>, StatusCode> {
-    let namespaces = state
-        .executor
-        .config_manager
-        .get_namespaces()
-        .map_err(reject)?;
+    let namespaces = state.executor.config().get_namespaces().map_err(reject)?;
 
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
 
@@ -1079,11 +1079,7 @@ struct HierarchyResponse {
 async fn get_hierarchy<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<HierarchyResponse>, StatusCode> {
-    let namespaces = state
-        .executor
-        .config_manager
-        .get_namespaces()
-        .map_err(reject)?;
+    let namespaces = state.executor.config().get_namespaces().map_err(reject)?;
 
     let types = namespaces.type_hierarchy.unwrap_or_default();
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
@@ -1091,7 +1087,7 @@ async fn get_hierarchy<S: IssueStore>(
     // Get resolved icons
     let icons = state
         .executor
-        .config_manager
+        .config()
         .get_hierarchy_icons()
         .map_err(reject)?;
 
@@ -1118,11 +1114,7 @@ struct NamespaceInfo {
 async fn get_namespaces<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<NamespacesResponse>, StatusCode> {
-    let label_namespaces = state
-        .executor
-        .config_manager
-        .get_namespaces()
-        .map_err(reject)?;
+    let label_namespaces = state.executor.config().get_namespaces().map_err(reject)?;
 
     let namespaces = label_namespaces
         .namespaces
@@ -1163,6 +1155,7 @@ async fn events_stream<S: IssueStore>(State(state): State<AppState<S>>) -> impl 
 mod tests {
     use super::*;
     use axum_test::TestServer;
+    use jit::commands::test_helpers::ExecutorTestAccess;
     use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
     use jit::domain::Priority;
     use jit::storage::{InMemoryStorage, JsonFileStorage, PathReadError};

@@ -5,6 +5,7 @@
 //! call. These tests inject a failure at that boundary and compare complete
 //! captured preimages, rather than observing superseded per-record writes.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::test_utils::add_reducing_edge;
 use std::collections::BTreeMap;
 use std::path::PathBuf;

@@ -13,6 +13,7 @@
 //! The examples live in the repository's `docs/` tree, not in `.jit/`, so they
 //! never activate on this repository; these tests load them directly from disk.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::test_utils::add_reducing_edge;
 use std::path::{Path, PathBuf};
 

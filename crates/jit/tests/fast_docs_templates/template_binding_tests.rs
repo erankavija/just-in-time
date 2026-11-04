@@ -19,6 +19,7 @@
 //! the binding map these tests pass explicitly — and is covered against the real
 //! binary in `template_binding_cli_tests.rs`.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
 use jit::domain::identity::IssueId;

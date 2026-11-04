@@ -2338,7 +2338,7 @@ fn require_issue_in_capture(issues: &[Issue], id: &IssueId) -> Result<IssueId> {
 /// (JSON files, SQLite, in-memory, etc.).
 pub struct CommandExecutor<S: IssueStore> {
     storage: S,
-    pub config_manager: ConfigManager,
+    config_manager: ConfigManager,
     /// Lazily-parsed `.jit/rules.toml`, cached for the lifetime of the
     /// executor so the validation ruleset is read at most once per process
     /// rather than re-parsed on every write. The cached value retains any
@@ -2437,7 +2437,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Record the leftover redo records startup recovery applied.
-    pub fn with_recovered_records(mut self, count: usize) -> Self {
+    pub(crate) fn with_recovered_records(mut self, count: usize) -> Self {
         self.recovered_records = count;
         self
     }
@@ -2471,7 +2471,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Explicit repository layout selected when this executor was constructed.
-    pub fn repository_layout(&self) -> Result<&crate::repository_state::RepositoryLayout> {
+    pub(crate) fn repository_layout(&self) -> Result<&crate::repository_state::RepositoryLayout> {
         self.layout
             .as_ref()
             .ok_or_else(|| anyhow!("no repository layout configured for this command"))
@@ -2726,7 +2726,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Get reference to the storage backend
-    pub fn storage(&self) -> &S {
+    pub(crate) fn storage(&self) -> &S {
         &self.storage
     }
 
@@ -2739,7 +2739,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `Err` rather than being swallowed, so a misconfigured repository cannot
     /// silently disable all rule enforcement. The load is performed at most once
     /// and the outcome (success or failure) is cached.
-    pub fn rules(&self) -> Result<&RuleSet, &RuleConfigError> {
+    pub(crate) fn rules(&self) -> Result<&RuleSet, &RuleConfigError> {
         self.rules
             .get_or_init(|| {
                 let config =
@@ -2764,7 +2764,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// declared schemas, while default assertions derive from configuration.
     ///
     /// The result, including any configuration or rule-loading error, is cached.
-    pub fn effective_rules(&self) -> Result<&RuleSet> {
+    pub(crate) fn effective_rules(&self) -> Result<&RuleSet> {
         self.effective_rules
             .get_or_init(|| {
                 let layout = self.require_layout().map_err(|error| error.to_string())?;
