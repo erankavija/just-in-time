@@ -720,4 +720,44 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn test_render_run_details_attestation_line_carries_rfc3339_started_at() {
+        use crate::domain::{GateEvaluationStability, GateRunResult, GateRunStatus};
+        use chrono::TimeZone;
+        let started_at = chrono::Utc
+            .with_ymd_and_hms(2026, 11, 4, 12, 30, 5)
+            .unwrap();
+        let run = GateRunResult {
+            schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
+            run_id: crate::test_utils::gate_run_id(1),
+            gate_key: "review".parse().unwrap(),
+            stage: crate::declarations::GateStage::Postcheck,
+            issue_id: crate::test_utils::issue_id(7),
+            commit: None,
+            branch: None,
+            status: GateRunStatus::Passed,
+            started_at,
+            completed_at: None,
+            duration_ms: None,
+            exit_code: None,
+            stdout: String::new(),
+            stderr: String::new(),
+            command: String::new(),
+            by: Some("human:alice".parse().unwrap()),
+            message: None,
+            findings: None,
+            inputs_digest: None,
+            origin: GateVerdictOrigin::Attested,
+            evaluation_stability: GateEvaluationStability::Stable,
+        };
+
+        let text = render_run_details(&GateRunSummary::full(&run));
+
+        assert!(text.contains(&format!(
+            "  Attested by human:alice at {}\n",
+            started_at.to_rfc3339()
+        )));
+        assert!(text.contains("at 2026-11-04T12:30:05+00:00\n"));
+    }
 }
