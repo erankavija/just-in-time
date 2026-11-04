@@ -5049,12 +5049,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
 
             let id = id.map(|id| id.parse::<IssueIdPrefix>()).transpose()?;
 
-            // --scope path: evaluate the container's bracket subtree as a
+            // --scope path: the container's bracket-subtree selection, a
             // deterministic gate checker. Exit 4 (ValidationFailed) on any
             // error-severity finding, 0 when clean.
             if let Some(container) = scope.as_deref() {
-                let container = resolve_issue(&storage, container)?;
-                let report = executor.validation().validate_scope(&container)?;
+                let scope = jit::validation::report::Selection::Scope(container.parse()?);
+                let report = executor.validation().selection_report()?.select(&scope)?;
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;

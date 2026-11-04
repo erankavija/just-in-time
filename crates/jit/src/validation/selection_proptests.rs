@@ -20,6 +20,7 @@ applies_to = ["epic"]
 [[template.nodes]]
 role = "planning"
 type = "planning"
+doc = "plans/{container.id}.md"
 [[template.nodes]]
 role = "breakdown"
 type = "breakdown"
@@ -43,6 +44,9 @@ const MENU: [(&str, &str); 4] = [
     ),
 ];
 
+/// The absent plan a done planning node links, failing the rule pass.
+const MISSING_PLAN: &str = "plans/missing.md";
+
 const LOCAL_SCHEMA: &str = r#"{"properties":{"title":{"minLength":4}}}"#;
 
 #[derive(Debug)]
@@ -51,6 +55,7 @@ struct Case {
     issues: Vec<Issue>,
     rules: Option<RuleSet>,
     broken_records: bool,
+    rule_pass_fails: bool,
 }
 
 fn arbitrary_case() -> impl Strategy<Value = Case> {
@@ -65,9 +70,10 @@ fn arbitrary_case() -> impl Strategy<Value = Case> {
                 0u8..5,
                 any::<bool>(),
                 0u8..8,
+                0u8..4,
             )
         })
-        .prop_map(|(nodes, attributes, rule_options, rules_mode, placeholder, records_mode)| {
+        .prop_map(|(nodes, attributes, rule_options, rules_mode, placeholder, records_mode, plan_mode)| {
             let ids: Vec<IssueId> = (0..nodes.len())
                 .map(|i| {
                     let head = if i < 2 { 0xa0000000 } else { 0xb0000000 + i };
@@ -76,7 +82,7 @@ fn arbitrary_case() -> impl Strategy<Value = Case> {
                         .unwrap()
                 })
                 .collect();
-            let issues: Vec<_> = nodes
+            let mut issues: Vec<Issue> = nodes
                 .iter()
                 .enumerate()
                 .map(|(i, (kind, dependencies))| {
@@ -126,6 +132,10 @@ fn arbitrary_case() -> impl Strategy<Value = Case> {
                     issue
                 })
                 .collect();
+            let plan_missing = plan_mode == 0;
+            if plan_missing {
+                issues = missing_plan_bracket();
+            }
             let rules_text: String = MENU
                 .iter()
                 .zip(rule_options)
@@ -169,8 +179,9 @@ fn arbitrary_case() -> impl Strategy<Value = Case> {
                 .file(VirtualPath::INDEX, crate::repository_state::fresh_index_bytes().unwrap())
                 .listing(
                     VirtualPath::ISSUES,
-                    DirectoryListing::new(ids.iter().map(|id| format!("{id}.json")).collect::<Vec<_>>()).unwrap(),
-                );
+                    DirectoryListing::new(issues.iter().map(|issue| format!("{}.json", issue.id)).collect::<Vec<_>>()).unwrap(),
+                )
+                .files(&[(MISSING_PLAN, None)]);
             let image = issues.iter().enumerate().fold(builder, |builder, (i, issue)| {
                 builder.file(
                     VirtualPath::issue_record(&issue.id),
@@ -179,14 +190,42 @@ fn arbitrary_case() -> impl Strategy<Value = Case> {
             }).build();
             let declarations = crate::repository_state::validation_declarations_from_image(&image).unwrap();
             let rules = declarations.rules_loaded().then(|| declarations.rules().clone());
-            Case { image, issues, rules, broken_records }
+            let rule_pass_fails = plan_missing && rules.is_some() && !broken_records;
+            Case { image, issues, rules, broken_records, rule_pass_fails }
         })
+}
+
+/// An integrity-clean bracket whose done planning node links [`MISSING_PLAN`],
+/// so the rule pass is the first structural failure.
+fn missing_plan_bracket() -> Vec<Issue> {
+    let node = |head: u32, index: usize, kind: &str, state: State, dependencies: &[&Issue]| {
+        let id = format!("{head:08x}-0000-0000-0000-{index:012x}")
+            .parse()
+            .unwrap();
+        let mut issue = Issue::draft(id, kind.into(), String::new());
+        issue.labels = vec![format!("type:{kind}")];
+        issue.state = state;
+        issue.dependencies = dependencies.iter().map(|issue| issue.id.clone()).collect();
+        issue
+    };
+    let mut planning = node(0xa0000000, 0, "planning", State::Done, &[]);
+    planning.documents.push(crate::domain::DocumentReference {
+        label: Some("plan".into()),
+        ..crate::test_utils::document_reference(MISSING_PLAN)
+    });
+    let mut breakdown = node(0xa0000000, 1, "breakdown", State::Ready, &[&planning]);
+    let epic = node(0xb0000002, 2, "epic", State::Backlog, &[&breakdown]);
+    breakdown
+        .labels
+        .push(format!("brackets:{}", epic.short_id()));
+    vec![planning, breakdown, epic]
 }
 
 #[derive(Debug, PartialEq)]
 enum Fault {
     History,
     Records,
+    RulePass,
     Missing,
     Ambiguous,
     Rule,
@@ -219,6 +258,9 @@ fn oracle(
     }
     if case.broken_records {
         return Err(Fault::Records);
+    }
+    if case.rule_pass_fails {
+        return Err(Fault::RulePass);
     }
     let prefix = match selection {
         Selection::Issue(prefix) | Selection::Scope(prefix) => prefix,
@@ -306,6 +348,10 @@ fn oracle(
         .collect())
 }
 
+fn names_missing_plan(error: &anyhow::Error) -> bool {
+    format!("{error:#}").contains(MISSING_PLAN)
+}
+
 fn check_selection(case: &Case, report: &ValidationReport, selection: &Selection) {
     let expected = oracle(case, report, selection);
     let actual = report.select(selection);
@@ -328,6 +374,7 @@ fn check_selection(case: &Case, report: &ValidationReport, selection: &Selection
                     format!("{error:#}"),
                     format!("{:#}", report.structural_failure.as_ref().unwrap())
                 ),
+                Fault::RulePass => assert!(names_missing_plan(&error), "{error:#}"),
                 Fault::Missing => assert!(error.is::<crate::storage::IssueNotFoundError>()),
                 Fault::Ambiguous => assert!(error.is::<crate::storage::AmbiguousIdError>()),
                 Fault::Rule => assert!(error.is::<RuleSelectionFault>()),
@@ -350,8 +397,15 @@ proptest! {
                     document_references: if history_mode == 3 { Err("document failure".into()) } else { Ok(()) },
                 }),
             });
-            assert_eq!(report.selectable.is_ok(), !case.broken_records, "{report:?}");
+            let selectable = !case.broken_records && !case.rule_pass_fails;
+            assert_eq!(report.selectable.is_ok(), selectable, "{report:?}");
             check_selection(&case, &report, &Selection::Whole);
+            // Fidelity and document-reference verdicts precede the rule pass.
+            if case.rule_pass_fails && history_mode == 1 {
+                let error = report.select(&Selection::Whole).unwrap_err();
+                let structural = error.downcast_ref::<StructuralFailure>().unwrap();
+                assert!(names_missing_plan(&structural.failure), "{error:#}");
+            }
             for prefix in ["a0000000", "ffffffff"] {
                 let prefix: IssueIdPrefix = prefix.parse().unwrap();
                 for selection in [Selection::Issue(prefix.clone()), Selection::Scope(prefix.clone()), Selection::Rule { issue: prefix.clone(), rule: "coverage".into() }] {
@@ -374,7 +428,7 @@ proptest! {
                 for rule in graph_rules.chain(["coverage", "unique", "shape", "local", "missing"]) {
                     check_selection(&case, &report, &Selection::Rule { issue: prefix.clone(), rule: rule.into() });
                 }
-                if !case.broken_records {
+                if selectable {
                     for finding in report.select(&selection).unwrap().findings {
                         let sources: Vec<_> = report.findings.iter().enumerate()
                             .filter(|(_, source)| ReportedFinding {
@@ -387,7 +441,9 @@ proptest! {
                     }
                 }
                 let explained = report.explain(&prefix);
-                if case.broken_records || case.rules.is_none() {
+                if case.rule_pass_fails {
+                    assert!(names_missing_plan(&explained.unwrap_err()));
+                } else if case.broken_records || case.rules.is_none() {
                     assert!(explained.is_err());
                 } else {
                     let selected = report.select(&selection).unwrap();
@@ -403,7 +459,7 @@ proptest! {
                     }
                 }
             }
-            if !case.broken_records {
+            if selectable {
                 assert_eq!(source_union, (0..report.findings.len()).collect(), "issue source union omitted a whole-report finding");
             }
         }
