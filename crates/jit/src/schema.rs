@@ -548,24 +548,6 @@ impl CommandSchema {
             // Status command
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 
-            // Profile commands.
-            "profile_show" => (
-                Some(schema_to_value::<crate::profile::ProfileShowResult>()),
-                "ProfileShowResult",
-            ),
-            "profile_diff" | "profile_apply" => (
-                Some(schema_to_value::<crate::profile::ProfileComposedApplyResult>()),
-                "ProfileComposedApplyResult",
-            ),
-            "profile_pack" => (
-                Some(schema_to_value::<crate::profile::ProfilePackResult>()),
-                "ProfilePackResult",
-            ),
-            "profile_add" => (
-                Some(schema_to_value::<crate::profile::ProfileAddResult>()),
-                "ProfileAddResult",
-            ),
-
             // Issue commands
             //
             // `issue create --json` returns the `issue show` projection with its
@@ -832,6 +814,36 @@ impl CommandSchema {
                 false,
             ),
             row("*", 5, "A filesystem operation was denied.", false),
+            row(
+                "profile apply",
+                2,
+                "The --values-file path could not be read.",
+                false,
+            ),
+            row(
+                "profile apply",
+                4,
+                "Repository-state derivation refused conflicting profile targets.",
+                false,
+            ),
+            row(
+                "profile diff",
+                4,
+                "The difference report found targets or final validation that prevent publication.",
+                true,
+            ),
+            row(
+                "profile pack",
+                6,
+                "The archive output path already exists.",
+                false,
+            ),
+            row(
+                "profile add",
+                4,
+                "The package destination already exists.",
+                false,
+            ),
             row(
                 "*",
                 10,
@@ -2079,7 +2091,10 @@ mod tests {
             .and_then(|commands| commands.get("show"))
             .expect("profile show command");
         let output = command.output.as_ref().expect("profile show output");
-        assert_eq!(output.success, "ProfileShowResult");
+        assert_eq!(
+            output.success,
+            OutputSchema::of::<crate::profile::ProfileShowResult>().success
+        );
 
         let success_schema = output
             .success_schema

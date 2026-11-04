@@ -869,6 +869,127 @@ fn invoke_hooks_external_io_failure(json: bool) -> Vec<Output> {
     vec![output_hooks_in_form(&cli, json)]
 }
 
+fn invoke_profile_apply_missing_values_file(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let package = jit::test_utils::profile_package_fixture("planner-asset-only");
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/profile"));
+    vec![output_in_form(
+        &cli,
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            "packages/profile",
+            "--values-file",
+            "absent.toml",
+        ],
+        json,
+    )]
+}
+
+fn invoke_profile_conflict(command: &str, json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    let package = jit::test_utils::profile_package_fixture("planner-asset-only");
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/left"));
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/right"));
+    let manifest = cli.root().join("packages/right/manifest.toml");
+    let declared = fs::read_to_string(&manifest).unwrap();
+    fs::write(
+        &manifest,
+        declared.replace("id = \"planner-asset-only\"", "id = \"rival\""),
+    )
+    .unwrap();
+    fs::write(
+        cli.root().join("packages/right/assets/profile.txt"),
+        "different bytes\n",
+    )
+    .unwrap();
+    let output = output_in_form(
+        &cli,
+        &[
+            "profile",
+            command,
+            "--profile",
+            "packages/left",
+            "--profile",
+            "packages/right",
+        ],
+        json,
+    );
+    if json {
+        let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(
+            envelope["error"]["code"],
+            if command == "diff" {
+                "VALIDATION_FAILED"
+            } else {
+                "PROFILE_CONFLICT"
+            }
+        );
+        assert!(output.stderr.is_empty(), "{output:?}");
+        if command == "diff" {
+            assert!(envelope["error"]["details"]["profiles"].is_array());
+        }
+    }
+    vec![output]
+}
+
+fn invoke_profile_apply_conflict(json: bool) -> Vec<Output> {
+    invoke_profile_conflict("apply", json)
+}
+
+fn invoke_profile_diff_conflict(json: bool) -> Vec<Output> {
+    invoke_profile_conflict("diff", json)
+}
+
+fn pack_profile_fixture(cli: &JitCli) {
+    let package = jit::test_utils::profile_package_fixture("planner-asset-only");
+    jit::test_utils::copy_package_tree(&package, &cli.root().join("packages/profile"));
+    cli.run([
+        "profile",
+        "pack",
+        "--source",
+        "packages/profile",
+        "--output",
+        "package.tar",
+    ])
+    .unwrap();
+}
+
+fn invoke_profile_pack_occupied_output(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    pack_profile_fixture(&cli);
+    vec![output_in_form(
+        &cli,
+        &[
+            "profile",
+            "pack",
+            "--source",
+            "packages/profile",
+            "--output",
+            "package.tar",
+        ],
+        json,
+    )]
+}
+
+fn invoke_profile_add_occupied_destination(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    pack_profile_fixture(&cli);
+    vec![output_in_form(
+        &cli,
+        &[
+            "profile",
+            "add",
+            "--archive",
+            "package.tar",
+            "--destination",
+            "packages/profile",
+        ],
+        json,
+    )]
+}
+
 /// A repository whose worktree identity record exists, in a Git checkout.
 fn worktree_identity_repo() -> JitCli {
     let cli = JitCli::initialised().unwrap();
@@ -969,6 +1090,11 @@ fn invoke_store_divergence_permission_denied(json: bool) -> Vec<Output> {
 }
 
 row_bindings! {
+    test_command_exit_codes_profile_apply_missing_values_file_emits_2: ("profile apply", 2, false) => invoke_profile_apply_missing_values_file;
+    test_command_exit_codes_profile_apply_repository_state_conflict_emits_4: ("profile apply", 4, false) => invoke_profile_apply_conflict;
+    test_command_exit_codes_profile_diff_conflicting_findings_emit_4: ("profile diff", 4, true) => invoke_profile_diff_conflict;
+    test_command_exit_codes_profile_pack_occupied_output_emits_6: ("profile pack", 6, false) => invoke_profile_pack_occupied_output;
+    test_command_exit_codes_profile_add_occupied_destination_emits_4: ("profile add", 4, false) => invoke_profile_add_occupied_destination;
     test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
     test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
     test_command_exit_codes_invalid_argument_emits_2: ("*", 2, false) => invoke_invalid_argument;

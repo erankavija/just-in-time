@@ -146,6 +146,15 @@ pub enum ProfileResolutionError {
         /// Package-reader failure.
         source: ProfilePackageError,
     },
+    /// A supplied archive could not be opened or read.
+    #[error("cannot read profile package archive '{location}': {source}")]
+    UnreadableArchive {
+        /// Location as the caller supplied it.
+        location: String,
+        /// Archive-reader failure.
+        #[source]
+        source: std::io::Error,
+    },
     /// A package whose live sources are drawn from repository content could
     /// not be assembled for an archive.
     #[error("profile package location '{location}' cannot be captured: {source}")]
@@ -1366,14 +1375,14 @@ fn read_archive_bytes(invocation_dir: &Path, archive: &Path) -> Result<Vec<u8>> 
     };
     let mut bytes = Vec::new();
     fs::File::open(&path)
-        .map_err(|source| {
-            anyhow::anyhow!(
-                "cannot read profile package archive '{}': {source}",
-                archive.display()
-            )
-        })?
-        .take(MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64 + 1)
-        .read_to_end(&mut bytes)?;
+        .and_then(|file| {
+            file.take(MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64 + 1)
+                .read_to_end(&mut bytes)
+        })
+        .map_err(|source| ProfileResolutionError::UnreadableArchive {
+            location: archive.display().to_string(),
+            source,
+        })?;
     if bytes.len() > MAX_PROFILE_PACKAGE_ARCHIVE_BYTES {
         anyhow::bail!(
             "profile package archive '{}' is larger than {MAX_PROFILE_PACKAGE_ARCHIVE_BYTES} bytes",

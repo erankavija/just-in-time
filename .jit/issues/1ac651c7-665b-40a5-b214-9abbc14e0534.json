@@ -15,7 +15,26 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c8a62f20-a593-4a24-9fdb-192f674a29b4",
+      "status": "passed",
+      "updated_at": "2026-11-04T11:03:21.285342766Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c543e28a-b11f-4a74-baa7-3142b7c9816e",
+      "status": "failed",
+      "updated_at": "2026-11-04T11:08:42.954693995Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "b2158bf6-06f4-4f2a-bef4-0e4cdcedfcb6",
+      "status": "passed",
+      "updated_at": "2026-11-04T11:03:38.335330203Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1ac651c7-665b-40a5-b214-9abbc14e0534",
   "labels": [
     "type:task",
@@ -33,5 +52,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate definition and preset commands move to library handlers",
-  "updated_at": "2026-11-04T03:38:41.511220782Z"
+  "updated_at": "2026-11-04T11:08:42.954693995Z"
 }
