@@ -1398,7 +1398,7 @@
       "epic": "b697a3f7"
     },
     "d58f80c9": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "b697a3f7 track B after 5d09e74b; worker checks criteria first",
       "epic": "b697a3f7",
@@ -1408,6 +1408,12 @@
       "status": "dispatched",
       "vendor": "Claude Opus",
       "reason": "last handler move; empties the legacy schema table"
+    },
+    "01a88d32": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 track B after d58f80c9; worker checks criteria first",
+      "epic": "b697a3f7"
     }
   },
   "handoff": {
