@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T09:35:09.714301017Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -32,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove the executor-side validation pass copies",
-  "updated_at": "2026-11-04T09:35:09.714301017Z"
+  "updated_at": "2026-11-04T09:56:31.853614991Z"
 }

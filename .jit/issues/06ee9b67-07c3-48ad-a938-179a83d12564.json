@@ -23,9 +23,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "d4f538b0-68b8-4c14-b8ca-c1d7fdad3a58",
-      "status": "failed",
-      "updated_at": "2026-11-04T09:15:48.070075888Z",
+      "run_id": "d1f855fb-d1e9-49be-8905-23e78c7febe1",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:56:47.786239622Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -52,5 +52,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Validate command moves to a library handler",
-  "updated_at": "2026-11-04T09:51:08.862682790Z"
+  "updated_at": "2026-11-04T09:56:47.786239622Z"
 }
