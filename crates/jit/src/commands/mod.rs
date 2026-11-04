@@ -593,7 +593,7 @@ impl<'a> CapturedGraphEvidence<'a> {
     ) -> Result<Self> {
         Ok(Self {
             declarations: crate::repository_state::declarations_from_image(image)?,
-            plan_content: validate::plan_content_with_issues(image, issues, issues)?,
+            plan_content: validate::plan_content_with_issues(image, issues)?,
             context,
         })
     }
