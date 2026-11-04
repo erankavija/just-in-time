@@ -321,6 +321,13 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         || error
             .downcast_ref::<crate::commands::ProfileApplyError>()
             .is_some()
+        // The sanctioned downcast of the typed repository-state error: every
+        // refused target decision is a profile conflict; every other variant
+        // keeps its classification below.
+        || matches!(
+            error.downcast_ref::<crate::repository_state::RepositoryStateError>(),
+            Some(crate::repository_state::RepositoryStateError::ProfileTargetConflicts(_))
+        )
     {
         return ErrorCode::ProfileConflict;
     }
@@ -358,8 +365,10 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     // The repository-state derivation error is classified by an exhaustive match
     // over every current variant — no fallback arm — so a newly added variant forces
     // a deliberate classification here rather than silently taking the generic code.
-    // Projection, managed-document, profile-target-conflict, ambiguous-ownership,
-    // gate-registry-edit, and archive-execution failures are validation failures (4);
+    // Projection, managed-document, ambiguous-ownership, gate-registry-edit, and
+    // archive-execution failures are validation failures (4); a profile-target
+    // conflict is classified as a profile conflict (4) above and listed here only for
+    // exhaustiveness;
     // a layout rejection is an argument error (2); capture/parse producer failures and
     // the structural delta/overlay/initialization failures keep the
     // generic code (1). The `project render` command additionally unwraps this error
@@ -671,37 +680,6 @@ pub fn command_json_error(error: &anyhow::Error, code: ErrorCode) -> JsonError {
         code
     };
     JsonError::new(code, error.to_string())
-}
-
-/// Build the JSON error envelope for a failed profile command: the code the
-/// profile command family assigns, with the details and suggestions the
-/// failure's type determines.
-pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
-    use crate::commands::ProfileApplyError;
-
-    let code = if matches!(
-        error.downcast_ref::<ProfileApplyError>(),
-        Some(ProfileApplyError::UncommittedTargets { .. })
-    ) {
-        ErrorCode::ProfileUncommittedTargets
-    } else if error
-        .downcast_ref::<crate::profile::ProfileClaimError>()
-        .is_some()
-        || error.is::<ProfileApplyError>()
-        // The single sanctioned downcast of the anyhow CLI transport to the typed
-        // repository-state error: every refused target decision is a conflict;
-        // every other variant, an unreadable or unparseable registry included,
-        // keeps the generic profile-error code.
-        || matches!(
-            error.downcast_ref::<crate::repository_state::RepositoryStateError>(),
-            Some(crate::repository_state::RepositoryStateError::ProfileTargetConflicts(_))
-        )
-    {
-        ErrorCode::ProfileConflict
-    } else {
-        ErrorCode::ProfileError
-    };
-    Ok(derive_guidance(error).apply(command_json_error(error, code)))
 }
 
 /// Build the `jit dep add` envelope for a rejected batch (jit:c8518f2a).
@@ -1102,12 +1080,11 @@ mod exit_code_projection_tests {
 #[cfg(test)]
 mod repository_state_classifier_tests {
     //! REQ-01/REQ-02: pin the exhaustive `RepositoryStateError` exit-code mapping
-    //! and the profile `--json` variant classification to their real classifiers
-    //! ([`classify`] and [`profile_json_error`]). Each representative
+    //! to the real classifier ([`classify`]). Each representative
     //! variant is asserted so a reclassification (or a mis-mapped newly added
     //! variant) fails here rather than silently changing a command's exit status.
 
-    use super::{classify, profile_json_error};
+    use super::classify;
     use crate::domain::identity::ProfileId;
     use crate::repository_state::{
         AmbiguousOwnershipError, ArchiveExecutionError, Contribution, GateRegistryEditError,
@@ -1194,27 +1171,33 @@ mod repository_state_classifier_tests {
     }
 
     #[test]
-    fn test_profile_json_error_classifies_repository_state_variants() {
-        // Every refused profile decision — a target or a declaration — is a
-        // profile conflict (validation exit 4); an unreadable registry and an
-        // unrelated variant keep the generic profile-error code (exit 1).
-        let conflict_cases: Vec<RepositoryStateError> = vec![target_conflicts().into()];
-        for state_error in conflict_cases {
-            let error = anyhow::Error::new(state_error);
-            let json = profile_json_error(&error).expect("a conflict renders a JSON error");
-            assert_eq!(json.error.code, crate::output::ErrorCode::ProfileConflict);
-            assert_eq!(json.exit_code().code(), 4);
-        }
-
-        let error_cases: Vec<RepositoryStateError> = vec![
-            ProducerError::ProfileRegistryNotFile { target: "t".into() }.into(),
-            RepositoryLayoutError::LexicalEscape("p".into()).into(),
+    fn test_classify_profile_repository_state_failures_report_their_classified_code() {
+        // A refused profile decision is a profile conflict (exit 4); an
+        // unreadable registry keeps the generic code (exit 1); a layout rejection
+        // is an argument error. None is substituted with `PROFILE_ERROR`.
+        let cases: Vec<(RepositoryStateError, crate::output::ErrorCode, i32)> = vec![
+            (
+                target_conflicts().into(),
+                crate::output::ErrorCode::ProfileConflict,
+                4,
+            ),
+            (
+                ProducerError::ProfileRegistryNotFile { target: "t".into() }.into(),
+                crate::output::ErrorCode::GenericError,
+                1,
+            ),
+            (
+                RepositoryLayoutError::LexicalEscape("p".into()).into(),
+                crate::output::ErrorCode::InvalidArgument,
+                2,
+            ),
         ];
-        for state_error in error_cases {
+        for (state_error, code, exit) in cases {
             let error = anyhow::Error::new(state_error);
-            let json = profile_json_error(&error).expect("a profile error renders a JSON error");
-            assert_eq!(json.error.code, crate::output::ErrorCode::ProfileError);
-            assert_eq!(json.exit_code().code(), 1);
+            let json = classify(&error);
+            assert_eq!(json.error.code, code, "{error}");
+            assert_ne!(json.error.code, crate::output::ErrorCode::ProfileError);
+            assert_eq!(json.exit_code().code(), exit, "{error}");
         }
     }
 
@@ -1225,12 +1208,12 @@ mod repository_state_classifier_tests {
     /// carrying every fact its structured form carries so a reader of either
     /// acts on the same evidence.
     #[test]
-    fn test_profile_json_error_conflict_keeps_its_code_exit_and_message_stable() {
+    fn test_classify_profile_conflict_keeps_its_code_exit_and_message_stable() {
         let state_error: RepositoryStateError = target_conflicts().into();
         let error = anyhow::Error::new(state_error);
         let rendered = error.to_string();
 
-        let json = profile_json_error(&error).expect("a conflict renders a JSON error");
+        let json = classify(&error);
 
         assert_eq!(json.error.code, crate::output::ErrorCode::ProfileConflict);
         assert_eq!(json.exit_code().code(), 4);
@@ -1252,11 +1235,11 @@ mod repository_state_classifier_tests {
     /// beside its conflict class and the packages defining it differently, and
     /// suggests no resolution.
     #[test]
-    fn test_profile_json_error_conflict_attaches_structured_details_without_remedies() {
+    fn test_classify_profile_conflict_attaches_structured_details_without_remedies() {
         let state_error: RepositoryStateError = target_conflicts().into();
         let error = anyhow::Error::new(state_error);
 
-        let json = profile_json_error(&error).expect("a conflict renders a JSON error");
+        let json = classify(&error);
 
         let details = json.error.details.expect("a conflict attaches details");
         let conflicts = details["conflicts"]
@@ -1283,10 +1266,9 @@ mod repository_state_classifier_tests {
     }
 
     #[test]
-    fn test_profile_json_error_conflict_details_conform_to_the_published_schema() {
+    fn test_classify_profile_conflict_details_conform_to_the_published_schema() {
         let error = anyhow::Error::new(RepositoryStateError::from(target_conflicts()));
-        let details = profile_json_error(&error)
-            .expect("a conflict renders a JSON error")
+        let details = classify(&error)
             .error
             .details
             .expect("a conflict attaches details");
@@ -1342,19 +1324,17 @@ mod repository_state_classifier_tests {
 
         for variant in variants {
             let error = anyhow::Error::new(variant);
-            let json = profile_json_error(&error).expect("a graph refusal renders a JSON error");
-            for rendered in [classify(&error), json] {
-                assert_eq!(
-                    rendered.error.code,
-                    crate::output::ErrorCode::ProfileError,
-                    "{error}"
-                );
-                assert_eq!(
-                    rendered.exit_code(),
-                    crate::output::ExitCode::GenericError,
-                    "{error}"
-                );
-            }
+            let rendered = classify(&error);
+            assert_eq!(
+                rendered.error.code,
+                crate::output::ErrorCode::ProfileError,
+                "{error}"
+            );
+            assert_eq!(
+                rendered.exit_code(),
+                crate::output::ExitCode::GenericError,
+                "{error}"
+            );
         }
     }
 }
@@ -1810,7 +1790,7 @@ mod derived_guidance_tests {
 
         let json = classify(&error);
 
-        assert_eq!(json.error.code, ErrorCode::ValidationFailed);
+        assert_eq!(json.error.code, ErrorCode::ProfileConflict);
         assert_eq!(
             details_of(&json)["conflicts"].as_array().map(Vec::len),
             Some(1)

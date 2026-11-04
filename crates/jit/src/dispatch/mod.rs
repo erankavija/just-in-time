@@ -195,6 +195,7 @@ pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     hooks::output_schema,
     init::output_schema,
     invariant::output_schema,
+    profile::output_schema,
     issue::output_schema,
     issue::alias_output_schema,
     snapshot::output_schema,
@@ -406,6 +407,7 @@ pub mod invariant;
 pub mod issue;
 pub mod item;
 pub mod label;
+pub mod profile;
 pub mod project;
 pub mod search;
 pub mod serve;

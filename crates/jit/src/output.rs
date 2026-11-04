@@ -29,6 +29,7 @@ mod init;
 mod invariant;
 mod issue;
 mod item;
+mod profile;
 mod project;
 mod search;
 mod serve;
