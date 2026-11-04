@@ -13,7 +13,7 @@ use crate::output::ErrorCode;
 use crate::storage::IssueStore;
 
 fn issue<S: IssueStore>(ctx: &CommandContext<'_, S>, id: &str) -> anyhow::Result<IssueId> {
-    resolve_issue(ctx.executor.storage(), id)
+    resolve_issue(ctx.executor, id)
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -11,8 +11,7 @@ fn export<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     args: SnapshotExportArgs,
 ) -> HandlerResult<SnapshotExportResponse> {
-    let snapshot_scope =
-        SnapshotScope::parse(&args.scope, |id| resolve_issue(ctx.executor.storage(), id))?;
+    let snapshot_scope = SnapshotScope::parse(&args.scope, |id| resolve_issue(ctx.executor, id))?;
     let snapshot_format = SnapshotFormat::parse(&args.format)
         .with_context(|| format!("Invalid format: {}", args.format))?;
     let source_mode = ctx.executor.archive().determine_snapshot_source_mode(
