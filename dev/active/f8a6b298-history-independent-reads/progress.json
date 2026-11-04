@@ -693,6 +693,7 @@
     "User allows Codex gpt-6-luna and gpt-6.1-sol liberally alongside astra and Claude.",
     "User ruling: reorder toward 944edb32 (format rewrite tooling); defer tasks off its path.",
     "a7314585 added LeaseChange::Reclaim and edited the lease-sequence contract in plan.md; batch a plan-review rerun after the wave.",
-    "gf2 quiet window 03:52-04:09 held the full-CI lock; released by 6a."
+    "gf2 quiet window 03:52-04:09 held the full-CI lock; released by 6a.",
+    "Window bracket (6a): give 6a 15 min warning; 6a stops all tracker writers (88, a4, gf2-4e) and confirms; then rewrite all five, reinstall jit once, verify each with jit validate, report to 6a who releases everyone and lifts the install freeze. Stop and report before reinstalling if any rewrite or validation fails."
   ]
 }
