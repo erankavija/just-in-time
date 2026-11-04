@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="1" failures="0" errors="0" uuid="edb79b96-1bff-4b72-af3f-0d98baaaffdb" timestamp="2026-11-04T15:49:44.953+02:00" time="0.017">
+    <testsuite name="jit" tests="1" disabled="0" errors="0" failures="0">
+        <testcase name="commands::serve::tests::test_start_server_bounds_a_child_that_neither_serves_nor_exits" classname="jit" timestamp="2026-11-04T15:49:44.955+02:00" time="0.014">
+        </testcase>
+    </testsuite>
+</testsuites>
