@@ -22,7 +22,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Refactor every test over the per-test limit",
-  "updated_at": "2026-11-03T22:39:32.591242126Z"
+  "updated_at": "2026-11-04T02:25:44.879292832Z"
 }
