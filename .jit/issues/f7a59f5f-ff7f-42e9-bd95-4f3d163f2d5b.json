@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "1fc9f56f-437a-4950-a633-250304c5b6d9",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:09:28.127757663Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f7a59f5f-ff7f-42e9-bd95-4f3d163f2d5b",
   "labels": [
     "type:task",
@@ -28,5 +35,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Sessions share the captured image and recognise it by token",
-  "updated_at": "2026-11-04T12:43:03.724721976Z"
+  "updated_at": "2026-11-04T13:09:28.127757663Z"
 }

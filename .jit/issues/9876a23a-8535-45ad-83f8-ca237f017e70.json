@@ -8,6 +8,7 @@
     "2195c98f-95a9-45d0-8582-d93c1d1fec45",
     "30eb0496-76d6-49bd-b087-b467aaccbd6a",
     "420bc076-e7f7-44bb-ad8f-487f106c5534",
+    "4b66bc6b-03a9-4fa4-90e9-dfec9ea78c13",
     "91edfa5c-2663-4fcb-a9d0-2817bc60664b",
     "b3ef68b5-ae91-4747-a2b2-49ac92cce1ba",
     "c92f4011-1850-4998-a555-ca899ec45552"
@@ -86,6 +87,12 @@
     "holistic-review"
   ],
   "gates_status": {
+    "holistic-review": {
+      "run_id": "1530f9eb-1af9-4e0f-a47c-4debe7a146b0",
+      "status": "failed",
+      "updated_at": "2026-11-04T13:12:23.479198191Z",
+      "updated_by": "auto:executor"
+    },
     "repo-validate": {
       "run_id": "cb95f1a8-9510-4092-a96c-75c8b0c88664",
       "status": "passed",
@@ -105,7 +112,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Compute one validation report and derive every validation view from it",
-  "updated_at": "2026-11-04T13:06:45.216894105Z"
+  "updated_at": "2026-11-04T13:12:49.823700322Z"
 }
