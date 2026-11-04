@@ -31,6 +31,38 @@ fn test_status_latest_by_default_unchanged() {
 }
 
 #[test]
+fn test_gate_status_reused_verdict_names_source_issue_and_run() {
+    let temp = JitCli::initialised().unwrap();
+    define_auto_gate(&temp, "tests", "exit 0");
+    let id = create_issue_requiring(&temp, &["tests"]);
+    run_gate_forced(&temp, &id, "tests");
+    let summary = temp.run_json(["gate", "status", &id, "tests"]).unwrap();
+    let run_id = serde_json::from_value(summary["run_id"].clone()).unwrap();
+    let path = temp.root().join(".jit").join(
+        jit::repository_state::VirtualPath::gate_run_record(&run_id)
+            .relative()
+            .as_path(),
+    );
+    let mut run: jit::domain::GateRunResult =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    let source_issue = jit::test_utils::issue_id(160);
+    let source_run = jit::test_utils::gate_run_id(1);
+    run.origin = jit::domain::GateVerdictOrigin::Reused {
+        source_issue: source_issue.clone(),
+        source_run: source_run.clone(),
+    };
+    std::fs::write(path, serde_json::to_vec(&run).unwrap()).unwrap();
+
+    temp.command(["gate", "status", &id, "tests"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains(source_issue.to_string())
+                .and(predicate::str::contains(source_run.to_string())),
+        );
+}
+
+#[test]
 fn test_status_latest_run_shows_manual_attestation_with_attestor_and_time() {
     let temp = JitCli::initialised().unwrap();
     temp.command([

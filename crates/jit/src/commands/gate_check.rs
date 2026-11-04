@@ -64,7 +64,10 @@ fn reused_gate_run(
         message: None,
         findings: source.findings.clone(),
         inputs_digest: source.inputs_digest.clone(),
-        origin: crate::domain::GateVerdictOrigin::Reused(source.run_id.clone()),
+        origin: crate::domain::GateVerdictOrigin::Reused {
+            source_issue: source.issue_id.clone(),
+            source_run: source.run_id.clone(),
+        },
         evaluation_stability: GateEvaluationStability::Stable,
     }
 }
@@ -2379,7 +2382,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         assert_eq!(fixture.executions(), 1, "the checker must run exactly once");
         assert!(executed.origin.is_executed());
-        assert_eq!(reused.origin.source_run(), Some(&executed.run_id));
+        assert_eq!(
+            reused.origin,
+            crate::domain::GateVerdictOrigin::Reused {
+                source_issue: executed.issue_id.clone(),
+                source_run: executed.run_id.clone(),
+            }
+        );
         assert_eq!(reused.status, executed.status);
         assert_eq!(reused.inputs_digest, executed.inputs_digest);
         assert!(
