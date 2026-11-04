@@ -125,13 +125,13 @@ assert "a copied seed shares no inode with the pool" different_inode \
 
 # --- Harvest --------------------------------------------------------------
 no_rsync="$FIX/no-rsync-bin"; mkdir -p "$no_rsync"
-for tool in bash git cp mkdir basename; do
+for tool in bash git cp mkdir basename rm; do
     ln -s "$(command -v "$tool")" "$no_rsync/$tool"
 done
 
 check_harvest() { # branch, PATH
     local branch="$1" search_path="$2"
-    local repo="$FIX/harvest-$branch" pool="$FIX/harvest-$branch-pool" sibling unshared_inode
+    local repo="$FIX/harvest-$branch" pool="$FIX/harvest-$branch-pool" sibling unshared_sibling unshared_inode
     new_repo "$repo"
     (cd "$repo" && LEAD_CACHE_POOL="$FIX/absent-pool" LEAD_SNAPSHOT_DIR="$snapshots" "$DISPATCH" a > /dev/null 2>&1)
     local wt="$repo/.agents/worktrees/agent-a"
@@ -146,6 +146,8 @@ check_harvest() { # branch, PATH
     put "$pool/target/debug/unshared" 'pool'
     touch -d '2020-01-01' "$pool/target/debug/unshared"
     unshared_inode="$(stat -c %i "$pool/target/debug/unshared")"
+    unshared_sibling="$FIX/harvest-$branch-unshared-sibling"
+    ln "$pool/target/debug/unshared" "$unshared_sibling"
     put "$wt/target/debug/unshared" 'worktree'
     touch -d '2021-01-01' "$wt/target/debug/unshared"
 
@@ -165,6 +167,40 @@ check_harvest() { # branch, PATH
 
 check_harvest rsync "$PATH"
 check_harvest cp "$no_rsync"
+
+# --- Worker temporary directories ---------------------------------------
+check_worker_tmp_reclaim() { # label, force
+    local label="$1" force="$2"
+    local repo="$FIX/worker-tmp-$label" pool="$FIX/worker-tmp-$label-pool"
+    local tmp_root="$FIX/worker-tmp-root-$label" tmp_dir wt dispatch_out
+    new_repo "$repo"
+    dispatch_out="$(cd "$repo" && LEAD_CACHE_POOL="$pool" LEAD_WORKTREE_TMP_ROOT="$tmp_root" \
+        LEAD_SNAPSHOT_DIR="$snapshots" "$DISPATCH" a 2>&1)"
+    wt="$repo/.agents/worktrees/agent-a"
+    tmp_dir="$tmp_root/${repo#/}/agent-a"
+    assert "$label: dispatch creates a per-worktree temporary directory" test -d "$tmp_dir"
+    assert "$label: prompt exports the temporary directory as TMPDIR" \
+        grep -Fq "export TMPDIR=\"$tmp_dir\"" <<<"$dispatch_out"
+    mkdir -p "$tmp_dir"
+    put "$tmp_dir/worker-leftover" 'left by a killed test'
+
+    if [[ "$force" == 1 ]]; then
+        put "$wt/unmerged.txt" 'force reclaim'
+        git -C "$wt" add unmerged.txt
+        git -C "$wt" -c user.email=test@example.com -c user.name=Test \
+            -c commit.gpgsign=false commit -qm 'unmerged worker commit'
+    fi
+
+    (cd "$repo" && LEAD_CACHE_POOL="$pool" LEAD_WORKTREE_TMP_ROOT="$tmp_root" \
+        LEAD_RECLAIM_FORCE="$force" "$RECLAIM" a > /dev/null 2>&1)
+    assert "$label: reclaim succeeds" test "$?" -eq 0
+    assert "$label: the temporary directory is removed" test ! -e "$tmp_dir"
+    assert "$label: the leftover is absent from the cache pool" \
+        test -z "$(find "$pool" -type f -name worker-leftover -print -quit 2>/dev/null)"
+}
+
+check_worker_tmp_reclaim normal 0
+check_worker_tmp_reclaim force 1
 
 echo "passed: $PASS, failed: $FAIL"
 [[ "$FAIL" -eq 0 ]]
