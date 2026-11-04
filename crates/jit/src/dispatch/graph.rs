@@ -1,6 +1,6 @@
 //! `jit graph` handlers.
 
-use super::{resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
+use super::{count_message, resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::GraphCommands;
 use crate::commands::graph::compute_dependency_summary;
 use crate::commands::GraphExportFormat;
@@ -29,7 +29,7 @@ fn deps<S: IssueStore>(
     let id = resolve_issue(ctx.executor.storage(), &id)?;
     let tree = ctx.executor.graph().build_dependency_tree(&id, depth)?;
     let summary = compute_dependency_summary(&tree);
-    let message = format!("{} dependencies", summary.total);
+    let message = count_message(summary.total, "", " dependencies");
     Ok(Outcome::success_with(
         GraphDepsTreeResponse::with_extras(
             tree,
@@ -50,7 +50,7 @@ fn rdeps<S: IssueStore>(
 ) -> HandlerResult<GraphDownstreamResponse> {
     let id = resolve_issue(ctx.executor.storage(), &id)?;
     let issues = ctx.executor.graph().show_rdeps_with_depth(&id, depth)?;
-    let message = format!("{} dependents", issues.len());
+    let message = count_message(issues.len(), "", " dependents");
     let dependents: Vec<MinimalIssue> = issues.iter().map(MinimalIssue::from).collect();
     Ok(Outcome::success_with(
         GraphDownstreamResponse::with_extras(dependents, IssueScope { issue_id: id }),
@@ -60,7 +60,7 @@ fn rdeps<S: IssueStore>(
 
 fn roots<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<GraphRootsResponse> {
     let issues = ctx.executor.graph().show_roots()?;
-    let message = format!("{} root issues", issues.len());
+    let message = count_message(issues.len(), "", " root issues");
     let roots: Vec<MinimalIssue> = issues.iter().map(MinimalIssue::from).collect();
     Ok(Outcome::success_with(
         GraphRootsResponse::new(roots),
@@ -76,7 +76,7 @@ fn tree<S: IssueStore>(
         .map(|root| resolve_issue(ctx.executor.storage(), &root))
         .transpose()?;
     let response = ctx.executor.graph().resolve_hierarchy_tree(root.as_ref())?;
-    let message = format!("{} nodes", response.count());
+    let message = count_message(response.count(), "", " nodes");
     Ok(Outcome::success_with(response, message))
 }
 

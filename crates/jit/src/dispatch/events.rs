@@ -1,18 +1,14 @@
 //! `jit events` handlers.
 
-use super::{resolve_issue_filter, CommandContext, HandlerResult, Outcome};
+use super::{count_message, resolve_issue_filter, CommandContext, HandlerResult, Outcome};
 use crate::cli::EventCommands;
 use crate::domain::event_catalog::EventTag;
 use crate::output::EventListResponse;
 use crate::storage::IssueStore;
 
-fn event_count_message(count: usize) -> String {
-    format!("{count} event(s)")
-}
-
 fn tail<S: IssueStore>(ctx: &CommandContext<'_, S>, n: usize) -> HandlerResult<EventListResponse> {
     let events = ctx.executor.queries().query_events(None, None, n)?;
-    let message = event_count_message(events.len());
+    let message = count_message(events.len(), "", " event(s)");
     Ok(Outcome::success_with(
         EventListResponse::new(events),
         message,
@@ -32,7 +28,7 @@ fn query<S: IssueStore>(
         .executor
         .queries()
         .query_events(event_type, issue, limit)?;
-    let message = event_count_message(events.len());
+    let message = count_message(events.len(), "", " event(s)");
     Ok(Outcome::success_with(
         EventListResponse::new(events),
         message,
@@ -95,7 +91,10 @@ mod tests {
         let printed: serde_json::Value = serde_json::from_slice(&out).unwrap();
         let events = printed["events"].as_array().unwrap();
         assert_eq!(printed["count"], events.len());
-        assert_eq!(printed["message"], event_count_message(events.len()));
+        assert_eq!(
+            printed["message"],
+            count_message(events.len(), "", " event(s)")
+        );
         assert_eq!(status, ExitCode::Success.into());
     }
 

@@ -1,6 +1,6 @@
 //! `jit issue` handlers.
 
-use super::{resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
+use super::{count_message, resolve_issue, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::{IssueCommands, IssueFilterArgs};
 use crate::commands::bulk_update::UpdateOperations;
 use crate::commands::{
@@ -119,7 +119,7 @@ pub(super) fn list<S: IssueStore>(
         filters.priority,
         filters.labels,
     )?;
-    let message = format!("Found {} issue(s)", issues.len());
+    let message = count_message(issues.len(), "Found ", " issue(s)");
     Ok(Outcome::success_with(
         IssueListing::new(issues, full),
         message,
@@ -153,8 +153,8 @@ fn search<S: IssueStore>(
     )?;
     let count = issues.len();
     let message = match &query {
-        Some(q) => format!("Found {count} issue(s) matching '{q}'"),
-        None => format!("Found {count} issue(s)"),
+        Some(q) => count_message(count, "Found ", &format!(" issue(s) matching '{q}'")),
+        None => count_message(count, "Found ", " issue(s)"),
     };
     let echoed = IssueSearchQuery { query };
     let results = if full {
