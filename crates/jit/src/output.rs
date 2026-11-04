@@ -17,6 +17,7 @@ pub mod config;
 mod emit;
 pub mod failure;
 mod invariant;
+mod version;
 
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 

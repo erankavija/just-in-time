@@ -526,12 +526,6 @@ impl CommandSchema {
             // Repository initialization.
             "init" => (Some(schema_to_value::<InitResponse>()), "InitResponse"),
 
-            // Version command
-            "version" => (
-                Some(schema_to_value::<crate::build_info::VersionInfo>()),
-                "VersionInfo",
-            ),
-
             // Status command
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 

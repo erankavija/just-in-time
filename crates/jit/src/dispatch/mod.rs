@@ -128,6 +128,7 @@ pub fn resolve_issue_filter<S: IssueStore>(
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     config::output_schema,
     invariant::output_schema,
+    version::output_schema,
     #[cfg(test)]
     test_group::output_schema,
     #[cfg(test)]
@@ -319,3 +320,4 @@ pub mod invariant;
 mod test_forms;
 #[cfg(test)]
 mod test_group;
+pub mod version;
