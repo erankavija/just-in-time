@@ -715,7 +715,8 @@ fn declared_exit_codes<'a>(
                 .map(|code| (*code, code.description(), false))
                 .chain(
                     leaf.findings
-                        .map(|(code, condition)| (code, condition, true)),
+                        .iter()
+                        .map(|(code, condition)| (*code, *condition, true)),
                 )
                 .map(move |(code, condition, exception)| CommandExitCode {
                     command: command.clone(),
@@ -1476,7 +1477,7 @@ mod tests {
     fn leaf(
         path: &'static str,
         raises: &'static [ErrorCode],
-        findings: Option<(ErrorCode, &'static str)>,
+        findings: &'static [(ErrorCode, &'static str)],
     ) -> crate::dispatch::LeafCodes {
         crate::dispatch::LeafCodes {
             path,
@@ -1490,7 +1491,7 @@ mod tests {
         let rows = declared_exit_codes(&[leaf(
             "dep_add",
             &[ErrorCode::CycleDetected, ErrorCode::ValidationFailed],
-            None,
+            &[],
         )]);
 
         assert_eq!(rows.len(), 1);
@@ -1504,9 +1505,9 @@ mod tests {
     #[test]
     fn test_declared_exit_codes_join_leaves_with_equal_rows() {
         let rows = declared_exit_codes(&[
-            leaf("a_one", &[ErrorCode::AlreadyExists], None),
-            leaf("b", &[ErrorCode::Blocked], None),
-            leaf("a_two", &[ErrorCode::AlreadyExists], None),
+            leaf("a_one", &[ErrorCode::AlreadyExists], &[]),
+            leaf("b", &[ErrorCode::Blocked], &[]),
+            leaf("a_two", &[ErrorCode::AlreadyExists], &[]),
         ]);
 
         let commands: Vec<_> = rows.iter().map(|row| row.command.as_str()).collect();
@@ -1515,11 +1516,11 @@ mod tests {
 
     #[test]
     fn test_declared_exit_codes_flag_exactly_the_findings_rows_as_exceptions() {
-        let condition = "the check found drift";
+        const CONDITION: &str = "the check found drift";
         let rows = declared_exit_codes(&[leaf(
             "check",
             &[ErrorCode::ValidationFailed],
-            Some((ErrorCode::ValidationFailed, condition)),
+            &[(ErrorCode::ValidationFailed, CONDITION)],
         )]);
 
         let flagged: Vec<_> = rows
@@ -1530,7 +1531,7 @@ mod tests {
             flagged,
             [
                 (ErrorCode::ValidationFailed.description(), false),
-                (condition, true)
+                (CONDITION, true)
             ]
         );
     }
