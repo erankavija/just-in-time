@@ -332,7 +332,7 @@ identity = "atomic-writes"
 
 [contribution.value]
 id = "atomic-writes"
-statement = "File replacements use the temp-file and atomic-rename pattern, and the event log grows by a positioned append at the length the mutation read. A mutation commits when its redo record is synced, and a session opening over a leftover record applies it idempotently. No-replace publication covers repository content: initialization publishes an absent data root from a synced stage directory by a no-replace rename, refusing an occupied destination."
+statement = "File replacements use the temp-file and atomic-rename pattern, and the event log grows by a positioned append at the committed length the mutation read. A mutation commits when its redo record is synced, and a session opening over a leftover record applies it idempotently. No-replace publication covers repository content: initialization publishes an absent data root from a synced stage directory by a no-replace rename, refusing an occupied destination."
 kind = "advisory"
 
 [[contribution]]
