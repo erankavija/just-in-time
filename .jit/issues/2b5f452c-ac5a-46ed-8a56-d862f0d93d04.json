@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-11-04T02:56:16.312950985Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "72ea2776-fd87-4276-a13a-244fd871470c",
+      "status": "failed",
+      "updated_at": "2026-11-04T02:59:57.926022244Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "2b5f452c-ac5a-46ed-8a56-d862f0d93d04",
@@ -35,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Validation capture hands its parsed records to the report",
-  "updated_at": "2026-11-04T02:56:16.312950985Z"
+  "updated_at": "2026-11-04T02:59:57.926022244Z"
 }
