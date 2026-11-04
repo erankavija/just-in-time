@@ -883,15 +883,15 @@ impl CommandSchema {
                 true,
             ),
             row(
-                "profile add",
-                3,
-                "The package archive path was not found.",
+                "profile pack",
+                6,
+                "The archive output path already exists.",
                 false,
             ),
             row(
-                "profile pack, profile add",
-                6,
-                "The archive output or package destination already exists.",
+                "profile add",
+                4,
+                "The package destination already exists.",
                 false,
             ),
             row(

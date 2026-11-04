@@ -243,7 +243,7 @@ fn test_profile_apply_preflights_conflicting_repeatable_selectors_before_publica
         );
 
         assert!(!output.status.success(), "{output:?}");
-        assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
+        assert_eq!(json(&output)["error"]["code"], "VALIDATION_FAILED");
         assert_eq!(fs::read(&config_path).unwrap(), config_before, "{output:?}");
         assert_eq!(fs::read(&events_path).unwrap(), events_before);
     }

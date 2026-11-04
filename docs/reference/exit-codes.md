@@ -33,8 +33,8 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `profile apply` | `2` | The --values-file path could not be read. |  |
 | `profile apply` | `4` | Repository-state derivation refused conflicting profile targets. |  |
 | `profile diff` | `4` | The difference report found targets or final validation that prevent publication. | yes |
-| `profile add` | `3` | The package archive path was not found. |  |
-| `profile pack, profile add` | `6` | The archive output or package destination already exists. |  |
+| `profile pack` | `6` | The archive output path already exists. |  |
+| `profile add` | `4` | The package destination already exists. |  |
 | `*` | `10` | The repository's on-disk format is not the one this binary accepts, or a filesystem/subprocess I/O operation failed. |  |
 | `*` | `11` | A lock wait expired while another jit process held the lock (`JIT_LOCK_TIMEOUT`); the command changed nothing and may be retried. |  |
 | `search` | `1` | ripgrep is not installed (RIPGREP_NOT_FOUND) or ran and failed (SEARCH_FAILED). |  |

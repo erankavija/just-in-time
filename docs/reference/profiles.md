@@ -331,7 +331,7 @@ the packages defining it, and states a final-validation refusal, such as a
 configured projection left stale, as status `would_conflict` carrying a
 `refusal`.
 
-A refused publication's `PROFILE_CONFLICT` error carries
+A refused publication's `VALIDATION_FAILED` error carries
 `error.details.conflicts[]` in the [standard `--json` error
 envelope](cli-commands.md#cli-json-contracts), one entry per refused target or
 declaration as `{owner, subject, conflict}`; `conflict.owners` names the
