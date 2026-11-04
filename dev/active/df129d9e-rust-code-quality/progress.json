@@ -1317,11 +1317,11 @@
       "review": "lead R1 FAIL: production -234 good; test call sites expanded to 7-line add_dependencies_with_policy (~+470 test lines), violates shared-test-contracts; one shared test helper + wrapped doc examples. Rework 1 to Codex. Rework 1: lead PASS; -222 production; shared add_reducing_edge (lead added its test-support gate). Landed; code-review 148117fc: add_reducing_edge recreates wrapper vs REQ-03 (helper came from lead's rework-1 review). Escalated. REQ-03 amended + D-01; code-review rerun passed; closed."
     },
     "3b696589": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Opus",
       "reason": "flaky graceful-shutdown tests (steward filed to lead); needs server seam judgement",
       "note": "criteria rewritten per steward (A1, cheaper partial-request fixture first); D-01 records the corrected diagnosis (348a3814b)",
-      "review": "lead PASS at 6f81dd120: test-support FirstReadAcceptor (server crate; same feature as the drain seam), fixture blocks on first-read report after a partial request; 20/20 alone and 20/20 under parallel suite Landed; code-review 8f278006: F1 unjoined stderr collector race, F2 no committed 20+20 evidence. Rework 1 to same worker. Rework 1 (cef206e33, 46cc5e1): lead PASS; wait_for_exit joins the collector and returns ExitedServer.log; evidence note dev/active/3b696589/req-04-evidence.md (lead links after landing)."
+      "review": "lead PASS at 6f81dd120: test-support FirstReadAcceptor (server crate; same feature as the drain seam), fixture blocks on first-read report after a partial request; 20/20 alone and 20/20 under parallel suite Landed; code-review 8f278006: F1 unjoined stderr collector race, F2 no committed 20+20 evidence. Rework 1 to same worker. Rework 1 (cef206e33, 46cc5e1): lead PASS; wait_for_exit joins the collector and returns ExitedServer.log; evidence note dev/active/3b696589/req-04-evidence.md (lead links after landing). Re-landed; all gates passed; evidence linked; closed."
     },
     "f7a59f5f": {
       "status": "done",
