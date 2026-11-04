@@ -506,25 +506,51 @@ pub enum MutationError {
     GatePresetAlreadyExists(String),
 }
 
-/// The id of each ordinary direct gate-run directory in a captured root listing.
-/// Non-directory clutter and names that are not run ids are ignored.
-pub(crate) fn captured_gate_run_ids(image: &RepositoryImage) -> Option<Vec<GateRunId>> {
+/// The issue directories a captured gate-run root listing names that the image
+/// holds as directories. `verdicts/` and other names that are not issue ids are
+/// ignored.
+pub(crate) fn captured_gate_run_issue_ids(image: &RepositoryImage) -> Option<Vec<IssueId>> {
     let listing = image.directory_listings().get(&VirtualPath::GATE_RUNS)?;
     Some(
         listing
             .names()
             .iter()
-            .filter_map(|name| GateRunId::try_from(name.as_str()).ok())
-            .filter(|run_id| {
+            .filter_map(|name| IssueId::try_from(name.as_str()).ok())
+            .filter(|issue| {
                 matches!(
                     image
                         .entries()
-                        .get(&VirtualPath::gate_run_directory(run_id)),
+                        .get(&VirtualPath::gate_run_issue_directory(issue)),
                     Some(RepositoryEntry::Directory { .. })
                 )
             })
             .collect(),
     )
+}
+
+/// Each `(issue, run)` a captured listing of a
+/// [`captured_gate_run_issue_ids`] directory names as `<run-id>.json`. Other
+/// names are clutter and ignored.
+pub(crate) fn captured_gate_run_ids(image: &RepositoryImage) -> Vec<(IssueId, GateRunId)> {
+    captured_gate_run_issue_ids(image)
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|issue| {
+            image
+                .directory_listings()
+                .get(&VirtualPath::gate_run_issue_directory(&issue))
+                .map(|listing| {
+                    listing
+                        .names()
+                        .iter()
+                        .filter_map(|name| name.strip_suffix(".json"))
+                        .filter_map(|stem| GateRunId::try_from(stem).ok())
+                        .map(|run| (issue.clone(), run))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        })
+        .collect()
 }
 
 /// The gate key of each directory a captured `gate-runs/verdicts` listing names.
@@ -1045,22 +1071,27 @@ pub(super) fn finalize_delta(
             result.started_at = now;
             result.completed_at = Some(now);
         }
-        // The run directory is freshly named by a derived id, so it is absent.
-        actions.push(RepositoryAction::CreateDirectory {
-            path: VirtualPath::gate_run_directory(&result.run_id),
-            owner: RepositoryActionOwner::RepositoryStateMutation,
-            expected: ExpectedPreimage::Absent,
-        });
+        let directory = VirtualPath::gate_run_issue_directory(&result.issue_id);
+        if matches!(image.entry(&directory)?, RepositoryEntry::Absent)
+            && !actions.iter().any(|action| action.path() == &directory)
+        {
+            actions.push(RepositoryAction::CreateDirectory {
+                path: directory,
+                owner: RepositoryActionOwner::RepositoryStateMutation,
+                expected: ExpectedPreimage::Absent,
+            });
+        }
+        // The record is freshly named by a derived id, so it is absent.
         actions.push(RepositoryAction::WriteFile {
-            path: VirtualPath::gate_run_record(&result.run_id),
+            path: VirtualPath::gate_run_record(&result.issue_id, &result.run_id),
             owner: RepositoryActionOwner::RepositoryStateMutation,
             expected: ExpectedPreimage::Absent,
             bytes: serialize_gate_run(&result)?,
             mode: FileMode::Regular,
         });
         // A run holding a reusable verdict becomes its key's reuse source. The
-        // record sorts after the run directory it names, so it never names an
-        // unpublished run.
+        // verdict record sorts after the run record it names, so it never names
+        // an unpublished run.
         if let Some(digest) = result.reusable_digest() {
             let path = VirtualPath::gate_verdict_record(&result.gate_key, digest);
             for parent in path.ancestor_directories()? {
@@ -2205,13 +2236,18 @@ mod tests {
     fn test_finalize_gate_run_reserves_its_derived_id_and_serializes_attestation() {
         let context = ctx();
         let run_id = context.gate_run_id_at(0);
+        let issue = crate::test_utils::issue_id(7);
         let image = ImageBuilder::new()
             .entry(VirtualPath::GATE_RUNS, RepositoryEntry::Absent)
+            .entry(
+                VirtualPath::gate_run_issue_directory(&issue),
+                RepositoryEntry::Absent,
+            )
             .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
             .build();
         let draft = GateRunResult::attestation(
             &run_id,
-            &crate::test_utils::issue_id(7),
+            &issue,
             &"cargo-ci".parse().unwrap(),
             crate::declarations::GateStage::Postcheck,
             GateStatus::Passed,
@@ -2235,7 +2271,7 @@ mod tests {
             serde_json::to_vec(retry.delta()).unwrap(),
             "a retry keeps the run record bytes"
         );
-        let result_path = VirtualPath::gate_run_record(&run_id);
+        let result_path = VirtualPath::gate_run_record(&issue, &run_id);
         let bytes = first
             .delta()
             .actions()
@@ -2298,14 +2334,15 @@ mod tests {
             identity: crate::repository_state::EntryIdentity::for_bytes("dir", b"dir").unwrap(),
             mode: FileMode::Regular,
         };
+        let issue = crate::test_utils::issue_id(7);
         let builder = ImageBuilder::new()
             .entry(VirtualPath::GATE_RUNS, directory())
             .entry(
-                VirtualPath::gate_run_directory(&run_id),
+                VirtualPath::gate_run_issue_directory(&issue),
                 RepositoryEntry::Absent,
             )
             .entry(
-                VirtualPath::gate_run_record(&run_id),
+                VirtualPath::gate_run_record(&issue, &run_id),
                 RepositoryEntry::Absent,
             );
         let record = VirtualPath::gate_verdict_record(&gate_key, &verdict_digest());
@@ -2356,6 +2393,73 @@ mod tests {
         .unwrap()
         .delta()
         .clone()
+    }
+
+    #[test]
+    fn test_finalize_gate_run_creates_an_issue_directory_only_when_captured_absent() {
+        let context = ctx();
+        let (recorded, fresh) = (
+            crate::test_utils::issue_id(7),
+            crate::test_utils::issue_id(8),
+        );
+        let directory = RepositoryEntry::Directory {
+            identity: crate::repository_state::EntryIdentity::for_bytes("dir", b"dir").unwrap(),
+            mode: FileMode::Regular,
+        };
+        let runs = [(&recorded, 0), (&fresh, 1), (&fresh, 2)].map(|(issue, index)| {
+            GateRunResult::attestation(
+                &context.gate_run_id_at(index),
+                issue,
+                &"cargo-ci".parse().unwrap(),
+                crate::declarations::GateStage::Postcheck,
+                GateStatus::Passed,
+                None,
+            )
+        });
+        let image = runs
+            .iter()
+            .fold(
+                ImageBuilder::new()
+                    .entry(VirtualPath::GATE_RUNS, directory.clone())
+                    .entry(VirtualPath::gate_run_issue_directory(&recorded), directory)
+                    .entry(
+                        VirtualPath::gate_run_issue_directory(&fresh),
+                        RepositoryEntry::Absent,
+                    ),
+                |builder, run| {
+                    builder.entry(
+                        VirtualPath::gate_run_record(&run.issue_id, &run.run_id),
+                        RepositoryEntry::Absent,
+                    )
+                },
+            )
+            .build();
+        let intents = runs
+            .iter()
+            .map(|run| MutationIntent::RecordGateRun {
+                draft: Box::new(run.clone()),
+            })
+            .collect::<Vec<_>>();
+
+        let plan = finalize(&synthetic_layout(), &image, &context, &intents).unwrap();
+
+        let created = plan
+            .delta()
+            .actions()
+            .iter()
+            .filter_map(|action| match action {
+                RepositoryAction::CreateDirectory { path, .. } => Some(path.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(created, [VirtualPath::gate_run_issue_directory(&fresh)]);
+        assert!(runs
+            .iter()
+            .all(|run| plan.delta().actions().iter().any(|action| matches!(
+                action,
+                RepositoryAction::WriteFile { path, expected: ExpectedPreimage::Absent, .. }
+                    if *path == VirtualPath::gate_run_record(&run.issue_id, &run.run_id)
+            ))));
     }
 
     #[test]
@@ -2451,7 +2555,8 @@ mod tests {
             assert!(delta
                 .actions()
                 .iter()
-                .any(|action| action.path() == &VirtualPath::gate_run_record(&run.run_id)));
+                .any(|action| action.path()
+                    == &VirtualPath::gate_run_record(&run.issue_id, &run.run_id)));
         }
     }
 

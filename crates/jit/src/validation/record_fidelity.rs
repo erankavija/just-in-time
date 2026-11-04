@@ -8,7 +8,7 @@
 
 use crate::domain::artifact_execution::ArchiveEvidenceRecord;
 use crate::domain::event_log::parse_known_events;
-use crate::domain::identity::GateRunId;
+use crate::domain::identity::{GateRunId, IssueId};
 use crate::domain::{Event, GateRunResult, GateVerdictRecord, Issue};
 use crate::repository_state::{
     canonical_json, captured_gate_run_ids, captured_gate_verdict_records, captured_issue_ids,
@@ -44,12 +44,11 @@ pub(crate) fn record_drift(
         })
         .collect::<Result<Vec<_>>>()?;
     let runs = captured_gate_run_ids(records)
-        .unwrap_or_default()
         .iter()
-        .map(|id| {
-            let path = VirtualPath::gate_run_record(id);
+        .map(|(issue, run)| {
+            let path = VirtualPath::gate_run_record(issue, run);
             let check = match records.file_bytes(&path)? {
-                Some(bytes) => gate_run_drift(id, bytes),
+                Some(bytes) => gate_run_drift(issue, run, bytes),
                 None => Ok(Some("missing".to_string())),
             };
             Ok(report(&path, check))
@@ -132,10 +131,14 @@ fn issue_drift(bytes: &[u8]) -> Result<Option<String>> {
         .then(|| "re-serializing changes the record".to_string()))
 }
 
-/// A record carrying the current key set reproduces byte for byte; one written
-/// under an earlier schema keeps its identity fields.
-fn gate_run_drift(id: &GateRunId, bytes: &[u8]) -> Result<Option<String>> {
+/// A record names the issue and run its path names. One carrying the current
+/// key set reproduces byte for byte; one written under an earlier schema keeps
+/// its identity fields.
+fn gate_run_drift(issue: &IssueId, id: &GateRunId, bytes: &[u8]) -> Result<Option<String>> {
     let run: GateRunResult = serde_json::from_slice(bytes)?;
+    if run.issue_id != *issue {
+        return Ok(Some(format!("holds issue id '{}'", run.issue_id)));
+    }
     if run.run_id != *id {
         return Ok(Some(format!("holds run id '{}'", run.run_id)));
     }
@@ -212,7 +215,7 @@ mod tests {
     fn run_bytes(id: &GateRunId) -> Vec<u8> {
         serialize_gate_run(&GateRunResult::attestation(
             id,
-            &crate::test_utils::issue_id(7),
+            &run_issue(),
             &"tests".parse().unwrap(),
             GateStage::Postcheck,
             GateStatus::Passed,
@@ -297,11 +300,53 @@ mod tests {
             .is_some());
     }
 
+    fn run_issue() -> IssueId {
+        crate::test_utils::issue_id(7)
+    }
+
     #[test]
     fn test_gate_run_drift_reports_a_record_stored_under_another_run_id() {
         let holding = crate::test_utils::gate_run_id(2);
-        let reason = gate_run_drift(&crate::test_utils::gate_run_id(1), &run_bytes(&holding));
+        let reason = gate_run_drift(
+            &run_issue(),
+            &crate::test_utils::gate_run_id(1),
+            &run_bytes(&holding),
+        );
         assert!(reason.unwrap().unwrap().contains(holding.as_str()));
+    }
+
+    #[test]
+    fn test_record_drift_reports_a_record_stored_under_another_issue_directory() {
+        let (directory, run) = (
+            crate::test_utils::issue_id(8),
+            crate::test_utils::gate_run_id(1),
+        );
+        let record = VirtualPath::gate_run_record(&directory, &run);
+
+        let drift = drift_over(
+            ImageBuilder::new()
+                .entry(VirtualPath::GATE_RUNS, directory_entry())
+                .listing(
+                    VirtualPath::GATE_RUNS,
+                    DirectoryListing::new([directory.to_string()]).unwrap(),
+                )
+                .entry(
+                    VirtualPath::gate_run_issue_directory(&directory),
+                    directory_entry(),
+                )
+                .listing(
+                    VirtualPath::gate_run_issue_directory(&directory),
+                    DirectoryListing::new([record.file_name().unwrap().to_string()]).unwrap(),
+                )
+                .file(record.clone(), run_bytes(&run)),
+        );
+
+        assert_eq!(drift.len(), 1, "{drift:?}");
+        assert!(
+            drift[0].starts_with(&record.repository_relative()),
+            "{drift:?}"
+        );
+        assert!(drift[0].contains(run_issue().as_str()), "{drift:?}");
     }
 
     #[test]
@@ -310,12 +355,12 @@ mod tests {
         let mut raw: Value = serde_json::from_slice(&run_bytes(&id)).unwrap();
         raw["retired_key"] = Value::Bool(true);
         assert_eq!(
-            gate_run_drift(&id, &serde_json::to_vec(&raw).unwrap()).unwrap(),
+            gate_run_drift(&run_issue(), &id, &serde_json::to_vec(&raw).unwrap()).unwrap(),
             None
         );
 
         raw["origin"] = serde_json::json!({ "kind": "not-a-recorded-origin" });
-        let lost = gate_run_drift(&id, &serde_json::to_vec(&raw).unwrap());
+        let lost = gate_run_drift(&run_issue(), &id, &serde_json::to_vec(&raw).unwrap());
         assert!(!matches!(lost, Ok(None)));
     }
 
@@ -323,15 +368,17 @@ mod tests {
     fn test_gate_run_drift_holds_current_keys_to_canonical_bytes() {
         let id = crate::test_utils::gate_run_id(1);
         let canonical = run_bytes(&id);
-        assert_eq!(gate_run_drift(&id, &canonical).unwrap(), None);
+        assert_eq!(gate_run_drift(&run_issue(), &id, &canonical).unwrap(), None);
 
         let raw: Value = serde_json::from_slice(&canonical).unwrap();
-        assert!(gate_run_drift(&id, &serde_json::to_vec(&raw).unwrap())
-            .unwrap()
-            .is_some());
+        assert!(
+            gate_run_drift(&run_issue(), &id, &serde_json::to_vec(&raw).unwrap())
+                .unwrap()
+                .is_some()
+        );
     }
 
-    fn directory() -> RepositoryEntry {
+    fn directory_entry() -> RepositoryEntry {
         RepositoryEntry::Directory {
             identity: EntryIdentity::for_bytes("dir", b"dir").unwrap(),
             mode: FileMode::Regular,
@@ -361,9 +408,9 @@ mod tests {
 
         let drift = drift_over(
             ImageBuilder::new()
-                .entry(VirtualPath::GATE_VERDICTS, directory())
+                .entry(VirtualPath::GATE_VERDICTS, directory_entry())
                 .listing(VirtualPath::GATE_VERDICTS, directory_names(&["tests"]))
-                .entry(VirtualPath::gate_verdict_directory(&key), directory())
+                .entry(VirtualPath::gate_verdict_directory(&key), directory_entry())
                 .listing(
                     VirtualPath::gate_verdict_directory(&key),
                     directory_names(&[
@@ -388,12 +435,12 @@ mod tests {
 
         let drift = drift_over(
             ImageBuilder::new()
-                .entry(VirtualPath::GATE_RUNS, directory())
+                .entry(VirtualPath::GATE_RUNS, directory_entry())
                 .listing(
                     VirtualPath::GATE_RUNS,
                     DirectoryListing::new([verdicts]).unwrap(),
                 )
-                .entry(VirtualPath::GATE_VERDICTS, directory()),
+                .entry(VirtualPath::GATE_VERDICTS, directory_entry()),
         );
 
         assert_eq!(drift, Vec::<String>::new());

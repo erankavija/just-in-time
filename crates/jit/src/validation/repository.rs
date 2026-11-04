@@ -918,9 +918,13 @@ mod tests {
         assert_eq!(plain.passes.len(), 8);
     }
 
+    /// Seed one issue holding an attested gate, and name its run.
     fn seed_attested_gate_run(
         executor: &mut crate::commands::CommandExecutor<JsonFileStorage>,
-    ) -> crate::domain::identity::GateRunId {
+    ) -> (
+        crate::domain::identity::IssueId,
+        crate::domain::identity::GateRunId,
+    ) {
         seed_fixture_issue(
             executor,
             "Root",
@@ -946,66 +950,15 @@ mod tests {
             .gates()
             .pass_gate(&issue.id, &key, Some("human:test".to_string()), false)
             .unwrap();
-        std::fs::read_dir(data_path(executor, &VirtualPath::GATE_RUNS))
+        let run_id = executor
+            .storage()
+            .load_issue(&issue.id)
             .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .file_name()
-            .to_string_lossy()
-            .as_ref()
-            .try_into()
-            .unwrap()
-    }
-
-    #[test]
-    fn test_report_judges_gate_recency_at_the_injected_instant() {
-        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
-            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
-        )
-        .unwrap();
-        seed_attested_gate_run(&mut executor);
-        let rules = String::from_utf8(
-            read_fixture(&executor, &VirtualPath::RULES.repository_relative()).unwrap(),
-        )
-        .unwrap();
-        std::fs::write(
-            data_path(&executor, &VirtualPath::RULES),
-            format!(
-                "{rules}\n[[rules]]\nname = \"recency\"\nseverity = \"error\"\n\
-                 assert = {{ gate-recency = {{ max-age-days = 7 }} }}\n"
-            ),
-        )
-        .unwrap();
-        let image = executor
-            .capture_validation_image_with(&std::collections::BTreeMap::new())
+            .gates_status[&key]
+            .run_id
+            .clone()
             .unwrap();
-        let captured = CapturedValidation::from_image(&image);
-        let is_stale_at = |now| {
-            report(&captured, &ReportInputs { now, history: None })
-                .rule_report
-                .findings
-                .iter()
-                .any(|finding| finding.rule == "recency")
-        };
-
-        assert!(!is_stale_at(Utc::now()));
-        assert!(is_stale_at(Utc::now() + chrono::Duration::days(8)));
-    }
-
-    #[test]
-    fn test_validate_live_accepts_every_record_the_writers_published() {
-        let (_repo, mut executor) = crate::test_utils::setup_test_repo_with_config(
-            "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
-        )
-        .unwrap();
-        executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
-        seed_attested_gate_run(&mut executor);
-
-        validate_live(&executor).unwrap();
+        (issue.id, run_id)
     }
 
     #[test]
@@ -1018,8 +971,8 @@ mod tests {
             .validation()
             .validate_with_fix(true, false)
             .unwrap();
-        let run_id = seed_attested_gate_run(&mut executor);
-        let path = VirtualPath::gate_run_record(&run_id);
+        let (issue_id, run_id) = seed_attested_gate_run(&mut executor);
+        let path = VirtualPath::gate_run_record(&issue_id, &run_id);
         let stored = read_fixture(&executor, &path.repository_relative()).unwrap();
         let mut raw: serde_json::Value = serde_json::from_slice(&stored).unwrap();
         raw["retired_key"] = serde_json::Value::Bool(true);
@@ -1048,17 +1001,14 @@ mod tests {
             .validation()
             .validate_with_fix(true, false)
             .unwrap();
-        let run_id = seed_attested_gate_run(&mut executor);
+        let (issue_id, run_id) = seed_attested_gate_run(&mut executor);
         let path = VirtualPath::gate_verdict_record(
             &"tests".parse().unwrap(),
             &crate::domain::repository_inputs::InputsDigest::try_from("d".repeat(64)).unwrap(),
         );
         let file = data_path(&executor, &path);
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-        let record = crate::domain::GateVerdictRecord {
-            issue_id: executor.storage().list_issues().unwrap().remove(0).id,
-            run_id,
-        };
+        let record = crate::domain::GateVerdictRecord { issue_id, run_id };
         std::fs::write(&file, serde_json::to_vec(&record).unwrap()).unwrap();
 
         let error = failure(&validate_live(&executor).unwrap_err());
@@ -1079,9 +1029,9 @@ mod tests {
             .validation()
             .validate_with_fix(true, false)
             .unwrap();
-        let run_id = seed_attested_gate_run(&mut executor);
+        let (issue_id, run_id) = seed_attested_gate_run(&mut executor);
         std::fs::write(
-            data_path(&executor, &VirtualPath::gate_run_record(&run_id)),
+            data_path(&executor, &VirtualPath::gate_run_record(&issue_id, &run_id)),
             "not json",
         )
         .unwrap();

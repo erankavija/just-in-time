@@ -29,33 +29,22 @@ pub(crate) trait GateRunTree {
     fn read_regular_file(&self, file: &VirtualPath) -> Result<TreeNode<Vec<u8>>>;
 }
 
-/// Every recorded run of `issue_id`.
+/// Every recorded run of `issue_id`, from one listing of its directory.
 ///
-/// A child of the gate-run root that is not a run directory named by a run id,
-/// or a run directory holding no record, is clutter and lists nothing. The root
-/// itself must be an ordinary directory when present.
+/// A child not named `<run-id>.json`, and a record of another issue, is clutter
+/// and lists nothing. The directory must be an ordinary directory when present.
 pub(crate) fn list_gate_runs_for_issue(
     tree: &impl GateRunTree,
     issue_id: &IssueId,
 ) -> Result<Vec<GateRunResult>> {
-    let names = match tree.list_directory(&VirtualPath::GATE_RUNS)? {
-        TreeNode::Absent => return Ok(Vec::new()),
-        TreeNode::OtherKind => anyhow::bail!(
-            "Gate run root at {} must be an ordinary directory",
-            VirtualPath::GATE_RUNS.repository_relative()
-        ),
-        TreeNode::Present(names) => names,
+    let Some(names) = list_issue_directory(tree, issue_id)? else {
+        return Ok(Vec::new());
     };
     names
         .iter()
-        .filter_map(|name| GateRunId::try_from(name.as_str()).ok())
-        .filter_map(
-            |run_id| match tree.list_directory(&VirtualPath::gate_run_directory(&run_id)) {
-                Ok(TreeNode::Present(_)) => read_record(tree, &run_id).transpose(),
-                Ok(TreeNode::Absent | TreeNode::OtherKind) => None,
-                Err(error) => Some(Err(error)),
-            },
-        )
+        .filter_map(|name| name.strip_suffix(".json"))
+        .filter_map(|stem| GateRunId::try_from(stem).ok())
+        .filter_map(|run_id| read_record(tree, issue_id, &run_id).transpose())
         .filter(|run| !matches!(run, Ok(run) if &run.issue_id != issue_id))
         .collect()
 }
@@ -65,34 +54,42 @@ pub(crate) fn list_gate_runs_for_issue(
 /// # Errors
 ///
 /// [`GateRunNotFoundError`] when no record exists or it belongs to another
-/// issue; an error naming the path when the root, the run directory or the
-/// record is of the wrong kind, or the record does not parse.
+/// issue; an error naming the path when the issue's directory or the record is
+/// of the wrong kind, or the record does not parse.
 pub(crate) fn load_gate_run_result(
     tree: &impl GateRunTree,
     issue_id: &IssueId,
     run_id: &GateRunId,
 ) -> Result<GateRunResult> {
     let not_found = || GateRunNotFoundError::new(run_id.clone()).into();
-    for directory in [
-        VirtualPath::GATE_RUNS,
-        VirtualPath::gate_run_directory(run_id),
-    ] {
-        match tree.list_directory(&directory)? {
-            TreeNode::Absent => return Err(not_found()),
-            TreeNode::OtherKind => anyhow::bail!(
-                "Gate run directory at {} must be an ordinary directory",
-                directory.repository_relative()
-            ),
-            TreeNode::Present(_) => {}
-        }
-    }
-    read_record(tree, run_id)?
+    list_issue_directory(tree, issue_id)?.ok_or_else(not_found)?;
+    read_record(tree, issue_id, run_id)?
         .filter(|run| &run.issue_id == issue_id)
         .ok_or_else(not_found)
 }
 
-fn read_record(tree: &impl GateRunTree, run_id: &GateRunId) -> Result<Option<GateRunResult>> {
-    let path = VirtualPath::gate_run_record(run_id);
+/// The child names of `issue_id`'s gate-run directory; `None` when it is absent.
+fn list_issue_directory(
+    tree: &impl GateRunTree,
+    issue_id: &IssueId,
+) -> Result<Option<Vec<String>>> {
+    let directory = VirtualPath::gate_run_issue_directory(issue_id);
+    match tree.list_directory(&directory)? {
+        TreeNode::Absent => Ok(None),
+        TreeNode::OtherKind => anyhow::bail!(
+            "Gate run directory at {} must be an ordinary directory",
+            directory.repository_relative()
+        ),
+        TreeNode::Present(names) => Ok(Some(names)),
+    }
+}
+
+fn read_record(
+    tree: &impl GateRunTree,
+    issue_id: &IssueId,
+    run_id: &GateRunId,
+) -> Result<Option<GateRunResult>> {
+    let path = VirtualPath::gate_run_record(issue_id, run_id);
     match tree.read_regular_file(&path)? {
         TreeNode::Absent => Ok(None),
         TreeNode::OtherKind => anyhow::bail!(

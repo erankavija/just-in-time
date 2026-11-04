@@ -281,7 +281,10 @@ fn captured_reusable_gate_run(
     )?;
     let Some(image) = super::capture_discovering(session, spec, |image, spec| {
         if let Some(record) = record(image)? {
-            spec.discover_paths([VirtualPath::gate_run_record(&record.run_id)])?;
+            spec.discover_paths([VirtualPath::gate_run_record(
+                &record.issue_id,
+                &record.run_id,
+            )])?;
         }
         Ok(())
     })?
@@ -291,7 +294,7 @@ fn captured_reusable_gate_run(
     let Some(record) = record(&image)? else {
         return Ok(Some(None));
     };
-    let run_path = VirtualPath::gate_run_record(&record.run_id);
+    let run_path = VirtualPath::gate_run_record(&record.issue_id, &record.run_id);
     let run = image
         .file_bytes(&run_path)?
         .map(|bytes| {
@@ -929,7 +932,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         let layout = self.exec.require_layout()?;
         let mutation = super::production_mutation_context();
         let run_id = mutation.gate_run_id_at(0);
-        let run_paths = super::gate_run_record_paths(&mutation, 1);
+        let run_paths = super::gate_run_record_paths(&mutation, issue_id, 1);
         let (target_id, image, issue, issues, registry, runs, captured) =
             with_mutation_attempts("gate evaluation inputs", || {
                 let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
@@ -2536,7 +2539,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 &fixture.gate_key,
                 source.inputs_digest.as_ref().unwrap(),
             ),
-            crate::repository_state::VirtualPath::gate_run_record(&source.run_id),
+            crate::repository_state::VirtualPath::gate_run_record(&source.issue_id, &source.run_id),
         ]
         .map(|path| layout.resolve(&path).unwrap());
         fn corrupt_files_except(dir: &std::path::Path, kept: &[std::path::PathBuf]) -> usize {
@@ -2966,27 +2969,34 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         .unwrap();
     }
 
-    fn corrupt_gate_run_record() -> crate::repository_state::VirtualPath {
-        crate::repository_state::VirtualPath::gate_run_record(&crate::test_utils::gate_run_id(0xc0))
+    fn corrupt_gate_run_record(issue: &IssueId) -> crate::repository_state::VirtualPath {
+        crate::repository_state::VirtualPath::gate_run_record(
+            issue,
+            &crate::test_utils::gate_run_id(0xc0),
+        )
     }
 
-    fn write_corrupt_gate_run(repo: &std::path::Path) {
+    fn write_corrupt_gate_run(repo: &std::path::Path, issue: &IssueId) {
         let path = repo
             .join(".jit")
-            .join(corrupt_gate_run_record().relative().as_path());
+            .join(corrupt_gate_run_record(issue).relative().as_path());
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, "{ corrupt").unwrap();
     }
 
     /// Shell commands a checker runs to publish `concurrent-run.json` as the
-    /// record of `run_id`.
-    fn publish_concurrent_run_script(run_id: &GateRunId) -> String {
+    /// record of `issue`'s run `run_id`.
+    fn publish_concurrent_run_script(issue: &IssueId, run_id: &GateRunId) -> String {
         use crate::repository_state::VirtualPath;
 
         format!(
             "mkdir -p .jit/{}; cp concurrent-run.json .jit/{}",
-            VirtualPath::gate_run_directory(run_id).relative().as_str(),
-            VirtualPath::gate_run_record(run_id).relative().as_str(),
+            VirtualPath::gate_run_issue_directory(issue)
+                .relative()
+                .as_str(),
+            VirtualPath::gate_run_record(issue, run_id)
+                .relative()
+                .as_str(),
         )
     }
 
@@ -3000,8 +3010,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let layout = executor.require_layout().unwrap();
         let probe = crate::test_utils::gate_run_id(0xe0);
         let run_paths = [
-            crate::repository_state::VirtualPath::gate_run_directory(&probe),
-            crate::repository_state::VirtualPath::gate_run_record(&probe),
+            crate::repository_state::VirtualPath::gate_run_issue_directory(issue_id),
+            crate::repository_state::VirtualPath::gate_run_record(issue_id, &probe),
         ];
         let mut session = executor.storage.open_mutation_session(layout).unwrap();
         let image = executor
@@ -3120,7 +3130,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .collect::<Vec<_>>();
         assert_eq!(
             captured_runs,
-            vec![VirtualPath::gate_run_record(&latest.run_id)]
+            vec![VirtualPath::gate_run_record(&issue_id, &latest.run_id)]
         );
 
         let result = executor.gates().check_gate(&issue_id, &gate_key).unwrap();
@@ -3157,7 +3167,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 },
             )
             .unwrap();
-        write_corrupt_gate_run(repo.path());
+        write_corrupt_gate_run(repo.path(), &issue_id);
 
         let result = executor
             .gates()
@@ -3184,7 +3194,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "true".to_string(),
             None,
         );
-        write_corrupt_gate_run(repo.path());
+        write_corrupt_gate_run(repo.path(), &issue_id);
         name_gate_run(
             &executor,
             &issue_id,
@@ -3197,7 +3207,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .check_gate(&issue_id, &"with-context".parse().unwrap())
             .unwrap_err();
 
-        assert!(format!("{error:#}").contains(corrupt_gate_run_record().relative().as_str()));
+        assert!(
+            format!("{error:#}").contains(corrupt_gate_run_record(&issue_id).relative().as_str())
+        );
     }
 
     #[test]
@@ -4413,9 +4425,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             named.status = GateRunStatus::Passed;
             for run in [&older, &named] {
                 executor.storage.add_data_file(
-                    crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
-                        .relative()
-                        .as_path(),
+                    crate::repository_state::VirtualPath::gate_run_record(
+                        &run.issue_id,
+                        &run.run_id,
+                    )
+                    .relative()
+                    .as_path(),
                     &serde_json::to_string(run).unwrap(),
                 );
             }
@@ -4452,7 +4467,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             None,
         );
         executor.storage.add_data_file(
-            crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
+            crate::repository_state::VirtualPath::gate_run_record(&run.issue_id, &run.run_id)
                 .relative()
                 .as_path(),
             &serde_json::to_string(&run).unwrap(),
@@ -4484,7 +4499,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             None,
         );
         executor.storage.add_data_file(
-            crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
+            crate::repository_state::VirtualPath::gate_run_record(&run.issue_id, &run.run_id)
                 .relative()
                 .as_path(),
             &serde_json::to_string(&run).unwrap(),
@@ -4725,7 +4740,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             )
             .unwrap();
         crate::test_utils::transition_issue(&executor, &issue_id, State::Ready).unwrap();
-        write_corrupt_gate_run(repo.path());
+        write_corrupt_gate_run(repo.path(), &issue_id);
 
         executor
             .issues()
@@ -5614,7 +5629,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "Run race",
             format!(
                 "if [ ! -f .run-race-seen ]; then : > .run-race-seen; {}; fi; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"",
-                publish_concurrent_run_script(&concurrent.run_id)
+                publish_concurrent_run_script(&issue_id, &concurrent.run_id)
             ),
             None,
         );
@@ -5668,7 +5683,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "Run race",
             format!(
                 "{}; printf x >> checker-count; cat \"$JIT_CONTEXT_FILE\"",
-                publish_concurrent_run_script(&concurrent.run_id)
+                publish_concurrent_run_script(&issue_id, &concurrent.run_id)
             ),
             None,
         );

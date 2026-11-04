@@ -1019,7 +1019,10 @@ mod tests {
     fn write_tracker_paths(layout: &RepositoryLayout) {
         let records = [
             VirtualPath::EVENTS,
-            VirtualPath::gate_run_record(&crate::test_utils::gate_run_id(1)),
+            VirtualPath::gate_run_record(
+                &crate::test_utils::issue_id(1),
+                &crate::test_utils::gate_run_id(1),
+            ),
             VirtualPath::archive_evidence_record(
                 &crate::domain::artifact_plan::PlanTarget::Document {
                     path: "doc.md".into(),
