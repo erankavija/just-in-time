@@ -8,37 +8,11 @@
   "description": "Run the one window that moves this repository, gf2, mealie-fi, inflected-messages and research to format 4, so the installed binary can leave the last format 3 build. The lead runs this, not a worker.\n\n## Background\n\nThe installed `jit` is the last format 3 build, and all five repositories are at format 3. `dev/active/f8a6b298-history-independent-reads/format4-rewrite.py` and `format4-window.sh` are tested on copies of all five. The rewrite takes no jit write lock and relies on quiet.\n\ngf2 has uncommitted paths inside and outside `.jit/`; its work outside `.jit/` stays untouched, and its `.jit` paths are committed by their owner before the window. A linked checkout's tracked `.jit` arrives by merging main, and leases in linked checkouts are covered by their repository's one rewrite.\n\n## Who does what\n\nThe lead runs every step. Each write to another repository needs its own user confirmation when it runs, and live sessions must coordinate the binary reinstall first.\n\n## Success Criteria\n\n- [hard] REQ-01: With no tracker writer in any of the five repositories and the reinstall coordinated with live sessions, the old binaries are copied for rollback and `jit` and `jit-server` are installed from a commit whose `cargo-ci` passed.\n- [hard] REQ-02: Each repository is rewritten, validated and committed by its own invocation of the driver, and each write to a repository other than this one has its own user confirmation.\n- [hard] REQ-03: Afterward all five repositories' `index.json` read 4, `jit validate` passes in each, and each run id cited in `dev/`, `docs/` or an issue record in this repository still resolves.\n\n## Notes\n\n- A linked checkout on an older branch stays refused until it merges main and re-runs the script. Live sessions finish or merge before the window.\n- A stop part-way leaves committed repositories at format 4, which the rollback binary refuses; the driver's message names them.\n\n## Decisions\n\n- D-1: User decision (2026-11-04, relayed by just-in-time-6a): the five-repository format 4 cutover is accepted on the steward's independent post-window verification. The installed jit and jit-server are the format 4 build from a05567fde; `jit validate` returned error_count 0 in just-in-time, gf2, mealie-fi, inflected-messages and research; jit-server restarted with identical arguments and /api/health returned 200. Evidence about repositories outside this checkout is accepted on that verification, not on the committed narrative.\n",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "2e4c2aeb475c57e9f33fb87a041d37c85d96f06c8092b2f1f9da30f75a8e2c92",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "format4-rewrite.py",
-          "resolved_path": "dev/active/f8a6b298-history-independent-reads/format4-rewrite.py"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "ad2c822c94fb4ec52db1bdfcc4176c420189e18776e94e15cf01cca5a4b8e9b1",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "format4-dry-run.sh",
-          "resolved_path": "dev/active/f8a6b298-history-independent-reads/format4-dry-run.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "8b72b123333524124b94429a28ddbcf0557507e04c22f632804a05c61de6d2c4",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "format4-window.sh",
-          "resolved_path": "dev/active/f8a6b298-history-independent-reads/format4-window.sh"
-        }
-      ],
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": "Format 4 cutover record",
-      "path": "dev/active/f8a6b298-history-independent-reads/format4-cutover.md"
+      "path": "dev/archive/f8a6b298-history-independent-reads/active/f8a6b298-history-independent-reads/format4-cutover.md"
     }
   ],
   "done_at": "2026-11-04T08:42:45.255527611Z",
@@ -70,5 +44,5 @@
   "priority": "high",
   "state": "done",
   "title": "Five repositories move to repository format 4 in one window",
-  "updated_at": "2026-11-04T11:54:55.226374885Z"
+  "updated_at": "2026-11-04T12:19:53.001700253Z"
 }

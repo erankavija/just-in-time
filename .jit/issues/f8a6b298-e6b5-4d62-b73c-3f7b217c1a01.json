@@ -1,4 +1,5 @@
 {
+  "archived_from": "done",
   "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-20T20:13:17.117995472Z",
   "context": {},
@@ -10,7 +11,57 @@
     "dc5fa7f8-0d0b-4b4f-9e9d-99cd07bc8857"
   ],
   "description": "Restructure the storage layout so that reading one issue's state, gate results, claim decision or lease reads only data addressed by that key. The event log, the claims log and gate-run history become append-only records that only history-reporting commands read.\n\n## Background\n\nSeveral ordinary commands scan the whole history of the repository. Their cost grows with the age of the project. Sizes measured in this repository when this epic was filed: `.jit/gate-runs/` holds 4,638 runs (47 MB), `.jit/events.jsonl` holds 16,465 lines (3.6 MB), and `.git/jit/claims.jsonl` holds 1,569 entries, 459 of them duplicate auto-evictions.\n\n- **Gate runs.** `gate-runs/<run-id>/result.json` is flat. An issue's runs are found by parsing every run and matching `issue_id` (`crates/jit/src/storage/json.rs:957`, `1473-1488`). The per-issue lookup and the `(gate, inputs digest)` reuse lookup both enumerate all runs. Gate evaluation and gate-checker evidence capture put every run record into the mutation image and then filter by issue (`commands/gate_check.rs:273-300`, `commands/mod.rs:660-675`, `commands/mod.rs:1971-1992`). Validation's precheck-history capture does the same (`commands/validate.rs:466`). Measured: `issue show` takes 98 ms with the runs present and 15 ms without them; `issue status` on 20 ids takes 1.4 s. `docs/reference/storage-records.md` documents the flat layout as deliberate.\n- **Claims log.** Every append rescans `claims.jsonl` to find the next sequence number (`storage/claim_coordinator.rs:935-983`). Every lease-enforced repository mutation and every synchronized acquisition replays the full log under the claims lock (`claim_coordinator.rs:420-438`, `690-701`, `1257-1360`). The storage reference calls `claims.index.json` a cache derived from the log. `ClaimCoordinator` repeats the lock, load, evict, append and write sequence by hand in eight operations. `acquire_claim` and `acquire_claim_with_reason` are called only from tests, so the claim property tests (`storage/claim_coordinator_proptests.rs`) exercise code that production never runs.\n- **Claim.** `claim` captures the whole event log and parses it to decide whether to emit one `IssueClaimed` event (`commands/claim.rs:188-200`, `repository_state/mutation.rs:675-700`, `850-885`).\n- **Archive.** Archive planning reads all of `events.jsonl` to find prior `artifact_archive_executed` evidence. Execute reads it twice: once through storage (`commands/archive.rs:248`) and once from the captured image (`commands/archive.rs:713`, `repository_state/archive.rs:31`, `456`).\n- **Event-log parsers.** `domain::parse_known_events` (`domain/event_log.rs:42`) certifies a torn line only by the profile marker that follows it, and it keeps records with retired tags. The file backend's archive reader is a second parser (`storage/json.rs:1355-1391`) with its own torn-prefix rule (`json.rs:1593`) and a raw `\"artifact_archive_executed\"` string literal. The in-memory backend has a third (`storage/memory.rs:480-492`), which fails on any record whose tag is retired.\n- **Search.** `jit search` with no `--glob` runs ripgrep over the whole data root (`main.rs:7140-7161`, `search.rs:116`), including the event log and every gate-run record.\n\n## Success Criteria\n\n- [hard] REQ-01: Reading one issue's gate runs (its latest run per gate, or its full run history) opens only that issue's run records. No read lists or parses another issue's runs.\n- [hard] REQ-02: The latest run of one gate on one issue is found directly from that (issue, gate) key, without reading older runs or runs of other gates.\n- [hard] REQ-03: A reusable verdict for a gate over an inputs digest is found directly from that (gate, digest) key, without reading runs recorded under other keys.\n- [hard] REQ-04: Gate evaluation, gate-checker evidence capture and validation's precheck-history capture put only the evaluated issue's run records into the mutation image. The size of the captured image does not depend on how many runs other issues have.\n- [hard] REQ-05: Reading or changing one issue's lease reads no claims-log content and no other issue's lease. Each claims-log append gets its sequence number without reading the log. The indefinite-lease limit check is the one exception: it reads current lease records, never the claims log.\n- [hard] REQ-06: Every lease operation runs through one lock-load-change-publish sequence that persists every change it makes. This covers acquire, renew, heartbeat, release, auto-evict, force-evict and the lease check inside repository mutations. No lease API exists only for tests, and the claim property tests drive the production acquisition path.\n- [hard] REQ-07: An interruption at any point in a lease operation leaves the lease state at its prior or its next value. No command rebuilds lease state from the claims log.\n- [hard] REQ-08: `claim` parses no event-log record; it reads only the bounded end-of-log probe that every event append shares. A claim that changes the assignment appends exactly one claim event in the same redo record as the issue write. Repeating a claim appends nothing.\n- [hard] REQ-09: Archive preview and execute find prior archive evidence for a target without reading the event log. Each of them reads that evidence once.\n- [hard] REQ-10: Exactly one event-log parser exists. The file backend, the in-memory backend and every history-reporting command parse through it, with one torn-line rule. A record with an unknown tag is an error naming its line. Events are selected by typed tag, never by a tag string literal.\n- [hard] REQ-11: A search without an explicit file selection reads no history file.\n- [hard] REQ-12: No file in the storage layout is derived from a history file, and no command compacts or rewrites a history file.\n- [hard] REQ-13: Only commands that report history read the event log, the claims log or gate-run history. Whole-repository `jit validate` and the `repository_validation` checker are named history readers: their record-fidelity pass has its own whole-log read and reads every gate-run record, and every other validation capture stays on the bounded end-of-log probe. The storage-format reference names those commands.\n- [hard] REQ-14: A file-backed test replaces the event log, the claims log and other issues' gate-run records with unparseable lines. With that content in place, it shows that `issue show`, `issue status`, `query available`, gate evaluation of one issue, `claim`, and lease acquire, renew and release still succeed.\n- [hard] REQ-15: The storage-format and storage-record references describe the per-key layout. Their flat gate-run layout and \"derived cache\" wording are gone.\n\n## Notes\n\n- Serves @/charter/D-19 and extends @/charter/D-17. It restructures rather than indexing or compacting (@/charter/D-18).\n- The layout changes without a migration boundary (@/inv/canonical-cutover). Repository per-key records are written in the same redo record as the mutation that produces them (@/inv/atomic-writes, @/inv/derived-state-coherence). Every state change still appends its event (@/inv/event-log).\n- One parser and one lease sequence satisfy @/inv/convention-convergence. Backend behaviour runs through shared conformance suites (@/inv/shared-test-contracts).\n- Resolved in planning: a claim's event follows the assignee change. Acquire, `issue unassign`, acquire writes the issue with no event today and appends one `IssueClaimed` after this work. An assignment made outside jit with no claim event gets a repair event today, and after this work a claim appends nothing and takes the lease only. Already assigned to the claimant through `issue assign`, `update --assignee` or `issue claim`: no-op. Assigned to another or unassigned: issue write plus event. The reachable-state table is in this epic's `drift-audit.md`.\n- `claim list` and `claim status` read per-file leases without the claims lock, report unexpired leases and mark a stale one `stale` (@/charter/D-22). Writers and `recover` do the evicting, which retires the persist-on-read of d7d0d0db.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Completion report",
+      "path": "dev/archive/f8a6b298-history-independent-reads/active/f8a6b298-history-independent-reads/completion-report.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "32ef6de89371003847c039ce0d991479abb8c916c33ae9c08376b810a11013ad",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../archive/3d9a0ce3-lead-friction/active/format3-window.sh",
+          "resolved_path": "dev/archive/f8a6b298-history-independent-reads/archive/3d9a0ce3-lead-friction/active/format3-window.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7a0f9b1e2918d11b0612261c8bf1d5033e9700078546f21ad79562a48b67ed23",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/archive/f8a6b298-history-independent-reads/active/f8a6b298-history-independent-reads/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bfdfc82300add7f5fcf11ba2cc6ad9be6cc961876813c1909b079b52610bde96",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/archive/f8a6b298-history-independent-reads/active/f8a6b298-history-independent-reads/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "ba3c3af28dcc0b0ff59cb1dc4aa52dec12b6e2c53a8b24e7a8b6d9313ebb2ef1",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "drift-audit.md",
+          "resolved_path": "dev/archive/f8a6b298-history-independent-reads/active/f8a6b298-history-independent-reads/drift-audit.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Plan",
+      "path": "dev/archive/f8a6b298-history-independent-reads/active/f8a6b298-history-independent-reads/plan.md"
+    }
+  ],
+  "done_at": "2026-11-04T12:19:23.892047472Z",
   "first_ready_at": "2026-10-20T20:12:36.798012405Z",
   "gates_required": [
     "repo-validate",
@@ -44,7 +95,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "archived",
   "title": "Restructure storage so reads never scale with project history",
-  "updated_at": "2026-11-04T12:17:02.520696504Z"
+  "updated_at": "2026-11-04T12:20:17.223014923Z"
 }

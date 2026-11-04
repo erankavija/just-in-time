@@ -402,15 +402,15 @@
   "escalations": [
     {
       "item": "stale-lease visibility under R2; b697a3f7 d3c94dc5, lease-required-error, c517b88b body",
-      "status": "pending with user via just-in-time-6a"
+      "status": "resolved by the user (relayed by 6a): stale leases listed and marked stale (not-expired filter, lock-free); b697a3f7 amendments d3c94dc5, lease-required-error -> foreign-lease-error, c517b88b body; applied in dd53527f, DEC-02, lease-read-api, f0a5b90a"
     },
     {
       "item": "dd53527f REQ-02 vs satisfies REQ-05 contradiction (code-review x2)",
-      "status": "pending with user via just-in-time-6a"
+      "status": "resolved by the user (relayed by 6a): dd53527f amended (REQ-05 label removed, REQ-02 reworded to the stored lease index, claims.seq note); claims.jsonl sequence scan accepted as dd53527f D-1"
     },
     {
       "item": "b697a3f7 REQ-04 wording: missing-lease to foreign-lease",
-      "status": "pending with user via just-in-time-6a"
+      "status": "resolved by the user (relayed by 6a): b697a3f7 REQ-04 wording '...and the foreign-lease refusal is defined once.'"
     },
     {
       "item": "dd53527f code-review fail 3: next_claim_seq scans claims.jsonl vs per:D-19; options (a) drop label (b) claims.seq now",

@@ -10,37 +10,11 @@
   "description": "Each lease is one record changed by one lock-load-change-publish sequence, and claims decide their event from the issue record, so no lease or claim operation reads the claims log or the event log's records.\n\n## Background\n\nThe claims control plane keeps every lease in one index that is a second authority beside a replayed log, repeats its lock and publish steps in each operation, and keeps test-only APIs. The claim command parses the whole event log to decide its event. This story stores one record per lease, runs every lease change through one held lease lock, reads listings without that lock, addresses every lease command by issue, and makes a claim's event follow the assignee.\n\n## Success Criteria\n\n- [hard] REQ-01: Reading or changing one issue's lease reads only that issue's lease record, except the indefinite-lease limit check, which reads current lease records (f8a6b298 REQ-05); no lease operation reads the claims log.\n- [hard] REQ-02: An interrupted lease operation leaves the prior or the next lease, and nothing rebuilds lease state from the log.\n- [hard] REQ-03: A claim appends its event exactly when the assignee changes and parses no event-log record.\n- [hard] REQ-04: Checkouts' leases are carried into lease records, and the lease docs describe them.\n\n## Decisions\n\n- D-1: User decision (2026-11-04, relayed by just-in-time-6a): the five-repository format 4 cutover is accepted on the steward's independent post-window verification. The installed jit and jit-server are the format 4 build from a05567fde; `jit validate` returned error_count 0 in just-in-time, gf2, mealie-fi, inflected-messages and research; jit-server restarted with identical arguments and /api/health returned 200. Evidence about repositories outside this checkout is accepted on that verification, not on the committed narrative.\n- D-2 (steward ruling, just-in-time-6a for the user, 2026-11-04; plan DEC-28): REQ-01 names the epic REQ-05 exception. An indefinite acquire reads current lease records for its limit check by design; holistic-review 2528dd8f F1 had read the unqualified criterion as forbidding it. A sweep of every open story criterion against every epic exception (REQ-05, REQ-13) found no other omission.\n",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "8b72b123333524124b94429a28ddbcf0557507e04c22f632804a05c61de6d2c4",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "format4-window.sh",
-          "resolved_path": "dev/active/f8a6b298-history-independent-reads/format4-window.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "ad2c822c94fb4ec52db1bdfcc4176c420189e18776e94e15cf01cca5a4b8e9b1",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "format4-dry-run.sh",
-          "resolved_path": "dev/active/f8a6b298-history-independent-reads/format4-dry-run.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "2e4c2aeb475c57e9f33fb87a041d37c85d96f06c8092b2f1f9da30f75a8e2c92",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "format4-rewrite.py",
-          "resolved_path": "dev/active/f8a6b298-history-independent-reads/format4-rewrite.py"
-        }
-      ],
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": "Format 4 cutover record",
-      "path": "dev/active/f8a6b298-history-independent-reads/format4-cutover.md"
+      "path": "dev/archive/f8a6b298-history-independent-reads/active/f8a6b298-history-independent-reads/format4-cutover.md"
     }
   ],
   "done_at": "2026-11-04T12:12:58.659591280Z",
@@ -76,5 +50,5 @@
   "priority": "high",
   "state": "done",
   "title": "Leases are per-issue records under one lease sequence",
-  "updated_at": "2026-11-04T12:12:58.659591280Z"
+  "updated_at": "2026-11-04T12:19:53.001700253Z"
 }
