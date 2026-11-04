@@ -3,10 +3,14 @@
 use super::{CommandContext, HandlerResult, Outcome};
 use crate::cli::WorktreeCommands;
 use crate::commands::worktree::{
-    execute_worktree_info, execute_worktree_list, execute_worktree_store_divergence, WorktreeInfo,
+    execute_worktree_exec, execute_worktree_info, execute_worktree_list,
+    execute_worktree_store_divergence, WorktreeInfo,
 };
-use crate::output::{StoreComparison, WorktreeListResponse, WorktreeStoreDivergenceResponse};
+use crate::output::{
+    StoreComparison, WorktreeExecResponse, WorktreeListResponse, WorktreeStoreDivergenceResponse,
+};
 use crate::storage::JsonFileStorage;
+use anyhow::Context;
 
 fn info(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<WorktreeInfo> {
     let (info, warnings) =
@@ -43,6 +47,21 @@ fn store_divergence(
     ))
 }
 
+fn exec(
+    ctx: &CommandContext<'_, JsonFileStorage>,
+    command: Vec<String>,
+) -> HandlerResult<WorktreeExecResponse> {
+    let (program, args) = command.split_first().context("no command to run")?;
+    let executor = ctx.executor;
+    let status = execute_worktree_exec(
+        executor.storage(),
+        executor.repository_layout()?,
+        program,
+        args,
+    )?;
+    Ok(Outcome::Exited(status))
+}
+
 command_group! {
     command: WorktreeCommands,
     storage: JsonFileStorage,
@@ -50,8 +69,8 @@ command_group! {
         "worktree_info" => WorktreeCommands::Info => info() -> WorktreeInfo,
         "worktree_list" => WorktreeCommands::List => list() -> WorktreeListResponse,
         "worktree_store-divergence" => WorktreeCommands::StoreDivergence => store_divergence() -> WorktreeStoreDivergenceResponse,
-    },
-    unmigrated: WorktreeCommands::Exec { .. }
+        "worktree_exec" => WorktreeCommands::Exec { command } => exec(command) -> WorktreeExecResponse,
+    }
 }
 
 #[cfg(test)]
@@ -68,6 +87,7 @@ mod tests {
                 "worktree_store-divergence",
                 OutputSchema::of::<WorktreeStoreDivergenceResponse>(),
             ),
+            ("worktree_exec", OutputSchema::of::<WorktreeExecResponse>()),
         ] {
             let registered = crate::dispatch::registered_output_schema(path).unwrap();
             assert_eq!(registered.success_schema, expected.success_schema);

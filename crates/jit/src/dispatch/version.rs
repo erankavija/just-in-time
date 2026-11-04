@@ -17,9 +17,9 @@ command_group! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::output::{ExitCode, HumanRender, OutputMode};
+    use crate::output::{ExitCode, HumanRender, OutputMode, RunStatus};
 
-    fn run(json: bool) -> (ExitCode, String) {
+    fn run(json: bool) -> (RunStatus, String) {
         let mut out = Vec::new();
         let status = dispatch(
             (),
@@ -37,7 +37,7 @@ mod tests {
 
         let printed: serde_json::Value = serde_json::from_str(&out).unwrap();
         assert_eq!(printed, serde_json::to_value(version_info()).unwrap());
-        assert_eq!(status, ExitCode::Success);
+        assert_eq!(status, ExitCode::Success.into());
     }
 
     #[test]
@@ -51,7 +51,7 @@ mod tests {
                 quiet: false
             })
         );
-        assert_eq!(status, ExitCode::Success);
+        assert_eq!(status, ExitCode::Success.into());
     }
 
     #[test]

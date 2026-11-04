@@ -1,7 +1,7 @@
 //! A test-only command group exercising the handler contract end to end.
 
 use super::{registered_output_schema, CommandContext, HandlerResult, Outcome};
-use crate::output::{ErrorCode, ExitCode, HumanRender, OutputMode};
+use crate::output::{ErrorCode, ExitCode, HumanRender, OutputMode, RunStatus};
 use crate::schema::CommandSchema;
 use crate::storage::IssueStore;
 use crate::test_harness::TestHarness;
@@ -75,7 +75,7 @@ command_group! {
 
 /// What one dispatch wrote and returned.
 struct Run {
-    status: anyhow::Result<ExitCode>,
+    status: anyhow::Result<RunStatus>,
     out: String,
     err: String,
 }
@@ -118,7 +118,7 @@ fn test_dispatch_success_json_writes_handler_response_as_success_envelope() {
         issues: harness.storage.list_issues().unwrap().len(),
     };
     assert_eq!(printed, serde_json::to_value(expected).unwrap());
-    assert_eq!(run.status.unwrap(), ExitCode::Success);
+    assert_eq!(run.status.unwrap(), ExitCode::Success.into());
     assert!(run.err.is_empty());
 }
 
@@ -132,7 +132,7 @@ fn test_dispatch_success_human_writes_response_rendering() {
         issues: harness.storage.list_issues().unwrap().len(),
     };
     assert_eq!(run.out, expected.render_human(OutputMode::default()));
-    assert_eq!(run.status.unwrap(), ExitCode::Success);
+    assert_eq!(run.status.unwrap(), ExitCode::Success.into());
     assert!(run.err.is_empty());
 }
 
@@ -152,7 +152,7 @@ fn test_dispatch_findings_json_writes_failure_envelope_with_report_details() {
         printed["error"]["details"],
         serde_json::to_value(report).unwrap()
     );
-    assert_eq!(run.status.unwrap(), FINDINGS_CODE.exit_code());
+    assert_eq!(run.status.unwrap(), FINDINGS_CODE.exit_code().into());
     assert!(run.err.is_empty());
 }
 
@@ -165,7 +165,7 @@ fn test_dispatch_findings_human_writes_report_and_unprefixed_message_line() {
     };
     assert_eq!(run.out, report.render_human(OutputMode::default()));
     assert_eq!(run.err, "flagged because drift\n");
-    assert_eq!(run.status.unwrap(), FINDINGS_CODE.exit_code());
+    assert_eq!(run.status.unwrap(), FINDINGS_CODE.exit_code().into());
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn test_registered_group_dispatches_and_resolves_its_leaf_schemas_through_regist
     let harness = TestHarness::new();
     assert_eq!(
         run(&harness, count_command(), true).status.unwrap(),
-        ExitCode::Success
+        ExitCode::Success.into()
     );
 
     let leaves = [

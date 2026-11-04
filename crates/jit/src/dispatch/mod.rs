@@ -6,21 +6,25 @@
 //! group's `dispatch` and its `output_schema` lookup; a group joins the schema
 //! by adding that lookup to [`REGISTERED_GROUPS`].
 //!
-//! `main.rs` builds one [`CommandContext`] after bootstrap and gives each
-//! migrated group one arm,
-//! `return group::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr())`;
-//! the returned [`ExitCode`](crate::output::ExitCode) becomes the process
-//! status in `main()`. Handlers build successes with `Outcome::from` (or `.into()`) and
+//! `main.rs` opens the repository with [`bootstrap`] and hands it to
+//! [`dispatch`], which routes the command to its group; the returned
+//! [`RunStatus`] becomes the process status in `main()`. Handlers build
+//! successes with `Outcome::from` (or `.into()`) and
 //! [`Outcome::success_with`]; a `message` becomes the `--json` envelope's
 //! top-level `message`, and [`Outcome::with_warnings`] attaches warnings the
 //! emitter renders (human) or lists (`--json`). Handlers resolve issue-id arguments with
 //! [`resolve_issue`].
 
-use crate::commands::CommandExecutor;
+use crate::cli::{Cli, Commands, IssueCommands, ProfileCommands};
+use crate::commands::{open_repository, CommandExecutor, OpenedRepository, RepositoryInvocation};
+use crate::config_manager::ConfigManager;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
-use crate::output::{ErrorCode, ExitCode, OutputMode, Report};
+use crate::output::{status_after, ErrorCode, ExitCode, OutputMode, Report, RunStatus};
 use crate::schema::OutputSchema;
 use crate::storage::{IssueNotFoundError, IssueStore, RepositoryStateStore};
+use anyhow::{anyhow, Context};
+use std::io::Write;
+use std::path::PathBuf;
 
 /// The return type of every handler.
 pub type HandlerResult<R> = anyhow::Result<Outcome<R>>;
@@ -55,6 +59,9 @@ pub enum Outcome<R> {
         report: Box<dyn Report>,
         warnings: Vec<String>,
     },
+    /// A child process ran on this process's streams: nothing renders, and its
+    /// exit status is the run's.
+    Exited(i32),
 }
 
 /// A success with no `--json` message.
@@ -92,28 +99,120 @@ impl<R> Outcome<R> {
         }
     }
 
-    /// This outcome with `warnings` appended.
+    /// This outcome with `warnings` appended; an `Exited` outcome renders none.
     #[must_use]
     pub fn with_warnings<I>(mut self, warnings: I) -> Self
     where
         I: IntoIterator,
         I::Item: std::fmt::Display,
     {
-        let (Self::Success { warnings: own, .. } | Self::Findings { warnings: own, .. }) =
-            &mut self;
-        own.extend(warnings.into_iter().map(|warning| warning.to_string()));
+        if let Self::Success { warnings: own, .. } | Self::Findings { warnings: own, .. } =
+            &mut self
+        {
+            own.extend(warnings.into_iter().map(|warning| warning.to_string()));
+        }
         self
     }
 }
 
-/// What a split group's `dispatch` returns: the exit status of a variant it
-/// handled, or the command back for the caller's remaining arm.
+/// Open the repository `cli`'s command runs over; `--schema`, a missing
+/// command, `version` and `init` run without one.
 ///
-/// Transitional: part of the `unmigrated:` form of `command_group!`, which
-/// 5687e281 removes once every group owns all its variants.
-pub enum Dispatched<C> {
-    Handled(ExitCode),
-    Unhandled(C),
+/// # Errors
+///
+/// An unusable linked-checkout write token, or [`open_repository`]'s failure.
+pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<OpenedRepository>> {
+    let command = match &cli.command {
+        Some(Commands::Version | Commands::Init(_)) | None => return Ok(None),
+        Some(_) if cli.schema => return Ok(None),
+        Some(command) => command,
+    };
+    open_repository(RepositoryInvocation {
+        current_dir: std::env::current_dir()?,
+        data_dir_override: std::env::var("JIT_DATA_DIR").ok().map(PathBuf::from),
+        is_init: false,
+        opens_mutation_session: command.requires_recovery_dispatch(),
+        coordinates_claims_first: command.coordinates_claims_first(),
+        is_validation_exempt: matches!(command, Commands::Profile(ProfileCommands::Show { .. })),
+        is_recover: matches!(command, Commands::Recover),
+        // Read before any repository work, so an unusable token fails the
+        // invocation even for a command that never writes.
+        write_override: ConfigManager::invocation_write_override()?,
+    })
+    .map(Some)
+}
+
+/// Run `cli`'s command over the `repository` [`bootstrap`] opened for it and
+/// render its outcome; the repository's guards drop before this returns.
+///
+/// # Errors
+///
+/// The handler's failure, for the caller to render.
+pub fn dispatch(
+    cli: Cli,
+    mut repository: Option<OpenedRepository>,
+    mode: OutputMode,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> anyhow::Result<RunStatus> {
+    if cli.schema {
+        let schema = serde_json::to_string_pretty(&crate::CommandSchema::generate())?;
+        return Ok(status_after(
+            writeln!(out, "{schema}"),
+            ExitCode::Success.into(),
+        )?);
+    }
+    let command = cli
+        .command
+        .ok_or_else(|| anyhow!("No command provided. Use --help for usage."))?;
+    // The server child runs its own startup recovery, so holding this session
+    // across the wait deadlocks the child against the parent.
+    if let Some(guard) = repository
+        .as_mut()
+        .filter(|_| matches!(command, Commands::Serve(_)))
+        .and_then(|repository| repository.retained_session.take())
+    {
+        guard.release()?;
+    }
+    let opened = repository.as_ref().map(|repository| CommandContext {
+        executor: &repository.executor,
+        mode,
+    });
+    let ctx = || opened.as_ref().context("bootstrap opened no repository");
+    match command {
+        Commands::Version => version::dispatch((), mode, out, err),
+        Commands::Init(args) => init::dispatch(args, mode, out, err),
+        Commands::Profile(command) => profile::dispatch(command, ctx()?, out, err),
+        Commands::List { filters, full } => {
+            issue::dispatch(IssueCommands::List { filters, full }, ctx()?, out, err)
+        }
+        Commands::Issue(command) => issue::dispatch(command, ctx()?, out, err),
+        Commands::Apply(args) => apply::dispatch(args, ctx()?, out, err),
+        Commands::Dep(command) => dep::dispatch(command, ctx()?, out, err),
+        Commands::Gate(command) => gate::dispatch(command, ctx()?, out, err),
+        Commands::Graph(command) => graph::dispatch(command, ctx()?, out, err),
+        Commands::Rdeps { id, depth } => {
+            graph::rdeps::dispatch(graph::RdepsArgs { id, depth }, ctx()?, out, err)
+        }
+        Commands::Events(command) => events::dispatch(command, ctx()?, out, err),
+        Commands::Doc(command) => doc::dispatch(command, ctx()?, out, err),
+        Commands::Archive(command) => archive::dispatch(command, ctx()?, out, err),
+        Commands::Query(args) => query::run(args, ctx()?, out, err),
+        Commands::Label(command) => label::dispatch(command, ctx()?, out, err),
+        Commands::Config(command) => config::dispatch(command, ctx()?, out, err),
+        Commands::Hooks(command) => hooks::dispatch(command, ctx()?, out, err),
+        Commands::Item(command) => item::dispatch(command, ctx()?, out, err),
+        Commands::Invariant(command) => invariant::dispatch(command, ctx()?, out, err),
+        Commands::Project(command) => project::dispatch(command, ctx()?, out, err),
+        Commands::Search(args) => search::dispatch(args, ctx()?, out, err),
+        Commands::Status => query::status::dispatch((), ctx()?, out, err),
+        Commands::Validate(args) => validate::dispatch(args, ctx()?, out, err),
+        Commands::Recover => claim::recover::dispatch((), ctx()?, out, err),
+        Commands::Serve(args) => serve::dispatch(args, ctx()?, out, err),
+        Commands::Claim(command) => claim::dispatch(command, ctx()?, out, err),
+        Commands::Worktree(command) => worktree::dispatch(command, ctx()?, out, err),
+        Commands::Snapshot(command) => snapshot::dispatch(command, ctx()?, out, err),
+    }
 }
 
 /// Parse and resolve one user-supplied issue-id argument: the CLI's single
@@ -241,7 +340,7 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 /// ```
 ///
 /// The `storage:` entry picks the group's form, which generates
-/// `dispatch(command, ctx, out, err) -> anyhow::Result<ExitCode>` and
+/// `dispatch(command, ctx, out, err) -> anyhow::Result<RunStatus>` and
 /// `output_schema(cmd_path)`. `dispatch` runs the leaf's handler and renders
 /// its outcome through [`crate::output::emit_outcome`]; `output_schema`
 /// returns the leaf's response schema.
@@ -262,97 +361,53 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 /// A leaf whose success is one of several shapes ends with
 /// `as union [A, B] "description"`; the schema is a `oneOf` over the listed
 /// types, and the handler's response type serializes as whichever applies.
-///
-/// A split group (transitional; 5687e281 removes this clause) ends its
-/// invocation with `, unmigrated: <pattern>` naming the variants it does not
-/// own. Its `dispatch` returns `anyhow::Result<`[`Dispatched`]`<command>>`,
-/// giving those variants back unchanged.
 // Child modules declared below reach it by textual scope.
 macro_rules! command_group {
     (
         command: $command:ty,
         storage: [$($bound:tt)+],
-        leaves: { $($leaves:tt)+ }
-        $(, unmigrated: $rest:pat)? $(,)?
+        leaves: { $($leaves:tt)+ } $(,)?
     ) => {
-        command_group!(@generate
+        command_group!(@body
             generics [<S: $($bound)+>]
             params [ctx: &$crate::dispatch::CommandContext<'_, S>,]
             mode [ctx.mode]
             handler_args [ctx,]
             command $command,
-            unmigrated [$($rest)?]
             leaves { $($leaves)+ }
         );
     };
     (
         command: $command:ty,
         storage: $storage:ty,
-        leaves: { $($leaves:tt)+ }
-        $(, unmigrated: $rest:pat)? $(,)?
+        leaves: { $($leaves:tt)+ } $(,)?
     ) => {
-        command_group!(@generate
+        command_group!(@body
             generics []
             params [ctx: &$crate::dispatch::CommandContext<'_, $storage>,]
             mode [ctx.mode]
             handler_args [ctx,]
             command $command,
-            unmigrated [$($rest)?]
             leaves { $($leaves)+ }
         );
     };
     (
         command: $command:ty,
-        leaves: { $($leaves:tt)+ }
-        $(, unmigrated: $rest:pat)? $(,)?
+        leaves: { $($leaves:tt)+ } $(,)?
     ) => {
-        command_group!(@generate
+        command_group!(@body
             generics []
             params [mode: $crate::output::OutputMode,]
             mode [mode]
             handler_args []
             command $command,
-            unmigrated [$($rest)?]
             leaves { $($leaves)+ }
-        );
-    };
-    (@generate
-        generics $generics:tt params $params:tt mode $mode:tt handler_args $handler_args:tt
-        command $command:ty,
-        unmigrated []
-        leaves $leaves:tt
-    ) => {
-        command_group!(@body
-            generics $generics params $params mode $mode handler_args $handler_args
-            command $command,
-            returns [::anyhow::Result<$crate::output::ExitCode>]
-            lift [::std::convert::identity]
-            rest []
-            leaves $leaves
-        );
-    };
-    (@generate
-        generics $generics:tt params $params:tt mode $mode:tt handler_args $handler_args:tt
-        command $command:ty,
-        unmigrated [$rest:pat]
-        leaves $leaves:tt
-    ) => {
-        command_group!(@body
-            generics $generics params $params mode $mode handler_args $handler_args
-            command $command,
-            returns [::anyhow::Result<$crate::dispatch::Dispatched<$command>>]
-            lift [$crate::dispatch::Dispatched::Handled]
-            rest [unhandled @ ($rest) => Ok($crate::dispatch::Dispatched::Unhandled(unhandled)),]
-            leaves $leaves
         );
     };
     (@body
         generics [$($generics:tt)*] params [$($params:tt)*] mode [$mode:expr]
         handler_args $handler_args:tt
         command $command:ty,
-        returns [$returns:ty]
-        lift [$lift:expr]
-        rest [$($rest:tt)*]
         leaves {
             $(
                 $path:literal => $pattern:pat => $handler:ident ( $($arg:expr),* $(,)? ) -> $response:ty
@@ -366,14 +421,13 @@ macro_rules! command_group {
             $($params)*
             out: &mut dyn ::std::io::Write,
             err: &mut dyn ::std::io::Write,
-        ) -> $returns {
+        ) -> ::anyhow::Result<$crate::output::RunStatus> {
             match command {
                 $( $pattern => {
                     let outcome: $crate::dispatch::Outcome<$response> =
                         command_group!(@call $handler $handler_args ($($arg),*))?;
-                    $crate::output::emit_outcome(&outcome, $mode, out, err).map($lift)
+                    $crate::output::emit_outcome(&outcome, $mode, out, err)
                 } )+
-                $($rest)*
             }
         }
 

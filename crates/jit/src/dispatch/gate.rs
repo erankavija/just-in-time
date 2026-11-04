@@ -692,7 +692,7 @@ mod tests {
     use crate::commands::CommandExecutor;
     use crate::declarations::{GateDefinition as Declared, GateMode, GateStage};
     use crate::output::failure::classify;
-    use crate::output::{ExitCode, OutputMode};
+    use crate::output::{ExitCode, OutputMode, RunStatus};
     use crate::schema::OutputSchema;
     use crate::storage::InMemoryStorage;
 
@@ -727,7 +727,7 @@ mod tests {
     fn run(
         executor: &CommandExecutor<InMemoryStorage>,
         command: GateCommands,
-    ) -> anyhow::Result<(ExitCode, serde_json::Value)> {
+    ) -> anyhow::Result<(RunStatus, serde_json::Value)> {
         let ctx = CommandContext {
             executor,
             mode: OutputMode {
@@ -792,7 +792,7 @@ mod tests {
 
         let first = ErrorCode::InvalidIdPrefix;
         assert_eq!(printed["error"]["code"], first.as_str());
-        assert_eq!(status, first.exit_code());
+        assert_eq!(status, first.exit_code().into());
         let results = printed["error"]["details"]["results"].as_array().unwrap();
         let statuses: Vec<_> = results.iter().map(|entry| &entry["status"]).collect();
         assert_eq!(statuses, ["failed", "passed", "failed"]);
@@ -810,7 +810,7 @@ mod tests {
 
         let (status, printed) = run(&executor, status_args(&id, Some("tests"))).unwrap();
 
-        assert_eq!(status, ExitCode::Success);
+        assert_eq!(status, ExitCode::Success.into());
         assert_eq!(printed["key"], "tests");
         assert_eq!(printed["issue_id"], id);
         assert!(printed["message"]
