@@ -478,9 +478,9 @@ impl TryFrom<IssueWire> for Issue {
 ///
 /// Readiness is stored on the issue and is also derivable from the graph, so the
 /// two views must agree. [`Issue::derive_readiness_correction`] names the change
-/// that restores agreement, and every dependency-mutating path applies the
-/// direction it owns: an edge addition can only demote, an edge removal or a
-/// dependency reaching a terminal state can only promote.
+/// that restores agreement for one issue;
+/// [`derive_readiness_corrections`](crate::domain::queries::derive_readiness_corrections)
+/// collects them for the issues a mutation can affect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadinessCorrection {
     /// A [`State::Backlog`] issue nothing blocks belongs in [`State::Ready`].
@@ -580,10 +580,8 @@ impl Issue {
     /// Derive the readiness correction the dependency graph demands for this
     /// issue, or `None` when the stored state already agrees with the graph.
     ///
-    /// This is the single derivation of readiness from the graph: every path
-    /// that mutates a dependency edge — `jit dep add`/`remove`, graph-template
-    /// application, and the `jit validate --fix` repair — decides here, so no two
-    /// of them can drift (`@/invariant/derived-state-coherence`). The
+    /// This is the single derivation of readiness from the graph, so no two
+    /// paths can drift (`@/invariant/derived-state-coherence`). The
     /// whole-repository check reports any correction as a violation.
     ///
     /// Only [`State::Backlog`] and [`State::Ready`] are graph-derived. Every

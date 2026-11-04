@@ -6,7 +6,9 @@
 
 use crate::domain::identity::GateKey;
 use crate::domain::identity::IssueId;
-use crate::domain::{is_dependency_met, Assignee, GateStatus, Issue, Priority, State};
+use crate::domain::{
+    is_dependency_met, Assignee, GateStatus, Issue, Priority, ReadinessCorrection, State,
+};
 use std::cmp::Reverse;
 use std::collections::HashMap;
 
@@ -115,6 +117,55 @@ pub fn issues_becoming_ready(issues: &[Issue]) -> Vec<crate::domain::identity::I
         .filter(|issue| issue.should_auto_transition_to_ready(&resolved))
         .map(|issue| issue.id.clone())
         .collect()
+}
+
+/// The issues [`derive_readiness_corrections`] re-derives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadinessScope {
+    /// Issues a mutation can affect: new issues, issues whose dependency list
+    /// changed, and direct dependents of an issue whose effective terminal state
+    /// changed or which was removed.
+    Affected,
+    /// Every issue after the mutation.
+    All,
+}
+
+/// The readiness corrections the dependency graph demands of `after`, the
+/// issues following a mutation of `before`, for the issues `scope` admits,
+/// ordered by issue id.
+///
+/// A correction moves an issue only between `Backlog` and `Ready`, which meets
+/// no dependency and unmeets none, so one pass over `after` is complete.
+pub fn derive_readiness_corrections(
+    before: &[Issue],
+    after: &[Issue],
+    scope: ReadinessScope,
+) -> Vec<(IssueId, ReadinessCorrection)> {
+    let prior = build_issue_map(before);
+    let resolved = build_issue_map(after);
+    let is_retired_or_reopened = |id: &IssueId| match (prior.get(id), resolved.get(id)) {
+        (Some(old), Some(new)) => old.effective_terminal_state() != new.effective_terminal_state(),
+        (Some(_), None) => true,
+        (None, _) => false,
+    };
+    let is_admitted = |issue: &Issue| {
+        scope == ReadinessScope::All
+            || prior.get(&issue.id).is_none_or(|old| {
+                old.dependencies != issue.dependencies
+                    || issue.dependencies.iter().any(is_retired_or_reopened)
+            })
+    };
+    let mut corrections = after
+        .iter()
+        .filter(|issue| is_admitted(issue))
+        .filter_map(|issue| {
+            issue
+                .derive_readiness_correction(&resolved)
+                .map(|correction| (issue.id.clone(), correction))
+        })
+        .collect::<Vec<_>>();
+    corrections.sort_by(|(left, _), (right, _)| left.cmp(right));
+    corrections
 }
 
 /// A typed reason explaining why an issue is blocked.
@@ -1389,6 +1440,264 @@ mod tests {
                 issue
             }).collect();
             prop_assert!(issues_becoming_ready(&applied).is_empty());
+        }
+    }
+
+    fn affected_corrections(
+        before: &[Issue],
+        after: &[Issue],
+    ) -> Vec<(IssueId, ReadinessCorrection)> {
+        derive_readiness_corrections(before, after, ReadinessScope::Affected)
+    }
+
+    fn with_state(issue: &Issue, state: State) -> Issue {
+        Issue {
+            state,
+            ..issue.clone()
+        }
+    }
+
+    #[test]
+    fn test_derive_readiness_corrections_promotes_a_dependent_whose_blocker_reaches_done_or_rejected(
+    ) {
+        for terminal in [State::Done, State::Rejected] {
+            let blocker = state_issue(0, State::InProgress);
+            let dependent = dependent_of(1, &[&blocker]);
+            let before = [blocker.clone(), dependent.clone()];
+            let after = [with_state(&blocker, terminal), dependent.clone()];
+            assert_eq!(
+                affected_corrections(&before, &after),
+                [(dependent.id.clone(), ReadinessCorrection::Promote)],
+                "{terminal:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_derive_readiness_corrections_demotes_a_dependent_whose_blocker_leaves_a_terminal_state()
+    {
+        let blocker = state_issue(0, State::Done);
+        let dependent = with_state(&dependent_of(1, &[&blocker]), State::Ready);
+        let before = [blocker.clone(), dependent.clone()];
+        let after = [with_state(&blocker, State::InProgress), dependent.clone()];
+        assert_eq!(
+            affected_corrections(&before, &after),
+            [(dependent.id, ReadinessCorrection::Demote)]
+        );
+    }
+
+    #[test]
+    fn test_derive_readiness_corrections_demotes_the_source_of_an_added_edge() {
+        let blocker = state_issue(0, State::InProgress);
+        let source = state_issue(1, State::Ready);
+        let before = [blocker.clone(), source.clone()];
+        let after = [
+            blocker.clone(),
+            Issue {
+                dependencies: vec![blocker.id.clone()],
+                ..source.clone()
+            },
+        ];
+        assert_eq!(
+            affected_corrections(&before, &after),
+            [(source.id, ReadinessCorrection::Demote)]
+        );
+    }
+
+    #[test]
+    fn test_derive_readiness_corrections_promotes_the_source_of_a_removed_edge() {
+        let blocker = state_issue(0, State::InProgress);
+        let source = dependent_of(1, &[&blocker]);
+        let before = [blocker.clone(), source.clone()];
+        let after = [blocker, dependent_of(1, &[])];
+        assert_eq!(
+            affected_corrections(&before, &after),
+            [(source.id, ReadinessCorrection::Promote)]
+        );
+    }
+
+    #[test]
+    fn test_derive_readiness_corrections_promotes_the_dependent_of_a_deleted_blocker() {
+        let blocker = state_issue(0, State::InProgress);
+        let dependent = dependent_of(1, &[&blocker]);
+        let before = [blocker, dependent.clone()];
+        let after = [dependent_of(1, &[])];
+        assert_eq!(
+            affected_corrections(&before, &after),
+            [(dependent.id, ReadinessCorrection::Promote)]
+        );
+    }
+
+    #[test]
+    fn test_derive_readiness_corrections_leaves_dependents_outside_backlog_and_ready() {
+        let blocker = state_issue(0, State::InProgress);
+        let dependents = [
+            (State::InProgress, None),
+            (State::Gated, None),
+            (State::Done, None),
+            (State::Rejected, None),
+            (State::Archived, Some(State::Backlog)),
+            (State::Archived, Some(State::Done)),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(index, (state, archived_from))| Issue {
+            archived_from,
+            ..with_state(&dependent_of(index + 1, &[&blocker]), state)
+        })
+        .collect::<Vec<_>>();
+        let before = std::iter::once(blocker.clone())
+            .chain(dependents.iter().cloned())
+            .collect::<Vec<_>>();
+        let after = std::iter::once(with_state(&blocker, State::Done))
+            .chain(dependents)
+            .collect::<Vec<_>>();
+        assert!(affected_corrections(&before, &after).is_empty());
+    }
+
+    #[test]
+    fn test_derive_readiness_corrections_affected_scope_excludes_drift_the_all_scope_reports() {
+        let drift = state_issue(0, State::Backlog);
+        let issues = [drift.clone()];
+        assert!(affected_corrections(&issues, &issues).is_empty());
+        assert_eq!(
+            derive_readiness_corrections(&issues, &issues, ReadinessScope::All),
+            [(drift.id, ReadinessCorrection::Promote)]
+        );
+    }
+
+    /// A repository whose stored readiness agrees with its acyclic graph: each
+    /// issue depends only on lower-indexed issues.
+    fn coherent_issues(nodes: &[(usize, usize, Vec<usize>)]) -> Vec<Issue> {
+        let issues = nodes
+            .iter()
+            .enumerate()
+            .map(|(index, (state, archived_from, dependencies))| {
+                let mut issue = state_issue(index, State::ALL[*state]);
+                issue.archived_from =
+                    (issue.state == State::Archived).then_some(State::ALL[*archived_from]);
+                issue.dependencies = dependencies
+                    .iter()
+                    .filter(|_| index > 0)
+                    .map(|dependency| issue_id((dependency % index.max(1)) as u128))
+                    .collect();
+                issue.dependencies.sort();
+                issue.dependencies.dedup();
+                issue
+            })
+            .collect::<Vec<_>>();
+        let resolved = build_issue_map(&issues);
+        let blocked = issues
+            .iter()
+            .map(|issue| issue.is_blocked(&resolved))
+            .collect::<Vec<_>>();
+        issues
+            .into_iter()
+            .zip(blocked)
+            .map(|(mut issue, blocked)| {
+                if matches!(issue.state, State::Backlog | State::Ready) {
+                    issue.state = if blocked {
+                        State::Backlog
+                    } else {
+                        State::Ready
+                    };
+                }
+                issue
+            })
+            .collect()
+    }
+
+    /// Apply one edit to `issues`, returning the edited set and the issues the
+    /// edit can reach: the edited source of an edge edit, or the direct
+    /// dependents of a changed or deleted issue.
+    fn edit_issues(
+        mut issues: Vec<Issue>,
+        (kind, first, second, state, cleans): (u8, usize, usize, usize, bool),
+    ) -> (Vec<Issue>, Vec<IssueId>) {
+        let count = issues.len();
+        let target = issues[first % count].id.clone();
+        let dependents = issues
+            .iter()
+            .filter(|issue| issue.dependencies.contains(&target))
+            .map(|issue| issue.id.clone())
+            .collect::<Vec<_>>();
+        match kind {
+            0 => {
+                let resolved_blocked = {
+                    let resolved = build_issue_map(&issues);
+                    issues[first % count].is_blocked(&resolved)
+                };
+                let issue = &mut issues[first % count];
+                let previous = issue.state;
+                issue.state = match State::ALL[state] {
+                    State::Backlog | State::Ready if resolved_blocked => State::Backlog,
+                    State::Backlog | State::Ready => State::Ready,
+                    other => other,
+                };
+                issue.archived_from = (issue.state == State::Archived).then_some(previous);
+                (issues, dependents)
+            }
+            1 => {
+                let dependency = issues[second % count].id.clone();
+                if second % count < first % count {
+                    let issue = &mut issues[first % count];
+                    issue.dependencies.push(dependency);
+                    issue.dependencies.sort();
+                    issue.dependencies.dedup();
+                }
+                (issues, vec![target])
+            }
+            2 => {
+                let issue = &mut issues[first % count];
+                if !issue.dependencies.is_empty() {
+                    let removed = second % issue.dependencies.len();
+                    issue.dependencies.remove(removed);
+                }
+                (issues, vec![target])
+            }
+            _ => {
+                issues.retain(|issue| issue.id != target);
+                if cleans {
+                    issues
+                        .iter_mut()
+                        .for_each(|issue| issue.dependencies.retain(|id| id != &target));
+                }
+                (issues, dependents)
+            }
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_derive_readiness_corrections_affected_scope_restores_coherence_after_one_edit(
+            nodes in proptest::collection::vec(
+                (
+                    0..State::ALL.len(),
+                    0..State::ALL.len(),
+                    proptest::collection::vec(0usize..16, 0..4),
+                ),
+                1..12,
+            ),
+            edit in (0u8..4, 0usize..16, 0usize..16, 0..State::ALL.len(), any::<bool>()),
+        ) {
+            let before = coherent_issues(&nodes);
+            let (after, reachable) = edit_issues(before.clone(), edit);
+
+            let corrections = affected_corrections(&before, &after);
+            prop_assert!(corrections.iter().all(|(id, _)| reachable.contains(id)));
+
+            let corrected = after
+                .into_iter()
+                .map(|issue| match corrections.iter().find(|(id, _)| id == &issue.id) {
+                    Some((_, ReadinessCorrection::Promote)) => with_state(&issue, State::Ready),
+                    Some((_, ReadinessCorrection::Demote)) => with_state(&issue, State::Backlog),
+                    None => issue,
+                })
+                .collect::<Vec<_>>();
+            prop_assert!(
+                derive_readiness_corrections(&corrected, &corrected, ReadinessScope::All)
+                    .is_empty()
+            );
         }
     }
 }
