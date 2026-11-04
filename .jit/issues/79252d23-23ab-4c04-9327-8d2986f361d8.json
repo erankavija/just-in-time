@@ -101,11 +101,19 @@
       "assets": [
         {
           "asset_type": "local",
-          "content_hash": "cba8155f17bde0e9a4fe5c2e7df4a390a786f3ab07fa3c84d7f58665d1d4d63b",
+          "content_hash": "1757f25c7959dbdba7753ace273bed62d395dd8353b477851bce7129d5b663f4",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "curated-tools.json",
+          "resolved_path": "mcp-server/curated-tools.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "493169f855cfea1b98acbf4770ac3162c95d7580c5fd193153875c14ed1d4141",
           "is_shared": false,
           "mime_type": "text/markdown",
-          "original_path": "../dev/architecture/cli-and-mcp-strategy.md",
-          "resolved_path": "dev/architecture/cli-and-mcp-strategy.md"
+          "original_path": "../docs/reference/profiles.md",
+          "resolved_path": "docs/reference/profiles.md"
         },
         {
           "asset_type": "external",
@@ -117,27 +125,27 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "5ea9c44d5656f93d13638d46310dd44f970196c511fd2d42f0e66364e453aac1",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "../docs/reference/cli-commands.md",
-          "resolved_path": "docs/reference/cli-commands.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "cab3b7ce1e442f8f9ce2291f76a093b4e394a03b975678dffb85691e8943ddd3",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "../docs/reference/profiles.md",
-          "resolved_path": "docs/reference/profiles.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "9291c5ad2ab7563400af0b2cefa5e2ac7f489deb75ab47c0e3d0c5f8fe3a7257",
+          "content_hash": "7ba4de8a3fc78d0f9c0aea75d30e382097a605353ef5094f41d16cd1d42e1cd5",
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "../README.md",
           "resolved_path": "README.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d8ff02ff15923a8f930b1e34ae725d31d1c1f8442637483686a2b4eba034f88",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../dev/architecture/cli-and-mcp-strategy.md",
+          "resolved_path": "dev/architecture/cli-and-mcp-strategy.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "86a1ed8ee66997f655b8bab4450dd0e1fbc088ac5d313aad18826fda80a5a8a5",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../docs/reference/cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md"
         },
         {
           "asset_type": "local",
@@ -149,14 +157,6 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "7e9179c8f7bb19fe33902f0c3a0eced332bd95efbe01229b6472d5c24da34d70",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "curated-tools.json",
-          "resolved_path": "mcp-server/curated-tools.json"
-        },
-        {
-          "asset_type": "local",
           "content_hash": "74d8fa8df7ba9a61fada7d41534922b85c7b0ad37b508ebe5c8150d34461b71c",
           "is_shared": false,
           "mime_type": "text/markdown",
@@ -164,7 +164,7 @@
           "resolved_path": "docs/how-to/mcp-integration.md"
         }
       ],
-      "commit": null,
+      "commit": "f0add631d58304738db38e1746e6151969626dc2",
       "doc_type": "implementation",
       "format": "markdown",
       "label": "MCP bridge README",
@@ -228,5 +228,5 @@
   "priority": "high",
   "state": "done",
   "title": "Profiles reference states the redo record",
-  "updated_at": "2026-10-01T23:22:48.024084713Z"
+  "updated_at": "2026-11-04T22:16:24.739609607Z"
 }

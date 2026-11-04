@@ -1,7 +1,6 @@
 name: Release Artifacts
 
-# The two artifacts a release ships, and the smoke test that proves the native
-# one runs. Nothing here publishes: this workflow produces run artifacts, and
+# The release archive and the smoke test that proves it runs. Nothing here publishes: this workflow produces run artifacts, and
 # release-publish.yml is the only workflow that turns them into a release.
 #
 # Two paths run it. release-publish.yml calls it on a version tag, downstream of
@@ -162,39 +161,6 @@ jobs:
         with:
           name: native-archive
           path: dist/jit-linux-x64.tar.gz
-          if-no-files-found: error
-
-  # One `npm pack`, whose output name and version come from the package
-  # manifest. The tarball ships as a release asset rather than a registry
-  # version, so adopters install it from the release URL.
-  package-mcp-server:
-    name: Package the MCP Server
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        working-directory: mcp-server
-        run: npm ci
-
-      - name: Pack the tarball
-        working-directory: mcp-server
-        run: |
-          mkdir -p "${GITHUB_WORKSPACE}/dist"
-          npm pack --pack-destination "${GITHUB_WORKSPACE}/dist"
-
-      - name: Upload the MCP tarball
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: mcp-tarball
-          path: dist/*.tgz
           if-no-files-found: error
 
   # The archive as an adopter receives it: extracted into an empty prefix, with

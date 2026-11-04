@@ -267,24 +267,6 @@ fn assert_profile_input_surface_is_non_sensitive(
         .map_or(Ok(()), Err)
 }
 
-/// The bridge maps every generated tool into exactly one curation section.
-/// Lifecycle input descriptions can therefore move between `include` and
-/// `exclude` without falling outside this check; membership is the generated
-/// init command plus the profile command family, not its current curation.
-fn lifecycle_bridge_inventory(inventory: &serde_json::Value) -> Vec<&serde_json::Value> {
-    ["include", "exclude"]
-        .into_iter()
-        .flat_map(|section| {
-            inventory[section]
-                .as_object()
-                .expect("bridge inventory keeps every curation section as a generated-tool map")
-                .iter()
-        })
-        .filter(|(name, _)| *name == "jit_init" || name.starts_with("jit_profile_"))
-        .map(|(_, description)| description)
-        .collect()
-}
-
 fn profile_generated_schema_text() -> String {
     let schema = jit::CommandSchema::generate();
     let profile = schema
@@ -1108,7 +1090,7 @@ fn test_profile_lifecycle_has_one_canonical_package_authority() {
 
 /// Profile packages enter through one worktree-relative directory contract.
 /// The source enums prove the runtime and reported-origin vocabularies, and the
-/// live command schema proves every CLI/MCP output projection carries the same
+/// live command schema proves every CLI output projection carries the same
 /// single wire option. The archive plan's separately scoped `Embedded` variant
 /// is intentionally outside these semantic profile surfaces.
 #[test]
@@ -1131,7 +1113,6 @@ fn test_profile_lifecycle_has_only_the_repository_directory_package_source() {
 #[test]
 fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values() {
     let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let workspace_root = crate_root.join("../..");
     let manifest = production_source(&crate_root.join("src/profile/manifest.rs"));
     let cli = production_source(&crate_root.join("src/cli.rs"));
     let profile_cli = cli
@@ -1146,10 +1127,6 @@ fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values
         .split_once("/// The tagged body of an [`Event`]: its variant and payload fields.")
         .expect("profile lifecycle audit inputs remain separate from unrelated event types")
         .0;
-    let bridge_inventory =
-        std::fs::read_to_string(workspace_root.join("mcp-server/curated-tools.json")).unwrap();
-    let bridge_inventory = serde_json::from_str::<serde_json::Value>(&bridge_inventory).unwrap();
-    let bridge_lifecycle_inventory = lifecycle_bridge_inventory(&bridge_inventory);
 
     for (surface, description) in [
         ("profile manifest model", manifest),
@@ -1158,10 +1135,6 @@ fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values
         (
             "profile lifecycle audit record",
             profile_audit_inputs.to_string(),
-        ),
-        (
-            "MCP init and profile lifecycle inventory",
-            serde_json::to_string(&bridge_lifecycle_inventory).unwrap(),
         ),
     ] {
         assert_profile_input_surface_is_non_sensitive(surface, &description)
@@ -1225,20 +1198,6 @@ fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
         "a non-secret and non-sensitive profile input"
     )
     .is_ok());
-
-    let omitted_init = serde_json::json!({
-        "include": { "jit_profile_apply": "ordinary profile inputs" },
-        "exclude": { "jit_init": "accepts a secret initialization input" },
-    });
-    let bridge_error = assert_profile_input_surface_is_non_sensitive(
-        "injected MCP lifecycle inventory",
-        &serde_json::to_string(&lifecycle_bridge_inventory(&omitted_init)).unwrap(),
-    )
-    .unwrap_err();
-    assert!(
-        bridge_error.contains("forbidden secret profile input description")
-            && bridge_error.contains("clean-cut lifecycle contract")
-    );
 
     let canonical_commands = r#"
 pub enum ProfileResolutionError { UnreadableLocation { location: String, source: ProfilePackageError }, }

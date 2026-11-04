@@ -44,7 +44,7 @@ Review only the smallest documentation impact cone:
 
 Do not limit the review to touched documentation files: an omitted required update is a blocking finding. Conversely, do not treat all adopter documentation as in scope just because no doc file was touched.
 
-The adopter-facing surface is `docs/`, `README.md`, `INSTALL.md`, `mcp-server/README.md`, and `web/README.md`. `CHANGELOG.md`, `dev/`, and code-quality findings are outside this gate. You may inspect implementation, tests, manifests, and repository configuration as sources of truth without making them finding locations.
+The adopter-facing surface is `docs/`, `README.md`, `INSTALL.md`, and `web/README.md`. `CHANGELOG.md`, `dev/`, and code-quality findings are outside this gate. You may inspect implementation, tests, manifests, and repository configuration as sources of truth without making them finding locations.
 
 ### Holistic container review
 

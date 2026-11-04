@@ -38,7 +38,7 @@ fn is_inside_git_work_tree(worktree_root: &Path) -> bool {
 ///
 /// # Errors
 ///
-/// Returns [`crate::errors::ClaimRequiresGitError`] when the selected worktree
+/// Returns [`crate::errors::RequiresGitError`] when the selected worktree
 /// is not inside a git repository, when git is not available, or when the
 /// selected worktree is a git repository with no commits yet (so `HEAD` doesn't
 /// resolve to a branch) — the error's [`GitRequirementGap`](crate::errors::GitRequirementGap)
@@ -59,7 +59,7 @@ fn get_current_branch(worktree_root: &Path) -> Result<String> {
         } else {
             crate::errors::GitRequirementGap::NoRepository
         };
-        return Err(crate::errors::ClaimRequiresGitError::new(gap).into());
+        return Err(crate::errors::RequiresGitError::new(gap).into());
     }
 
     Ok(String::from_utf8(output.stdout)?.trim().to_string())

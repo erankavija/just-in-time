@@ -597,6 +597,8 @@ assert = { require-label = { label = "req:*", min = 1 } }
         },
     );
 
+    jit::test_harness::seed_memory_gate_keys(executor.storage(), &["manual-gate".parse().unwrap()]);
+
     let mut issue = crate::fixture_issue("A task".to_string(), String::new());
     issue.labels = vec!["type:task".to_string()]; // no req: -> violates the rule
     issue.state = State::InProgress;

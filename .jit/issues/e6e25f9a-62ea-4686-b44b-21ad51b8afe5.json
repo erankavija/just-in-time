@@ -12,11 +12,11 @@
       "assets": [
         {
           "asset_type": "local",
-          "content_hash": "875b59f7db738a342f195ca93579938b8383b17ecaf0143360aa06251122c77e",
+          "content_hash": "493169f855cfea1b98acbf4770ac3162c95d7580c5fd193153875c14ed1d4141",
           "is_shared": false,
           "mime_type": "text/markdown",
-          "original_path": "../reference/runtime-defaults.md",
-          "resolved_path": "docs/reference/runtime-defaults.md"
+          "original_path": "../reference/profiles.md",
+          "resolved_path": "docs/reference/profiles.md"
         },
         {
           "asset_type": "local",
@@ -28,15 +28,23 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "ec8dccf22ce7b0c02d029ad4db4609846394e27b0dbdcc1ebb2ff1bec80c9019",
+          "content_hash": "aa88a6efac48fa4effa073f2fd63778bcae9ce59da84273d821d932e09fd68ab",
           "is_shared": false,
           "mime_type": "text/markdown",
-          "original_path": "../reference/profiles.md",
-          "resolved_path": "docs/reference/profiles.md"
+          "original_path": "../../INSTALL.md",
+          "resolved_path": "INSTALL.md"
         },
         {
           "asset_type": "local",
-          "content_hash": "fca83276b3da0fe575b282dde091c49e58ab6dafc1b227f0300fb3d8292d5fd2",
+          "content_hash": "65f78747d7e144d665959fb1640c6d9b200031598dab49d54a162f93a9058ee3",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/runtime-defaults.md",
+          "resolved_path": "docs/reference/runtime-defaults.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "20020e8f799425c8befb77bfa2041dbb42ea3b47de33544eb6dcb1acef61d4d8",
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "multi-agent-coordination.md",
@@ -44,22 +52,14 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "7dc9bd2dc4d7b1965f731e35d2dab588f8a7c5fd436fbaaf77293ad356da1bf8",
+          "content_hash": "2ac943330b6dce1fc114e4fa621636f0e31b01a69be33e37562e2a771c6deb81",
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "../reference/configuration.md",
           "resolved_path": "docs/reference/configuration.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "aa88a6efac48fa4effa073f2fd63778bcae9ce59da84273d821d932e09fd68ab",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "../../INSTALL.md",
-          "resolved_path": "INSTALL.md"
         }
       ],
-      "commit": null,
+      "commit": "f0add631d58304738db38e1746e6151969626dc2",
       "doc_type": "documentation",
       "format": "markdown",
       "label": "Deployment guide",
@@ -106,5 +106,5 @@
   "priority": "high",
   "state": "done",
   "title": "Deployment guide backup procedure",
-  "updated_at": "2026-10-01T23:22:48.024084713Z"
+  "updated_at": "2026-11-04T22:16:24.766144584Z"
 }

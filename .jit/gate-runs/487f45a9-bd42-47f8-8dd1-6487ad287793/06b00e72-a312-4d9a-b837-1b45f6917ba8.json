@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9fdfc0d812aa2a667cf7713a60dbb751021d9537",
+  "completed_at": "2026-11-04T22:15:44.192964531Z",
+  "duration_ms": 281967,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/vision/9db27a3a-charter.md",
+        "id": "F1",
+        "line": 85,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-4"
+        ],
+        "severity": "high",
+        "summary": "D-4 and the Git-requirement guarantees omit hooks install although it now reports REQUIRES_GIT outside a repository."
+      }
+    ],
+    "summary": "Canonical Git-requirement policy and guarantees omit the newly classified hooks install requirement.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "487f45a9-bd42-47f8-8dd1-6487ad287793",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "06b00e72-a312-4d9a-b837-1b45f6917ba8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:11:02.225713033Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3873 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a89d-967e-7dd3-a740-e372c08af990\n--------\nuser\n--- 3860 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b0c51b0e7; eb0752bea  \nPolicy sources: AGENTS.md  \nResolved items: @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md)  \nGate evidence: cargo-ci passed (exit 0, 2026-11-04T22:08:49Z)  \nTruncation recovery: recovered the truncated implementation patch with bounded per-path diffs and current source, test, schema, and documentation reads  \n\n1. **F1 — Blocking, issue-impact:** The canonical Git-requirement policy and user-facing guarantee omit `hooks install`. The handler now returns `RequiresGitError` outside Git ([hooks.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/dispatch/hooks.rs:10)), and the exit-code reference lists it, but D-4 still says only claims and leases require Git ([charter](/home/vkaskivuo/Projects/just-in-time/dev/vision/9db27a3a-charter.md:85)); the guarantees list likewise omits it ([guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:243)). This leaves the shipping behavior contradictory to canonical policy. References: @/charter/D-4.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Canonical Git-requirement policy and guarantees omit the newly classified hooks install requirement.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"D-4 and the Git-requirement guarantees omit hooks install although it now reports REQUIRES_GIT outside a repository.\",\"file\":\"dev/vision/9db27a3a-charter.md\",\"line\":85,\"references\":[\"@/charter/D-4\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

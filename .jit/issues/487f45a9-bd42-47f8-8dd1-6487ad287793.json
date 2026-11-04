@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5354bcdf-cfea-45dd-b147-50f1d306260a",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:10:18.548490126Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "06b00e72-a312-4d9a-b837-1b45f6917ba8",
+      "status": "failed",
+      "updated_at": "2026-11-04T22:15:44.194759071Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "487f45a9-bd42-47f8-8dd1-6487ad287793",
   "labels": [
     "epic:rust-code-quality",
@@ -25,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "One requires-Git error for every command family",
-  "updated_at": "2026-11-04T22:01:47.959663931Z"
+  "updated_at": "2026-11-04T22:15:44.194759071Z"
 }

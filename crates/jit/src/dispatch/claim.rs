@@ -124,24 +124,24 @@ command_group! {
     leaves: {
         "claim_acquire" => ClaimCommands::Acquire { issue_id, ttl, agent_id, reason }
             => acquire(issue_id, ttl, agent_id, reason)
-            raises [ClaimRequiresGit] -> ClaimAcquireResponse,
+            raises [RequiresGit] -> ClaimAcquireResponse,
         "claim_release" => ClaimCommands::Release { issue_id }
             => release(issue_id)
-            raises [ClaimRequiresGit] -> ClaimReleaseResponse,
+            raises [RequiresGit] -> ClaimReleaseResponse,
         "claim_renew" => ClaimCommands::Renew { issue_id, extension }
             => renew(issue_id, extension)
-            raises [ClaimRequiresGit] -> ClaimRenewResponse,
+            raises [RequiresGit] -> ClaimRenewResponse,
         "claim_heartbeat" => ClaimCommands::Heartbeat { issue_id }
             => heartbeat(issue_id)
-            raises [ClaimRequiresGit] -> ClaimHeartbeatResponse,
+            raises [RequiresGit] -> ClaimHeartbeatResponse,
         "claim_status" => ClaimCommands::Status { issue, agent }
             => status(issue, agent)
-            raises [ClaimRequiresGit] -> LeaseListResponse,
+            raises [RequiresGit] -> LeaseListResponse,
         "claim_list" => ClaimCommands::List => list()
-            raises [ClaimRequiresGit] -> LeaseListResponse,
+            raises [RequiresGit] -> LeaseListResponse,
         "claim_force-evict" => ClaimCommands::ForceEvict { issue_id, reason }
             => force_evict(issue_id, reason)
-            raises [ClaimRequiresGit] -> ClaimForceEvictResponse,
+            raises [RequiresGit] -> ClaimForceEvictResponse,
     }
 }
 

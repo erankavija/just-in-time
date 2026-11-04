@@ -428,40 +428,6 @@ An ineligible `--execute` is an error: it exits non-zero and performs no
 publication, reference update, archive event, or source deletion. This differs
 from a blocked preview, which exits zero because it only reports the plan.
 
-## MCP Tools Reference
-
-jit ships an MCP (Model Context Protocol) server under
-[`mcp-server/`](../../mcp-server/README.md) so MCP clients (such as VS
-Code, and other agents) can drive jit through structured tool calls instead of
-shelling out to the CLI.
-
-The tool surface is **generated from the CLI schema**, so it stays in lockstep
-with the commands documented above rather than being maintained by hand.
-[MCP Integration](../how-to/mcp-integration.md) installs the server and starts
-it from a client; the generation model in brief:
-
-- **Tools mirror commands.** Every leaf command in `jit --schema` becomes one
-  tool named `jit_<command_path>` — `jit doc assets list` is
-  `jit_doc_assets_list`. A tool's parameters are its command's flags (hyphens
-  become underscores, so `--add-gate` is `add_gate`); repeatable flags take
-  arrays. Each tool's response carries the same JSON payload the command prints
-  with `--json`.
-- **Curated default listing.** `tools/list` advertises an agent-facing subset —
-  the commands for finding, claiming, inspecting, and transitioning work,
-  checking gates, and reading repository structure. The include/exclude decisions and their
-  rationale live in
-  [`mcp-server/curated-tools.json`](../../mcp-server/curated-tools.json).
-- **Full set on demand.** Setting `JIT_MCP_ALL_TOOLS=1` in the server's
-  environment exposes every generated tool, not just the curated subset.
-  `jit worktree exec` generates no tool, flag or no flag.
-
-### See Also
-
-- [MCP Integration](../how-to/mcp-integration.md) - Installing the server and starting it from a client
-- [Core Model](../concepts/core-model.md) - Understanding issues, gates, dependencies
-- [How-To: Custom Gates](../how-to/custom-gates.md) - Gate usage patterns
-- [Quickstart Tutorial](../tutorials/quickstart.md) - Getting started
-
 ## Global Options
 
 ### Multi-Value Arguments

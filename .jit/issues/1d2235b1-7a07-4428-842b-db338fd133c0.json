@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T22:24:54.946576604Z",
+  "dependencies": [
+    "32607213-7402-4c17-9889-7a6286e1959e"
+  ],
+  "description": "The storage predicate and its watcher consumer form one small behavior cutover.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage-owned predicate derives watched paths from storage constants, includes config.toml, and emits configuration changes; watcher tests cover included and unrelated paths.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T22:24:54.946576604Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "1d2235b1-7a07-4428-842b-db338fd133c0",
+  "labels": [
+    "type:task",
+    "epic:frontends-share-core",
+    "milestone:v1.0",
+    "story:frontend-server",
+    "satisfies:0f8efc37/REQ-03",
+    "satisfies:0f8efc37/REQ-04",
+    "satisfies:c8e79465/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Centralize watcher path selection",
+  "updated_at": "2026-11-04T22:25:07.648907703Z"
+}

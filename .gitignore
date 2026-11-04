@@ -12,9 +12,6 @@
 # Jit worktree identity (machine-specific, regenerated on init — never commit)
 .jit/worktree.json
 
-# MCP Server (Node.js)
-mcp-server/node_modules/**
-mcp-server/jit-schema.json
 
 # Coverage badge artifacts
 coverage.json

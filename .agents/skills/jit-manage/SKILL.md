@@ -5,7 +5,7 @@ description: >
   plan, create with DAG wiring, check status, complete through gates. The
   default for any single-issue jit operation; container delivery belongs to
   jit-execution-lead.
-compatibility: Requires JIT CLI on PATH or JIT MCP tools available. Works in any repository with a .jit/ directory.
+compatibility: Requires JIT CLI on PATH. Works in any repository with a .jit/ directory.
 ---
 
 # JIT Project Management

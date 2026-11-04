@@ -3,7 +3,7 @@ name: jit-migrate
 description: >
   Adopt jit in an existing project: scan planning artifacts (ROADMAP, TODO,
   issue lists), extract work items, infer the dependency DAG, populate .jit/.
-compatibility: Requires JIT CLI on PATH. JIT MCP tools used where available.
+compatibility: Requires JIT CLI on PATH.
 ---
 
 # JIT Migration

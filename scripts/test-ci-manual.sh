@@ -37,12 +37,6 @@ cargo test --all-features --verbose
 echo "✅ Rust tests OK (490+ tests)"
 echo ""
 
-# Test 5: MCP Server tests
-echo "5️⃣  Testing MCP Server..."
-(cd mcp-server && npm test)
-echo "✅ MCP Server tests OK"
-echo ""
-
 # Test 6: Web UI linting
 echo "6️⃣  Linting Web UI..."
 (cd web && npm run lint)
@@ -85,18 +79,6 @@ else
 fi
 echo ""
 
-# Test 10: Security audit (npm - MCP)
-echo "🔟 Running npm audit (MCP Server)..."
-cd mcp-server
-if npm audit --audit-level=info; then
-    echo "✅ npm audit (MCP Server) OK"
-else
-    echo "❌ npm audit (MCP Server) found vulnerabilities"
-    AUDIT_FAILED=1
-fi
-cd ..
-echo ""
-
 # Test 11: Security audit (npm - Web)
 echo "1️⃣1️⃣  Running npm audit (Web UI)..."
 cd web
@@ -121,7 +103,6 @@ echo "✅ All CI checks complete!"
 echo ""
 echo "Summary:"
 echo "  - Rust: fmt ✅, clippy ✅, build ✅, tests ✅, audit ✅"
-echo "  - MCP Server: tests ✅, audit ✅"
 echo "  - Web UI: lint ✅, tests ✅, build ✅, audit ✅"
 echo ""
 echo "Ready to push to GitHub! 🚀"

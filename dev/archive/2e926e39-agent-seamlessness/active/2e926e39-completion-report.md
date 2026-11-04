@@ -35,7 +35,7 @@ weakened, or removed; every failing review was reworked until it passed on its o
 | REQ-14 | `issue create --json` ↔ `show` contract parity | b920ea57 |
 | REQ-15 | (coverage) | d287bd4c |
 | REQ-16 | Editable gate definition (`gate update`) | 252c947b |
-| REQ-17 | `ClaimRequiresGitError` (exit 10) | c4b56370 |
+| REQ-17 | the then claim-specific Git requirement error (exit 10) | c4b56370 |
 | REQ-18 | (coverage) | 4b063bdf |
 | REQ-19 | Bounded reverse-dependency depth | 0cbc93e6 |
 

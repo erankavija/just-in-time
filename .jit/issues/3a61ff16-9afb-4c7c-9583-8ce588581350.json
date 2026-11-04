@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T22:24:54.946576604Z",
+  "dependencies": [
+    "1cdf5965-226b-4eb0-8707-33b35a7854d5",
+    "83b561ed-0884-4301-a597-dee4cb8a73fe",
+    "cd0ac0f7-a7ca-4e33-a9eb-c060a7f7565c"
+  ],
+  "description": "Browser refresh, search and graph layout consume shared server results efficiently.\n\n## Success Criteria\n\n- [hard] REQ-01: The browser exposes shared search results, graph metadata and live configured hierarchy across refreshes; indexed bulk passes preserve layout semantics.\n",
+  "documents": [],
+  "gates_required": [
+    "repo-validate",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "3a61ff16-9afb-4c7c-9583-8ce588581350",
+  "labels": [
+    "type:story",
+    "epic:frontends-share-core",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Browser convergence",
+  "updated_at": "2026-11-04T22:24:54.946576604Z"
+}

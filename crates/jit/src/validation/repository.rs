@@ -16,7 +16,7 @@ use crate::domain::item::{
     index_items, index_project_sources, is_qualified_reference, load_toml_scope_items,
     unqualified_link_message, ItemAddressIndex, ItemError, ItemKind, ProjectSource, RawScopeItem,
 };
-use crate::domain::{Issue, ReadinessCorrection};
+use crate::domain::{Issue, ReadinessCorrection, State};
 use crate::graph::DependencyGraph;
 use crate::repository_state::{
     captured_issue_ids, parse_issue_records, IssueRecordsError, RepositoryImage, RepositoryIndex,
@@ -444,7 +444,10 @@ fn validate_integrity(
             }
         }
         for gate in &issue.gates_required {
-            if !gates.gates.contains_key(gate) {
+            if !issue.state.is_terminal()
+                && issue.state != State::Archived
+                && !gates.gates.contains_key(gate)
+            {
                 return Err(anyhow!(
                     "Gate '{}' required by issue '{}' is not defined in registry",
                     gate,
@@ -869,6 +872,26 @@ mod tests {
             report,
             crate::validation::report::BuiltInPass::DanglingItemLink,
         )
+    }
+
+    #[test]
+    fn test_validate_integrity_allows_retired_gates_only_on_closed_issues() {
+        let mut issue = issue_with_labels("Historical", "", &[]);
+        issue.gates_required.push("retired".parse().unwrap());
+        let gates = GateRegistry::default();
+        for state in [State::Done, State::Rejected, State::Archived] {
+            issue.state = state;
+            assert!(validate_integrity(&[issue.clone()], &gates, None).is_ok());
+        }
+        for state in [
+            State::Backlog,
+            State::Ready,
+            State::InProgress,
+            State::Gated,
+        ] {
+            issue.state = state;
+            assert!(validate_integrity(&[issue.clone()], &gates, None).is_err());
+        }
     }
 
     #[test]

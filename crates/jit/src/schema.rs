@@ -10,7 +10,7 @@ use clap::{Arg, ArgAction, CommandFactory};
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Complete command schema for the JIT CLI
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,9 +40,6 @@ pub struct CommandSchema {
 pub struct Command {
     /// Command description
     pub description: String,
-    /// Whether this command is hidden from default MCP tool listing
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub hidden: bool,
     /// Alternate accepted invocations (visible command aliases, without a
     /// leading path; e.g. `dependency` for `dep`, `pass`/`eval` for
     /// `gate evaluate`).
@@ -282,69 +279,12 @@ impl CommandSchema {
             .collect()
     }
 
-    /// Commands hidden from the default MCP tool listing.
-    /// These are still present in the schema and executable, but the MCP server
-    /// filters them from `tools/list` unless `JIT_MCP_ALL_TOOLS=1` is set.
-    fn hidden_commands() -> HashSet<&'static str> {
-        [
-            "claim_force-evict",
-            "claim_heartbeat",
-            "claim_list",
-            "claim_status",
-            "config_get",
-            "config_set",
-            "config_show",
-            "config_show-hierarchy",
-            "config_validate",
-            "doc_assets_list",
-            "doc_check-links",
-            "doc_diff",
-            "doc_history",
-            "events_query",
-            "events_tail",
-            "gate_define",
-            "gate_preset_apply",
-            "gate_preset_create",
-            "gate_preset_list",
-            "gate_preset_show",
-            "gate_remove",
-            "gate_show",
-            "graph_export",
-            "graph_roots",
-            "hooks_install",
-            "init",
-            "issue_assign",
-            "issue_unassign",
-            "query_closed",
-            "query_strategic",
-            "snapshot_export",
-            "serve",
-            "worktree_info",
-            "worktree_list",
-            "worktree_store-divergence",
-            "worktree_exec",
-        ]
-        .into_iter()
-        .collect()
-    }
-
-    /// Extract command from clap Command with full path for output schema lookup
+    /// Extract a command and its output schema from clap.
     fn extract_command_with_path(clap_cmd: &clap::Command, cmd_path: &str) -> Command {
-        Self::extract_command_with_path_hidden(clap_cmd, cmd_path, false, &Self::hidden_commands())
-    }
-
-    fn extract_command_with_path_hidden(
-        clap_cmd: &clap::Command,
-        cmd_path: &str,
-        parent_hidden: bool,
-        hidden_commands: &HashSet<&str>,
-    ) -> Command {
         let description = clap_cmd
             .get_about()
             .map(|s| s.to_string())
             .unwrap_or_default();
-
-        let hidden = parent_hidden || hidden_commands.contains(cmd_path);
 
         // Visible command aliases are additional accepted invocations (e.g.
         // `dependency` for `dep`). Hidden aliases stay out of the contract,
@@ -366,12 +306,7 @@ impl CommandSchema {
                     let sub_path = format!("{}_{}", cmd_path, name);
                     sub_map.insert(
                         name.to_string(),
-                        Self::extract_command_with_path_hidden(
-                            subcmd,
-                            &sub_path,
-                            hidden,
-                            hidden_commands,
-                        ),
+                        Self::extract_command_with_path(subcmd, &sub_path),
                     );
                 }
             }
@@ -399,7 +334,6 @@ impl CommandSchema {
 
         Command {
             description,
-            hidden,
             aliases,
             subcommands,
             args,
@@ -600,7 +534,10 @@ impl CommandSchema {
                     "error": {
                         "type": "object",
                         "properties": {
-                            "code": { "type": "string" },
+                            "code": {
+                                "type": "string",
+                                "enum": crate::output::ErrorCode::ALL.iter().map(|code| code.as_str()).collect::<Vec<_>>()
+                            },
                             "message": { "type": "string" },
                             "suggestion": { "type": ["string", "null"] }
                         }
@@ -820,6 +757,7 @@ pub fn render_exit_code_reference() -> String {
 mod tests {
     use super::*;
     use crate::output::ErrorCode;
+    use std::collections::HashSet;
 
     #[test]
     fn test_get_output_schema_for_command_uses_only_registered_responses() {
@@ -873,31 +811,19 @@ mod tests {
     }
 
     #[test]
-    fn test_hidden_field_set_for_known_commands() {
-        let schema = CommandSchema::generate();
-
-        // Known hidden commands should have hidden=true on their leaf
-        let init = schema.commands.get("init");
-        assert!(init.is_some(), "init command should exist");
-        assert!(init.unwrap().hidden, "init should be hidden");
-
-        // issue_assign should be hidden (leaf under issue)
-        let issue = schema.commands.get("issue").expect("issue command");
-        let assign = issue.subcommands.as_ref().and_then(|s| s.get("assign"));
-        assert!(assign.is_some(), "issue assign should exist");
-        assert!(assign.unwrap().hidden, "issue assign should be hidden");
-
-        // Non-hidden commands should not have hidden=true
-        let status = schema.commands.get("status");
-        assert!(status.is_some(), "status command should exist");
-        assert!(!status.unwrap().hidden, "status should not be hidden");
-
-        let issue_create = issue.subcommands.as_ref().and_then(|s| s.get("create"));
-        assert!(issue_create.is_some(), "issue create should exist");
-        assert!(
-            !issue_create.unwrap().hidden,
-            "issue create should not be hidden"
-        );
+    fn test_generate_types_error_codes_match_runtime_vocabulary() {
+        let types = CommandSchema::generate_types();
+        let codes = types["ErrorResponse"]["properties"]["error"]["properties"]["code"]["enum"]
+            .as_array()
+            .expect("error codes declare their closed vocabulary")
+            .iter()
+            .map(|code| code.as_str().unwrap())
+            .collect::<std::collections::BTreeSet<_>>();
+        let expected = ErrorCode::ALL
+            .iter()
+            .map(|code| code.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(codes, expected);
     }
 
     #[test]
@@ -930,62 +856,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_hidden_propagates_to_children() {
-        let schema = CommandSchema::generate();
-
-        // gate_preset is hidden, so its children should inherit hidden
-        let gate = schema.commands.get("gate").expect("gate command");
-        if let Some(preset) = gate.subcommands.as_ref().and_then(|s| s.get("preset")) {
-            if let Some(children) = &preset.subcommands {
-                for (name, child) in children {
-                    assert!(
-                        child.hidden,
-                        "gate preset {name} should be hidden (inherited from parent)"
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_hidden_not_serialized_when_false() {
-        let cmd = Command {
-            description: "test".to_string(),
-            hidden: false,
-            aliases: vec![],
-            subcommands: None,
-            args: vec![],
-            flags: vec![],
-            output: None,
-        };
-        let json = serde_json::to_string(&cmd).unwrap();
-        assert!(
-            !json.contains("hidden"),
-            "hidden:false should be skipped in serialization"
-        );
-    }
-
-    #[test]
-    fn test_hidden_serialized_when_true() {
-        let cmd = Command {
-            description: "test".to_string(),
-            hidden: true,
-            aliases: vec![],
-            subcommands: None,
-            args: vec![],
-            flags: vec![],
-            output: None,
-        };
-        let json = serde_json::to_string(&cmd).unwrap();
-        assert!(
-            json.contains("\"hidden\":true"),
-            "hidden:true should be present in serialization"
-        );
-    }
-
     /// `graph tree` publishes its response shape through the schema command, so
-    /// MCP clients and other consumers read the resolved-hierarchy contract
+    /// consumers read the resolved-hierarchy contract
     /// instead of re-deriving it.
     #[test]
     fn test_graph_tree_schema_is_published() {
@@ -1038,7 +910,7 @@ mod tests {
     }
 
     /// `issue update` accepts every state but `rejected`, which only
-    /// `jit issue reject` sets; the schema (and so the MCP tool) lists exactly those.
+    /// `jit issue reject` sets; the schema lists exactly those.
     #[test]
     fn test_schema_issue_update_state_values_exclude_rejected() {
         use crate::domain::State;

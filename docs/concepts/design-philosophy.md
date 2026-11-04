@@ -58,7 +58,7 @@ This flexibility enables broader adoption (teams outside software), clearer work
 AI agents are increasingly capable of complex software tasks, but existing tools assume human users. JIT inverts this:
 
 - **Primary audience:** Programmatic agents (AI assistants, automation scripts)
-- **Secondary audience:** Humans (via same CLI, web UI, or MCP)
+- **Secondary audience:** Humans (via the CLI or web UI)
 
 **Result:** Agents get a predictable interface. Humans benefit from the same clarity.
 
@@ -76,7 +76,6 @@ need shared access; an atomic rename alone does not serialize competing writers.
 
 **Clear Exit Codes:** UNIX-standard exit codes enable bash error handling: `jit ... || handle_error`
 
-**MCP Protocol:** AI assistants call JIT operations directly via Model Context Protocol, with type-safe, structured tool use.
 
 **Structured Errors:** JSON errors include error codes and context for programmatic error recovery.
 
@@ -288,28 +287,22 @@ jit query available --json | \
 
 ### Every Surface Runs on the Core Library
 
-The MCP server drives the `jit` binary. The web UI server embeds the core library in
-process. Both reach the same storage, graph, and validation code:
+The CLI and web UI server use the core library for storage, graph, and validation:
 
 ```mermaid
 flowchart TD
     W["Web UI (jit-server)<br/>visualization layer"] --> L
-    M["MCP Server (mcp-server/)<br/>AI agent integration"] --> C
     C["CLI (jit)<br/>command-line interface"] --> L["Core Library (crates/jit)<br/>storage, graph, validation"]
 ```
 
 **Benefits:**
 - Single source of truth (core library)
-- MCP tools are generated from `jit --schema`, so every CLI command is callable; the default `tools/list` advertises a curated agent-facing subset (see `mcp-server/README.md`)
-- Each surface reaches the same core code, so results stay consistent across the CLI, MCP, and web UI
+- Each surface reaches the same core code, so results stay consistent across the CLI and web UI
 
 **Example:**
 ```bash
 # CLI
 jit issue create --title "Feature X" --priority high
-
-# MCP server (calls the CLI internally)
-Jit-jit_issue_create(title="Feature X", priority="high")
 
 # Web UI (jit-server, calls the core library in process)
 POST /api/issues {"title": "Feature X", "priority": "high"}
