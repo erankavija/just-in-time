@@ -5087,12 +5087,19 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 return Ok(ExitCode::Success);
             }
 
-            // --rule path: evaluate exactly one configured graph rule with the
-            // positional issue as its sole firing subject. The command keeps the
-            // same report and exit contract as per-issue validation.
+            // --rule path: select one configured graph rule from the captured
+            // report, with the positional issue as its sole firing subject.
             if let (Some(rule_name), Some(issue_id)) = (rule.as_deref(), id.as_ref()) {
-                let issue_id = resolve_issue(&storage, issue_id.as_str())?;
-                let report = executor.validation().validate_rule(&issue_id, rule_name)?;
+                let selection = jit::validation::report::Selection::Rule {
+                    issue: issue_id.clone(),
+                    rule: rule_name.to_string(),
+                };
+                let report = match executor.validation().selection_report()?.select(&selection) {
+                    Ok(report) => report,
+                    Err(error) => error
+                        .downcast::<jit::validation::report::RuleSelectionFault>()?
+                        .into_report(),
+                };
                 let exit_nonzero = report.has_errors();
                 if json {
                     let value = serde_json::to_value(&report)?;

@@ -9,15 +9,16 @@
 //! EXCLUDED exactly as at transition time (R2 / CC-2a). The command fails with
 //! findings shown when an error-severity finding is produced.
 //!
-//! These are in-process tests over `ValidationOps::validate_scope` (fast and
-//! deterministic); the failure presentation is covered by a subprocess test.
+//! These are in-process tests over validation capture and scope operations;
+//! command failure presentation is covered by subprocess tests.
 
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
-use jit::domain::identity::IssueId;
+use jit::domain::identity::{IssueId, IssueIdPrefix};
 use jit::domain::{DocumentReference, State};
 use jit::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
 use jit::test_utils::{document_reference, issue_id};
+use jit::validation::report::Selection;
 
 trait ScopeFixtureStore: IssueStore + RepositoryStateStore {
     fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> IssueId;
@@ -236,234 +237,33 @@ fn spine_with_breakdown_criteria(
     (c, b)
 }
 
-/// A selected breakdown whose configured rule reads criteria from its bracketed
-/// container, plus a satisfying child in that container's dependency context.
-fn selected_rule_fixture(executor: &CommandExecutor<InMemoryStorage>) -> (IssueId, IssueId) {
-    let criteria = "## Success Criteria\n\n- [hard] REQ-01: selected work\n";
-    let child = seed(
-        executor,
-        "selected implementation",
-        &[
-            "type:task",
-            &credit("selected container", criteria, "REQ-01"),
-        ],
-        "",
-        &[],
-    );
-    let container = seed(
-        executor,
-        "selected container",
-        &["type:epic"],
-        criteria,
-        std::slice::from_ref(&child),
-    );
-    let container_short = executor
-        .storage()
-        .load_issue(&container)
-        .unwrap()
-        .short_id();
-    let selected = seed(
-        executor,
-        "selected breakdown",
-        &["type:breakdown", &format!("brackets:{container_short}")],
-        "",
-        &[],
-    );
-    (selected, container)
-}
-
-const SELECTED_RULE: &str = r#"
-[[rules]]
-name = "selected-coverage"
-when = { type = "breakdown" }
-severity = "error"
-enforce = true
-assert = { label-coverage = { marker = "[hard]", id-pattern = "REQ-[0-9]+", container-from-label = "brackets", child-link = "dependencies" } }
-"#;
-
 #[test]
-fn test_rule_validation_uses_selected_issue_and_repository_context() {
+fn test_rule_selection_reports_rules_file_finding_for_unloadable_rules() {
     let executor = memory_executor_declaring(
         InMemoryStorage::new(),
         MemoryDeclarations {
-            rules: Some(SELECTED_RULE),
-            templates: Some(PLAN_TEMPLATE_INLINE),
+            rules: Some("[[rules]\nname = \"unterminated\"\n"),
+            after_initialization: true,
             ..Default::default()
         },
     );
-    let (selected, _container) = selected_rule_fixture(&executor);
-
-    // Keep an unrelated historical application and a rejected target in the
-    // repository context. It would fail the same rule if it became a firing
-    // subject, but must not affect the selected application.
-    let rejected = seed(
-        &executor,
-        "rejected historical container",
-        &["type:epic"],
-        "## Success Criteria\n\n- [hard] REQ-99: old work\n",
-        &[],
-    );
-    let mut rejected_issue = executor.storage().load_issue(&rejected).unwrap();
-    rejected_issue.state = State::Rejected;
-    jit::test_harness::seed_memory_issue(executor.storage(), &rejected_issue);
-    let rejected_short = rejected_issue.short_id();
-    let historical = seed(
-        &executor,
-        "historical breakdown",
-        &["type:breakdown", &format!("brackets:{rejected_short}")],
-        "",
-        &[],
-    );
-
-    let selected_report = executor
-        .validation()
-        .validate_rule(&selected, "selected-coverage")
-        .expect("selected rule validation runs");
-    assert!(
-        !selected_report.has_errors(),
-        "unrelated historical applications cannot fail the selected result: {:?}",
-        selected_report.findings
-    );
-
-    let historical_report = executor
-        .validation()
-        .validate_rule(&historical, "selected-coverage")
-        .expect("historical rule validation runs");
-    assert!(historical_report.has_errors());
-    assert!(historical_report
-        .findings
-        .iter()
-        .any(|finding| finding.message.contains("REQ-99")));
-}
-
-#[test]
-fn test_rule_validation_selection_errors_are_non_vacuous() {
-    let executor = memory_executor_declaring(
-        InMemoryStorage::new(),
-        MemoryDeclarations {
-            rules: Some(&format!(
-        "{SELECTED_RULE}\n[[rules]]\nname = \"disabled-rule\"\nwhen = {{ type = \"breakdown\" }}\nseverity = \"off\"\nenforce = false\nassert = {{ label-coverage = {{ }} }}\n"
-    )),
-            templates: Some(PLAN_TEMPLATE_INLINE),
-            ..Default::default()
-        },
-    );
-    let (selected, _container) = selected_rule_fixture(&executor);
-    let task = seed(&executor, "nonmatching task", &["type:task"], "", &[]);
-
-    for (rule, expected) in [
-        ("missing-rule", "was not found"),
-        ("disabled-rule", "is off"),
-        ("selected-coverage", "does not match selected issue"),
-    ] {
-        let target = if rule == "selected-coverage" {
-            &task
-        } else {
-            &selected
-        };
-        let report = executor
-            .validation()
-            .validate_rule(target, rule)
-            .expect("selection error is reported as a rule finding");
-        assert!(report.has_errors(), "{rule} must not pass vacuously");
-        assert!(
-            report
-                .findings
-                .iter()
-                .any(|finding| finding.message.contains(expected)),
-            "{rule} error should name the selection problem: {:?}",
-            report.findings
-        );
-    }
-}
-
-#[test]
-fn test_rule_validation_reports_selected_container_errors_precisely() {
-    let executor = memory_executor_declaring(
-        InMemoryStorage::new(),
-        MemoryDeclarations {
-            rules: Some(SELECTED_RULE),
-            templates: Some(PLAN_TEMPLATE_INLINE),
-            ..Default::default()
-        },
-    );
-
-    let missing = seed(
-        &executor,
-        "missing target breakdown",
-        &["type:breakdown", "brackets:missing-target"],
-        "",
-        &[],
-    );
-    let missing_report = executor
-        .validation()
-        .validate_rule(&missing, "selected-coverage")
-        .expect("missing selected target is a validation finding");
-    assert!(missing_report.has_errors());
-    assert!(missing_report
-        .findings
-        .iter()
-        .any(|finding| finding.message.contains("names no known issue")));
-
-    [
-        (
-            "deadbeef-0000-4000-8000-00000000000a",
-            "ambiguous target one",
-        ),
-        (
-            "deadbeef-0000-4000-8000-00000000000b",
-            "ambiguous target two",
-        ),
-    ]
-    .into_iter()
-    .for_each(|(id, title)| {
-        let mut target = crate::fixture_issue(title.to_string(), String::new());
-        target.id = id.parse().expect("the fixture id is a canonical issue id");
-        target.labels = vec!["type:epic".to_string()];
-        jit::test_harness::seed_memory_issue(executor.storage(), &target);
-    });
-    let ambiguous = seed(
-        &executor,
-        "ambiguous target breakdown",
-        &["type:breakdown", "brackets:deadbeef"],
-        "",
-        &[],
-    );
-    let ambiguous_report = executor
-        .validation()
-        .validate_rule(&ambiguous, "selected-coverage")
-        .expect("ambiguous selected target is a validation finding");
-    assert!(ambiguous_report.has_errors());
-    assert!(ambiguous_report
-        .findings
-        .iter()
-        .any(|finding| finding.message.contains("ambiguous")));
-}
-
-#[test]
-fn test_rule_validation_resolves_rejected_selected_container() {
-    let executor = memory_executor_declaring(
-        InMemoryStorage::new(),
-        MemoryDeclarations {
-            rules: Some(SELECTED_RULE),
-            templates: Some(PLAN_TEMPLATE_INLINE),
-            ..Default::default()
-        },
-    );
-    let (selected, container) = selected_rule_fixture(&executor);
-    let mut rejected = executor.storage().load_issue(&container).unwrap();
-    rejected.state = State::Rejected;
-    jit::test_harness::seed_memory_issue(executor.storage(), &rejected);
+    let issue = seed(&executor, "selected issue", &["type:task"], "", &[]);
 
     let report = executor
         .validation()
-        .validate_rule(&selected, "selected-coverage")
-        .expect("rejected selected target remains resolvable");
-    assert!(
-        !report.has_errors(),
-        "a directly selected rejected target must still resolve: {:?}",
-        report.findings
-    );
+        .selection_report()
+        .expect("the captured validation report is available");
+    let selected = report
+        .select(&Selection::Rule {
+            issue: IssueIdPrefix::from(&issue),
+            rule: "selected-coverage".to_string(),
+        })
+        .expect("an unloadable rule set is reported as a finding");
+
+    assert!(selected
+        .findings
+        .iter()
+        .any(|finding| finding.rule == "rules-file"));
 }
 
 #[test]
