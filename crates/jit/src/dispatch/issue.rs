@@ -171,18 +171,14 @@ fn status<S: IssueStore>(
     ids: Vec<String>,
 ) -> anyhow::Result<Outcome<IssueStatusOutput>> {
     let issues = ctx.executor.issues();
-    let mut statuses = ids
+    let statuses = ids
         .iter()
         .map(|id| issues.issue_status_response(issues.show_issue(&resolve(ctx, id)?)?))
         .collect::<anyhow::Result<Vec<IssueStatusResponse>>>()?;
     // A single id stays a bare object, like `issue show`.
-    let output = match (statuses.pop(), statuses.is_empty()) {
-        (Some(only), true) => IssueStatusOutput::One(only),
-        (Some(last), false) => {
-            statuses.push(last);
-            IssueStatusOutput::Many(IssueStatusListResponse::new(statuses))
-        }
-        (None, _) => IssueStatusOutput::Many(IssueStatusListResponse::new(statuses)),
+    let output = match <[IssueStatusResponse; 1]>::try_from(statuses) {
+        Ok([only]) => IssueStatusOutput::One(only),
+        Err(many) => IssueStatusOutput::Many(IssueStatusListResponse::new(many)),
     };
     Ok(success(output, None))
 }
