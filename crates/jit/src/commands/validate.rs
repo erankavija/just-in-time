@@ -5,7 +5,7 @@ use crate::domain::identity::GateKey;
 use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
-use crate::validation::report::BuiltInPass;
+use crate::validation::report::{group_messages, render_selector, BuiltInPass, RuleSelectionFault};
 use anyhow::Context;
 
 #[derive(Clone, Copy)]
@@ -408,13 +408,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     .listings
                     .iter()
                     .all(|listing| read.listings().contains(listing));
-            // The base already reads the log in the mode this capture needs.
-            spec.discover_paths(
-                closure
-                    .paths
-                    .into_iter()
-                    .filter(|path| *path != VirtualPath::EVENTS),
-            )?;
+            spec.discover_paths(closure.paths)?;
             spec.discover_listings(closure.listings)?;
             if !closure_read {
                 return Ok(());
@@ -1090,32 +1084,6 @@ pub(super) fn rule_validation_outcome(
             .map(|finding| ReportedFinding::new(finding.issue_id, &finding.finding))
             .collect(),
     }))
-}
-
-/// A configured rule that cannot be evaluated against the selected issue.
-pub(super) struct RuleSelectionFault {
-    issue_id: IssueId,
-    rule: String,
-    pub(super) message: String,
-}
-
-impl RuleSelectionFault {
-    fn into_report(self) -> crate::validation::report::RuleReport {
-        use crate::declarations::rules::Severity;
-        use crate::validation::engine::Finding;
-        use crate::validation::report::{ReportedFinding, RuleReport};
-
-        RuleReport {
-            findings: vec![ReportedFinding::new(
-                Some(self.issue_id),
-                &Finding {
-                    rule: self.rule,
-                    severity: Severity::Error,
-                    message: self.message,
-                },
-            )],
-        }
-    }
 }
 
 impl<S: IssueStore> ValidationOps<'_, S> {
@@ -2209,45 +2177,6 @@ fn force_evict_remedy(lease: &crate::storage::claim_coordinator::Lease) -> Strin
     )
 }
 
-/// Group `(rule_name, message)` pairs into a map of rule name to its messages,
-/// preserving first-seen order within each rule.
-fn group_messages(
-    pairs: impl IntoIterator<Item = (String, String)>,
-) -> std::collections::HashMap<String, Vec<String>> {
-    pairs.into_iter().fold(
-        std::collections::HashMap::new(),
-        |mut acc, (rule, message)| {
-            acc.entry(rule).or_default().push(message);
-            acc
-        },
-    )
-}
-
-/// Render a rule selector as a compact, human-readable string for `--explain`.
-///
-/// An empty selector (matches everything) renders as `"*"`; otherwise the
-/// present dimensions are joined with `", "` (e.g. `"type=epic, state=ready"`).
-fn render_selector(selector: &crate::declarations::rules::Selector) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    if let Some(t) = &selector.type_ {
-        parts.push(format!("type={t}"));
-    }
-    if let Some(l) = &selector.label {
-        parts.push(format!("label={l}"));
-    }
-    if let Some(s) = &selector.state {
-        parts.push(format!("state={}", s.tokens().join("|")));
-    }
-    if let Some(d) = &selector.has_doc_type {
-        parts.push(format!("has_doc_type={d}"));
-    }
-    if parts.is_empty() {
-        "*".to_string()
-    } else {
-        parts.join(", ")
-    }
-}
-
 /// Format duration in human-readable form
 fn format_duration(duration: chrono::Duration) -> String {
     let secs = duration.num_seconds();
@@ -2752,29 +2681,6 @@ mod tests {
         assert_eq!(format_duration(Duration::seconds(1)), "1 second");
         assert_eq!(format_duration(Duration::seconds(30)), "30 seconds");
         assert_eq!(format_duration(Duration::seconds(59)), "59 seconds");
-    }
-
-    #[test]
-    fn test_render_selector_state_single() {
-        use crate::declarations::rules::{Selector, StatePredicate};
-        let sel = Selector {
-            type_: Some("epic".to_string()),
-            state: Some(StatePredicate::single("in_progress")),
-            ..Default::default()
-        };
-        assert_eq!(render_selector(&sel), "type=epic, state=in_progress");
-    }
-
-    #[test]
-    fn test_render_selector_state_list_joins_with_pipe() {
-        use crate::declarations::rules::{Selector, StatePredicate};
-        use crate::domain::State;
-        let (first, second) = (State::Ready, State::InProgress);
-        let sel = Selector {
-            state: Some(StatePredicate::list([first, second].map(State::as_str))),
-            ..Default::default()
-        };
-        assert_eq!(render_selector(&sel), format!("state={first}|{second}"));
     }
 
     #[test]

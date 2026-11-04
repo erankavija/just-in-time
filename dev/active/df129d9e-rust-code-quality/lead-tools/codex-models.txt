@@ -1,0 +1,9 @@
+0fe46027 gpt-6.1-sol high
+1ac651c7 gpt-6.1-sol high
+06ee9b67 gpt-6-luna xhigh
+71f5296c gpt-6-luna xhigh
+cc4ea8a9 gpt-6.1-sol high
+52110fb4 gpt-6-luna xhigh
+182f4c03 gpt-6-luna xhigh
+cd8e04cc gpt-6-astra default
+8e91126b gpt-6-luna xhigh

@@ -470,7 +470,7 @@ fn repository_rule_report(
             history: None,
         },
     )
-    .rule_report
+    .rule_report()
 }
 
 fn captured_issue_rule_report(
@@ -3370,7 +3370,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let validate = executor
             .validation()
             .validate_repository_report()
-            .map(|report| report.structural_failure.is_none() && !report.rule_report.has_errors())
+            .map(|report| report.structural_failure.is_none() && !report.rule_report().has_errors())
             .unwrap();
         let run = executor
             .execute_builtin_checker_with_repository_view(

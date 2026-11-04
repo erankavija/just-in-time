@@ -575,7 +575,7 @@ pub struct RecoveryReport {
     pub expired_leases_evicted: usize,
     /// Number of indefinite leases reclaimed for a stale heartbeat
     pub stale_leases_reclaimed: usize,
-    /// Number of orphaned temp files removed
+    /// Number of orphaned temp files removed, lease stage files included
     pub temp_files_removed: usize,
     /// Number of derived-state targets repaired during recovery.
     pub derived_state_repaired: usize,
@@ -662,7 +662,29 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
     report.expired_leases_evicted = lapsed.expired;
     report.stale_leases_reclaimed = lapsed.reclaimed;
 
+    // 3. Remove interrupted lease operations' stage files; lease records are
+    // not `*.tmp` files.
+    sweep_temp_files(
+        &crate::storage::WorktreePaths::leases_dir(&paths.shared_jit),
+        report,
+    );
+
     Ok(())
+}
+
+/// Remove orphaned `*.tmp` files under `root` past the cleanup threshold,
+/// counting them in `report`. Best-effort: a failure is surfaced as a warning
+/// rather than aborting recovery.
+fn sweep_temp_files(root: &std::path::Path, report: &mut RecoveryReport) {
+    match crate::storage::temp_cleanup::cleanup_orphaned_temp_files(
+        root,
+        crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS,
+    ) {
+        Ok(removed) => report.temp_files_removed += removed,
+        Err(e) => report.warnings.push(StorageWarning::TempCleanupFailed {
+            reason: e.to_string(),
+        }),
+    }
 }
 
 impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
@@ -673,7 +695,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
     /// - Repairs declaration-derived state through the `jit validate --fix` path
     /// - With claims coordination: cleans up stale claim locks from crashed processes
     ///   (PID check), evicts expired leases, and reclaims indefinite leases whose
-    ///   heartbeat is stale; without Git, skips these with a warning
+    ///   heartbeat is stale, and removes interrupted lease operations' stage
+    ///   files; without Git, skips these with a warning
     /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
     ///
     /// Safe to run at any time: it removes only provably stale data and never
@@ -681,7 +704,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
     pub fn recover(&self) -> Result<RecoveryReport> {
         let paths = self.exec.require_worktree_paths()?;
         let storage = self.exec.storage();
-        use crate::storage::temp_cleanup;
 
         let mut report = RecoveryReport::default();
 
@@ -713,18 +735,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
                 .push(StorageWarning::ClaimsLeaseRecoverySkipped);
         }
 
-        // 4. Clean up orphaned temp files. Best-effort: a failure is surfaced as a
-        // warning rather than aborting recovery.
-        let jit_data_dir = &paths.local_jit;
-        match temp_cleanup::cleanup_orphaned_temp_files(
-            jit_data_dir,
-            crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS,
-        ) {
-            Ok(removed) => report.temp_files_removed = removed,
-            Err(e) => report.warnings.push(StorageWarning::TempCleanupFailed {
-                reason: e.to_string(),
-            }),
-        }
+        sweep_temp_files(&paths.local_jit, &mut report);
 
         Ok(report)
     }
@@ -2087,6 +2098,53 @@ mod tests {
             events_after.len(),
             "coordinator-only operations must not append repository events"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_recover_removes_stale_lease_stage_files_and_keeps_lease_records() -> Result<()> {
+        use crate::storage::WorktreePaths;
+        let (temp, storage) = setup_test_repo()?;
+        ensure_git_checkout(&temp)?;
+        let leased = crate::test_utils::issue_id(1);
+        let shared_jit = create_test_paths(&temp).shared_jit;
+        let now = chrono::Utc::now();
+        crate::test_lease_store::plant_lease(
+            &shared_jit,
+            &Lease {
+                lease_id: "00000000-0000-4000-8000-000000000001".parse()?,
+                issue_id: leased.clone(),
+                agent_id: "agent:holder".parse()?,
+                worktree_id: "wt:holder".parse()?,
+                branch: None,
+                ttl_secs: 600,
+                acquired_at: now,
+                expires_at: Some(now + chrono::Duration::seconds(600)),
+                last_beat: now,
+            },
+        )?;
+        let record = WorktreePaths::lease_path(&shared_jit, &leased);
+        let stale_stage = WorktreePaths::lease_stage_path(&shared_jit, &leased);
+        let fresh_stage =
+            WorktreePaths::lease_stage_path(&shared_jit, &crate::test_utils::issue_id(2));
+        fs::write(&stale_stage, "interrupted")?;
+        fs::write(&fresh_stage, "in flight")?;
+        let past_threshold = std::time::SystemTime::now()
+            - Duration::from_secs(crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS + 60);
+        for aged in [&record, &stale_stage] {
+            fs::File::options()
+                .write(true)
+                .open(aged)?
+                .set_modified(past_threshold)?;
+        }
+
+        let report = CommandExecutor::new(storage.clone())
+            .with_worktree_paths(create_test_paths(&temp))
+            .claims()
+            .recover()?;
+
+        assert!(!stale_stage.exists(), "{report:?}");
+        assert!(fresh_stage.exists() && record.exists(), "{report:?}");
         Ok(())
     }
 }
