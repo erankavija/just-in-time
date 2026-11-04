@@ -321,6 +321,13 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         || error
             .downcast_ref::<crate::commands::ProfileApplyError>()
             .is_some()
+        // The sanctioned downcast of the typed repository-state error: every
+        // refused target decision is a profile conflict; every other variant
+        // keeps its classification below.
+        || matches!(
+            error.downcast_ref::<crate::repository_state::RepositoryStateError>(),
+            Some(crate::repository_state::RepositoryStateError::ProfileTargetConflicts(_))
+        )
     {
         return ErrorCode::ProfileConflict;
     }
@@ -358,8 +365,10 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
     // The repository-state derivation error is classified by an exhaustive match
     // over every current variant — no fallback arm — so a newly added variant forces
     // a deliberate classification here rather than silently taking the generic code.
-    // Projection, managed-document, profile-target-conflict, ambiguous-ownership,
-    // gate-registry-edit, and archive-execution failures are validation failures (4);
+    // Projection, managed-document, ambiguous-ownership, gate-registry-edit, and
+    // archive-execution failures are validation failures (4); a profile-target
+    // conflict is classified as a profile conflict (4) above and listed here only for
+    // exhaustiveness;
     // a layout rejection is an argument error (2); capture/parse producer failures and
     // the structural delta/overlay/initialization failures keep the
     // generic code (1). The `project render` command additionally unwraps this error
@@ -1155,13 +1164,13 @@ mod repository_state_classifier_tests {
 
     #[test]
     fn test_classify_profile_repository_state_failures_report_their_classified_code() {
-        // A refused profile decision is a validation failure (exit 4); an
+        // A refused profile decision is a profile conflict (exit 4); an
         // unreadable registry keeps the generic code (exit 1); a layout rejection
         // is an argument error. None is substituted with `PROFILE_ERROR`.
         let cases: Vec<(RepositoryStateError, crate::output::ErrorCode, i32)> = vec![
             (
                 target_conflicts().into(),
-                crate::output::ErrorCode::ValidationFailed,
+                crate::output::ErrorCode::ProfileConflict,
                 4,
             ),
             (
@@ -1198,7 +1207,7 @@ mod repository_state_classifier_tests {
 
         let json = classify(&error);
 
-        assert_eq!(json.error.code, crate::output::ErrorCode::ValidationFailed);
+        assert_eq!(json.error.code, crate::output::ErrorCode::ProfileConflict);
         assert_eq!(json.exit_code().code(), 4);
         assert_eq!(json.error.message, rendered);
         for expected in [
@@ -1773,7 +1782,7 @@ mod derived_guidance_tests {
 
         let json = classify(&error);
 
-        assert_eq!(json.error.code, ErrorCode::ValidationFailed);
+        assert_eq!(json.error.code, ErrorCode::ProfileConflict);
         assert_eq!(
             details_of(&json)["conflicts"].as_array().map(Vec::len),
             Some(1)

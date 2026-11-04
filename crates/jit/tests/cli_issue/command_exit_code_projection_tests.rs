@@ -912,7 +912,14 @@ fn invoke_profile_conflict(command: &str, json: bool) -> Vec<Output> {
     );
     if json {
         let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(envelope["error"]["code"], "VALIDATION_FAILED");
+        assert_eq!(
+            envelope["error"]["code"],
+            if command == "diff" {
+                "VALIDATION_FAILED"
+            } else {
+                "PROFILE_CONFLICT"
+            }
+        );
         assert!(output.stderr.is_empty(), "{output:?}");
         if command == "diff" {
             assert!(envelope["error"]["details"]["profiles"].is_array());
