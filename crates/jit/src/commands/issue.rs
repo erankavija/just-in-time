@@ -3407,6 +3407,35 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         assert_eq!(counter.0.load(Ordering::SeqCst) - opened, 1);
     }
 
+    #[test]
+    fn test_update_issue_reopening_with_retired_gate_fails_without_mutation() {
+        let executor = crate::commands::test_helpers::memory_executor(InMemoryStorage::new());
+        let mut issue = crate::test_utils::fixture_issue("Closed".into(), String::new());
+        issue.state = State::Done;
+        issue.gates_required.push("retired".parse().unwrap());
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
+        let error = executor
+            .issues()
+            .update_issue(
+                &id,
+                None,
+                None,
+                None,
+                Some(State::InProgress),
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap_err();
+        assert!(error
+            .downcast_ref::<crate::storage::GateNotFoundError>()
+            .is_some());
+        assert_eq!(executor.storage.load_issue(&id).unwrap().state, State::Done);
+    }
+
     /// Move a `Done` blocker back to `InProgress`, optionally with a `Ready`
     /// dependent; returns the session opens the update took and the
     /// dependent's state.

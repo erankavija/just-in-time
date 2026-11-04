@@ -426,7 +426,7 @@ def check_failure_escapes(relative: Path, doc) -> list[Finding]:
 # construct belongs nowhere, because the release's whole published output is
 # one GitHub release (@/charter/D-16, @/charter/D-9). Packaging is not
 # publication: `npm pack` writes a tarball into the workspace and reaches no
-# registry, which is how the MCP server ships as a release asset.
+# registry.
 #
 # Each command marker is a tuple of substrings that all have to appear in the
 # same script, so the REST form of a release call is caught without every `gh

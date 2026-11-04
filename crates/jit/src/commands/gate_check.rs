@@ -3932,6 +3932,37 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
+    fn test_list_gate_runs_preserves_history_after_gate_and_binding_are_removed() {
+        let executor = setup();
+        let issue_id = seed_review_issue(&executor);
+        let key = "review".parse().unwrap();
+        executor
+            .gates()
+            .pass_gate(&issue_id, &key, Some("human:me".into()), false)
+            .unwrap();
+        let mut issue = executor.storage.load_issue(&issue_id).unwrap();
+        issue.gates_required.retain(|gate| gate != &key);
+        seed_issue(executor.storage(), issue);
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.remove(&key);
+        seed_gate_registry(executor.storage(), &registry);
+        let runs = executor
+            .gates()
+            .list_gate_runs(&issue_id, Some(&key))
+            .unwrap();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].gate_key, key);
+        assert_eq!(
+            executor
+                .gates()
+                .get_gate_run_result(&issue_id, &runs[0].run_id)
+                .unwrap()
+                .gate_key,
+            key
+        );
+    }
+
+    #[test]
     fn test_list_gate_runs_lists_manual_attestations_alongside_automated_runs() {
         let executor = setup();
         let issue_id = seed_review_issue(&executor);

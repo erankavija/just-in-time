@@ -10,7 +10,7 @@ capabilities it aligns, and what an upgrade replaces are the
 
 ## Product version
 
-One product version spans the CLI, the server, the MCP package, the web
+One product version spans the CLI, the server, the web
 bundle, their lock metadata, the release tag, and the compatibility record.
 `scripts/release-version-contract.py` takes the version the `jit` manifest
 declares and requires every one of those declarations to agree with it,
@@ -50,9 +50,8 @@ The release carries these assets:
 | Asset | Contents | Installed by |
 | --- | --- | --- |
 | native archive | the `jit` CLI, the `jit-server` binary, both license texts, the `jit-default` vocabulary package under `packages/jit-default/`, and the assembled `jit-dogfood` workflow package under `packages/jit-dogfood/`, built for Linux x86_64 against musl | [Installation Guide](../../INSTALL.md#pre-built-binaries) |
-| MCP server tarball | the packaged MCP server | [MCP Integration](../how-to/mcp-integration.md) |
-| checksum file | SHA-256 sums covering both archives, computed where the assets are assembled | [Installation Guide](../../INSTALL.md#download-and-verify) |
-| license texts | the two texts the manifest expression names, published beside the archives that also carry them | downloaded from the release page |
+| checksum file | SHA-256 sums covering the archive, computed where the assets are assembled | [Installation Guide](../../INSTALL.md#download-and-verify) |
+| license texts | the two texts the manifest expression names, published beside the archive that also carries them | downloaded from the release page |
 
 The committed release note for the declared version is the release body, so
 each version's published narrative is reviewed in the repository rather than

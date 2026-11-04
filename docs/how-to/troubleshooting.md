@@ -85,7 +85,7 @@ become ready or complete. Required gates must pass before an issue can become
    jit issue update <issue-id> --state done   # completes an in_progress issue; no change once done
    ```
 
-For scripts and MCP clients, use `--json` on `issue update`, `issue claim`, or
+For scripts, use `--json` on `issue update`, `issue claim`, or
 `issue claim-next`. Blocked transitions include structured `details.blockers`
 and `details.remediation` fields so agents do not need to parse prose.
 
