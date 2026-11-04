@@ -934,7 +934,8 @@
     "1ac651c7": 2,
     "cd8e04cc": 2,
     "cc4ea8a9": 2,
-    "1a4f2ebd": 2
+    "1a4f2ebd": 2,
+    "4a01ccba": 1
   },
   "surfaced_pitfalls": [
     {
@@ -976,7 +977,8 @@
     "close-issue.sh globbed format-3 gate-run paths; fixed to .jit/gate-runs/<id>-*/ for format 4.",
     "Some code-review evaluations recorded two runs a minute apart with different verdicts (8e91126b, 1a4f2ebd); cause unknown.",
     "A for-loop over gate-one.sh continues past a failing issue; the lead assumed it stopped and started a second runner, doubling code-review runs. Break on failure or check ps before starting another runner.",
-    "Codex brief TMPDIR=$PWD/target/tmp puts temp dirs inside the git tree; claim/archive tests that need a non-git directory then fail (handoff-11 trap). Use /mnt/nvme/jit/tmp/df129d9e-workers."
+    "Codex brief TMPDIR=$PWD/target/tmp puts temp dirs inside the git tree; claim/archive tests that need a non-git directory then fail (handoff-11 trap). Use /mnt/nvme/jit/tmp/df129d9e-workers.",
+    "test_strict_lease_exempt_paths_write_for_their_stated_reason took 12-13 s in parallel runs (not on the 4a01ccba list); relevant to f487aeef's per-test limits."
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
@@ -1220,9 +1222,10 @@
     },
     "4a01ccba": {
       "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43).",
-      "status": "dispatched",
+      "status": "rework",
       "vendor": "Claude Sonnet",
-      "reason": "test refactors needing judgement on seams; f487aeef stays held (D-43)"
+      "reason": "test refactors needing judgement on seams; f487aeef stays held (D-43)",
+      "review": "b1ed23165 landed; cargo-ci passed; code-review 32037cf7: F1 sleep-polling readiness in serve test (REQ-02), F2 no same-method remeasurement evidence (REQ-01). Rework 1 to same worker."
     },
     "8a14e8e9": {
       "status": "done",
