@@ -585,8 +585,8 @@ confirmation = "invoked"
 path = "project render"
 argv = ["project", "render", "--name", "no-such-projection", "--json"]
 setup = ["init", "no-projection:no-such-projection"]
-expected_failure = "PROJECT_COMMAND_FAILED: unknown projection 'no-such-projection'"
-expected_code = "PROJECT_COMMAND_FAILED"
+expected_failure = "INVALID_ARGUMENT: unknown projection 'no-such-projection'"
+expected_code = "INVALID_ARGUMENT"
 confirmation = "invoked"
 
 [[arms]]

@@ -547,6 +547,16 @@ fn invoke_gate_preset_apply_missing_target(json: bool) -> Vec<Output> {
     )]
 }
 
+/// `jit project render` when the requested projection name is not configured.
+fn invoke_project_render_unknown_name(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    vec![output_in_form(
+        &cli,
+        &["project", "render", "--name", "no-such-projection"],
+        json,
+    )]
+}
+
 /// `jit serve --status` (like the daemon start and `--stop`) classifies a
 /// malformed PID file as `PARSE_ERROR`, whose registered status is 1.
 fn invoke_serve_daemon_error(json: bool) -> Vec<Output> {
@@ -753,6 +763,7 @@ row_bindings! {
     test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", Some(4), false) => invoke_config_validate;
     test_command_exit_codes_doc_check_links_emits_1: ("doc check-links", Some(1), true) => invoke_doc_check_links;
     test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", Some(3), false) => invoke_gate_preset_apply_missing_target;
+    test_command_exit_codes_project_render_unknown_projection_emits_2: ("project render", Some(2), false) => invoke_project_render_unknown_name;
     test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", Some(1), false) => invoke_serve_daemon_error;
     #[cfg(unix)]
     test_command_exit_codes_serve_foreground_passthrough_is_dual_form: ("serve --fg", None, true) => invoke_serve_foreground_passthrough;

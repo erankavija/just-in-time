@@ -18,12 +18,12 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
-    GateCommands, GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
+    GateCommands, GraphCommands, IssueCommands, ItemCommands, ProfileCommands,
 };
 use jit::commands::{
     parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
 };
-use jit::dispatch::{invariant, CommandContext};
+use jit::dispatch::{invariant, project, CommandContext};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -1018,69 +1018,6 @@ fn run_item_inner<S: IssueStore>(
         ItemCommands::Show { qualified_id } | ItemCommands::Resolve { qualified_id } => {
             let result = executor.items().show_item(&qualified_id)?;
             print_item_show(&result, json, quiet)?;
-        }
-    }
-    Ok(())
-}
-
-/// Run `jit project <subcommand>`.
-///
-/// A thin delegation over [`jit::commands::ItemOps::project_render`]: `render` writes
-/// every declared `[projection.*]` (or a single `--name`d one) into its configured
-/// documentation target and reports what was written. On `--json` a failure is
-/// rendered as a JSON error object (honoring the machine-readable contract) rather
-/// than the top-level plain `Error: ...`.
-fn run_project<S: IssueStore + jit::storage::RepositoryStateStore>(
-    executor: &CommandExecutor<S>,
-    command: ProjectCommands,
-    mode: OutputMode,
-) -> Result<()> {
-    let result = run_project_inner(executor, command, mode);
-    if let Err(e) = result {
-        // A typed projection or managed-region composition failure is a validation
-        // error (exit 4) in JSON mode too, matching the non-JSON path's top-level
-        // classification.
-        let json_error = if e
-            .downcast_ref::<jit::repository_state::ProjectionError>()
-            .is_some()
-            || e.downcast_ref::<jit::repository_state::ManagedDocumentError>()
-                .is_some()
-        {
-            command_json_error(&e, jit::output::ErrorCode::ValidationFailed)
-        } else {
-            command_json_error(&e, jit::output::ErrorCode::ProjectCommandFailed)
-        };
-        handle_json_error!(mode.json, e, json_error);
-    }
-    Ok(())
-}
-
-/// Inner dispatch for `jit project`; errors are converted to JSON by
-/// [`run_project`] when `--json` is set.
-fn run_project_inner<S: IssueStore + jit::storage::RepositoryStateStore>(
-    executor: &CommandExecutor<S>,
-    command: ProjectCommands,
-    mode: OutputMode,
-) -> Result<()> {
-    let OutputMode { json, quiet } = mode;
-    match command {
-        ProjectCommands::Render { name } => {
-            let result = executor.items().project_render(name.as_deref())?;
-            let output_ctx = OutputContext::new(quiet, json);
-            if json {
-                let msg = format!("Rendered {} projection(s)", result.count());
-                let output = JsonOutput::success(&result).with_message(msg);
-                println!("{}", output.to_json_string()?);
-            } else if result.items.is_empty() {
-                output_ctx.print_data("No projections declared".to_string())?;
-            } else {
-                for projection in &result.items {
-                    output_ctx.print_data(format!(
-                        "Rendered projection '{}' to {} ({} mode, {} style)",
-                        projection.name, projection.target, projection.mode, projection.style
-                    ))?;
-                }
-            }
         }
     }
     Ok(())
@@ -5567,7 +5504,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             return invariant::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Project(project_cmd) => {
-            run_project(&executor, project_cmd, mode)?;
+            return project::dispatch(project_cmd, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Search {
             query,

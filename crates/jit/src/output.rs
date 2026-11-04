@@ -16,6 +16,7 @@ use thiserror::Error;
 mod emit;
 pub mod failure;
 mod invariant;
+mod project;
 
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 
@@ -957,8 +958,6 @@ wire_vocabulary! {
         ItemCommandFailed = "ITEM_COMMAND_FAILED",
         /// An invariant command failed without a more specific public classification.
         InvariantCommandFailed = "INVARIANT_COMMAND_FAILED",
-        /// A project command failed without a more specific public classification.
-        ProjectCommandFailed = "PROJECT_COMMAND_FAILED",
         /// A profile command failed without a more specific public classification.
         ProfileError = "PROFILE_ERROR",
         /// The search backend failed while executing a query.
@@ -1037,7 +1036,6 @@ impl ErrorCode {
             | ErrorCode::ItemNotFound
             | ErrorCode::ItemCommandFailed
             | ErrorCode::InvariantCommandFailed
-            | ErrorCode::ProjectCommandFailed
             | ErrorCode::ProfileError
             | ErrorCode::SearchFailed
             | ErrorCode::RipgrepNotFound
@@ -1106,9 +1104,6 @@ impl ErrorCode {
             }
             ErrorCode::InvariantCommandFailed => {
                 "An invariant command failed without a more specific classification."
-            }
-            ErrorCode::ProjectCommandFailed => {
-                "A project command failed without a more specific classification."
             }
             ErrorCode::ProfileError => {
                 "A profile command failed without a more specific classification."
@@ -3602,7 +3597,6 @@ mod tests {
             (ErrorCode::ItemNotFound, ExitCode::GenericError),
             (ErrorCode::ItemCommandFailed, ExitCode::GenericError),
             (ErrorCode::InvariantCommandFailed, ExitCode::GenericError),
-            (ErrorCode::ProjectCommandFailed, ExitCode::GenericError),
             (ErrorCode::ProfileError, ExitCode::GenericError),
             (ErrorCode::SearchFailed, ExitCode::GenericError),
             (ErrorCode::RipgrepNotFound, ExitCode::GenericError),
@@ -3772,7 +3766,6 @@ mod tests {
             ErrorCode::ItemNotFound,
             ErrorCode::ItemCommandFailed,
             ErrorCode::InvariantCommandFailed,
-            ErrorCode::ProjectCommandFailed,
             ErrorCode::ProfileError,
             ErrorCode::SearchFailed,
             ErrorCode::RipgrepNotFound,

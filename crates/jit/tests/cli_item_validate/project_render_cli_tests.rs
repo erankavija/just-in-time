@@ -61,6 +61,8 @@ fn test_project_render_region_mode_byte_preserves_surroundings() {
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["message"], "Rendered 1 projection(s)");
     assert_eq!(json["projections"].as_array().unwrap().len(), 1);
     assert_eq!(
         json["projections"][0]["target"].as_str().unwrap(),
@@ -113,13 +115,22 @@ fn test_project_render_named_selects_single_projection() {
 
     let written = std::fs::read_to_string(cli.root().join(".jit/invariants.md")).unwrap();
     assert!(written.contains("- **sample-invariant** — "));
+
+    let human = cli
+        .command(["project", "render", "--name", "invariants"])
+        .output()
+        .unwrap();
+    assert!(human.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&human.stdout),
+        "Rendered projection 'invariants' to .jit/invariants.md (separate-file mode, id-anchor style)\n"
+    );
 }
 
 #[test]
-fn test_project_render_json_projection_error_reports_validation_failed() {
-    // A typed projection failure under --json carries VALIDATION_FAILED. A
-    // region-mode target missing its begin marker fails the splice with a typed
-    // ProjectionError.
+fn test_project_render_projection_error_reports_classified_code_on_both_paths() {
+    // A region-mode target missing its begin marker fails with a typed
+    // ManagedDocumentError, classified as VALIDATION_FAILED in both modes.
     let cli = JitCli::with_repository(
         jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
@@ -147,24 +158,38 @@ fn test_project_render_json_projection_error_reports_validation_failed() {
     );
     let json: Value = serde_json::from_slice(&output.stdout).expect("JSON error object on stdout");
     assert_eq!(json["error"]["code"].as_str().unwrap(), "VALIDATION_FAILED");
+
+    let human = cli.command(["project", "render"]).output().unwrap();
+    assert_eq!(human.status.code(), Some(4));
+    assert!(!human.status.success());
+    assert!(String::from_utf8_lossy(&human.stderr).contains("required managed region"));
 }
 
 #[test]
-fn test_project_render_unknown_name_errors() {
+fn test_project_render_unknown_name_uses_invalid_argument_on_both_paths() {
     let cli = JitCli::with_repository(
         jit::test_utils::profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
     );
-    let output = cli
-        .command(["project", "render", "--name", "does-not-exist"])
+    let json = cli
+        .command(["project", "render", "--name", "does-not-exist", "--json"])
         .output()
         .unwrap();
     assert!(
-        !output.status.success(),
-        "unknown projection name must fail"
+        !json.status.success(),
+        "unknown projection name must fail under --json"
     );
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let envelope: Value = serde_json::from_slice(&json.stdout).unwrap();
     assert!(
-        stderr.contains("does-not-exist") || stderr.contains("unknown"),
-        "stderr: {stderr}"
+        envelope["error"]["code"] == "INVALID_ARGUMENT",
+        "unexpected error envelope: {envelope}"
     );
+
+    let human = cli
+        .command(["project", "render", "--name", "does-not-exist"])
+        .output()
+        .unwrap();
+    assert_eq!(human.status.code(), Some(2));
+    assert!(!human.status.success());
+    let stderr = String::from_utf8_lossy(&human.stderr);
+    assert!(stderr.contains("does-not-exist"), "stderr: {stderr}");
 }
