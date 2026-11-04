@@ -325,7 +325,7 @@ jit validate --fix
 ### Corrupted Control Plane
 
 ```bash
-# Rebuild claims index from log
+# Clear dead locks, evict expired leases, reclaim stale indefinite ones
 jit recover
 
 # Validate everything

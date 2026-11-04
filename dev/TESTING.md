@@ -125,7 +125,7 @@ impl TestHarness {
 impl Default for TestHarness { /* delegates to new() */ }
 ```
 
-`new()` initializes the storage and enables test mode. The helpers cover the common
+`new()` initializes the storage. The helpers cover the common
 shapes; anything else goes through `h.executor` (any command) or `h.storage` (direct
 `IssueStore` calls).
 
@@ -208,7 +208,7 @@ New and migrated CLI tests spawn `jit` through `jit::test_cli::JitCli`, the one 
 subprocess fixture. It owns a temporary repository (`uninitialised()`, `initialised()` by
 `jit init`, or `with_repository(TempDir)` for one built by shared test support) and removes it
 on drop. `command(args)` yields a `std::process::Command` for the target's `jit` with the
-repository as working directory, test mode on and every inherited `JIT_*` variable removed;
+repository as working directory and every inherited `JIT_*` variable removed;
 `command_with_env` sets a variable for that process alone, so tests keep `assert_cmd`'s
 assertion traits. `run` and `run_json` return stdout or parsed `--json` output,
 `create_issue` returns the created id from `--json`, and `init_git` (backed by
@@ -572,10 +572,8 @@ ran rather than what the sources appear to declare.
 
 ## Test Environment
 
-Three environment behaviors matter when writing tests:
+Two environment behaviors matter when writing tests:
 
-- **`JIT_TEST_MODE`** disables the claims-index validation inside `jit validate` in a live
-  repository. Tests that spawn the binary pass the variable with `Command::env`; `JitCli` does.
 - **Process-wide state** (environment variables, working directory) is never changed, so tests
   read it and run in parallel without a lock. A test that varies a value passes it explicitly
   (`Command::env`, `Command::current_dir`, a function parameter, an absolute path).

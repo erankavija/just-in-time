@@ -105,7 +105,6 @@ pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
     TemplateDelta,
 };
-pub(crate) use validate::validate_claims_index_at;
 pub use validate::ValidationOps;
 
 // Re-export WorktreeIdentity for init return type

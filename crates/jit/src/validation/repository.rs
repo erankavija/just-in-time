@@ -27,7 +27,6 @@ use crate::validation::engine::{Finding, SchemaEngine};
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::path::Path;
 
 /// One named stage in whole-repository validation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -279,12 +278,7 @@ pub(crate) fn validate_repository_with_materializations(
                 structural_error = Some(error);
             }
         } else if structural_error.is_none() {
-            structural_error = validate_machine_local_claims(image.layout().worktree_root())
-                .context("repository-integrity validation pass")
-                .err();
-            if structural_error.is_none() {
-                passes.push(RepositoryValidationPass::RepositoryIntegrity);
-            }
+            passes.push(RepositoryValidationPass::RepositoryIntegrity);
         }
     }
 
@@ -507,25 +501,6 @@ fn validate_integrity(
             incoherent.len(),
             incoherent.join("\n  ")
         ));
-    }
-    Ok(())
-}
-
-/// Validate the machine-local claims control plane selected by the repository
-/// root. This boundary intentionally sits beside the captured repository image:
-/// claims live in `.git/jit`, not in the planned `.jit` byte set, so overlays
-/// delegate to the same coordination state without reopening repository storage.
-fn validate_machine_local_claims(repository_root: &Path) -> Result<()> {
-    if !crate::test_mode::is_enabled() {
-        let index_issues = crate::commands::validate_claims_index_at(repository_root)
-            .context("Failed to validate claims index")?;
-        if !index_issues.is_empty() {
-            return Err(RepositoryJudgedInvalid(format!(
-                "Claims index validation failed:\n  {}",
-                index_issues.join("\n  ")
-            ))
-            .into());
-        }
     }
     Ok(())
 }
