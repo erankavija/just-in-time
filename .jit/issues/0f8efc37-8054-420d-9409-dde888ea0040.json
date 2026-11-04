@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:frontend-lead",
   "claimed_at": "2026-10-20T20:13:20.825884847Z",
   "context": {},
   "created_at": "2026-10-20T20:12:38.027010524Z",
@@ -31,5 +31,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Run the server and web UI on the core's shared mechanisms",
-  "updated_at": "2026-11-04T22:25:08.969751814Z"
+  "updated_at": "2026-11-04T23:08:47.808062564Z"
 }
