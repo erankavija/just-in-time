@@ -24844,3 +24844,4 @@
 {"from":"in_progress","id":"5be837b8-c0fe-44fc-9769-177a16cf027c","issue_id":"8c67b21a-3672-46b2-ab71-db1d0a268da8","timestamp":"2026-11-04T23:24:15.487796278Z","to":"done","type":"issue_state_changed"}
 {"id":"0bf2ff35-5a28-40df-aef1-7d21e4c6dd71","issue_id":"8c67b21a-3672-46b2-ab71-db1d0a268da8","timestamp":"2026-11-04T23:24:15.487796278Z","type":"issue_completed"}
 {"fields":["description"],"id":"002ec801-b705-458e-a3c5-b16f7fbf4d67","issue_id":"f9977efd-9626-4075-9cdb-d8f74dd9881d","timestamp":"2026-11-04T23:35:50.315248077Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"plan-review","id":"3bc8b0ae-c692-4a6f-b6cc-941504d702b7","issue_id":"28ccf9a9-939a-40e4-9c5c-e3cee6e1c7c3","timestamp":"2026-11-04T23:41:08.907127739Z","type":"gate_failed","updated_by":"auto:executor"}

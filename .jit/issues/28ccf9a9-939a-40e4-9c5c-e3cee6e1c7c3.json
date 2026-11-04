@@ -53,9 +53,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "run_id": "b467972e-b65b-4cda-b62a-3e26fb633836",
-      "status": "passed",
-      "updated_at": "2026-10-21T15:43:12.951176888Z",
+      "run_id": "308242b9-7e36-41c8-b4d1-b6878d8bd9a3",
+      "status": "failed",
+      "updated_at": "2026-11-04T23:41:08.907127739Z",
       "updated_by": "auto:executor"
     }
   },
@@ -74,5 +74,5 @@
   "priority": "normal",
   "state": "done",
   "title": "planning: Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-10-21T15:43:27.226344832Z"
+  "updated_at": "2026-11-04T23:41:08.907127739Z"
 }
