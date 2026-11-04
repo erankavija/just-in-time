@@ -5595,7 +5595,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                         use jit::output::{JsonOutput, SearchResponse};
 
                         let msg = format!("Found {} result(s)", matches.len());
-                        let results = matches.into_iter().map(|m| m.result).collect();
+                        let results = matches
+                            .into_iter()
+                            .map(|m| jit::output::SearchHit {
+                                result: m.result,
+                                issue_title: m.issue_title,
+                            })
+                            .collect();
                         let response = SearchResponse::with_extras(
                             results,
                             jit::output::SearchQuery { query },
