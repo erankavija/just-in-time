@@ -719,7 +719,6 @@ fn test_recover_reports_a_reclaimed_stale_lease_without_appending_an_event() {
         acquired_at: silent_since,
         expires_at: None,
         last_beat: silent_since,
-        stale: false,
     };
     let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
     jit::test_lease_store::plant_lease(&paths.shared_jit, &lease).unwrap();
@@ -1848,7 +1847,6 @@ fn test_claim_list_text_marks_a_stale_unexpired_lease_with_its_heartbeat_remedy(
         acquired_at: silent_since,
         expires_at: None,
         last_beat: silent_since,
-        stale: false,
     };
     let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
     jit::test_lease_store::plant_lease(&paths.shared_jit, &lease).unwrap();

@@ -7095,7 +7095,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 }
 
 /// Render one lease for plain-text `claim status` and `claim list`.
-fn print_lease(lease: &jit::storage::Lease) {
+fn print_lease(listed: &jit::commands::claim::ListedLease) {
+    let lease = &listed.lease;
     let now = chrono::Utc::now();
     println!("Lease: {}", lease.lease_id);
     println!("  Issue:    {}", lease.issue_id);
@@ -7123,7 +7124,7 @@ fn print_lease(lease: &jit::storage::Lease) {
             lease.last_beat,
             since_beat.num_seconds()
         );
-        if lease.stale {
+        if listed.stale {
             println!(
                 "  STALE: Lease marked stale (no heartbeat for {} minutes)",
                 since_beat.num_minutes()

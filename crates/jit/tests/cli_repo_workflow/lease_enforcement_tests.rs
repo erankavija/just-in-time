@@ -707,7 +707,6 @@ fn test_strict_lease_enforced_mutation_leaves_the_claims_log_unchanged() {
             acquired_at,
             expires_at: Some(acquired_at + chrono::Duration::seconds(60)),
             last_beat: acquired_at,
-            stale: false,
         },
     )
     .unwrap();
