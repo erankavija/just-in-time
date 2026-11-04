@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3494915bfcaf19b6e72d0c6fd571c26bf945cae8",
+  "completed_at": "2026-11-04T13:59:02.641447431Z",
+  "duration_ms": 212118,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The first-read fixture, test-support seam, collector join, and committed 20×20 run evidence satisfy the issue criteria; prior blocking findings are addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3b696589-81fa-4a01-a576-460c1e34a7dd",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bdbf1813-54aa-47db-a334-be70314d83a4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T13:55:30.522527847Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9c7622740, 348a3814b, 6f81dd120, cef206e33, 80e2bf0f0\nPolicy sources: AGENTS.md\nResolved items: @/issue/3b696589/requirement/REQ-01–REQ-04 and @/issue/3b696589/decision/D-01 (.jit/issues/3b696589-81fa-4a01-a576-460c1e34a7dd.json); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T13:55:12Z)\nTruncation recovery: none\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The first-read fixture, test-support seam, collector join, and committed 20×20 run evidence satisfy the issue criteria; prior blocking findings are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
