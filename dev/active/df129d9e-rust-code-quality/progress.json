@@ -1005,7 +1005,8 @@
     "test_strict_lease_exempt_paths_write_for_their_stated_reason took 12-13 s in parallel runs (not on the 4a01ccba list); relevant to f487aeef's per-test limits.",
     "Codex workers attempted `jit recover` despite the no-tracker-writes rule; briefs now name it explicitly.",
     "Lead review asked for a shared test helper (shared-test-contracts) that the code-review then read as recreating a removed wrapper against REQ-03; check a rework instruction against the issue's literal criteria before sending it.",
-    "Lead's 4575a03d Notes correction searched only architecture/ paths and wrongly said the f2532a2d copies were gone; they were under eval/. Search the whole archive dir before asserting absence."
+    "Lead's 4575a03d Notes correction searched only architecture/ paths and wrongly said the f2532a2d copies were gone; they were under eval/. Search the whole archive dir before asserting absence.",
+    "Two workers ran git checkout to measure the merge-base line count; briefs now say production-lines.py takes a revision and needs no checkout."
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
@@ -1354,7 +1355,7 @@
       "review": "lead PASS: HandlerResult<R>, HandlerStore trait (blanket impl), From<R> for Outcome replaces Outcome::success; no renames; -31"
     },
     "1ade3e6f": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Opus",
       "reason": "b697a3f7 track B; large config assembler",
       "epic": "b697a3f7",
@@ -1364,6 +1365,18 @@
       "status": "dispatched",
       "vendor": "Claude Sonnet",
       "reason": "gate status handler move; first of the four remaining moves"
+    },
+    "24a982b7": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "query/status handler move; parallel with f87f9b00 (disjoint arms)"
+    },
+    "ceaaf0ab": {
+      "status": "landing",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 track B after 4575a03d; worker checks criteria first",
+      "epic": "b697a3f7",
+      "review": "lead PASS at 6d721625c: ProposedLayoutViolation domain error, typed repository_inputs errors, no anyhow in domain types; +19 (b697a3f7 ledger). Worker checked out the merge base to measure (forbidden; restored)."
     }
   },
   "handoff": {
@@ -1407,7 +1420,7 @@
         "7cd27db8 (30334066)"
       ]
     },
-    "status": "f56bad8d, f7a59f5f done; 1ade3e6f, 4575a03d dispatched; next track A 945f9181 (after 3f816619 sequencing) and ceaaf0ab after 4575a03d",
+    "status": "done: f56bad8d, f7a59f5f, 4575a03d; landing: 1ade3e6f; running: ceaaf0ab; track A 945f9181 waits for 3f816619",
     "criteria_check_2026_11_04": {
       "945f9181": "valid; line cites drifted; large; touches commands/{issue,dependency,template,mod}, overlaps 3f816619/5687e281 files",
       "1ade3e6f": "valid; cites drifted; large; misses ConfigManager::load/EffectiveConfig::load callers",

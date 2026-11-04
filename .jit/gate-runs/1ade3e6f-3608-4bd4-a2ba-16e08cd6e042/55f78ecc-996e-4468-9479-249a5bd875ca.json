@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "92aef9022d06fafaa25222faf5727f431edd623e",
+  "completed_at": "2026-11-04T14:35:27.747889110Z",
+  "duration_ms": 240189,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed change centralizes configuration assembly, removes the duplicate declaration mirror, and satisfies the scoped criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1ade3e6f-3608-4bd4-a2ba-16e08cd6e042",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "55f78ecc-996e-4468-9479-249a5bd875ca",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T14:31:27.558004668Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: db05aa79512e9474a3a62ac04e9cee4e87661376 (`jit:1ade3e6f`)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/b697a3f7/requirement/REQ-09 (.jit issue)\nGate evidence: cargo-ci: passed (exit 0, 2026-11-04T14:29:42Z); code-review: pending\nTruncation recovery: Per-file commit patch reads after an initial malformed pathspec; bounded source and symbol searches\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed change centralizes configuration assembly, removes the duplicate declaration mirror, and satisfies the scoped criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
