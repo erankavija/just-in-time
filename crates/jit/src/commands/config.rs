@@ -31,8 +31,19 @@ pub struct ConfigSetOutcome {
     pub key: String,
     /// The value as written (the raw string the user supplied).
     pub value: String,
-    /// The config file that was written.
+    /// The config file that was written, rendered as its display text so a
+    /// non-UTF-8 path serializes as the same lossy string the human output prints.
+    #[serde(serialize_with = "serialize_path_display")]
+    #[schemars(with = "String")]
     pub file: PathBuf,
+}
+
+/// Serialize a path as its [`Path::display`](std::path::Path::display) text.
+fn serialize_path_display<S: serde::Serializer>(
+    path: &std::path::Path,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    serializer.collect_str(&path.display())
 }
 
 /// Result of a `jit config get` lookup, carrying what the CLI needs to print.
@@ -679,5 +690,21 @@ schema = 1
         let err = executor.config().get_config("bogus_section").unwrap_err();
         assert!(err.downcast_ref::<InvalidArgumentError>().is_some());
         assert!(err.to_string().contains("valid top-level sections"));
+    }
+
+    #[test]
+    fn test_config_set_outcome_serializes_file_as_display_text_for_non_utf8_path() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let path = PathBuf::from(std::ffi::OsString::from_vec(b"config-\xff.toml".to_vec()));
+        let outcome = ConfigSetOutcome {
+            key: "project.name".to_string(),
+            value: "demo".to_string(),
+            file: path.clone(),
+        };
+
+        let serialized = serde_json::to_value(&outcome).unwrap();
+
+        assert_eq!(serialized["file"], path.display().to_string());
     }
 }
