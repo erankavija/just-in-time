@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T02:48:00.065799803Z",
   "context": {},
   "created_at": "2026-11-04T02:47:06.826404367Z",
@@ -13,14 +13,16 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-11-04T02:47:06.994157404Z",
-      "updated_by": null
+      "run_id": "05057289-b31d-4c77-b8f2-3e37a91bfc4d",
+      "status": "failed",
+      "updated_at": "2026-11-04T03:02:31.508572223Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-11-04T02:47:07.023167554Z",
-      "updated_by": null
+      "run_id": "2ecca0d6-bfc2-4edd-82d9-2f64e1202712",
+      "status": "passed",
+      "updated_at": "2026-11-04T03:06:29.404198312Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "e2082ba9-76ed-4137-ba57-7103f0f78943",
@@ -34,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Item links resolve sugar addresses whose self-id several kinds admit",
-  "updated_at": "2026-11-04T02:48:00.065799803Z"
+  "updated_at": "2026-11-04T03:06:29.404198312Z"
 }

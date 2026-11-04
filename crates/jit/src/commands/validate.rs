@@ -424,9 +424,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 // parsed once, with the strict reader, and handed back with the
                 // image. Validation parses the overlaid set leniently and reports
                 // defects as findings; it keeps each record's JSON value for
-                // record fidelity.
+                // record fidelity. Repair derives from the declarations alone and
+                // decodes no record.
                 let (parsed, values) = if mutation {
                     (super::captured_active_issues(image)?, Vec::new())
+                } else if matches!(purpose, BaseCapturePurpose::Repair) {
+                    (Vec::new(), Vec::new())
                 } else {
                     // Effective bytes: the override (create/replace or proposed
                     // absence) when present, otherwise the captured base bytes.
@@ -850,6 +853,14 @@ pub(super) const MUTATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget
         max_depth: 32,
     };
 
+/// Capture budget for the record-fidelity pass, which lists one gate-run
+/// directory per issue; the byte limit bounds its growth.
+const RECORD_FIDELITY_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
+    crate::repository_state::CaptureBudget {
+        max_listings: 65_536,
+        ..MUTATION_CAPTURE_BUDGET
+    };
+
 /// The base an issue mutation derives from, from
 /// [`CommandExecutor::capture_mutation_base`].
 pub(crate) struct MutationBase {
@@ -919,7 +930,7 @@ fn capture_record_fidelity_validation(
     session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
     captured: &crate::validation::CapturedValidation<'_>,
 ) -> Result<Option<std::result::Result<(), String>>> {
-    let spec = crate::repository_state::CaptureSpec::new([], MUTATION_CAPTURE_BUDGET)?;
+    let spec = crate::repository_state::CaptureSpec::new([], RECORD_FIDELITY_CAPTURE_BUDGET)?;
     let Some(records) = super::capture_discovering(session, spec, |image, spec| {
         super::discover_gate_records(image, spec)?;
         discover_archive_evidence_records(image, spec)
@@ -2287,6 +2298,36 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_silent_reads_gate_runs_of_more_issues_than_the_mutation_budget_lists() {
+        use crate::repository_state::VirtualPath;
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config("").unwrap();
+        let issues = (0..=MUTATION_CAPTURE_BUDGET.max_listings as u128)
+            .map(crate::test_utils::issue_id)
+            .collect::<Vec<_>>();
+        for issue in &issues {
+            let directory = VirtualPath::gate_run_issue_directory(issue);
+            std::fs::create_dir_all(executor.storage.root().join(directory.relative().as_path()))
+                .unwrap();
+        }
+        let corrupt = VirtualPath::gate_run_record(
+            issues.last().unwrap(),
+            &crate::test_utils::gate_run_id(1),
+        );
+        std::fs::write(
+            executor.storage.root().join(corrupt.relative().as_path()),
+            b"not json",
+        )
+        .unwrap();
+
+        let error = executor.validation().validate_silent().unwrap_err();
+
+        assert!(
+            format!("{error:#}").contains(&corrupt.repository_relative()),
+            "{error:#}"
+        );
+    }
+
+    #[test]
     fn test_evaluate_graph_rules_preserves_invalid_hierarchy_error() {
         let (repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
         let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
@@ -2329,6 +2370,38 @@ mod tests {
             format!("{error:#}").contains("index.json"),
             "missing index must fail through captured-image validation: {error:#}"
         );
+    }
+
+    #[test]
+    fn test_repair_derived_state_plans_without_decoding_issue_records() {
+        let (repo, storage, taxonomy) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        let jit_dir = repo.path().join(".jit");
+        let config = format!(
+            "{}\n\
+            {}\n\
+            [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n",
+            taxonomy.config_fragment(),
+            crate::test_utils::shipped_item_kinds_toml()
+        );
+        std::fs::write(jit_dir.join("config.toml"), config).unwrap();
+        std::fs::write(
+            repo.path().join("AGENTS.md"),
+            "# Doc\n\n<!-- jit:invariants:begin -->\nSTALE\n<!-- jit:invariants:end -->\n",
+        )
+        .unwrap();
+        // An undecodable record: planning that decoded it would fail.
+        std::fs::write(
+            jit_dir.join(format!("issues/{}.json", crate::test_utils::issue_id(1))),
+            "{",
+        )
+        .unwrap();
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
+
+        let (repaired, _) = executor.validation().repair_derived_state(true).unwrap();
+
+        assert!(repaired >= 1, "the stale projection region must be planned");
     }
 
     #[test]
