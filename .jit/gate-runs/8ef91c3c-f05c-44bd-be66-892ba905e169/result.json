@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8a075e8f1f9f2e502dc358414dcf95a8cfe02f86",
+  "completed_at": "2026-11-04T02:55:59.887741958Z",
+  "duration_ms": 315803,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/invariant.rs",
+        "id": "F1",
+        "line": 33,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/3acaa5a3/decision/D-01",
+          "@/charter/D-20"
+        ],
+        "severity": "high",
+        "summary": "check_invariants reads config, then effective_rules reloads it, allowing mixed declaration versions."
+      }
+    ],
+    "summary": "Invariant check reloads config while assembling its supposedly single declaration read.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3acaa5a3-ff38-43f6-a252-5984b3cad2d9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8ef91c3c-f05c-44bd-be66-892ba905e169",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T02:50:44.084627511Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5527 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a477-4cb0-7772-be1d-083557c2ab2f\n--------\nuser\n--- 5514 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 8032c9f1, b26136a0, ffb2cd8a (`jit:3acaa5a3`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20, @/charter/D-22 (dev/vision/9db27a3a-charter.md); @/issue/3acaa5a3/decision/D-01 (issue description); @/issue/9876a23a/requirement/REQ-05 (parent issue)\nGate evidence: cargo-ci passed (exit 0); code-review failed (exit 1, prior concurrency finding addressed by ffb2cd8a)\nTruncation recovery: re-read each affected 8032c9f1 patch path, the follow-up patch, and narrow current source ranges\n\n1. **[blocking][issue-impact] F1:** `check_invariants` loads cached config at line 32, then `effective_rules()` at line 33 reloads config through `rules()` when `.jit/rules.toml` exists (`commands/mod.rs:2686-2698`). A concurrent config update can therefore combine invariant declarations from one config version with effective rules derived from another, contrary to the hard “obtains declarations once” criterion and D-01’s accepted lock-free read discipline. References: @/issue/3acaa5a3/decision/D-01, @/charter/D-20.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Invariant check reloads config while assembling its supposedly single declaration read.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"check_invariants reads config, then effective_rules reloads it, allowing mixed declaration versions.\",\"file\":\"crates/jit/src/commands/invariant.rs\",\"line\":33,\"references\":[\"@/issue/3acaa5a3/decision/D-01\",\"@/charter/D-20\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

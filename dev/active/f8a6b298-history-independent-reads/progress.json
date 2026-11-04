@@ -664,6 +664,12 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "code-review F1: unsupported-entry conformance cases"
+    },
+    {
+      "id": "1630015d",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path: gate-run records under their issue (format-4 layout)"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",

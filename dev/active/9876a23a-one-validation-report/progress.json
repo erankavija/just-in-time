@@ -171,27 +171,33 @@
       "issues": [
         {
           "short_id": "612ee9d4",
-          "status": "dispatched",
+          "status": "rework 1 + merge c4a8c14d6; pipeline queued after 2b5f452c",
           "worker": "claude opus",
           "worker_reason": "report-selection contract"
         },
         {
           "short_id": "2b5f452c",
-          "status": "first pass 532b649b2; rework 1: fidelity re-decodes records into Value (REQ-03)",
+          "status": "landed 6d4a8b704; code-review F1 (--fix repair planning re-decodes); rework 3 of 3 (final before escalation)",
           "worker": "claude opus",
           "worker_reason": "fidelity on parsed records (REQ-10)"
         },
         {
           "short_id": "3acaa5a3",
-          "status": "reviewed (-228 diff); pipeline running",
+          "status": "landed 7b2cfcdef, 1077419b1; rework 2: rules() reloads config.toml (code-review F1)",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "drift through report function"
         },
         {
           "short_id": "c1af05ac",
-          "status": "dispatched",
+          "status": "WIP a961a0d8f; blocked on new bug e2082ba9 (sugar address parity)",
           "worker": "codex gpt-6-luna xhigh",
           "worker_reason": "test relocation"
+        },
+        {
+          "short_id": "e2082ba9",
+          "status": "reviewed; pipeline running",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "bug found by c1af05ac; regression from 001a9c46"
         }
       ]
     }
@@ -272,6 +278,10 @@
     {
       "short_id": "f368ce3d",
       "note": "cross-epic: REQ-03 (--orphan) and its Background bullet removed per steward ruling"
+    },
+    {
+      "short_id": "e2082ba9",
+      "note": "bug: report item-link pass rejects sugar addresses several kinds admit (from 001a9c46); c1af05ac depends on it"
     }
   ],
   "escalations": [
@@ -304,6 +314,18 @@
       "at": "2026-11-04",
       "subject": "docs-mechanical M8 fails: jit profile pack refuses symlinked target/",
       "status": "resolved: 14f49a28 (a2) landed 7f255bf7a"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-04",
+      "subject": "2b5f452c duplicate-key side effect",
+      "status": "resolved: steward requires fix in 2b5f452c"
+    },
+    {
+      "to": "just-in-time-6a",
+      "at": "2026-11-04",
+      "subject": "3acaa5a3 REQ-01 vs D-22",
+      "status": "resolved: lock-free loads; 578ed10d REQ-08 retires them"
     }
   ],
   "rework_counts": {
@@ -312,14 +334,17 @@
     "f968dfe1": 1,
     "5d5a1794": 2,
     "6ba4f623": 1,
-    "2b5f452c": 1
+    "2b5f452c": 3,
+    "3acaa5a3": 2,
+    "612ee9d4": 1
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
     "df129d9e 2e0f276b: IssueOps mutations take &IssueIdPrefix and return IssueMutation; brief 5d5a1794/03c59566",
     "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch",
     "jit-server graceful_shutdown_tests::test_the_drain_assertion_rejects_a_server_that_force_closes_early failed once under load ~10 (5d5a1794 CI); passes alone",
-    "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording."
+    "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording.",
+    "2b5f452c: issue records now decode bytes->Value->Issue once; a duplicated JSON key in a record now loads (last wins) instead of failing, and field-type errors lose line/column. Accepted (no criterion); flag to steward."
   ],
   "started_at": "2026-11-03T23:40:00+02:00",
   "rejected": [

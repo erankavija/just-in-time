@@ -11,19 +11,20 @@ use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::GateRunId;
 use crate::domain::{Event, GateRunResult, GateVerdictRecord, Issue};
 use crate::repository_state::{
-    canonical_json, captured_gate_run_ids, captured_gate_verdict_records, captured_issue_ids,
-    serialize_event, serialize_gate_run, serialize_gate_verdict, serialize_issue, RepositoryImage,
-    RepositoryIndex, VirtualPath,
+    canonical_json, captured_gate_run_ids, captured_gate_verdict_records, serialize_event,
+    serialize_gate_run, serialize_gate_verdict, serialize_issue, RepositoryImage, RepositoryIndex,
+    VirtualPath,
 };
+use crate::validation::CapturedValidation;
 use anyhow::Result;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
 /// One message per stored record that does not decode or reproduce, over
-/// `image`'s records, `records`' runs, verdict records and archive evidence,
-/// and the whole `events`.
+/// `captured`'s parsed index and issue records, `records`' runs, verdict
+/// records and archive evidence, and the whole `events`.
 pub(crate) fn record_drift(
-    image: &RepositoryImage,
+    captured: &CapturedValidation<'_>,
     records: &RepositoryImage,
     events: Option<&[u8]>,
 ) -> Result<Vec<String>> {
@@ -32,17 +33,25 @@ pub(crate) fn record_drift(
             .unwrap_or_else(|error| Some(error.to_string()))
             .map(|reason| format!("{}: {reason}", path.repository_relative()))
     };
-    let index = image.file_bytes(&VirtualPath::INDEX)?;
-    let issues = captured_issue_ids(image)
+    let index = match &captured.index {
+        Ok(index) => captured
+            .image
+            .file_bytes(&VirtualPath::INDEX)?
+            .and_then(|bytes| report(&VirtualPath::INDEX, index_drift(index, bytes))),
+        Err(_) => None,
+    };
+    let issues = captured
+        .issues
+        .as_deref()
         .unwrap_or_default()
         .iter()
-        .map(|id| {
-            let path = VirtualPath::issue_record(id);
-            Ok(image
-                .file_bytes(&path)?
-                .and_then(|bytes| report(&path, issue_drift(bytes))))
-        })
-        .collect::<Result<Vec<_>>>()?;
+        .zip(&captured.values)
+        .map(|(issue, value)| {
+            report(
+                &VirtualPath::issue_record(&issue.id),
+                issue_drift(issue, value),
+            )
+        });
     let runs = captured_gate_run_ids(records)
         .unwrap_or_default()
         .iter()
@@ -92,7 +101,7 @@ pub(crate) fn record_drift(
         .chain(runs)
         .chain(verdicts)
         .chain(evidence)
-        .chain([index.and_then(|bytes| report(&VirtualPath::INDEX, index_drift(bytes)))])
+        .chain([index])
         .flatten()
         .chain(
             events
@@ -119,16 +128,13 @@ fn archive_evidence_drift(path: &VirtualPath, bytes: &[u8]) -> Result<Option<Str
     )
 }
 
-fn index_drift(bytes: &[u8]) -> Result<Option<String>> {
-    let written = RepositoryIndex::parse(bytes)?.to_pretty_bytes()?;
-    Ok((written != bytes).then(|| "stored bytes are not canonical".to_string()))
+fn index_drift(index: &RepositoryIndex, bytes: &[u8]) -> Result<Option<String>> {
+    Ok((index.to_pretty_bytes()? != bytes).then(|| "stored bytes are not canonical".to_string()))
 }
 
 /// Canonical rather than byte-exact: key order is not part of an issue record.
-fn issue_drift(bytes: &[u8]) -> Result<Option<String>> {
-    let raw: Value = serde_json::from_slice(bytes)?;
-    let issue: Issue = serde_json::from_value(raw.clone())?;
-    Ok((serialize_issue(&issue)? != canonical_json(&raw, true)?)
+fn issue_drift(issue: &Issue, value: &Value) -> Result<Option<String>> {
+    Ok((serialize_issue(issue)? != canonical_json(value, true)?)
         .then(|| "re-serializing changes the record".to_string()))
 }
 
@@ -255,12 +261,16 @@ mod tests {
         let records = ImageBuilder::new()
             .file(path.clone(), raw.to_string())
             .build();
-        assert!(record_drift(&image, &records, None).unwrap().is_empty());
+        assert!(
+            record_drift(&CapturedValidation::from_image(&image), &records, None)
+                .unwrap()
+                .is_empty()
+        );
         raw["executions"][0]["field_no_reader_knows"] = true.into();
         let records = ImageBuilder::new()
             .file(path.clone(), raw.to_string())
             .build();
-        let drift = record_drift(&image, &records, None).unwrap();
+        let drift = record_drift(&CapturedValidation::from_image(&image), &records, None).unwrap();
         assert_eq!(drift.len(), 1, "{drift:?}");
         assert!(drift[0].contains(&path.repository_relative()));
     }
@@ -268,10 +278,11 @@ mod tests {
     #[test]
     fn test_index_drift_reports_only_a_non_canonical_form() {
         let canonical = crate::repository_state::fresh_index_bytes().unwrap();
-        assert_eq!(index_drift(&canonical).unwrap(), None);
+        let index = RepositoryIndex::parse(&canonical).unwrap();
+        assert_eq!(index_drift(&index, &canonical).unwrap(), None);
 
         let spaced = [canonical.as_slice(), b"\n"].concat();
-        assert!(index_drift(&spaced).unwrap().is_some());
+        assert!(index_drift(&index, &spaced).unwrap().is_some());
     }
 
     #[test]
@@ -287,14 +298,16 @@ mod tests {
             .collect::<Vec<_>>()
             .join(",");
         assert_eq!(
-            issue_drift(format!("{{{reversed}}}").as_bytes()).unwrap(),
+            issue_drift(
+                &issue,
+                &serde_json::from_str(&format!("{{{reversed}}}")).unwrap()
+            )
+            .unwrap(),
             None
         );
 
         raw["field_no_reader_knows"] = Value::Bool(true);
-        assert!(issue_drift(&serde_json::to_vec(&raw).unwrap())
-            .unwrap()
-            .is_some());
+        assert!(issue_drift(&issue, &raw).unwrap().is_some());
     }
 
     #[test]
@@ -342,7 +355,12 @@ mod tests {
         let image = ImageBuilder::new()
             .entry(VirtualPath::INDEX, RepositoryEntry::Absent)
             .build();
-        record_drift(&image, &gate_runs.build(), None).unwrap()
+        record_drift(
+            &CapturedValidation::from_image(&image),
+            &gate_runs.build(),
+            None,
+        )
+        .unwrap()
     }
 
     #[test]
