@@ -23,9 +23,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "41cb9b76-44b9-4aa6-b2fc-975860a01fe1",
+      "run_id": "cf7bb70a-08c9-4b17-9ac9-ab47c225d4c7",
       "status": "failed",
-      "updated_at": "2026-11-04T00:19:57.419072017Z",
+      "updated_at": "2026-11-04T00:36:23.959607196Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue creation derives its findings inside its mutation",
-  "updated_at": "2026-11-04T00:32:04.525687310Z"
+  "updated_at": "2026-11-04T00:36:23.959607196Z"
 }
