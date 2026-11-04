@@ -166,9 +166,10 @@
           "short_id": "7297f922",
           "title": "CLI test bounds the git processes of issue reads",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "pinned_gates_passed_pending_merge"
+          "worker_status": "merged_and_gated",
+          "source_merge": "c65447466451e7d4c58988e4ba02568a2363e986"
         },
         {
           "id": "732f7afb-f1ee-4242-aa18-82b3b70ea96f",
@@ -579,6 +580,14 @@
       "effort": "high",
       "reason": "Bounded config query primitive with child-isolated tests",
       "agent": "/root/user_name"
+    },
+    {
+      "issue": "4ba18af4",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "agent": "/root/head_contract",
+      "classification": "research",
+      "reason": "Reliable single-process unborn versus genuine Git failure contract requires experimental edge-case analysis before criterion reconciliation."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -638,9 +647,9 @@
       "required_changes": "Experimentally prove reliable unborn versus genuine-error semantics before rework; no constructor-only waiver."
     },
     "7297f922": {
-      "verdict": "PASS_PENDING_INTEGRATION",
+      "verdict": "PASS",
       "gates": {
-        "cargo-ci": "75648818-5b22-4b6b-b7a0-e82533f5f632",
+        "cargo-ci": "5a78af94-d08c-4606-b4ad-927d3f9540ef",
         "code-review": "8b7dabdb-92eb-4b0f-a06c-e40d616940b1"
       },
       "reviewed_source": "2d998c5b7670cda2c3e551b0f2a150c2fa6e0cf1",
@@ -652,7 +661,8 @@
       "prior_findings": "None; first review.",
       "stale_narrative": "No stale forward-looking process-budget narrative; planning manifest remains authoritative task description.",
       "deferred_items": "No linked documents.",
-      "holistic": "Uses shared JitCli/GitStandIn; child-only PATH; adds module under existing CLI target."
+      "holistic": "Uses shared JitCli/GitStandIn; child-only PATH; adds module under existing CLI target.",
+      "integration": "Merged source unchanged; intervening graph-validation and invalid-command hint changes do not alter reviewed process-budget logic. Actual pinned review evidence integrated; merged configured Cargo gate passed stable."
     }
   }
 }
