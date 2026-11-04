@@ -10,20 +10,20 @@
 | Criterion | Approach | Evidence / open gap |
 |---|---|---|
 | REQ-01 | Handlers return typed command or domain results; output owns rendering and envelopes (`handler-response-ownership`). | Inline bodies: investigation area 2 §1 |
-| REQ-02 | `run()` shrinks to group dispatch as groups migrate; a final consolidation leaves `main()` as parse, bootstrap, dispatch, render, exit. | `run()` spans 6,428 lines: area 1 claim 1d |
+| REQ-02 | `run()` parses, opens the repository, dispatches and renders propagated failures; `main()` performs the sole process exit. | `run()` spans 6,428 lines: area 1 claim 1d |
 | REQ-03 | Per-family facades borrowed from the executor (D-1); the shared kernel becomes crate-private. | 195 methods, 28 blocks, 25 files: area 3 §1 |
 | REQ-04 | The eight per-query structs are dead and are deleted; every live list response becomes a `list-envelope` instantiation. | area 2 §2 |
-| REQ-05 | `generate()` stays the authority; `get_output_schema_for_command` survives as a lookup into the handler registry; `hidden_commands()` and `builtin_global_flags()` stay where they are (D-12). | area 2 §4 |
+| REQ-05 | `generate()` stays the authority; `get_output_schema_for_command` survives as a lookup into the handler registry; `builtin_global_flags()` remains; MCP-only `hidden_commands()` is removed under charter D-23. | area 2 §4 |
 | REQ-06 | `[workspace.lints]` denies `warnings` and `unsafe_code`; members inherit it (D-14). | area 3 Lints |
 | REQ-07 | The harness moves into `jit`'s `test-support` surface (D-15); the completion report re-measures the budgets. | Included in 4 of 10 targets: area 3 Harness |
 | REQ-08 | A fourth budget in `rust-build-budget.sh`, calibrated after consolidation (D-20), reported as a field of the existing success line. | area 3 Budget script |
 | REQ-09 | Each deliberate change is decided in a decision row below or in the task that makes it, and gets a test that states the new contract; changed exit codes also update the schema's exit-code projection; `cli-contract-docs` states the contract once. | Suites: area 1 Prior art, area 2 Consumer sweep |
-| REQ-10 | `production-line-count` counts before and after with one committed counter, in the Background's described method; `completion-report` holds `main.rs` + `dispatch/` + `output` below 8,700 (D-26). | area 3 REQ-10 counting method |
+| REQ-10 | `production-line-count` counts before and after with one committed counter, in the Background's described method; `completion-report` verifies the epic-attributed whole-crate net increase is at most 375 production lines (D-54). | area 3 REQ-10 counting method |
 | REQ-11 | `failure-classification` moves the classifier into output, then absorbs the details and suggestions call sites build today. | 15 emitters: area 1 §A |
 | REQ-12 | Handlers return `Outcome` values (`handler-contract`); findings render through `findings-envelope`; `main()` holds the one `std::process::exit`. | 75 exits, 14 findings sites: area 1 claim 3, §D |
 | REQ-13 | `type-only-error-codes`: a call site that needs a distinct code gets a typed error; codes nothing produces any more retire. | 50+ fallback sites: area 1 §B, §C |
 | REQ-14 | Document path-read failures first get correct codes; the server then derives its status from `failure-classification` through one exhaustive code-to-status projection (D-10). | area 1 §E |
-| REQ-15 | `output-mode`: one global `--json`; both argv scans disappear with the stubs and with threading the parsed mode out of `run()`. | area 2 §5 |
+| REQ-15 | `output-mode`: one global `--json`; `run()` passes its parsed mode to dispatch and failure rendering, and returns `RunStatus`; no raw-argv mode inference remains. | area 2 §5 |
 | REQ-16 | `issue-filter-args`: one flattened group with one conversion at the CLI boundary (D-8). | about 14 parse sites: area 2 §6 |
 | REQ-17 | `handler-contract` registers each leaf's response type, including the pre-bootstrap `version` leaf; the hand table is deleted once every group has migrated. | 74 of 120 leaves untyped: area 2 §4 |
 | REQ-18 | `list-envelope` replaces the 33 `count` structs and the inline count bodies; bare prints go through the one success emitter. | area 2 §2, §3 |
@@ -43,11 +43,11 @@ Ordinary command errors derive codes and exit statuses through canonical typed c
 
 ### `output-mode` [implementation-produced] — One global output mode
 
-`Cli` declares `--json` once with `global = true`, beside `--quiet`. `OutputMode { json, quiet }` is built once from the parsed `Cli` and is the only source of the flag for handlers and for failure rendering. `run()` hands the mode back to `main()` with its result, so no code reads raw argv.
+`Cli` declares `--json` once with `global = true`, beside `--quiet`. `OutputMode { json, quiet }` is built once from the parsed `Cli` and is the only source of the flag for handlers and for failure rendering. `run()` passes that mode to dispatch and failure rendering, then returns `RunStatus` to `main()`; no code recovers the output mode from raw argv.
 
 ### `json-mode-streams` [plan-fixed] — One rendering per invocation
 
-Once clap has accepted the arguments, a failing `--json` invocation writes exactly one envelope to stdout and nothing to stderr. In human mode a failure prints one `Error:` diagnostic to stderr. This retires the propagated-failure `Error:` line that is printed today alongside the envelope (D-6). Parse failures follow `parser-diagnostics-outside-envelope`, and success-path warnings stay on stderr as documented.
+Once clap has accepted the arguments, a failing `--json` invocation writes exactly one envelope to stdout and nothing to stderr. In human mode a propagated failure prints one `Error:` diagnostic to stderr. The propagated-failure `Error:` line is absent from JSON output (D-6). Parse failures follow `parser-diagnostics-outside-envelope`. Warnings appear in the top-level `warnings` array under `--json` and on stderr in human, non-quiet mode (epic D-04).
 
 ### `parser-diagnostics-outside-envelope` [plan-fixed] — Parse failures stay clap's
 
@@ -71,7 +71,7 @@ Handlers return typed command or domain results. Output owns rendering and envel
 
 ### `handler-contract` [implementation-produced] — Library-side command handlers
 
-`crates/jit/src/dispatch/` holds one module per command group. A handler takes its parsed arguments and a `CommandContext` carrying the executor and the `output-mode`, and returns `anyhow::Result<Outcome<R>>`, where `R` is its registered response type. `Outcome` is either a success or a findings result carrying an `ErrorCode` (`findings-envelope`). One registration per group generates both the group's dispatch and the schema's per-leaf response lookup, so they cannot drift. `main()` renders an `Outcome` through one output emitter and a failure through `failure-classification`. Until every group has migrated, schema generation consults the registry first and the legacy table second (D-2).
+`crates/jit/src/dispatch/` holds one module per command group. A handler takes its parsed arguments and a `CommandContext` carrying the executor and the `output-mode`, and returns `anyhow::Result<Outcome<R>>`, where `R` is its registered response type. `Outcome` carries a success, findings with an `ErrorCode` (`findings-envelope`), or a child-process passthrough status. One registration per group generates both the group's dispatch and the schema's per-leaf response lookup, so they cannot drift. The generated group dispatch renders the outcome through one output emitter. `run()` renders propagated failures through `failure-classification` and returns `RunStatus` to `main()` for the sole process exit. Schema generation consults only the handler registry; no legacy table or generic leaf fallback remains.
 
 ### `executor-family-facades` [implementation-produced] — Narrow executor capabilities
 
