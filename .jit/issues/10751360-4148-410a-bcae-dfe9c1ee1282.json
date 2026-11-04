@@ -11,13 +11,33 @@
   ],
   "description": "The issue read commands build their payloads and choose fallback error codes inside `run()`. This moves them to library handlers with typed responses.\n\n## Background\n\nIn `crates/jit/src/main.rs`, the `IssueCommands::{Show, List, Search, Status, Children, Progress}` arms, the top-level `list` alias (rewritten to `issue list` before dispatch) and `run_query_all` (shared by `issue list`, `list`, `query all` and bare `query`) build `IssueSearchResponse`, `IssueShowListResponse`, `IssueStatusListResponse` and similar inline, and `issue show` uses the `output_data!` macro. Failures go through `handle_json_error!` with `JsonError::issue_not_found` as the code for any error in `show`, `status`, `children` and `progress`, and `show` substitutes `ItemNotFound` for item addresses; under `--json` these exit 3 while the human path exits with the classifier's code. `issue progress` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `issue show|list|search|status|children|progress` and the `list` alias to handlers in `crates/jit/src/dispatch/issue.rs`, and the filtered-list body formerly in `run_query_all` lives there as one library function; `main.rs` keeps neither.\n- [hard] REQ-02: Each of these leaves returns its registered response type, list payloads are `ListEnvelope` instantiations, human output goes through the shared issue-list renderer, and the schema names a typed response for every one of them.\n- [hard] REQ-03: The handlers return failures as errors with no substituted code, `handle_json_error!` use or `std::process::exit`; a test asserts that a failure other than a missing issue (for example an unreadable issue file) now reports the classifier's code with the same exit on the JSON and human paths instead of `ISSUE_NOT_FOUND`.\n- [hard] REQ-04: A missing issue or item still reports `ISSUE_NOT_FOUND` or `ITEM_NOT_FOUND` because its error type carries that code.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: The \"unchanged\" criterion excludes `issue show --field/--fields` under `--json`, which now emits valid JSON through the success path (the field's value, or an object of the fields) instead of raw text. Under `--json` only JSON reaches stdout (stream rule; steward ruling, 2026-11-04).\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.\n",
   "documents": [],
+  "done_at": "2026-11-04T10:16:57.599563683Z",
   "first_ready_at": "2026-11-03T23:08:01.006612503Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3ab8d51a-ca37-41de-ab9d-6d8833798b24",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:09:03.129366173Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "487b3665-8134-4d6c-80c3-3ebeae12eb5f",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:16:38.638176430Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "3c69b598-fda1-45a4-a584-028e4b186372",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:09:20.983640420Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "10751360-4148-410a-bcae-dfe9c1ee1282",
   "labels": [
     "type:task",
@@ -33,7 +53,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Issue read commands move to library handlers",
-  "updated_at": "2026-11-04T03:18:43.229229379Z"
+  "updated_at": "2026-11-04T10:16:57.599563683Z"
 }
