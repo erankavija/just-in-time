@@ -6,11 +6,10 @@ use crate::commands::ItemShowResult;
 use crate::domain::MinimalIssue;
 use crate::errors::InvalidArgumentError;
 use crate::output::{
-    emit_outcome, ContainerProgressResponse, ExitCode, IssueChildrenResponse,
-    IssueListFullResponse, IssueListResponse, IssueListing, IssueProjection,
-    IssueSearchFullResponse, IssueSearchQuery, IssueSearchResponse, IssueSearchResults,
-    IssueShowListResponse, IssueShowOutput, IssueShowResponse, IssueShowSummaryResponse,
-    IssueStatusListResponse, IssueStatusOutput, IssueStatusResponse,
+    ContainerProgressResponse, IssueChildrenResponse, IssueListFullResponse, IssueListResponse,
+    IssueListing, IssueProjection, IssueSearchFullResponse, IssueSearchQuery, IssueSearchResponse,
+    IssueSearchResults, IssueShowListResponse, IssueShowOutput, IssueShowResponse,
+    IssueShowSummaryResponse, IssueStatusListResponse, IssueStatusOutput, IssueStatusResponse,
 };
 use crate::schema::OutputSchema;
 use crate::storage::IssueStore;
@@ -96,6 +95,9 @@ fn show<S: IssueStore>(
     ))
 }
 
+/// The schema description of every [`IssueListing`] leaf.
+pub(super) const ISSUE_LISTING: &str = "Default shape: lean MinimalIssue entries (id, short_id, title, state, priority) with no gate fields. With --full: complete stored issue records, whose gate list is carried under gates_required / gates_status.";
+
 /// `jit issue list`, `jit list`, `jit query all` and bare `jit query`.
 pub(super) fn list<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
@@ -110,14 +112,10 @@ pub(super) fn list<S: IssueStore>(
         filters.labels,
     )?;
     let message = format!("Found {} issue(s)", issues.len());
-    let listing = if full {
-        IssueListing::Full(IssueListFullResponse::new(issues))
-    } else {
-        IssueListing::Summary(IssueListResponse::new(
-            issues.iter().map(MinimalIssue::from).collect(),
-        ))
-    };
-    Ok(Outcome::success_with(listing, message))
+    Ok(Outcome::success_with(
+        IssueListing::new(issues, full),
+        message,
+    ))
 }
 
 fn search<S: IssueStore>(
@@ -214,7 +212,7 @@ command_group! {
             "Single id: a bare IssueShowResponse (IssueShowSummaryResponse with --summary; the addressed item for an <issue>/<self-id> argument; the projected value with --field/--fields). Multiple ids: the {count, issues} envelope of full IssueShowResponse objects in argument order.",
         "issue_list" => IssueCommands::List { filters, full } => list(filters, full) -> IssueListing
             as union [IssueListResponse, IssueListFullResponse]
-            "Default shape: lean MinimalIssue entries (id, short_id, title, state, priority) with no gate fields. With --full: complete stored issue records, whose gate list is carried under gates_required / gates_status.",
+            ISSUE_LISTING,
         "issue_search" => IssueCommands::Search { query, filters, full } => search(query, filters, full) -> IssueSearchResults
             as union [IssueSearchResponse, IssueSearchFullResponse]
             "Default shape: lean MinimalIssue entries with no gate fields, plus the echoed query. With --full: complete stored issue records, whose gate list is carried under gates_required / gates_status.",
@@ -234,17 +232,6 @@ command_group! {
         | IssueCommands::Reject { .. }
         | IssueCommands::Release { .. }
         | IssueCommands::ClaimNext { .. }
-}
-
-/// Run the `list` handler and render it, for `jit query all` and bare `jit query`.
-pub fn emit_list<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-    filters: IssueFilterArgs,
-    full: bool,
-    out: &mut dyn std::io::Write,
-    err: &mut dyn std::io::Write,
-) -> anyhow::Result<ExitCode> {
-    emit_outcome(&list(ctx, filters, full)?, ctx.mode, out, err)
 }
 
 /// The top-level `list` alias shares `issue list`'s response.

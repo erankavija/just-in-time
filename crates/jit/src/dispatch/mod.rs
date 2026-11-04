@@ -199,6 +199,9 @@ pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     init::output_schema,
     invariant::output_schema,
     profile::output_schema,
+    query::output_schema,
+    query::bare::output_schema,
+    query::status::output_schema,
     issue::output_schema,
     issue::alias_output_schema,
     snapshot::output_schema,
@@ -353,7 +356,7 @@ macro_rules! command_group {
         leaves {
             $(
                 $path:literal => $pattern:pat => $handler:ident ( $($arg:expr),* $(,)? ) -> $response:ty
-                    $(as union [$($member:ty),+ $(,)?] $description:literal)?
+                    $(as union [$($member:ty),+ $(,)?] $description:expr)?
             ),+ $(,)?
         }
     ) => {
@@ -387,7 +390,7 @@ macro_rules! command_group {
     (@schema $response:ty) => {
         $crate::schema::OutputSchema::of::<$response>()
     };
-    (@schema $response:ty, [$($member:ty),+] $description:literal) => {
+    (@schema $response:ty, [$($member:ty),+] $description:expr) => {
         $crate::schema::OutputSchema::union_of(
             vec![$($crate::schema::UnionMember::of::<$member>()),+],
             $description,
@@ -412,6 +415,7 @@ pub mod item;
 pub mod label;
 pub mod profile;
 pub mod project;
+pub mod query;
 pub mod search;
 pub mod serve;
 pub mod snapshot;

@@ -320,18 +320,7 @@ pub enum Commands {
     /// ready` (alias of `available`) for unassigned, unblocked ready issues.
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
-    Query {
-        #[command(flatten)]
-        filters: IssueFilterArgs,
-
-        /// Subcommand — omit to list all issues
-        #[command(subcommand)]
-        subcommand: Option<QueryCommands>,
-
-        /// Return full issue objects instead of minimal summaries (used when no subcommand is given)
-        #[arg(long)]
-        full: bool,
-    },
+    Query(QueryArgs),
 
     /// Label namespace management commands
     ///
@@ -2032,6 +2021,21 @@ pub enum EventCommands {
     },
 }
 
+/// Arguments of `jit query`: the bare form's own filters, or a subcommand.
+#[derive(Args)]
+pub struct QueryArgs {
+    #[command(flatten)]
+    pub filters: IssueFilterArgs,
+
+    /// Subcommand — omit to list all issues
+    #[command(subcommand)]
+    pub subcommand: Option<QueryCommands>,
+
+    /// Return full issue objects instead of minimal summaries (used when no subcommand is given)
+    #[arg(long)]
+    pub full: bool,
+}
+
 #[derive(Subcommand)]
 pub enum QueryCommands {
     /// Query all issues with optional filters
@@ -2703,7 +2707,7 @@ impl Commands {
             | Self::Events(_)
             | Self::Graph(_)
             | Self::Rdeps { .. }
-            | Self::Query { .. }
+            | Self::Query(_)
             | Self::Label(_)
             | Self::Worktree(_)
             | Self::Item(_)
@@ -2729,10 +2733,10 @@ impl Commands {
             Self::Doc(command) => command.coordinates_claims_first(),
             Self::Archive(command) => command.coordinates_claims_first(),
             Self::Graph(command) => command.coordinates_claims_first(),
-            Self::Query {
+            Self::Query(QueryArgs {
                 subcommand: Some(command),
                 ..
-            } => command.coordinates_claims_first(),
+            }) => command.coordinates_claims_first(),
             Self::Label(command) => command.coordinates_claims_first(),
             Self::Config(command) => command.coordinates_claims_first(),
             Self::Snapshot(command) => command.coordinates_claims_first(),
@@ -2747,9 +2751,9 @@ impl Commands {
             | Self::List { .. }
             | Self::Apply(_)
             | Self::Rdeps { .. }
-            | Self::Query {
+            | Self::Query(QueryArgs {
                 subcommand: None, ..
-            }
+            })
             | Self::Search(_)
             | Self::Validate(_)
             | Self::Serve(_)
