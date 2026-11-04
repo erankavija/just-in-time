@@ -715,7 +715,8 @@ fn declared_exit_codes<'a>(
                 .map(|code| (*code, code.description(), false))
                 .chain(
                     leaf.findings
-                        .map(|(code, condition)| (code, condition, true)),
+                        .iter()
+                        .map(|(code, condition)| (*code, *condition, true)),
                 )
                 .map(move |(code, condition, exception)| CommandExitCode {
                     command: command.clone(),
@@ -1328,8 +1329,19 @@ mod tests {
     }
 
     #[test]
-    fn test_command_schema_generate_adds_only_the_optional_warnings_property_to_each_success_schema(
-    ) {
+    fn test_command_schema_never_declares_payload_warnings_in_any_success_variant() {
+        fn has_payload_warnings(schema: &Value) -> bool {
+            schema
+                .get("properties")
+                .and_then(Value::as_object)
+                .is_some_and(|properties| properties.contains_key(crate::output::WARNINGS_FIELD))
+                || ["oneOf", "anyOf", "allOf"]
+                    .iter()
+                    .filter_map(|key| schema.get(key).and_then(Value::as_array))
+                    .flatten()
+                    .any(has_payload_warnings)
+        }
+
         fn walk(commands: &HashMap<String, Command>, path: &str, mismatched: &mut Vec<String>) {
             for (name, command) in commands {
                 let path = if path.is_empty() {
@@ -1343,11 +1355,7 @@ mod tests {
                     .and_then(|output| output.success_schema.clone());
                 let mut raw = CommandSchema::get_output_schema_for_command(&path)
                     .and_then(|output| output.success_schema);
-                if raw
-                    .as_ref()
-                    .and_then(|r| r.pointer("/properties/warnings"))
-                    .is_some()
-                {
+                if raw.as_ref().is_some_and(has_payload_warnings) {
                     mismatched.push(format!("{path}: declares its own warnings"));
                 }
                 if let Some(Value::Object(schema)) = &mut raw {
@@ -1469,7 +1477,7 @@ mod tests {
     fn leaf(
         path: &'static str,
         raises: &'static [ErrorCode],
-        findings: Option<(ErrorCode, &'static str)>,
+        findings: &'static [(ErrorCode, &'static str)],
     ) -> crate::dispatch::LeafCodes {
         crate::dispatch::LeafCodes {
             path,
@@ -1483,7 +1491,7 @@ mod tests {
         let rows = declared_exit_codes(&[leaf(
             "dep_add",
             &[ErrorCode::CycleDetected, ErrorCode::ValidationFailed],
-            None,
+            &[],
         )]);
 
         assert_eq!(rows.len(), 1);
@@ -1497,9 +1505,9 @@ mod tests {
     #[test]
     fn test_declared_exit_codes_join_leaves_with_equal_rows() {
         let rows = declared_exit_codes(&[
-            leaf("a_one", &[ErrorCode::AlreadyExists], None),
-            leaf("b", &[ErrorCode::Blocked], None),
-            leaf("a_two", &[ErrorCode::AlreadyExists], None),
+            leaf("a_one", &[ErrorCode::AlreadyExists], &[]),
+            leaf("b", &[ErrorCode::Blocked], &[]),
+            leaf("a_two", &[ErrorCode::AlreadyExists], &[]),
         ]);
 
         let commands: Vec<_> = rows.iter().map(|row| row.command.as_str()).collect();
@@ -1508,11 +1516,11 @@ mod tests {
 
     #[test]
     fn test_declared_exit_codes_flag_exactly_the_findings_rows_as_exceptions() {
-        let condition = "the check found drift";
+        const CONDITION: &str = "the check found drift";
         let rows = declared_exit_codes(&[leaf(
             "check",
             &[ErrorCode::ValidationFailed],
-            Some((ErrorCode::ValidationFailed, condition)),
+            &[(ErrorCode::ValidationFailed, CONDITION)],
         )]);
 
         let flagged: Vec<_> = rows
@@ -1523,7 +1531,7 @@ mod tests {
             flagged,
             [
                 (ErrorCode::ValidationFailed.description(), false),
-                (condition, true)
+                (CONDITION, true)
             ]
         );
     }

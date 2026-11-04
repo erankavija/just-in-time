@@ -472,7 +472,7 @@ pub fn discover_archive_artifacts(
                     .clone()
                     .with_edges(merge(entry.edges(), edges))
                     .with_blockers(merge(entry.blockers(), entry_blockers))
-                    .with_warnings(merge(entry.warnings(), entry_warnings));
+                    .with_plan_warnings(merge(entry.plan_warnings(), entry_warnings));
                 if let Some(format) = parsed.format() {
                     updated = updated.with_format(format);
                 }
@@ -602,7 +602,7 @@ fn append_blocker(entry: &mut ArtifactPlanEntry, blocker: PlanBlocker) -> Result
 fn append_warning(entry: &mut ArtifactPlanEntry, warning: PlanWarning) -> Result<(), PlanError> {
     let mut updated = entry
         .clone()
-        .with_warnings(merge(entry.warnings(), [warning]));
+        .with_plan_warnings(merge(entry.plan_warnings(), [warning]));
     updated.normalize()?;
     *entry = updated;
     Ok(())

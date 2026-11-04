@@ -718,7 +718,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     let validation = success_json_with_path(&repo, &["validate", "--json"], path);
     assert_eq!(validation["valid"], true);
     assert_eq!(validation["error_count"], 0);
-    assert!(validation["warnings"]
+    assert!(validation["validation_warnings"]
         .as_array()
         .unwrap()
         .iter()

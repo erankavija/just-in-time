@@ -240,6 +240,10 @@ pub trait RepositoryReadSession {
         image: RepositoryImage,
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError>;
+    /// The event log's whole bytes, read without following a link, or `None`
+    /// when absent. Outside any [`CaptureSpec`], so no image holds the whole
+    /// log; whole-repository record fidelity is its one reader.
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError>;
 }
 
 /// Opaque mutation session retaining serialization through capture and apply.
@@ -251,10 +255,6 @@ pub trait RepositoryMutationSession: RepositoryReadSession {
         &mut self,
         plan: &MaterializationPlan,
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError>;
-    /// The event log's whole bytes, read without following a link, or `None`
-    /// when absent. Outside any [`CaptureSpec`], so no image holds the whole
-    /// log; whole-repository record fidelity is its one reader.
-    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError>;
 }
 
 /// The whole log from its entry: a link or any non-file is unsafe, not absent.
@@ -269,6 +269,27 @@ fn history_log_bytes(
             VirtualPath::EVENTS
         ))),
     }
+}
+
+/// The whole JSON-backed log, through the session's capability roots.
+fn json_history_log(
+    layout: &RepositoryLayout,
+    roots: &CapabilityRoots,
+) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+    revalidate_layout_capabilities(layout, roots)?;
+    history_log_bytes(Some(&inspect_capability_entry(
+        layout,
+        roots,
+        &VirtualPath::EVENTS,
+        ReadMode::Whole,
+    )?))
+}
+
+/// The whole in-memory log.
+fn memory_history_log(
+    storage: &InMemoryStorage,
+) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+    history_log_bytes(storage.repository_state().entries.get(&VirtualPath::EVENTS))
 }
 
 /// Whether a lock-free read's capture is one whole repository version.
@@ -696,6 +717,11 @@ impl RepositoryReadSession for JsonReadSession {
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
         self.capture_over(image.into_answers(&spec), spec)
     }
+
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        json_history_log(&self.layout, &self.roots)
+    }
 }
 
 impl JsonReadSession {
@@ -742,6 +768,11 @@ impl RepositoryReadSession for MemoryReadSession {
         let prior = image.into_answers(&spec);
         capture_memory_image(&self.layout, &self.storage.repository_state(), spec, prior)
     }
+
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        memory_history_log(&self.storage)
+    }
 }
 
 impl OptimisticReadSession for MemoryReadSession {
@@ -765,6 +796,10 @@ impl RepositoryReadSession for JsonMutationSession {
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
         self.capture_over(image.into_answers(&spec), spec)
+    }
+
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+        json_history_log(&self.layout, &self.roots)
     }
 }
 
@@ -811,16 +846,6 @@ impl RepositoryMutationSession for JsonMutationSession {
         }
         self.captured = None;
         Ok(outcome)
-    }
-
-    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
-        revalidate_layout_capabilities(&self.layout, &self.roots)?;
-        history_log_bytes(Some(&inspect_capability_entry(
-            &self.layout,
-            &self.roots,
-            &VirtualPath::EVENTS,
-            ReadMode::Whole,
-        )?))
     }
 }
 
@@ -939,6 +964,10 @@ impl RepositoryReadSession for MemoryMutationSession {
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
         self.capture_over(image.into_answers(&spec), spec)
     }
+
+    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+        memory_history_log(&self.storage)
+    }
 }
 
 impl RepositoryMutationSession for MemoryMutationSession {
@@ -973,15 +1002,6 @@ impl RepositoryMutationSession for MemoryMutationSession {
         }
         self.captured = None;
         Ok(outcome)
-    }
-
-    fn read_history_log(&mut self) -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
-        history_log_bytes(
-            self.storage
-                .repository_state()
-                .entries
-                .get(&VirtualPath::EVENTS),
-        )
     }
 }
 

@@ -863,7 +863,7 @@ fn validate_proposed_artifact_layout(
             let Some(target_source) = edge.target.as_deref() else {
                 continue;
             };
-            if parent.warnings().iter().any(|warning| {
+            if parent.plan_warnings().iter().any(|warning| {
                 warning.code == WarningCode::MissingEdgeTarget
                     && warning.path.as_deref() == Some(target_source)
             }) {
@@ -1191,10 +1191,10 @@ fn cite_moving_path(
         return entry;
     }
     let warnings = merge(
-        entry.warnings(),
+        entry.plan_warnings(),
         moving_path_citation_warnings(entry.source(), citations),
     );
-    entry.with_warnings(warnings)
+    entry.with_plan_warnings(warnings)
 }
 
 /// One [`WarningCode::MovingPathCitation`] warning per scanned citation of
@@ -1562,7 +1562,7 @@ fn unpreservable_parents(
                 edge.kind == EdgeKind::Supported
                     && edge.target.as_ref().is_some_and(|target| {
                         !inventory_paths.contains(target)
-                            && !entry.warnings().iter().any(|warning| {
+                            && !entry.plan_warnings().iter().any(|warning| {
                                 warning.code == WarningCode::MissingEdgeTarget
                                     && warning.path.as_deref() == Some(target)
                             })
@@ -3986,7 +3986,7 @@ mod tests {
             "dev/active/missing.png",
             EdgeResolutionMode::Relative,
         )])
-        .with_warnings(vec![crate::domain::artifact_plan::PlanWarning::new(
+        .with_plan_warnings(vec![crate::domain::artifact_plan::PlanWarning::new(
             WarningCode::MissingEdgeTarget,
             Some("dev/active/missing.png"),
         )]);
@@ -4314,7 +4314,7 @@ mod tests {
 
     fn cited_locations(artifact: &ArtifactPlanEntry) -> Vec<(String, usize, usize)> {
         artifact
-            .warnings()
+            .plan_warnings()
             .iter()
             .filter(|warning| warning.code == WarningCode::MovingPathCitation)
             .map(|warning| {

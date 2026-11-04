@@ -986,6 +986,12 @@ impl jit::storage::RepositoryReadSession for FailingMutationSession {
     {
         self.inner.extend(image, spec)
     }
+
+    fn read_history_log(
+        &mut self,
+    ) -> Result<Option<Vec<u8>>, jit::storage::RepositoryStateStoreError> {
+        self.inner.read_history_log()
+    }
 }
 
 impl jit::storage::RepositoryMutationSession for FailingMutationSession {
@@ -1000,12 +1006,6 @@ impl jit::storage::RepositoryMutationSession for FailingMutationSession {
         Err(jit::storage::RepositoryStateStoreError::UnsafeTarget(
             "simulated publication failure".to_string(),
         ))
-    }
-
-    fn read_history_log(
-        &mut self,
-    ) -> Result<Option<Vec<u8>>, jit::storage::RepositoryStateStoreError> {
-        self.inner.read_history_log()
     }
 }
 

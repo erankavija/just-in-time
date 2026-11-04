@@ -107,3 +107,20 @@ fn test_concurrent_mutations_queue_behind_a_holder_under_the_default_wait() {
         2
     );
 }
+
+#[test]
+fn test_validate_reads_while_a_writer_holds_the_bootstrap_lock() {
+    let cli = JitCli::initialised().unwrap();
+    cli.create_issue(["Validated"]).unwrap();
+    let _held = FileLocker::new(Duration::from_secs(5))
+        .lock_exclusive(&cli.root().join(".jit-bootstrap.lock"))
+        .unwrap();
+
+    // A read waiting on the holder would time out after one second.
+    let output = cli
+        .command_with_env(["validate", "--json"], [("JIT_LOCK_TIMEOUT", "1")])
+        .output()
+        .unwrap();
+
+    assert_eq!(envelope(&succeeded(output))["valid"], true);
+}

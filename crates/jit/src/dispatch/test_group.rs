@@ -186,25 +186,13 @@ fn test_dispatch_findings_human_writes_report_and_unprefixed_message_line() {
 
 #[test]
 fn test_dispatch_findings_under_undeclared_code_fails_without_writing() {
-    let command = TestCommand::Undeclared {
-        code: ErrorCode::GateFailed,
-    };
-    let run = run(&TestHarness::new(), command, true);
+    for code in [ErrorCode::GateFailed, ErrorCode::LockTimeout] {
+        let run = run(&TestHarness::new(), TestCommand::Undeclared { code }, true);
 
-    assert!(run
-        .status
-        .unwrap_err()
-        .to_string()
-        .contains("test_undeclared"));
-    assert!(run.out.is_empty() && run.err.is_empty());
-}
-
-#[test]
-fn test_dispatch_findings_under_universal_code_need_no_declaration() {
-    let code = ErrorCode::LockTimeout;
-    let run = run(&TestHarness::new(), TestCommand::Undeclared { code }, true);
-
-    assert_eq!(run.status.unwrap(), code.exit_code().into());
+        let error = run.status.unwrap_err().to_string();
+        assert!(error.contains("test_undeclared"), "{code:?}: {error}");
+        assert!(run.out.is_empty() && run.err.is_empty(), "{code:?}");
+    }
 }
 
 #[test]

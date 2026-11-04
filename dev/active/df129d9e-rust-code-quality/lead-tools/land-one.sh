@@ -2,15 +2,13 @@
 # usage: land-one.sh <id>; serialized merge, CI and gates for one wave issue
 id=$1; S=${0:A:h}; R=/home/vkaskivuo/Projects/just-in-time; W=/mnt/nvme/jit/agents/worktrees/agent-$id
 export JIT_AGENT_ID=agent:df129d9e-lead CARGO_INCREMENTAL=0
-# Authoritative runs use their own tmpfs (/tmp runs out of inodes under load); the
-# directory is emptied after every CI and gate run (steward, 2026-11-04).
+# Authoritative runs use their own tmpfs; cargo-ci makes and removes a per-run
+# directory inside it (d952d057).
 export TMPDIR=/dev/shm/jit-ci/df129d9e
 # Use the shared sccache daemon only when one is already running (started with a
 # stable TMPDIR by the steward); never let this run start one under its per-run TMPDIR.
 sccache_guard() { ps -C sccache -o pid= >/dev/null 2>&1 && unset CARGO_CI_NO_SCCACHE || { export CARGO_CI_NO_SCCACHE=1; echo "$id: no sccache daemon; building without it"; }; }
 mkdir -p $TMPDIR
-clean_tmp() { find $TMPDIR -mindepth 1 -delete 2>/dev/null; }
-trap clean_tmp EXIT
 # flock -o holds the lock in the flock process and closes it for children, so a
 # daemon a child spawns (sccache) cannot inherit and keep it.
 [[ -n $LAND_LOCKED ]] || LAND_LOCKED=1 exec flock -o $S/land2.lock $0 $@
@@ -24,7 +22,7 @@ git merge -q --no-edit main || { git merge --abort; echo "$id: CONFLICT merging 
 for try in 1 2; do
   sccache_guard
   flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/cargo-ci.sh > $S/ci-$id.log 2>&1
-  rc=$?; clean_tmp
+  rc=$?
   # Retry exit 75 (load), ENOSPC on the shared /tmp tmpfs, and failures made only of
   # TIMEOUTs (jobserver token waits inside nextest's timer).
   env_only=0
@@ -33,6 +31,9 @@ for try in 1 2; do
     others=$(print -r -- "$fails" | grep -avE 'TIMEOUT' | grep -c .)
     [[ -n $fails && $others == 0 ]] && env_only=1
     grep -aq 'No space left on device' $S/ci-$id.log && env_only=1
+    # D-56: only the suite-duration budget failed and the doctest step compiled cold (>15 s).
+    dms=$(grep -aoE 'doctest: [0-9]+ passed[^(]*\(([0-9]+) ms\)' $S/ci-$id.log | tail -1 | grep -oE '[0-9]+ ms' | grep -oE '[0-9]+')
+    if [[ -z $fails ]] && grep -aq 'test suite duration: observed' $S/ci-$id.log && (( ${dms:-0} > 15000 )); then env_only=1; fi
   fi
   [[ ($rc == 75 || $env_only == 1) && $try == 1 ]] || break
   echo "$id: branch CI environmental failure rc=$rc (try $try), retrying"; sleep 120
@@ -57,7 +58,7 @@ for g in $gates; do
     for try in 1 2; do
       sccache_guard
       flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock jit gate evaluate $id $g > $S/gate-$id-$g.log 2>&1
-      rc=$?; clean_tmp; [[ $rc == 10 && $try == 1 ]] && grep -q 'exit code: Some(75)' $S/gate-$id-$g.log || break
+      rc=$?; [[ $rc == 10 && $try == 1 ]] && grep -q 'exit code: Some(75)' $S/gate-$id-$g.log || break
       echo "$id cargo-ci gate exit 75 (try $try), retrying"; sleep 120
     done
   else jit gate evaluate $id $g > $S/gate-$id-$g.log 2>&1; rc=$?; fi

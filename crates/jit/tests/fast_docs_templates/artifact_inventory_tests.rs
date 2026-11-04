@@ -158,8 +158,8 @@ fn test_document_inventory_normalizes_zero_owner_opaque_root() {
     assert_eq!(artifact.source(), "figures/chart.svg");
     assert_eq!(artifact.version(), &ArtifactVersion::WorkingTree);
     assert!(artifact.owners().is_empty());
-    assert_eq!(artifact.warnings().len(), 1);
-    assert_eq!(artifact.warnings()[0].code, WarningCode::NoOwner);
+    assert_eq!(artifact.plan_warnings().len(), 1);
+    assert_eq!(artifact.plan_warnings()[0].code, WarningCode::NoOwner);
 }
 
 #[test]
