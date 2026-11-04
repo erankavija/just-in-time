@@ -1338,9 +1338,22 @@
       "review": "lead PASS at fd2221df3 (Codex); stored resolutions + per-root reachability; +29 lines (b697a3f7 ledger)"
     },
     "4575a03d": {
-      "status": "claimed",
+      "status": "dispatched",
       "epic": "v1-release (taken on per 6a)",
-      "note": "gates cargo-ci, code-review added; Notes amended (ac1c71c64)"
+      "note": "gates cargo-ci, code-review added; Notes amended (ac1c71c64)",
+      "vendor": "Claude Sonnet",
+      "reason": "v1-release bug blocking b697a3f7 track B"
+    },
+    "8fbf8c43": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "N2 handler aliases; before f87f9b00/3f816619/24a982b7; no renames"
+    },
+    "1ade3e6f": {
+      "status": "dispatched",
+      "vendor": "Claude Opus",
+      "reason": "b697a3f7 track B; large config assembler",
+      "epic": "b697a3f7"
     }
   },
   "handoff": {
@@ -1384,7 +1397,7 @@
         "7cd27db8 (30334066)"
       ]
     },
-    "status": "criteria checked; paused for quiet window",
+    "status": "f56bad8d, f7a59f5f done; 1ade3e6f, 4575a03d dispatched; next track A 945f9181 (after 3f816619 sequencing) and ceaaf0ab after 4575a03d",
     "criteria_check_2026_11_04": {
       "945f9181": "valid; line cites drifted; large; touches commands/{issue,dependency,template,mod}, overlaps 3f816619/5687e281 files",
       "1ade3e6f": "valid; cites drifted; large; misses ConfigManager::load/EffectiveConfig::load callers",
