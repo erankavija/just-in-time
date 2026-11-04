@@ -243,7 +243,14 @@ fn load_profile_variable_inputs(
     let values_file = options
         .values_file
         .as_deref()
-        .map(fs::read_to_string)
+        .map(|path| {
+            fs::read_to_string(path).map_err(|error| {
+                crate::errors::InvalidArgumentError::new(format!(
+                    "cannot read profile values file '{}': {error}",
+                    path.display()
+                ))
+            })
+        })
         .transpose()?
         .map(|text| toml::from_str::<ProfileValuesFile>(&text))
         .transpose()?

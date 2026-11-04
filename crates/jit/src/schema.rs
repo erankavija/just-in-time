@@ -969,7 +969,7 @@ impl CommandSchema {
                  created.",
                 false,
             ),
-            row("init", 3, "The `--values-file` path does not exist.", false),
+            row("init", 2, "The `--values-file` path cannot be read.", false),
             row(
                 "issue update, issue claim, issue claim-next",
                 4,
