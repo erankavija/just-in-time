@@ -12,7 +12,7 @@ wt=$repo/.agents/worktrees/agent-$id
 log=$repo/.agents/worktrees/ci-$id.log
 export JIT_AGENT_ID=agent:9876a23a-lead
 export CARGO_INCREMENTAL=0
-STOP=/tmp/claude-1000/-home-vkaskivuo-Projects-just-in-time/04c36bd3-9126-41e7-a804-3c2880c8e2ec/scratchpad/ENOSPC-STOP
+STOP=/tmp/claude-1000/-home-vkaskivuo-Projects-just-in-time/05ecddb0-8baa-4b7a-aa67-f8c1de1186ca/scratchpad/ENOSPC-STOP
 [ -e $STOP ] && { echo "$id skipped: ENOSPC stop file present"; exit 3; }
 
 # Authoritative runs use a lead-owned directory on /dev/shm (steward rule: /tmp
