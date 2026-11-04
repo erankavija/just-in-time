@@ -1,0 +1,197 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/2fbd2a82-planning-bracket",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 17741,
+            "sha256": "08695439af9086423eee2bc2d49cbd235ef9e8942849e37a9a3cf4c862b382a5"
+          },
+          "source": "dev/active/planning-bracket-design.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 12499,
+            "sha256": "e964dd787590ea2c2eb5784b5362674504e66d2e4626bca1b1e8abff071f7059"
+          },
+          "source": "dev/active/planning-bracket-showcase/base.css"
+        },
+        {
+          "content_identity": {
+            "byte_size": 16813,
+            "sha256": "e5a8b15d047d497b6e8513091c2751a74468466f3084050937e4f47e102e8aac"
+          },
+          "source": "dev/active/planning-bracket-showcase/talk.html"
+        },
+        {
+          "content_identity": {
+            "byte_size": 1393,
+            "sha256": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe"
+          },
+          "source": "dev/active/planning-bracket-showcase/themes/rust.css"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 17741,
+            "sha256": "08695439af9086423eee2bc2d49cbd235ef9e8942849e37a9a3cf4c862b382a5"
+          },
+          "destination": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md",
+          "source": "dev/active/planning-bracket-design.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 12499,
+            "sha256": "e964dd787590ea2c2eb5784b5362674504e66d2e4626bca1b1e8abff071f7059"
+          },
+          "destination": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/base.css",
+          "source": "dev/active/planning-bracket-showcase/base.css"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 16813,
+            "sha256": "e5a8b15d047d497b6e8513091c2751a74468466f3084050937e4f47e102e8aac"
+          },
+          "destination": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/talk.html",
+          "source": "dev/active/planning-bracket-showcase/talk.html"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 1393,
+            "sha256": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe"
+          },
+          "destination": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/themes/rust.css",
+          "source": "dev/active/planning-bracket-showcase/themes/rust.css"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "f9cd79722f102086aa29f23cbefb9d674fe9d06a2aedca9a6e4c9ff9ef2572c3"
+          },
+          "destination": "dev/archive/2fbd2a82-planning-bracket/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/planning-bracket-design.md",
+          "issue": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+          "to_path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/planning-bracket-showcase/talk.html",
+          "issue": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+          "to_path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/talk.html"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/planning-bracket-design.md",
+          "issue": "8646a474-4324-47f3-bc75-89ea4cd0e516",
+          "to_path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md"
+        }
+      ],
+      "target": {
+        "id": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/2fbd2a82-planning-bracket",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 3636,
+            "sha256": "b835feba6c82b645f3a4eb98bfc49622501b1b8f4b1a0d28bf4241bb5b147401"
+          },
+          "source": "dev/active/planning-bracket-showcase/themes/gruvbox.css"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 3636,
+            "sha256": "b835feba6c82b645f3a4eb98bfc49622501b1b8f4b1a0d28bf4241bb5b147401"
+          },
+          "destination": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/themes/gruvbox.css",
+          "source": "dev/active/planning-bracket-showcase/themes/gruvbox.css"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 3,
+          "from_path": "dev/active/planning-bracket-showcase/themes/gruvbox.css",
+          "issue": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+          "to_path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/themes/gruvbox.css"
+        }
+      ],
+      "target": {
+        "id": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/2fbd2a82-planning-bracket",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 1317,
+            "sha256": "6c7aefd559086e966c0dc80a79da2af7da7886ca7a4cd2d1856b87529d06caf8"
+          },
+          "source": "dev/active/2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c-plan.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 1317,
+            "sha256": "6c7aefd559086e966c0dc80a79da2af7da7886ca7a4cd2d1856b87529d06caf8"
+          },
+          "destination": "dev/archive/2fbd2a82-planning-bracket/dev/active/2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c-plan.md",
+          "source": "dev/active/2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c-plan.md"
+        }
+      ],
+      "reconciling": true,
+      "reference_changes": [
+        {
+          "document_index": 1,
+          "from_path": "dev/active/planning-bracket-showcase/talk.html",
+          "issue": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+          "to_path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/talk.html"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/planning-bracket-showcase/themes/gruvbox.css",
+          "issue": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+          "to_path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/themes/gruvbox.css"
+        },
+        {
+          "document_index": 4,
+          "from_path": "dev/active/2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c-plan.md",
+          "issue": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+          "to_path": "dev/archive/2fbd2a82-planning-bracket/dev/active/2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c-plan.md"
+        }
+      ],
+      "target": {
+        "id": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "2fbd2a82-14ba-4e6e-90f6-e0c34f0f912c",
+    "kind": "container"
+  }
+}

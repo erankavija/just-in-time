@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "992072bb42962879888b3ac92c2793dad4926c72",
+  "completed_at": "2026-11-04T07:52:51.974531200Z",
+  "duration_ms": 146830,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The generated reference accurately documents both per-key records, derives paths and examples from production types and constructors, and is current with its projection.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "09ca911e-0518-4545-b516-b13cdbfd6834",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "76b63ce9-7c9b-4f84-90c2-7480033a2b9a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T07:50:25.143819912Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ab4647e0e (`jit:09ca911e`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose (.jit/invariants.toml); @/issue/f8a6b298/requirement/REQ-15 (issue description)\nGate evidence: cargo-ci passed (0); doc-review failed (1); docs-mechanical passed (0)\nTruncation recovery: recovered the initial patch with a narrower per-file diff; inspected reader/writer functions separately\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The generated reference accurately documents both per-key records, derives paths and examples from production types and constructors, and is current with its projection.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

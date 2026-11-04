@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9af61dd1f9c5f06fb8fab4248bc5867d836fbe7d",
+  "completed_at": "2026-11-04T08:10:34.398983392Z",
+  "duration_ms": 282668,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 159,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/cargo-ci",
+          "@/invariant/bounded-rust-build-footprint"
+        ],
+        "severity": "high",
+        "summary": "cargo-ci fails the enforced suite-duration budget: 42,323 ms exceeds 30,000 ms on a quiet-host run; reduce attributable execution cost and obtain a passing gate."
+      }
+    ],
+    "summary": "The implementation meets the inspected functional criteria, but the required cargo-ci suite-duration budget fails.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1f24e3e9-43bb-44da-aa8c-b4b90d157e94",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fad1c1ee-d30b-4fa5-8ffa-9f2c5849b961",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T08:05:51.730733713Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15744 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a597-d20c-7870-8447-8a2f2cf099b4\n--------\nuser\n--- 15731 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 5b26ce94f; 588b8f7b3; d2bbac0a5 (`jit:1f24e3e9`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-14 (.jit issue); @/gate/cargo-ci, @/invariant/bounded-rust-build-footprint (.jit registries)\nGate evidence: cargo-ci failed (exit 1): 4,932 tests passed, but suite clock was 42,323 ms vs 30,000 ms budget\nTruncation recovery: re-read tagged patches per commit/path with zero-context diffs; inspected current validate, CLI rendering, capture, mutation, and focused test ranges; unrelated historical gate records were outside the impact cone\n\n1. **Blocking, issue-impact:** `cargo-ci` does not pass the required measured suite-duration budget. The recorded quiet-host run attributes the 42.3s suite clock to repository content, and this change adds the mandatory post-fix full report at `crates/jit/src/commands/validate.rs:159` plus its accompanying coverage. Reduce the attributable execution cost enough for the 30s budget and obtain a passing gate. References: `@/gate/cargo-ci`, `@/invariant/bounded-rust-build-footprint`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The implementation meets the inspected functional criteria, but the required cargo-ci suite-duration budget fails.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"cargo-ci fails the enforced suite-duration budget: 42,323 ms exceeds 30,000 ms on a quiet-host run; reduce attributable execution cost and obtain a passing gate.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":159,\"references\":[\"@/gate/cargo-ci\",\"@/invariant/bounded-rust-build-footprint\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

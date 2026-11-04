@@ -15,8 +15,8 @@ export CARGO_INCREMENTAL=0
 STOP=/tmp/claude-1000/-home-vkaskivuo-Projects-just-in-time/05ecddb0-8baa-4b7a-aa67-f8c1de1186ca/scratchpad/ENOSPC-STOP
 [ -e $STOP ] && { echo "$id skipped: ENOSPC stop file present"; exit 3; }
 
-# Authoritative runs use a lead-owned directory on /dev/shm (steward rule: /tmp
-# is out of inodes); it is created before and removed after each run.
+# Authoritative runs use a lead-owned TMPDIR on /dev/shm (steward rule: /tmp is
+# out of inodes); cargo-ci.sh creates and removes its own per-run directory in it.
 CI_TMP=/dev/shm/jit-ci/9876a23a
 ci_tmp_begin() {
   mkdir -p /dev/shm/jit-ci/9876a23a
@@ -24,7 +24,6 @@ ci_tmp_begin() {
   # under this run's TMPDIR (steward rule).
   if ps -C sccache >/dev/null; then unset CARGO_CI_NO_SCCACHE; else export CARGO_CI_NO_SCCACHE=1; echo "no sccache daemon: running without sccache"; fi
 }
-ci_tmp_end() { rm -rf /dev/shm/jit-ci/9876a23a; }
 
 wait_load() {
   local deadline=$(( $(date +%s) + 1800 ))
@@ -35,7 +34,7 @@ if [ -d $wt ]; then
   cd $wt || exit 1
   git merge -q --no-edit main || { echo "$id CONFLICT: $(git diff --name-only --diff-filter=U | tr '\n' ' ')"; exit 1; }
   wait_load
-  ci_tmp_begin; TMPDIR=$CI_TMP flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/cargo-ci.sh > $log 2>&1; r=$?; ci_tmp_end
+  ci_tmp_begin; TMPDIR=$CI_TMP flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/cargo-ci.sh > $log 2>&1; r=$?
   echo "$id worktree cargo-ci exit $r"; tail -3 $log
   grep -E "^\s+FAIL|^error" $log | sort -u | head -3
   grep -q "No space left on device" $log && { echo "$id ENOSPC in authoritative branch CI"; touch $STOP; exit 2; }
@@ -50,7 +49,6 @@ for g in $gates; do
   if [ $g = cargo-ci ]; then
     ci_tmp_begin
     out=$(TMPDIR=$CI_TMP flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock jit gate evaluate $id $g ${=FORCE:-} 2>&1 | tail -1)
-    ci_tmp_end
     echo "$id gate $g: $out"
     r=$(ls -t $repo/.jit/gate-runs/*/result.json | head -20 | xargs grep -l "\"issue_id\": \"$id" | head -1)
     [ -n "$r" ] && jq -r .stdout $r | grep -q "No space left on device" && { echo "$id ENOSPC in cargo-ci gate run $r"; touch $STOP; exit 2; }

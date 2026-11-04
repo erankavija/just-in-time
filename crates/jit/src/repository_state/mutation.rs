@@ -699,6 +699,7 @@ fn captured_issue(image: &RepositoryImage, id: &IssueId) -> Result<Option<Issue>
 }
 
 /// The single typed-to-byte finalizer for repository-owned records.
+/// `preimages`, when supplied, are the issue records already decoded from `image`.
 ///
 /// Given the captured `image`, the reused `context`, and closed semantic
 /// `intents`, it produces one exact [`MaterializationPlan`]. When no transition occurs the plan carries an empty delta having
@@ -712,8 +713,9 @@ pub fn finalize(
     image: &RepositoryImage,
     context: &MutationContext,
     intents: &[MutationIntent],
+    preimages: Option<&[Issue]>,
 ) -> Result<MaterializationPlan, MutationError> {
-    let delta = finalize_delta(layout, image, context, intents)?;
+    let delta = finalize_delta(layout, image, context, intents, preimages)?;
     Ok(MaterializationPlan::new(image, delta))
 }
 
@@ -799,6 +801,7 @@ pub(super) fn finalize_delta(
     image: &RepositoryImage,
     context: &MutationContext,
     intents: &[MutationIntent],
+    preimages: Option<&[Issue]>,
 ) -> Result<RepositoryDelta, MutationError> {
     context.begin();
     let mut actions: Vec<RepositoryAction> = Vec::new();
@@ -950,8 +953,14 @@ pub(super) fn finalize_delta(
     // absent from the captured image is a typed error, never an implicit create.
     for intent in intents {
         if let MutationIntent::UpdateIssue { issue } = intent {
-            let preimage = captured_issue(image, &issue.id)?
-                .ok_or_else(|| MutationError::MissingIssue(issue.id.clone()))?;
+            let preimage = match preimages {
+                Some(issues) => issues
+                    .iter()
+                    .find(|original| original.id == issue.id)
+                    .cloned(),
+                None => captured_issue(image, &issue.id)?,
+            }
+            .ok_or_else(|| MutationError::MissingIssue(issue.id.clone()))?;
             let updated = updated_issue(&preimage, issue, intents, context.timestamp());
             actions.push(write_issue_action(image, &updated)?);
         }
@@ -1497,6 +1506,7 @@ mod tests {
             &[MutationIntent::CreateIssue {
                 draft: Box::new(first_draft),
             }],
+            None,
         )
         .unwrap();
         let retry = finalize(
@@ -1506,6 +1516,7 @@ mod tests {
             &[MutationIntent::CreateIssue {
                 draft: Box::new(retry_draft),
             }],
+            None,
         )
         .unwrap();
 
@@ -1586,7 +1597,14 @@ mod tests {
         let intents = [MutationIntent::CreateIssue {
             draft: Box::new(map_order_draft(false)),
         }];
-        let plan = finalize(&synthetic_layout(), &image, &annotated_ctx(), &intents).unwrap();
+        let plan = finalize(
+            &synthetic_layout(),
+            &image,
+            &annotated_ctx(),
+            &intents,
+            None,
+        )
+        .unwrap();
 
         let created_id = created_id();
         assert!(
@@ -1667,15 +1685,21 @@ mod tests {
             draft: Box::new(map_order_draft(false)),
         }];
         let unannotated = appended_event_bytes(
-            finalize(&synthetic_layout(), &image, &ctx(), &intents)
+            finalize(&synthetic_layout(), &image, &ctx(), &intents, None)
                 .unwrap()
                 .delta(),
         )
         .expect("an issue creation appends its own events");
         let annotated = appended_event_bytes(
-            finalize(&synthetic_layout(), &image, &annotated_ctx(), &intents)
-                .unwrap()
-                .delta(),
+            finalize(
+                &synthetic_layout(),
+                &image,
+                &annotated_ctx(),
+                &intents,
+                None,
+            )
+            .unwrap()
+            .delta(),
         )
         .expect("an issue creation appends its own events");
 
@@ -1722,6 +1746,7 @@ mod tests {
                 issue_id: issue.id.clone(),
                 agent,
             }],
+            None,
         )
         .unwrap();
         assert!(
@@ -1865,6 +1890,7 @@ mod tests {
             &[MutationIntent::CreateIssue {
                 draft: Box::new(draft),
             }],
+            None,
         )
         .unwrap();
         let created: Issue = plan
@@ -1973,9 +1999,10 @@ mod tests {
             &image,
             &ctx(),
             std::slice::from_ref(&intent),
+            None,
         )
         .unwrap();
-        let retry = finalize(&synthetic_layout(), &image, &ctx(), &[intent]).unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &ctx(), &[intent], None).unwrap();
         assert_eq!(first.delta(), retry.delta());
         let written = first
             .delta()
@@ -2060,6 +2087,7 @@ mod tests {
                 issue_id: issue.id.clone(),
                 agent,
             }],
+            None,
         )
         .unwrap();
         assert!(plan.delta().actions().is_empty());
@@ -2101,6 +2129,7 @@ mod tests {
                     issue_id: issue.id,
                     agent: agent.clone(),
                 }],
+                None,
             )
             .unwrap()
         };
@@ -2134,9 +2163,10 @@ mod tests {
             &image,
             &context,
             std::slice::from_ref(&intent),
+            None,
         )
         .unwrap();
-        let retry = finalize(&synthetic_layout(), &image, &context, &[intent]).unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &[intent], None).unwrap();
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
             serde_json::to_vec(retry.delta()).unwrap(),
@@ -2181,6 +2211,7 @@ mod tests {
             &ImageBuilder::new().build(),
             &context,
             &[],
+            None,
         )
         .unwrap();
 
@@ -2208,9 +2239,10 @@ mod tests {
             &image,
             &context,
             std::slice::from_ref(&intent),
+            None,
         )
         .unwrap();
-        let retry = finalize(&synthetic_layout(), &image, &context, &[intent]).unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &[intent], None).unwrap();
 
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
@@ -2261,8 +2293,8 @@ mod tests {
             )),
         };
         let intents = [intent, provenance];
-        let first = finalize(&synthetic_layout(), &image, &context, &intents).unwrap();
-        let retry = finalize(&synthetic_layout(), &image, &context, &intents).unwrap();
+        let first = finalize(&synthetic_layout(), &image, &context, &intents, None).unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &intents, None).unwrap();
 
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
@@ -2387,6 +2419,7 @@ mod tests {
             &[MutationIntent::RecordGateRun {
                 draft: Box::new(run),
             }],
+            None,
         )
         .unwrap()
         .delta()
@@ -2439,7 +2472,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let plan = finalize(&synthetic_layout(), &image, &context, &intents).unwrap();
+        let plan = finalize(&synthetic_layout(), &image, &context, &intents, None).unwrap();
 
         let created = plan
             .delta()
@@ -2582,8 +2615,8 @@ mod tests {
         ];
         let image = creation_image();
         let context = ctx();
-        let first = finalize(&synthetic_layout(), &image, &context, &intents).unwrap();
-        let retry = finalize(&synthetic_layout(), &image, &context, &intents).unwrap();
+        let first = finalize(&synthetic_layout(), &image, &context, &intents, None).unwrap();
+        let retry = finalize(&synthetic_layout(), &image, &context, &intents, None).unwrap();
         assert_eq!(
             serde_json::to_vec(first.delta()).unwrap(),
             serde_json::to_vec(retry.delta()).unwrap(),
@@ -2655,6 +2688,7 @@ mod tests {
                 drafts,
                 dependencies: vec![(1, 0)],
             }],
+            None,
         )
         .unwrap();
 
@@ -2724,6 +2758,7 @@ mod tests {
             &[MutationIntent::CreateIssue {
                 draft: Box::new(draft),
             }],
+            None,
         )
         .unwrap();
         let expected_id = created_id();
@@ -2777,6 +2812,7 @@ mod tests {
             &[MutationIntent::DeleteIssue {
                 issue_id: issue.id.clone(),
             }],
+            None,
         )
         .unwrap();
 
@@ -2824,6 +2860,7 @@ mod tests {
             &[MutationIntent::DeleteIssue {
                 issue_id: issue.id.clone(),
             }],
+            None,
         )
         .expect_err("duplicate deleted membership must prevent plan construction");
         assert!(error.to_string().contains("duplicate deleted issue id"));
@@ -2852,6 +2889,7 @@ mod tests {
             &[MutationIntent::UpdateIssue {
                 issue: Box::new(updated),
             }],
+            None,
         )
         .unwrap();
         let action = plan
@@ -2871,7 +2909,7 @@ mod tests {
 
     /// The finalizer's event-log action over `image`: its offset and bytes.
     fn event_append(image: &RepositoryImage, intents: &[MutationIntent]) -> (u64, Vec<u8>) {
-        let plan = finalize(&synthetic_layout(), image, &ctx(), intents).unwrap();
+        let plan = finalize(&synthetic_layout(), image, &ctx(), intents, None).unwrap();
         plan.delta()
             .actions()
             .iter()

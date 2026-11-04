@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "7af823110ad2fee8cb7aee2d8cb30334fe07d181",
+  "completed_at": "2026-11-04T08:13:43.922328568Z",
+  "duration_ms": 140181,
+  "evaluation_stability": "stable",
+  "exit_code": 75,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "c6ed321aac525764843b61689da198260bdeff6f74efd852054f11c2944c1313",
+  "issue_id": "09ca911e-0518-4545-b516-b13cdbfd6834",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "acf12c3d-58e4-49c5-9fc6-3c1ae5659918",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T08:11:23.740628165Z",
+  "status": "error",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 42033 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 42033 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 61198 ms, warmed 18 executables (2115850912 bytes) in 620 ms.\n  ✓ fmt: ok (1831 ms)\n  ✓ clippy: ok (34133 ms)\n  ✓ suite-build: built in 61198 ms, warmed 18 executables (2115850912 bytes) in 620 ms (61827 ms)\n  ✓ test: 4932 passed, 0 failed, 0 skipped (38843 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (3171 ms)\n  ✓ suite-clock: 42033 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (99 ms)\n\ncargo-ci: infrastructure fault (exit 75): failing steps (budget) are environment-sensitive; baseline load1=6.31 >= threshold 4.08 (0.17 x 24 CPUs); rerun when the host is quiet\n"
+}

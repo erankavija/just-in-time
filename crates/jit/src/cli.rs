@@ -162,9 +162,10 @@ pub struct ValidateArgs {
     pub explain: bool,
 
     /// Validate a container's bracket subtree as a deterministic gate
-    /// checker: evaluate the rules whose selector matches each issue in the
-    /// container's transitive dependency closure (including the
-    /// `type:breakdown` node, bounded there), excluding whole-repo rules.
+    /// checker: report the findings, from rules evaluated over the whole
+    /// repository, of the issues in the container's transitive dependency
+    /// closure (bounded at the template's breakdown node), excluding
+    /// whole-repo rules.
     /// Exits 4 with findings shown when an enforcing rule fails, 0 when
     /// clean. Mutually exclusive with a positional id and with
     /// `--fix`/`--branch-drift`/`--leases`/`--explain`.

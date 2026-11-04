@@ -8,9 +8,11 @@
 //! long after `jit init` baked the registry schema, and the first `enforces:`
 //! label failed `namespace-registry` against the frozen file.
 
+use jit::domain::identity::IssueIdPrefix;
 use jit::domain::{ContentFormat, Issue, Priority};
 use jit::test_utils::{file_executor, setup_test_repo_with_config};
 use jit::validation::evaluate_local;
+use jit::validation::report::Selection;
 use std::fs;
 
 /// A freshly initialised repo whose `config.toml` declares a single `type` namespace.
@@ -122,9 +124,8 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
         "precondition: baked registry projection is stale: {baked}"
     );
 
-    // Store a real issue carrying the label and run it through the same rule
-    // path `jit validate <id>` uses (`run_rules`), on a FRESH executor so the
-    // config cache reflects the hand edit — REQ-04's literal scenario.
+    // Store a real issue carrying the label and select it as `jit validate <id>`
+    // does, on a FRESH executor — REQ-04's literal scenario.
     let issue = issue_with_label("enforces:gate-semantics");
     let exec = file_executor(temp.path()).unwrap();
     let id = exec
@@ -142,7 +143,12 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
         .unwrap()
         .issue
         .id;
-    let report = exec.validation().run_rules(Some(&id)).unwrap();
+    let report = exec
+        .validation()
+        .selection_report()
+        .unwrap()
+        .select(&Selection::Issue(IssueIdPrefix::from(&id)))
+        .unwrap();
     assert!(
         !report.has_errors(),
         "`jit validate` must pass for a hand-declared namespace with no \

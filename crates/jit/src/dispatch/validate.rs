@@ -1,13 +1,14 @@
 //! `jit validate` handlers.
 
-use super::{resolve_issue, CommandContext, Outcome};
+use super::{CommandContext, Outcome};
 use crate::cli::ValidateArgs;
+use crate::domain::identity::IssueIdPrefix;
 use crate::output::{
     ErrorCode, RepositoryValidationResponse, ValidateResponse, ValidationCheck,
-    ValidationChecksResponse, ValidationFixResponse, ValidationWarning,
+    ValidationChecksResponse, ValidationFixSummary, ValidationWarning,
 };
 use crate::storage::{IssueStore, RepositoryStateStore};
-use crate::validation::report::RuleReport;
+use crate::validation::report::{RuleReport, RuleSelectionFault, Selection};
 
 fn validate<S: IssueStore + RepositoryStateStore>(
     ctx: &CommandContext<'_, S>,
@@ -66,22 +67,27 @@ fn validate<S: IssueStore + RepositoryStateStore>(
         );
     }
 
-    let id = id
-        .as_deref()
-        .map(|requested| resolve_issue(ctx.executor.storage(), requested))
-        .transpose()?;
+    let id = id.map(|id| id.parse::<IssueIdPrefix>()).transpose()?;
 
     if let Some(container) = scope {
-        let container = resolve_issue(ctx.executor.storage(), &container)?;
-        let report = ctx.executor.validation().validate_scope(&container)?;
-        return Ok(validation_findings(report, ValidationMode::Scope));
-    }
-
-    if let (Some(rule_name), Some(issue_id)) = (rule.as_deref(), id.as_ref()) {
         let report = ctx
             .executor
             .validation()
-            .validate_rule(issue_id, rule_name)?;
+            .selection_report()?
+            .select(&Selection::Scope(container.parse()?))?;
+        return Ok(validation_findings(report, ValidationMode::Scope));
+    }
+
+    if let (Some(rule), Some(issue)) = (rule, id.clone()) {
+        let report = match ctx
+            .executor
+            .validation()
+            .selection_report()?
+            .select(&Selection::Rule { issue, rule })
+        {
+            Ok(report) => report,
+            Err(error) => error.downcast::<RuleSelectionFault>()?.into_report(),
+        };
         return Ok(validation_findings(report, ValidationMode::Rule));
     }
 
@@ -90,7 +96,11 @@ fn validate<S: IssueStore + RepositoryStateStore>(
     }
 
     if let (true, Some(issue_id)) = (explain, id.as_ref()) {
-        let response = ctx.executor.validation().explain_rules(issue_id)?;
+        let response = ctx
+            .executor
+            .validation()
+            .selection_report()?
+            .explain(issue_id)?;
         let outcome = if response.has_errors() {
             Outcome::findings(
                 ErrorCode::ValidationFailed,
@@ -103,8 +113,12 @@ fn validate<S: IssueStore + RepositoryStateStore>(
         return Ok(outcome);
     }
 
-    if let Some(issue_id) = id.as_ref() {
-        let report = ctx.executor.validation().run_rules(Some(issue_id))?;
+    if let Some(issue_id) = id {
+        let report = ctx
+            .executor
+            .validation()
+            .selection_report()?
+            .select(&Selection::Issue(issue_id))?;
         return Ok(validation_findings(report, ValidationMode::Issue));
     }
 
@@ -160,17 +174,22 @@ fn validate<S: IssueStore + RepositoryStateStore>(
         });
     }
 
-    if fix {
-        let (fixes_applied, messages) =
-            ctx.executor.validation().validate_with_fix(true, dry_run)?;
-        let response = ValidationFixResponse::new(fixes_applied, dry_run, messages);
-        return Ok(Outcome::success(ValidateResponse::Fix(response)));
-    }
-
-    let (validation_report, divergence_report) = ctx
-        .executor
-        .validation()
-        .validate_repository_report_with_divergences()?;
+    let (fix, validation_report, divergence_report) = if fix {
+        let (fixes_applied, fix_messages, report, divergences) =
+            ctx.executor.validation().validate_with_fix(dry_run)?;
+        let summary = ValidationFixSummary {
+            fixes_applied,
+            fix_messages,
+            dry_run,
+        };
+        (Some(summary), report, divergences)
+    } else {
+        let (report, divergences) = ctx
+            .executor
+            .validation()
+            .validate_repository_report_with_divergences()?;
+        (None, report, divergences)
+    };
     let (structural_failure, rule_report) = validation_report.into_parts();
     let integrity_error = structural_failure.map(|error| format!("Invalid repository: {error:#}"));
     let rules_failed = rule_report.has_errors();
@@ -216,6 +235,7 @@ fn validate<S: IssueStore + RepositoryStateStore>(
         rule_findings: rule_report.findings,
         error_count,
         message: message.clone(),
+        fix,
     };
 
     Ok(if validation_failed {
@@ -280,7 +300,6 @@ command_group! {
                 RuleReport,
                 crate::validation::report::ExplainReport,
                 ValidationChecksResponse,
-                ValidationFixResponse,
                 RepositoryValidationResponse,
             ] "The validation report for the selected mode",
     }

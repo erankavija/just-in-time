@@ -1,0 +1,29 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/004d10b7-documentation-contract-followups",
+      "planned_deletions": [],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "ebe53911edd83271925193eb47080015f186e918969b131a2f0ad09347323f97"
+          },
+          "destination": "dev/archive/004d10b7-documentation-contract-followups/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "id": "004d10b7-13d7-4a35-9467-f9572a373b27",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "004d10b7-13d7-4a35-9467-f9572a373b27",
+    "kind": "container"
+  }
+}

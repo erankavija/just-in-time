@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6c94d48c4cd657b6f2e7f2e52953445d6bad57e2",
+  "completed_at": "2026-11-04T08:27:32.189007187Z",
+  "duration_ms": 265480,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 5473,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "The exit-status comment narrates that a prior finding is fixed rather than documenting a code contract."
+      }
+    ],
+    "summary": "All hard issue criteria are met; one isolated advisory comment includes review-history prose.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1f24e3e9-43bb-44da-aa8c-b4b90d157e94",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c566d40e-49d9-4506-837a-7d403e7f2fe0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T08:23:06.708351131Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:1f24e3e9 commits 5b26ce94f, 588b8f7b3, d2bbac0a5\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/9876a23a/requirement/REQ-14 (issue Markdown); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T08:20:59Z); prior code-review failure’s suite-duration finding is superseded by that newer pass\nTruncation recovery: narrowed reads by tagged commit, affected path, patch section, and current-file line range\n\n1. F1 — advisory / issue-impact: [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:5473) says “finding #1 is fixed,” which narrates review history rather than documenting a code contract. Remove or generalize the isolated comment. References: @/invariant/essential-code-prose.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard issue criteria are met; one isolated advisory comment includes review-history prose.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The exit-status comment narrates that a prior finding is fixed rather than documenting a code contract.\",\"file\":\"crates/jit/src/main.rs\",\"line\":5473,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

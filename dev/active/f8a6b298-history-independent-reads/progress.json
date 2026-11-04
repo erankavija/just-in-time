@@ -430,7 +430,11 @@
     },
     {
       "item": "format-4 window bracket.sh denied by permission check",
-      "status": "user approved cutover in 52 session; bracket pending green rebuild"
+      "status": "resolved: user approved; window run 10:40 in 52 session"
+    },
+    {
+      "item": "ac8f07c2 REQ-01 says each per-key record (incl. leases) is written in a redo record; lease-record-layout commits by rename/unlink. Recommend (a) restrict to repository records + epic Constraints qualifier",
+      "status": "resolved: steward (a), DEC-25, ac8f07c2 D-1"
     }
   ],
   "rework_counts": {
@@ -440,7 +444,9 @@
     "2117739f": 1,
     "2f563673": 1,
     "0851fae4": 1,
-    "944edb32": 2
+    "944edb32": 2,
+    "09ca911e": 1,
+    "f0a5b90a": 1
   },
   "surfaced_pitfalls": [
     {
@@ -724,11 +730,49 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "lease interruption matrix; concurrency-critical"
+    },
+    {
+      "id": "4466395d",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "test-only, fully specified criteria"
+    },
+    {
+      "id": "09ca911e-r1",
+      "vendor": "lead",
+      "reason": "doc-review 11855055 F1 F2: drop two internal reader claims in reference.rs prose, regenerate"
+    },
+    {
+      "id": "f0a5b90a",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "multi-page operator docs derived from current lease code"
+    },
+    {
+      "id": "f0a5b90a-r1",
+      "vendor": "lead",
+      "reason": "doc-review 802cc1ad F1: drop bad-claims-index from validate failure modes"
+    },
+    {
+      "id": "ac8f07c2",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "storage-format and concepts docs derived from current code"
+    },
+    {
+      "id": "ac8f07c2-2",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "redispatch after REQ-01 amendment (DEC-25)"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
   "freeze": {
-    "format4_bump": "2117739f dispatched; installed jit stays last format-3 build until cutover window"
+    "format4_bump": "lifted pending 6a release; installed jit is format 4 (a05567fde)"
   },
   "notes": [
     "Dispatch runs ready issues ahead of a held wave 1 remainder, per the user's maximum-parallelism instruction relayed by just-in-time-6a; dependencies still order all work. 2117739f is held to shorten the format freeze.",
@@ -746,6 +790,8 @@
     "Window blocked 07:3x by Claude Code permission (Modify Shared Resources); awaiting user. 6a released writers; repeat stop sequence after user allows. Bracket script: scratchpad/f8a6-lead/bracket.sh; re-verify green sha before rerun.",
     "Session paused at usage limit 07:35; see handoff.md.",
     "Lead rotation 08:40: handing to just-in-time-52; see handoff-2.md.",
-    "08:40 lead rotation: just-in-time-52 took over from 3e (handoff-2 a36f603b6). User approved the format-4 cutover directly in 52 session. Order: land 7244ecb2, 725af076, 09ca911e; rebuild green at main HEAD; rerun five-repo dry run; 15-min warning to 6a; bracket."
+    "08:40 lead rotation: just-in-time-52 took over from 3e (handoff-2 a36f603b6). User approved the format-4 cutover directly in 52 session. Order: land 7244ecb2, 725af076, 09ca911e; rebuild green at main HEAD; rerun five-repo dry run; 15-min warning to 6a; bracket.",
+    "10:40 green a05567fde (cargo-ci pass, release binaries target/format4-green-a05567fde2c7). Dry run on five copies with it: all checks ok, rc 0. 15-min warning sent to 6a; bracket earliest 10:55, after ac8f07c2 land settles. Bracket: 52 scratchpad f8a6-lead/bracket.sh (8c script, green path updated).",
+    "10:40-10:42 format-4 window: installed a05567fde (rollback ~/.cache/jit-format4-rollback.8UsGmO); rewrites just-in-time ecdb2e473, gf2 321f632ac, mealie-fi f1572e900, inflected-messages 0652d60, research 7b7e9e9; all validate ok, claim list ok (3/2/0/0/0 leases); jit-server 3361204 -> 3274476, same args, health 200. Reported to 6a."
   ]
 }

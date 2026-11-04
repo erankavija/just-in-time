@@ -1,0 +1,245 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/c780514e-test-topology",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 430866,
+            "sha256": "6ea36bc539e642b1b7c7582151b001c11ebf51d16dde03bdfb604316237f10a5"
+          },
+          "source": "dev/active/c780514e-test-topology/breakdown.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 7487,
+            "sha256": "18a38e93adc5de14ce4eefd45578eb4fe912a9ceba9ffb5c0090c2c4aab453fc"
+          },
+          "source": "dev/active/c780514e-test-topology/completion-report.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 14195,
+            "sha256": "f66b53e5ecc877aef3cf80691f562749610214f1177cb71ee0d01f65eb95ac42"
+          },
+          "source": "dev/active/c780514e-test-topology/handoff-2.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 13577,
+            "sha256": "7257a7e2a624f749cd602e165d42f7d9489d20d39a283156140e1f1b4095fdc2"
+          },
+          "source": "dev/active/c780514e-test-topology/handoff.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 72678,
+            "sha256": "1e4e1b31222f0df5009892236529e73947bd7e73b6d8980b721434adb5a5046c"
+          },
+          "source": "dev/active/c780514e-test-topology/investigation.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 92509,
+            "sha256": "173a83c7f0c25c6684a522aa22741d8eb687f53765dcdd575210890d705354da"
+          },
+          "source": "dev/active/c780514e-test-topology/plan.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 112127,
+            "sha256": "6d9b992d2c6cc73fd181197d4f5f1c76ae2d5675bca3326423ae1ae0871908f6"
+          },
+          "source": "dev/active/c780514e-test-topology/progress.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 1837209,
+            "sha256": "24d79b253d4f482a8d0f15045d4f467e4c86efb33694e6c8da674eb98d33511a"
+          },
+          "source": "dev/benchmarks/suite-profile.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 9581,
+            "sha256": "bcb893ed4e94c6da3acb24d3bf89fa808aadf71f233fd36b78639fac5a3d75ca"
+          },
+          "source": "dev/benchmarks/test-topology-c780514e/README.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 23907,
+            "sha256": "7a14595684adb5883094e5acd5fac8455ac08d47392d1437f22f06a80b9f621b"
+          },
+          "source": "dev/benchmarks/test-topology-c780514e/measurement-log-c780514e.txt"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 430866,
+            "sha256": "6ea36bc539e642b1b7c7582151b001c11ebf51d16dde03bdfb604316237f10a5"
+          },
+          "destination": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/breakdown.json",
+          "source": "dev/active/c780514e-test-topology/breakdown.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 7487,
+            "sha256": "18a38e93adc5de14ce4eefd45578eb4fe912a9ceba9ffb5c0090c2c4aab453fc"
+          },
+          "destination": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/completion-report.md",
+          "source": "dev/active/c780514e-test-topology/completion-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 14195,
+            "sha256": "f66b53e5ecc877aef3cf80691f562749610214f1177cb71ee0d01f65eb95ac42"
+          },
+          "destination": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/handoff-2.md",
+          "source": "dev/active/c780514e-test-topology/handoff-2.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 13577,
+            "sha256": "7257a7e2a624f749cd602e165d42f7d9489d20d39a283156140e1f1b4095fdc2"
+          },
+          "destination": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/handoff.md",
+          "source": "dev/active/c780514e-test-topology/handoff.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 72678,
+            "sha256": "1e4e1b31222f0df5009892236529e73947bd7e73b6d8980b721434adb5a5046c"
+          },
+          "destination": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/investigation.md",
+          "source": "dev/active/c780514e-test-topology/investigation.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 92509,
+            "sha256": "173a83c7f0c25c6684a522aa22741d8eb687f53765dcdd575210890d705354da"
+          },
+          "destination": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/plan.md",
+          "source": "dev/active/c780514e-test-topology/plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 112127,
+            "sha256": "6d9b992d2c6cc73fd181197d4f5f1c76ae2d5675bca3326423ae1ae0871908f6"
+          },
+          "destination": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/progress.json",
+          "source": "dev/active/c780514e-test-topology/progress.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 1837209,
+            "sha256": "24d79b253d4f482a8d0f15045d4f467e4c86efb33694e6c8da674eb98d33511a"
+          },
+          "destination": "dev/archive/c780514e-test-topology/benchmarks/suite-profile.json",
+          "source": "dev/benchmarks/suite-profile.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 9581,
+            "sha256": "bcb893ed4e94c6da3acb24d3bf89fa808aadf71f233fd36b78639fac5a3d75ca"
+          },
+          "destination": "dev/archive/c780514e-test-topology/benchmarks/test-topology-c780514e/README.md",
+          "source": "dev/benchmarks/test-topology-c780514e/README.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 23907,
+            "sha256": "7a14595684adb5883094e5acd5fac8455ac08d47392d1437f22f06a80b9f621b"
+          },
+          "destination": "dev/archive/c780514e-test-topology/benchmarks/test-topology-c780514e/measurement-log-c780514e.txt",
+          "source": "dev/benchmarks/test-topology-c780514e/measurement-log-c780514e.txt"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "a961ca530da9f9858b79a467e9d23135cb0975d04129f415a5b2807418b02d30"
+          },
+          "destination": "dev/archive/c780514e-test-topology/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/c780514e-test-topology/investigation.md",
+          "issue": "7c885165-89de-45a0-a867-e621c96867d1",
+          "to_path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/c780514e-test-topology/plan.md",
+          "issue": "7c885165-89de-45a0-a867-e621c96867d1",
+          "to_path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/plan.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/c780514e-test-topology/breakdown.json",
+          "issue": "7c885165-89de-45a0-a867-e621c96867d1",
+          "to_path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/breakdown.json"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/benchmarks/test-topology-c780514e/README.md",
+          "issue": "871df4b0-6d6d-4408-8054-a574cb9eafe9",
+          "to_path": "dev/archive/c780514e-test-topology/benchmarks/test-topology-c780514e/README.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/c780514e-test-topology/progress.json",
+          "issue": "c780514e-8491-40a7-8844-3974bba91257",
+          "to_path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/progress.json"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/benchmarks/test-topology-c780514e/README.md",
+          "issue": "c780514e-8491-40a7-8844-3974bba91257",
+          "to_path": "dev/archive/c780514e-test-topology/benchmarks/test-topology-c780514e/README.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/c780514e-test-topology/handoff.md",
+          "issue": "c780514e-8491-40a7-8844-3974bba91257",
+          "to_path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/handoff.md"
+        },
+        {
+          "document_index": 3,
+          "from_path": "dev/active/c780514e-test-topology/handoff-2.md",
+          "issue": "c780514e-8491-40a7-8844-3974bba91257",
+          "to_path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/handoff-2.md"
+        },
+        {
+          "document_index": 4,
+          "from_path": "dev/active/c780514e-test-topology/completion-report.md",
+          "issue": "c780514e-8491-40a7-8844-3974bba91257",
+          "to_path": "dev/archive/c780514e-test-topology/active/c780514e-test-topology/completion-report.md"
+        }
+      ],
+      "target": {
+        "id": "c780514e-8491-40a7-8844-3974bba91257",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "c780514e-8491-40a7-8844-3974bba91257",
+    "kind": "container"
+  }
+}

@@ -16,7 +16,6 @@ pub enum ValidateResponse {
     Issue(RuleReport),
     Explanation(ExplainReport),
     Checks(ValidationChecksResponse),
-    Fix(ValidationFixResponse),
     Repository(RepositoryValidationResponse),
 }
 
@@ -34,7 +33,6 @@ impl HumanRender for ValidateResponse {
             }
             Self::Explanation(report) => report.render_human(mode),
             Self::Checks(response) => response.render_human(mode),
-            Self::Fix(response) => response.render_human(mode),
             Self::Repository(response) => response.render_human(mode),
         }
     }
@@ -166,40 +164,12 @@ impl HumanRender for ValidationChecksResponse {
     }
 }
 
+/// What `--fix` did before the repository was validated.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct ValidationFixResponse {
-    pub valid: bool,
+pub struct ValidationFixSummary {
     pub fixes_applied: usize,
+    pub fix_messages: Vec<String>,
     pub dry_run: bool,
-    pub message: String,
-    #[serde(skip)]
-    #[schemars(skip)]
-    messages: Vec<String>,
-}
-
-impl ValidationFixResponse {
-    pub fn new(fixes_applied: usize, dry_run: bool, messages: Vec<String>) -> Self {
-        Self {
-            valid: true,
-            fixes_applied,
-            dry_run,
-            message: if dry_run {
-                format!("{fixes_applied} fixes would be applied")
-            } else if fixes_applied > 0 {
-                format!("Applied {fixes_applied} fixes, repository is now valid")
-            } else {
-                "Repository is valid".to_owned()
-            },
-            messages,
-        }
-    }
-
-    fn human_text(&self) -> String {
-        self.messages
-            .iter()
-            .map(|message| format!("{message}\n"))
-            .collect()
-    }
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -223,11 +193,19 @@ pub struct RepositoryValidationResponse {
     pub rule_findings: Vec<crate::validation::report::ReportedFinding>,
     pub error_count: usize,
     pub message: String,
+    /// Present under `--fix`.
+    #[serde(flatten)]
+    pub fix: Option<ValidationFixSummary>,
 }
 
 impl RepositoryValidationResponse {
     fn human_text(&self) -> String {
-        let mut rendered = String::new();
+        let mut rendered: String = self
+            .fix
+            .iter()
+            .flat_map(|fix| &fix.fix_messages)
+            .map(|message| format!("{message}\n"))
+            .collect();
         if self.valid {
             rendered.push_str("Repository validation passed\n");
         } else {
@@ -256,12 +234,6 @@ impl RepositoryValidationResponse {
             );
         }
         rendered
-    }
-}
-
-impl HumanRender for ValidationFixResponse {
-    fn render_human(&self, _: OutputMode) -> String {
-        self.human_text()
     }
 }
 

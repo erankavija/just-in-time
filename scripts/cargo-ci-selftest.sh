@@ -538,6 +538,90 @@ EOF
   done
 }
 
+# A run owns its temporary directory: every Cargo process it starts, the wrapper
+# probe and the focused `--cargo` path included, sees a directory inside the
+# caller's TMPDIR, and a file a test leaves there is gone once the run ends,
+# whether the run passed or failed. A compiler-cache server a probe or a compile
+# starts keeps the caller's TMPDIR. The caller's TMPDIR is a directory this test
+# owns, so it also holds what the run leaves.
+test_run_removes_its_temporary_directory() {
+  local fixture="$scratch/tmpdir-owned" status
+  mkdir -p "$fixture/bin" "$fixture/repo"
+  cat >"$fixture/bin/cargo" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  --version) echo "$SELFTEST_CARGO_VERSION" ;;
+  "nextest --version") echo "cargo-nextest 0.9.133 (selftest fixture)" ;;
+  check*)
+    echo "probe $TMPDIR" >>"$SELFTEST_SEEN"
+    "$RUSTC_WRAPPER" rustc
+    ;;
+  focused)
+    echo "focused $TMPDIR" >>"$SELFTEST_SEEN"
+    : >"$TMPDIR/left-by-a-test"
+    exit 7
+    ;;
+  "nextest run --workspace")
+    echo "test $TMPDIR" >>"$SELFTEST_SEEN"
+    : >"$TMPDIR/left-by-a-test"
+    "$RUSTC_WRAPPER" rustc
+    echo "Summary [1s] 1 tests run: 1 passed, 0 skipped"
+    exit "$SELFTEST_SUITE_STATUS"
+    ;;
+  *) echo "test result: ok. 1 passed; 0 failed; 0 ignored" ;;
+esac
+EOF
+  cat >"$fixture/bin/sccache" <<'EOF'
+#!/usr/bin/env bash
+echo "$TMPDIR" >>"$SELFTEST_SERVER_TMPDIR"
+EOF
+  chmod +x "$fixture/bin/cargo" "$fixture/bin/sccache"
+  owned_run() { # owned_run <name> <caller> <suite status> <gate args...>; sets rc
+    local name="$1" caller="$2" suite_status="$3"
+    shift 3
+    mkdir -p "$caller"
+    (
+      cd "$fixture/repo" || exit 3
+      [ -z "$explicit_wrapper" ] || export RUSTC_WRAPPER="$explicit_wrapper"
+      PATH="$fixture/bin:$PATH" TMPDIR="$caller" \
+        SELFTEST_CARGO_VERSION="$real_cargo_version" \
+        SELFTEST_SEEN="$fixture/seen-$name" \
+        SELFTEST_SUITE_STATUS="$suite_status" \
+        SELFTEST_SERVER_TMPDIR="$fixture/server-$name" \
+        CARGO_CI_NO_LOCK=1 \
+        "$gate" "$@"
+    ) >"$fixture/out-$name" 2>&1
+    rc=$?
+  }
+  local rc caller explicit_wrapper=""
+  caller="$fixture/caller-explicit"
+  cp "$fixture/bin/sccache" "$fixture/bin/explicit-wrapper"
+  explicit_wrapper="$fixture/bin/explicit-wrapper"
+  owned_run explicit "$caller" 0 --suite
+  explicit_wrapper=""
+  check "explicit RUSTC_WRAPPER: the caller's wrapper starts with the caller's TMPDIR, in the probe and a compile" \
+    test "$(sort -u "$fixture/server-explicit")" = "$caller" -a "$(wc -l <"$fixture/server-explicit")" -ge 2
+  for status in 0 1; do
+    caller="$fixture/caller-$status"
+    owned_run "suite-$status" "$caller" "$status" --suite
+    check "run owning its TMPDIR (suite status $status): the wrapper probe sees a directory inside the caller's" \
+      grep -qF "probe $caller/" "$fixture/seen-suite-$status"
+    check "run owning its TMPDIR (suite status $status): the tests see a directory inside the caller's" \
+      grep -qF "test $caller/" "$fixture/seen-suite-$status"
+    check "run owning its TMPDIR (suite status $status): a compiler-cache server started by the probe or a compile keeps the caller's" \
+      test "$(sort -u "$fixture/server-suite-$status")" = "$caller" -a "$(wc -l <"$fixture/server-suite-$status")" -ge 2
+    check "run owning its TMPDIR (suite status $status): a file a test left is gone and nothing else remains" \
+      test -z "$(ls -A "$caller")"
+  done
+
+  caller="$fixture/caller-focused"
+  owned_run focused "$caller" 0 --cargo focused
+  check "focused --cargo: Cargo sees a directory inside the caller's" \
+    grep -qF "focused $caller/" "$fixture/seen-focused"
+  check "focused --cargo: the run exits with Cargo's status" test "$rc" -eq 7
+  check "focused --cargo: nothing remains in the caller's TMPDIR" test -z "$(ls -A "$caller")"
+}
+
 # --- fixture construction ----------------------------------------------------
 
 # Base commit of a throwaway crate: dependency-free, two independent modules.
@@ -1071,6 +1155,7 @@ run_test test_classifier_enospc_exit_paths
 run_test test_build_lock_status_propagation
 run_test test_script_build_lock_wait
 run_test test_unrunnable_compiler_wrapper
+run_test test_run_removes_its_temporary_directory
 
 run_test run_scenario healthy "healthy_mainline" "healthy_worker" pass
 run_test run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail

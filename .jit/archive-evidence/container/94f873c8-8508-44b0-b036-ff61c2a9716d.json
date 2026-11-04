@@ -1,0 +1,155 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/94f873c8-docs-lifecycle-p2",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 9205,
+            "sha256": "0b0a1ee813b02f929db8d4f860a767141de35efbd14595d9bdaeea42a435f4ba"
+          },
+          "source": "dev/active/5c060496-raw-assets-design.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 5651,
+            "sha256": "3baf0b0a4a917f88404fde29c40c21a2cc4c28acf4159fb379af8e6f062b4d3f"
+          },
+          "source": "dev/active/abfd6016-multi-format-doc-rendering-design.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 17374,
+            "sha256": "570f6b94867c617e103617cd03da332328ae0b79e2532d1f4c245ccef917711b"
+          },
+          "source": "dev/active/documentation-lifecycle-phase2-design.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 9205,
+            "sha256": "0b0a1ee813b02f929db8d4f860a767141de35efbd14595d9bdaeea42a435f4ba"
+          },
+          "destination": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/5c060496-raw-assets-design.md",
+          "source": "dev/active/5c060496-raw-assets-design.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 5651,
+            "sha256": "3baf0b0a4a917f88404fde29c40c21a2cc4c28acf4159fb379af8e6f062b4d3f"
+          },
+          "destination": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/abfd6016-multi-format-doc-rendering-design.md",
+          "source": "dev/active/abfd6016-multi-format-doc-rendering-design.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 17374,
+            "sha256": "570f6b94867c617e103617cd03da332328ae0b79e2532d1f4c245ccef917711b"
+          },
+          "destination": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/documentation-lifecycle-phase2-design.md",
+          "source": "dev/active/documentation-lifecycle-phase2-design.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "ae35a8fdc215a02098fa9820f9c54f59b96cec84ce17862fb59e79fa4be14855"
+          },
+          "destination": "dev/archive/94f873c8-docs-lifecycle-p2/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/5c060496-raw-assets-design.md",
+          "issue": "5c060496-f33e-4a70-9414-ec9436b84b1e",
+          "to_path": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/5c060496-raw-assets-design.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/documentation-lifecycle-phase2-design.md",
+          "issue": "94f873c8-8508-44b0-b036-ff61c2a9716d",
+          "to_path": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/documentation-lifecycle-phase2-design.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/abfd6016-multi-format-doc-rendering-design.md",
+          "issue": "abfd6016-a79d-4a5c-9d1d-d5393e7acb2d",
+          "to_path": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/abfd6016-multi-format-doc-rendering-design.md"
+        }
+      ],
+      "target": {
+        "id": "94f873c8-8508-44b0-b036-ff61c2a9716d",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/94f873c8-docs-lifecycle-p2",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 531,
+            "sha256": "46f23b8e27daf41ae6b57959bde637647ca3560c61c5776b4a961cdb9b838e1b"
+          },
+          "source": "dev/active/94f873c8-8508-44b0-b036-ff61c2a9716d-plan.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 2715,
+            "sha256": "92d7d6277087f8a93bf4be897bbf5883b312e68de69ffa3e06be05b175ffb4f2"
+          },
+          "source": "dev/active/abfd6016-progress.json"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 531,
+            "sha256": "46f23b8e27daf41ae6b57959bde637647ca3560c61c5776b4a961cdb9b838e1b"
+          },
+          "destination": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/94f873c8-8508-44b0-b036-ff61c2a9716d-plan.md",
+          "source": "dev/active/94f873c8-8508-44b0-b036-ff61c2a9716d-plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 2715,
+            "sha256": "92d7d6277087f8a93bf4be897bbf5883b312e68de69ffa3e06be05b175ffb4f2"
+          },
+          "destination": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/abfd6016-progress.json",
+          "source": "dev/active/abfd6016-progress.json"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 1,
+          "from_path": "dev/active/94f873c8-8508-44b0-b036-ff61c2a9716d-plan.md",
+          "issue": "94f873c8-8508-44b0-b036-ff61c2a9716d",
+          "to_path": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/94f873c8-8508-44b0-b036-ff61c2a9716d-plan.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/abfd6016-progress.json",
+          "issue": "abfd6016-a79d-4a5c-9d1d-d5393e7acb2d",
+          "to_path": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/abfd6016-progress.json"
+        }
+      ],
+      "target": {
+        "id": "94f873c8-8508-44b0-b036-ff61c2a9716d",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "94f873c8-8508-44b0-b036-ff61c2a9716d",
+    "kind": "container"
+  }
+}

@@ -462,7 +462,12 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
     assert_eq!(c1_new.dependencies.len(), 0);
 
     // The recreated repository passes whole-repo validation.
-    let report = fresh.executor.validation().run_rules(None).unwrap();
+    let report = fresh
+        .executor
+        .validation()
+        .validate_repository_report()
+        .unwrap()
+        .rule_report();
     assert!(
         !report.has_errors(),
         "fresh repo failed validation: {:?}",

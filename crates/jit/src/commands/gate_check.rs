@@ -1065,7 +1065,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                     event: Box::new(event),
                 },
             ];
-            let plan = finalize(&layout, &final_image, &mutation, &intents)?;
+            let plan = finalize(&layout, &final_image, &mutation, &intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -3282,7 +3282,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let late_rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
-        let cached = executor.validation().run_rules(None).unwrap();
+        let cached = executor
+            .validation()
+            .validate_repository_report()
+            .unwrap()
+            .rule_report();
         assert!(!cached
             .findings
             .iter()
@@ -3721,8 +3725,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         let broad_report = executor
             .validation()
-            .run_rules(None)
-            .expect("the representative unrelated failures should be observable");
+            .validate_repository_report()
+            .expect("the representative unrelated failures should be observable")
+            .rule_report();
         for rule in [
             "unrelated-local-failure",
             "unrelated-graph-failure",

@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T07:02:35.730208099Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -8,12 +8,26 @@
   ],
   "description": "Make `jit validate --fix` derive every fix from one captured validation, publish them in one mutation, and always render the one report computed over the fixed repository.\n\n## Background\n\n- `validate_with_fix` (`crates/jit/src/commands/validate.rs:68-131`) first runs a full validation (`:70`) whose result it uses only when it applied no fix (`:101-107`): since 8ffd504de a zero-fix `--fix` over an invalid repository fails with that report's errors. It then publishes each hierarchy type fix (`detect_and_fix_hierarchy_issues` `:1203-1280`, `apply_type_fix` `:1282-1299`, reading the hierarchy and issue list from disk), the transitive reduction (`fix_all_transitive_reductions` `:2113-2118` over `reduce_all_dependencies`, `commands/dependency.rs:226`, already one mutation), each readiness correction in up to ten passes (`check_pending_transitions` `validate.rs:2140-2200`, one lifecycle mutation per correction through `auto_transition_to_ready` and `auto_transition_to_backlog`, `commands/issue.rs:843,858`) and the derived-state repair (`repair_derived_state`, `validate.rs:597-648`, one mutation). After applying fixes it re-runs `validate_silent` (`:119`), which yields only pass or an error message.\n- The `--fix` branch of the `Commands::Validate` arm (`crates/jit/src/main.rs:6126-6169`) prints the fix messages in human mode and `{valid, fixes_applied, dry_run, message}` in JSON; neither renders the findings of a report.\n- `auto_transition_to_backlog` has no other caller; `auto_transition_to_ready` is also called at `commands/issue.rs:888`.\n- Pure derivations exist: `generate_fixes` over `detect_validation_issues` (`crates/jit/src/domain/type_taxonomy.rs:280,425`), `derive_dependency_repair` (`commands/dependency.rs:839`, private), `Issue::derive_readiness_correction` (`domain/types.rs:609`), and `derive_materialization` for derived state. `finalize` (`crates/jit/src/repository_state/mutation.rs:648`) turns issue intents into a plan, and `RepositoryDelta::new` (`repository_state/image.rs:1372-1389`) accepts concatenated actions and refuses duplicate targets.\n- `test_apply_type_fix_preserves_concurrent_type_correction` (`commands/validate.rs:2808`) shows that a type correction saved between capture and apply survives. `jit recover` calls `repair_derived_state` (`commands/claim.rs:715`) and keeps doing so.\n\nKept as one change for a build reason: the fix return value and its renderer compile only together.\n\n## Success Criteria\n\n- [hard] REQ-01: `--fix` computes no report before deriving its fixes. It derives the hierarchy, reduction, readiness and derived-state fixes from one validation capture's parsed records, decoding no issue record or index again, folding the issue edits per issue, and publishes them all through one mutation; `--dry-run` derives the same plan and publishes nothing; when the captured records do not parse, no fix is derived and the post-fix report carries the structural failure.\n- [hard] REQ-02: Readiness corrections apply `Issue::derive_readiness_correction` to the projected issue set until none remains, and no other readiness derivation is introduced; `detect_and_fix_hierarchy_issues`, `apply_type_fix`, `check_pending_transitions` and `auto_transition_to_backlog` no longer exist.\n- [hard] REQ-03: `--fix` always computes one report over the repository as the fixes leave it, including when it applied none, and renders it as plain `jit validate` does, with the fix count and messages; its exit status follows that report. A harness test shows one publication carrying fixes of every class, and a CLI test over a repository with a finding no fix repairs shows the post-fix report's findings in the human output and in `--fix --json`; the JSON assertion fails on today's code, whose `--fix` JSON carries no structured findings (its error envelope holds a message string, `crates/jit/src/output/failure.rs:656-658`).\n- [hard] REQ-04: A harness test replaces `test_apply_type_fix_preserves_concurrent_type_correction`: a type correction saved between capture and publish survives the composed fix, which re-derives over the new state. The listed fix suites pass with their assertions on repository state unchanged.\n\n## Notes\n\n- Behaviour and output change: `--fix` renders the post-fix report's findings, `--fix --json` carries the post-fix report fields, and its exit status follows that report.\n- A later pure readiness derivation that every mutation shares will replace the fixpoint loop in this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T08:28:06.664746722Z",
   "first_ready_at": "2026-11-04T05:16:37.135832063Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3a6ab439-f071-40d6-b023-284271f666f4",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:22:38.595749754Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c566d40e-49d9-4506-837a-7d403e7f2fe0",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:27:32.489024765Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1f24e3e9-43bb-44da-aa8c-b4b90d157e94",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:9876a23a/REQ-14"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "One mutation and one post-fix report for validate --fix",
-  "updated_at": "2026-11-04T07:02:35.730208099Z"
+  "updated_at": "2026-11-04T08:28:06.664746722Z"
 }

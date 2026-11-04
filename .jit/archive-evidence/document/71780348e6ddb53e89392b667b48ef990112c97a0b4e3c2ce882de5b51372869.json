@@ -1,0 +1,37 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 8962,
+            "sha256": "04975691078a0910e8278ef6baa07bf43cdce220bed84641b463fe7647dbb88f"
+          },
+          "source": "dev/active/2195c98f-semantic-types/handoff-3.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 8962,
+            "sha256": "04975691078a0910e8278ef6baa07bf43cdce220bed84641b463fe7647dbb88f"
+          },
+          "destination": "dev/archive/active/2195c98f-semantic-types/handoff-3.md",
+          "source": "dev/active/2195c98f-semantic-types/handoff-3.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "kind": "document",
+        "path": "dev/active/2195c98f-semantic-types/handoff-3.md"
+      }
+    }
+  ],
+  "target": {
+    "kind": "document",
+    "path": "dev/active/2195c98f-semantic-types/handoff-3.md"
+  }
+}
