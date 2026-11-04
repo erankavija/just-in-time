@@ -15,7 +15,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6c7b502c-558b-4c38-852b-69f73747da89",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:08:31.862285294Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "728ecfb0-ac90-480c-9122-c34cf5187031",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "One property test owns the selection contract",
-  "updated_at": "2026-11-04T07:58:10.249110334Z"
+  "updated_at": "2026-11-04T08:08:31.862285294Z"
 }

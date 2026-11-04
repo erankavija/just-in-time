@@ -19,6 +19,12 @@
       "status": "failed",
       "updated_at": "2026-11-04T08:05:51.301792727Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "fad1c1ee-d30b-4fa5-8ffa-9f2c5849b961",
+      "status": "failed",
+      "updated_at": "2026-11-04T08:10:34.748702835Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "1f24e3e9-43bb-44da-aa8c-b4b90d157e94",
@@ -35,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "One mutation and one post-fix report for validate --fix",
-  "updated_at": "2026-11-04T08:05:51.301792727Z"
+  "updated_at": "2026-11-04T08:10:34.748702835Z"
 }
