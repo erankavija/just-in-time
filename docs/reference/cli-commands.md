@@ -3481,8 +3481,8 @@ jit item search atomic
 jit item search "" --kind requirement
 ```
 
-A failing `jit item` command under `--json` returns the error envelope with code
-`ITEM_COMMAND_FAILED`.
+A failing `jit item` command under `--json` returns the error envelope with the
+[machine-readable error code](error-codes.md) assigned by the shared classifier.
 
 ## Documentation Projection Commands
 
