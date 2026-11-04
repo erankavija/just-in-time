@@ -9,12 +9,10 @@
 
 use super::*;
 use crate::config::SourceOfTruth;
-use crate::domain::identity::IssueIdPrefix;
-use crate::domain::item::AddressScope;
 use crate::domain::item::{
-    expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
-    load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, resolve_kind_alias,
-    AddressableItem, ItemError, ItemKind, ProjectSource, Scope, PROJECT_SCOPE_SENTINEL,
+    index_items, index_project_sources, is_qualified_reference, load_toml_scope_items,
+    parse_kind_segmented_address, resolve_item_kinds, resolve_kind_alias, resolve_sugar_address,
+    AddressableItem, IssueItemAddress, ItemKind, ProjectSource, Scope, PROJECT_SCOPE_SENTINEL,
 };
 use crate::errors::ItemNotFoundError;
 
@@ -44,28 +42,14 @@ pub struct ItemShowResult {
     pub issue_title: Option<String>,
 }
 
-/// An item address classified into the scope + kind + self-id `show_item` resolves
-/// against, after applying the sugar-expansion and kind-segmented grammars.
-///
-/// A project-scope address always names its kind explicitly (`@/<kind>/<self-id>`),
-/// so [`ResolvedItemAddress::Project`] carries a concrete `kind`. An issue-scope
-/// address's `kind` is `Some` for an explicit `@/issue/<short-id>/<kind>/<self-id>`
-/// or an unambiguously-inferred sugar, and `None` only when a sugar's self-id shape
-/// is pattern-ambiguous or matches no kind (deferring to actual-item matching, per
-/// amendment D3-A).
+/// An address classified for project or issue item lookup.
 enum ResolvedItemAddress {
     /// A project-scope address `@/<kind>/<self-id>` of an explicit kind.
-    Project { kind: String, self_id: String },
-    /// An issue-scope address: an explicit `@/issue/<short-id>/<kind>/<self-id>`
-    /// (kind `Some`), or the `<short-id>/<self-id>` sugar whose kind is `Some` when
-    /// the self-id's shape names exactly one issue-scoped kind and `None` when it is
-    /// pattern-ambiguous or matches no kind (deferring to actual-item matching,
-    /// which still errors on a genuine multi-item collision).
-    Issue {
-        issue_ref: IssueIdPrefix,
-        kind: Option<String>,
+    Project {
+        kind: String,
         self_id: String,
     },
+    Issue(IssueItemAddress),
 }
 
 /// Addressable-item operations of a [`CommandExecutor`].
@@ -322,13 +306,13 @@ impl<S: IssueStore> ItemOps<'_, S> {
     ///   [`AddressScope::bind_local`](crate::domain::item::AddressScope::bind_local):
     ///   it resolves identically to the bare-`@`
     ///   form when `<name>` is the repo's declared `[project] name`, and is an
-    ///   [`ItemError::NotResolvable`] error otherwise (no federation or remote
-    ///   lookup is attempted).
+    ///   [`ItemError::NotResolvable`](crate::domain::item::ItemError::NotResolvable)
+    ///   error otherwise (no federation or remote lookup is attempted).
     /// - `@/issue/<short-id>/<kind>/<self-id>` — an issue-scope item of an explicit
     ///   kind; the issue reference is resolved through the SAME issue-id resolver the
     ///   rest of the CLI uses (full id, short id, or unique prefix).
     /// - `<short-id>/<self-id>` — sugar for an issue-scope item whose kind is
-    ///   inferred from the self-id's shape ([`expand_sugar_address`]).
+    ///   inferred from the self-id's shape and actual items.
     ///
     /// Every minted qualified id (`@/<kind>/<self-id>` for project scope,
     /// `@/issue/<short-id>/<kind>/<self-id>` for issue scope) is itself an explicit
@@ -368,11 +352,11 @@ impl<S: IssueStore> ItemOps<'_, S> {
             }
             // Issue scope: resolve the issue, index its description, then filter by
             // kind AND self-id (REQ-01, REQ-02).
-            ResolvedItemAddress::Issue {
+            ResolvedItemAddress::Issue(IssueItemAddress {
                 issue_ref,
                 kind,
                 self_id,
-            } => {
+            }) => {
                 let full_id = self
                     .exec
                     .storage
@@ -450,44 +434,20 @@ impl<S: IssueStore> ItemOps<'_, S> {
     /// A non-`@` input is the `<short-id>/<self-id>` sugar, whose kind is inferred
     /// from the self-id's shape. An `@`-prefixed input is an explicit kind-segmented
     /// address; a malformed one (including a kindless `@/<self-id>`) is the parser's
-    /// own [`ItemError::InvalidAddress`], never a self-id-only match.
+    /// own [`ItemError::InvalidAddress`](crate::domain::item::ItemError::InvalidAddress),
+    /// never a self-id-only match.
     fn resolve_item_address(&self, qualified: &str) -> Result<ResolvedItemAddress> {
         // Sugar `<short-id>/<self-id>`: infer the kind from the self-id's shape
         // against the issue-scoped kinds (project-scoped kinds have no sugar form).
         if !qualified.starts_with(PROJECT_SCOPE_SENTINEL) {
-            let Some((issue_ref, self_id)) = qualified.split_once('/') else {
+            if !qualified.contains('/') {
                 return Err(anyhow!(
                     "'{qualified}' is not a qualified id; expected '<short-id>/<self-id>'"
                 ));
-            };
-            // A self-id whose shape names exactly one issue-scoped kind fixes the
-            // kind (resolution filters by kind AND self-id). A pattern-ambiguous or
-            // unmatched self-id leaves the kind open and defers to actual-item
-            // matching, which still errors on a genuine multi-item collision rather
-            // than silently picking one.
-            let kinds = self.item_kinds()?;
-            let (issue_ref, kind) = match expand_sugar_address(qualified, &kinds) {
-                Ok(addr) => {
-                    let AddressScope::Issue(issue_ref) = addr.scope else {
-                        return Err(anyhow!("sugar requires an issue scope"));
-                    };
-                    (issue_ref, Some(addr.kind))
-                }
-                Err(ItemError::SugarKindNotFound { .. } | ItemError::SugarKindAmbiguous { .. }) => {
-                    let Scope::Issue(issue_ref) = Scope::parse(issue_ref)? else {
-                        return Err(anyhow!("sugar requires an issue scope"));
-                    };
-                    (issue_ref, None)
-                }
-                Err(err) => {
-                    return Err(anyhow!("cannot resolve item address '{qualified}': {err}"))
-                }
-            };
-            return Ok(ResolvedItemAddress::Issue {
-                issue_ref,
-                kind,
-                self_id: self_id.to_string(),
-            });
+            }
+            return resolve_sugar_address(qualified, &self.item_kinds()?)
+                .map(ResolvedItemAddress::Issue)
+                .map_err(|err| anyhow!("cannot resolve item address '{qualified}': {err}"));
         }
 
         // An `@`-prefixed input is an explicit kind-segmented address. A malformed
@@ -523,11 +483,11 @@ impl<S: IssueStore> ItemOps<'_, S> {
                         kind,
                         self_id: addr.self_id,
                     }),
-                    Scope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue {
+                    Scope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue(IssueItemAddress {
                         issue_ref,
                         kind: Some(kind),
                         self_id: addr.self_id,
-                    }),
+                    })),
                 }
             }
             // A malformed `@`-address surfaces the parser's own InvalidAddress

@@ -18,6 +18,9 @@ enum BaseCapturePurpose<'a> {
     Archive,
 }
 
+/// A capture's parsed issues and, for validation, the JSON value each decoded from.
+type ParsedIssues = (Vec<Issue>, Vec<serde_json::Value>);
+
 struct CapturedRepairPlan {
     declarations: crate::repository_state::CapturedRepositoryDeclarations,
     plan: Option<crate::repository_state::MaterializationPlan>,
@@ -115,7 +118,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
 
     /// Validate the exact repository through the closed-image pipeline.
     ///
-    /// Declaration and rule passes share the repair image; document references
+    /// Declaration and rule passes share one validation capture; document references
     /// resolve in separate bounded images under the same session. Every pass
     /// reads captured evidence.
     pub fn validate_silent(&self) -> Result<()> {
@@ -234,7 +237,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             extra_paths,
             BaseCapturePurpose::Mutation { precheck_target },
         )
-        .map(|captured| captured.map(|(image, issues)| MutationBase { image, issues }))
+        .map(|captured| captured.map(|(image, (issues, _))| MutationBase { image, issues }))
     }
 
     /// Capture the resolved target and lease policy before taking the claims guard.
@@ -261,7 +264,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
         let issues = crate::repository_state::parse_issue_records(&candidates, |path| {
             image.file_bytes(path)
-        })?;
+        })?
+        .into_iter()
+        .map(|(issue, _)| issue)
+        .collect::<Vec<_>>();
         let target_id = super::require_issue_in_capture(&issues, issue_id)?;
         let target = issues
             .into_iter()
@@ -283,7 +289,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 precheck_target: Some(issue_id),
             },
         )?;
-        Ok(grown.map(|(image, issues)| MutationPreflight {
+        Ok(grown.map(|(image, (issues, _))| MutationPreflight {
             image,
             target,
             issues: Some(issues),
@@ -326,7 +332,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
         purpose: BaseCapturePurpose<'_>,
-    ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
+    ) -> Result<Option<(crate::repository_state::RepositoryImage, ParsedIssues)>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath,
         };
@@ -372,7 +378,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     None => super::image_virtual_bytes(image, path),
                 }
             };
-        let mut issues = None::<Vec<Issue>>;
+        let mut issues = None::<ParsedIssues>;
         let mut discover = |image: &RepositoryImage, spec: &mut CaptureSpec| -> Result<()> {
             base(spec)?;
             if spec != image.capture_spec() {
@@ -417,9 +423,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 // A mutation derives from exactly these issues, so they are
                 // parsed once, with the strict reader, and handed back with the
                 // image. Validation parses the overlaid set leniently and reports
-                // defects as findings.
-                let parsed = if mutation {
-                    super::captured_active_issues(image)?
+                // defects as findings; it keeps each record's JSON value for
+                // record fidelity.
+                let (parsed, values) = if mutation {
+                    (super::captured_active_issues(image)?, Vec::new())
                 } else {
                     // Effective bytes: the override (create/replace or proposed
                     // absence) when present, otherwise the captured base bytes.
@@ -430,6 +437,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                             None => image.file_bytes(path),
                         },
                     )?
+                    .into_iter()
+                    .unzip()
                 };
                 if matches!(
                     purpose,
@@ -444,7 +453,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                         precheck_target,
                     )?;
                 }
-                issues = Some(parsed);
+                issues = Some((parsed, values));
             }
             Ok(())
         };
@@ -488,37 +497,28 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
             &layout,
             "repository validation",
             |session| {
-                let Some(image) = self.capture_repair_base(session)? else {
+                let Some(captured) = self.capture_validation(session)? else {
                     return Ok(SessionStep::Retry);
                 };
-                let Some(image) = self.exec.capture_proposed_base(
-                    session,
-                    &std::collections::BTreeMap::new(),
-                    &[],
-                    Some(image),
-                )?
-                else {
-                    return Ok(SessionStep::Retry);
-                };
+                let issues = captured.issues.as_deref().unwrap_or_default();
                 let divergences =
-                    crate::repository_state::validation_declarations_from_image(&image)
+                    crate::repository_state::validation_declarations_from_image(&captured.image)
                         .map_err(anyhow::Error::from)
                         .and_then(|declarations| {
-                            captured_divergences(&image, declarations.config())
+                            captured_divergences(issues, declarations.config())
                         })
                         .unwrap_or_else(|_| crate::output::DivergenceResponse::new(Vec::new()));
-                let issues = captured_active_issues(&image).unwrap_or_default();
                 let Some(document_references) =
-                    capture_document_reference_validation(session, &issues)?
+                    capture_document_reference_validation(session, issues)?
                 else {
                     return Ok(SessionStep::Retry);
                 };
-                let Some(record_fidelity) = capture_record_fidelity_validation(session, &image)?
+                let Some(record_fidelity) = capture_record_fidelity_validation(session, &captured)?
                 else {
                     return Ok(SessionStep::Retry);
                 };
                 let report = crate::validation::report(
-                    &crate::validation::CapturedValidation::from_image(&image),
+                    &captured,
                     &crate::validation::ReportInputs {
                         now: chrono::Utc::now(),
                         history: Some(crate::validation::HistoryVerdicts {
@@ -596,6 +596,26 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         )
     }
 
+    /// Capture the whole-repository validation base with the issue records its
+    /// closure planning parsed.
+    fn capture_validation(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    ) -> Result<Option<crate::validation::CapturedValidation<'static>>> {
+        Ok(self
+            .exec
+            .capture_proposed_base_inner(
+                session,
+                None,
+                &std::collections::BTreeMap::new(),
+                &[],
+                BaseCapturePurpose::Validation,
+            )?
+            .map(|(image, (issues, values))| {
+                crate::validation::CapturedValidation::with_records(image, issues, values)
+            }))
+    }
+
     /// Capture the repository's own validation closure: its registries, its
     /// event log, and the paths they plan.
     fn capture_repair_base(
@@ -656,13 +676,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
 }
 
 fn captured_divergences(
-    image: &crate::repository_state::RepositoryImage,
+    issues: &[Issue],
     config: &JitConfig,
 ) -> Result<crate::output::DivergenceResponse> {
     use crate::domain::type_taxonomy::HierarchyConfig;
     use crate::output::{DivergenceResponse, DivergenceView};
 
-    let issues = captured_active_issues(image)?;
     let namespaces = crate::config_manager::namespaces_from_config(config);
     let hierarchy = HierarchyConfig::from_declarations(&namespaces)?;
     let issue_refs = issues.iter().collect::<Vec<_>>();
@@ -894,12 +913,11 @@ fn capture_document_reference_validation(
 }
 
 /// Capture every gate-run, verdict and archive-evidence record, read the whole
-/// event log, and judge the
-/// stored records against `image`. Whole-repository validation pays these
-/// reads; no other capture does.
+/// event log, and judge the stored records against `captured`.
+/// Whole-repository validation pays these reads; no other capture does.
 fn capture_record_fidelity_validation(
     session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-    image: &crate::repository_state::RepositoryImage,
+    captured: &crate::validation::CapturedValidation<'_>,
 ) -> Result<Option<std::result::Result<(), String>>> {
     let spec = crate::repository_state::CaptureSpec::new([], MUTATION_CAPTURE_BUDGET)?;
     let Some(records) = super::capture_discovering(session, spec, |image, spec| {
@@ -911,7 +929,7 @@ fn capture_record_fidelity_validation(
     };
     let events = session.read_history_log()?;
     let drift =
-        crate::validation::record_fidelity::record_drift(image, &records, events.as_deref())?;
+        crate::validation::record_fidelity::record_drift(captured, &records, events.as_deref())?;
     Ok(Some(match drift.is_empty() {
         true => Ok(()),
         false => Err(format!(
