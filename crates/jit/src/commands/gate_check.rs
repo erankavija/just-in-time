@@ -5656,7 +5656,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .list_gate_runs_for_issue(&issue_id)
             .unwrap()
             .into_iter()
-            .find(|run| run.gate_key == "run-race".parse().unwrap())
+            .find(|run| {
+                run.gate_key == "run-race".parse().unwrap() && run.run_id != concurrent.run_id
+            })
             .unwrap();
         assert_eq!(
             run.evaluation_stability,
