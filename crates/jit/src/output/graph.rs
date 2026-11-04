@@ -51,30 +51,11 @@ impl GraphExportOutput {
 
 impl HumanRender for GraphExportOutput {
     fn render_human(&self, mode: OutputMode) -> String {
-        match self {
-            Self::Summary(document) => document.render_human(mode),
-            Self::Full(document) => document.render_human(mode),
-            Self::Written(written) => written.render_human(mode),
-            Self::Text(text) => text.render_human(mode),
+        match (self, self.document_text()) {
+            (Self::Written(written), _) => written.render_human(mode),
+            (_, Some(text)) => format!("{text}\n"),
+            (_, None) => String::new(),
         }
-    }
-}
-
-impl HumanRender for GraphExportSummaryResponse {
-    fn render_human(&self, _: OutputMode) -> String {
-        format!("{}\n", pretty_document(self))
-    }
-}
-
-impl HumanRender for GraphExportFullResponse {
-    fn render_human(&self, _: OutputMode) -> String {
-        format!("{}\n", pretty_document(self))
-    }
-}
-
-impl HumanRender for GraphExportText {
-    fn render_human(&self, _: OutputMode) -> String {
-        format!("{}\n", self.0)
     }
 }
 

@@ -242,35 +242,26 @@ pub trait ListedIssue {
     fn priority(&self) -> Priority;
 }
 
-impl ListedIssue for Issue {
-    fn id(&self) -> &IssueId {
-        &self.id
-    }
-    fn title(&self) -> &str {
-        &self.title
-    }
-    fn state(&self) -> State {
-        self.state
-    }
-    fn priority(&self) -> Priority {
-        self.priority
-    }
+macro_rules! listed_issue {
+    ($($ty:ty),+) => {$(
+        impl ListedIssue for $ty {
+            fn id(&self) -> &IssueId {
+                &self.id
+            }
+            fn title(&self) -> &str {
+                &self.title
+            }
+            fn state(&self) -> State {
+                self.state
+            }
+            fn priority(&self) -> Priority {
+                self.priority
+            }
+        }
+    )+};
 }
 
-impl ListedIssue for MinimalIssue {
-    fn id(&self) -> &IssueId {
-        &self.id
-    }
-    fn title(&self) -> &str {
-        &self.title
-    }
-    fn state(&self) -> State {
-        self.state
-    }
-    fn priority(&self) -> Priority {
-        self.priority
-    }
-}
+listed_issue!(Issue, MinimalIssue);
 
 /// One row of a human issue list: the issue and its optional reason lines.
 pub type IssueListRow<'a, I = Issue> = (&'a I, Vec<String>);
