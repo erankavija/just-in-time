@@ -3,6 +3,8 @@
 use super::{CaptureError, VirtualPath};
 use crate::domain::identity::IssueId;
 use crate::domain::Issue;
+use serde::Deserialize;
+use serde_json::Value;
 use thiserror::Error;
 
 /// A captured issue record that does not decode, including a non-canonical id
@@ -27,10 +29,21 @@ pub fn decode_issue_record(
     path: &VirtualPath,
     bytes: &[u8],
 ) -> Result<Issue, MalformedIssueRecordError> {
-    serde_json::from_slice(bytes).map_err(|source| MalformedIssueRecordError {
+    decode_issue_value(path, bytes).map(|(issue, _)| issue)
+}
+
+/// Decode the record at `path` to its JSON value, and the issue from that value.
+fn decode_issue_value(
+    path: &VirtualPath,
+    bytes: &[u8],
+) -> Result<(Issue, Value), MalformedIssueRecordError> {
+    let malformed = |source| MalformedIssueRecordError {
         path: path.relative().as_str().to_string(),
         source,
-    })
+    };
+    let value: Value = serde_json::from_slice(bytes).map_err(malformed)?;
+    let issue = Issue::deserialize(&value).map_err(malformed)?;
+    Ok((issue, value))
 }
 
 /// A listed issue record that could not be read or parsed.
@@ -52,28 +65,28 @@ pub enum IssueRecordsError {
     MismatchedId { expected: IssueId, found: IssueId },
 }
 
-/// Parse the record of each listed issue id from `read`, in listing order.
+/// Parse the record of each listed issue id from `read`, in listing order,
+/// each beside the JSON value it decoded from.
 pub fn parse_issue_records<'a>(
     ids: &[IssueId],
     read: impl Fn(&VirtualPath) -> Result<Option<&'a [u8]>, CaptureError>,
-) -> Result<Vec<Issue>, IssueRecordsError> {
+) -> Result<Vec<(Issue, Value)>, IssueRecordsError> {
     ids.iter()
         .map(|id| {
             let path = VirtualPath::issue_record(id);
             let bytes = read(&path)?.ok_or_else(|| IssueRecordsError::Missing(id.clone()))?;
-            let issue = decode_issue_record(&path, bytes).map_err(|error| {
-                IssueRecordsError::Malformed {
+            let (issue, value) =
+                decode_issue_value(&path, bytes).map_err(|error| IssueRecordsError::Malformed {
                     id: id.clone(),
                     error,
-                }
-            })?;
+                })?;
             if &issue.id != id {
                 return Err(IssueRecordsError::MismatchedId {
                     expected: id.clone(),
                     found: issue.id,
                 });
             }
-            Ok(issue)
+            Ok((issue, value))
         })
         .collect()
 }
@@ -92,7 +105,7 @@ mod tests {
     fn parse_from(
         ids: &[IssueId],
         records: &BTreeMap<VirtualPath, Vec<u8>>,
-    ) -> Result<Vec<Issue>, IssueRecordsError> {
+    ) -> Result<Vec<(Issue, Value)>, IssueRecordsError> {
         parse_issue_records(ids, |path| Ok(records.get(path).map(Vec::as_slice)))
     }
 
@@ -106,7 +119,7 @@ mod tests {
 
         let issues = parse_from(&ids, &records).unwrap();
 
-        let parsed: Vec<_> = issues.into_iter().map(|issue| issue.id).collect();
+        let parsed: Vec<_> = issues.into_iter().map(|(issue, _)| issue.id).collect();
         assert_eq!(parsed, ids);
     }
 

@@ -5,6 +5,8 @@
 
 use super::gate_run_reader::TreeNode;
 use crate::declarations::{parse_gate_registry, GateRegistry};
+use crate::domain::artifact_execution::ArchiveEvidenceRecord;
+use crate::domain::artifact_plan::PlanTarget;
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::{GateRunId, IssueId};
 use crate::domain::{Event, GateRunResult, Issue};
@@ -332,6 +334,18 @@ impl InMemoryStorage {
         Self::ensure_ancestor_dirs(&mut state, &vpath);
         state.entries.insert(vpath, entry(content));
         Ok(())
+    }
+
+    /// Seed an object of a kind no repository path holds (a FIFO, a socket) at
+    /// `path`.
+    #[cfg(test)]
+    pub(crate) fn add_repository_special(&self, path: VirtualPath) {
+        self.insert_repo_entry(path, b"special", |object| RepositoryEntry::Unsupported {
+            identity: object.identity().clone(),
+            reason: "special object".to_string(),
+            mode: FileMode::Regular,
+        })
+        .expect("add_repository_special requires a canonical repository path");
     }
 
     /// Seed a symlink at `path` whose link text names `target`.
@@ -862,6 +876,29 @@ impl IssueStore for InMemoryStorage {
 
     fn read_events(&self) -> Result<Vec<Event>> {
         Self::load_events(&self.repository_state())
+    }
+
+    fn read_archive_evidence_record(
+        &self,
+        target: &PlanTarget,
+    ) -> Result<Option<ArchiveEvidenceRecord>> {
+        let path = VirtualPath::archive_evidence_record(target);
+        let state = self.repository_state();
+        match state.entries.get(&path) {
+            None | Some(RepositoryEntry::Absent) => Ok(None),
+            Some(RepositoryEntry::File { content, .. }) => serde_json::from_slice(content.bytes())
+                .with_context(|| {
+                    format!(
+                        "Failed to deserialize archive evidence record at {}",
+                        path.relative().as_path().display()
+                    )
+                })
+                .map(Some),
+            Some(_) => anyhow::bail!(
+                "Archive evidence record at {} must be an ordinary file",
+                path.relative().as_path().display()
+            ),
+        }
     }
 
     fn root(&self) -> &std::path::Path {

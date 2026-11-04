@@ -4,10 +4,10 @@ use super::{CommandContext, Outcome};
 use crate::cli::InvariantCommands;
 use crate::commands::InvariantCheckResult;
 use crate::output::ErrorCode;
-use crate::storage::IssueStore;
+use crate::storage::{IssueStore, RepositoryStateStore};
 
 /// Enforcement drift is a findings outcome; a clean registry succeeds.
-fn check<S: IssueStore>(
+fn check<S: IssueStore + RepositoryStateStore>(
     ctx: &CommandContext<'_, S>,
 ) -> anyhow::Result<Outcome<InvariantCheckResult>> {
     let result = ctx.executor.items().check_invariants()?;
@@ -27,7 +27,7 @@ fn check<S: IssueStore>(
 
 command_group! {
     command: InvariantCommands,
-    storage: [IssueStore],
+    storage: [IssueStore + RepositoryStateStore],
     leaves: {
         "invariant_check" => InvariantCommands::Check => check() -> InvariantCheckResult,
     }
@@ -71,5 +71,12 @@ mod tests {
         );
         assert_eq!(status, ExitCode::ValidationFailed);
         assert_eq!(status.code(), 4);
+    }
+
+    #[test]
+    fn test_registered_output_schema_invariant_check_is_named_for_its_result_type() {
+        let registered = crate::dispatch::registered_output_schema("invariant_check").unwrap();
+
+        assert_eq!(registered.success, "InvariantCheckResult");
     }
 }

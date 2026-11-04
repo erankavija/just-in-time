@@ -7,6 +7,7 @@
 //! state only what that backend adds (`@/inv/orthogonal-tests`).
 
 use crate::declarations::{serialize_gate_registry, GateRegistry, GateStage};
+use crate::domain::artifact_execution::{ArchiveEvidenceRecord, ArchiveExecution};
 use crate::domain::artifact_plan::PlanTarget;
 use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use crate::domain::{Event, EventBody, GateRunResult, GateStatus, GateVerdictOrigin, Issue};
@@ -45,6 +46,9 @@ trait Backend: IssueStore + RepositoryStateStore {
 
     /// Place a symlink at `path` naming `target`.
     fn link(&self, worktree: &Path, path: &VirtualPath, target: &VirtualPath);
+
+    /// Place an object of a kind no repository path holds at `path`.
+    fn plant_special(&self, worktree: &Path, path: &VirtualPath);
 }
 
 fn physical_path(worktree: &Path, path: &VirtualPath) -> std::path::PathBuf {
@@ -94,6 +98,15 @@ impl Backend for JsonFileStorage {
             std::os::windows::fs::symlink_file(target, link).unwrap();
         }
     }
+
+    fn plant_special(&self, worktree: &Path, path: &VirtualPath) {
+        let special = physical_path(worktree, path);
+        std::fs::create_dir_all(special.parent().unwrap()).unwrap();
+        #[cfg(unix)]
+        nix::unistd::mkfifo(&special, nix::sys::stat::Mode::S_IRWXU).unwrap();
+        #[cfg(not(unix))]
+        unimplemented!("no special object to plant at {}", special.display());
+    }
 }
 
 impl Backend for InMemoryStorage {
@@ -115,6 +128,10 @@ impl Backend for InMemoryStorage {
 
     fn link(&self, _worktree: &Path, path: &VirtualPath, target: &VirtualPath) {
         self.add_repository_symlink(path.clone(), target);
+    }
+
+    fn plant_special(&self, _worktree: &Path, path: &VirtualPath) {
+        self.add_repository_special(path.clone());
     }
 }
 
@@ -145,6 +162,10 @@ impl<B: Backend> Repository<B> {
 
     fn link(&self, path: &VirtualPath, target: &VirtualPath) {
         self.store.link(self.worktree.path(), path, target);
+    }
+
+    fn plant_special(&self, path: &VirtualPath) {
+        self.store.plant_special(self.worktree.path(), path);
     }
 
     fn layout(&self) -> RepositoryLayout {
@@ -546,34 +567,39 @@ fn test_read_events_rejects_unknown_tags_and_malformed_records<B: Backend>() {
     }
 }
 
-fn test_read_artifact_archive_events_keeps_only_archive_executions<B: Backend>() {
-    let archive = crate::test_utils::stamped_event(
-        EventBody::draft_artifact_archive_executed(
-            crate::domain::artifact_execution::ArchiveExecution {
-                target: PlanTarget::Document {
-                    path: "dev/active/plan.md".to_string(),
-                },
-                destination_root: "dev/archive".to_string(),
-                publications: Vec::new(),
-                reference_changes: Vec::new(),
-                planned_deletions: Vec::new(),
-                reconciling: false,
-            },
-        ),
-        "archive",
-        chrono::Utc::now(),
-    );
-    let log = format!(
-        "{}\n{}\n{}\n",
-        event_line(&issue_created("before")),
-        event_line(&archive),
-        event_line(&issue_created("after"))
-    );
-    let repository = Repository::<B>::seeded(&[(VirtualPath::EVENTS, log)]);
+fn test_read_archive_evidence_record_is_target_addressed<B: Backend>() {
+    let target = PlanTarget::Document {
+        path: "dev/active/plan.md".to_string(),
+    };
+    let record = ArchiveEvidenceRecord {
+        target: target.clone(),
+        executions: vec![ArchiveExecution {
+            target: target.clone(),
+            destination_root: "dev/archive".to_string(),
+            publications: Vec::new(),
+            reference_changes: Vec::new(),
+            planned_deletions: Vec::new(),
+            reconciling: false,
+        }],
+    };
+    let path = VirtualPath::archive_evidence_record(&target);
+    let repository = Repository::<B>::seeded(&[(path, serde_json::to_string(&record).unwrap())]);
 
     assert_eq!(
-        repository.store.read_artifact_archive_events().unwrap(),
-        vec![archive]
+        repository
+            .store
+            .read_archive_evidence_record(&target)
+            .unwrap(),
+        Some(record)
+    );
+    assert_eq!(
+        repository
+            .store
+            .read_archive_evidence_record(&PlanTarget::Document {
+                path: "dev/active/other.md".to_string(),
+            })
+            .unwrap(),
+        None
     );
 }
 
@@ -909,6 +935,61 @@ fn test_gate_run_readers_refuse_a_symlink_as_a_result<B: Backend>() {
         assert!(message.contains(record.relative().as_str()), "{message}");
         assert!(message.contains("ordinary file"), "{message}");
     }
+}
+
+fn test_gate_run_readers_refuse_a_special_object_as_the_gate_run_root<B: Backend>() {
+    let repository = Repository::<B>::seeded(&initialized());
+    repository.plant_special(&VirtualPath::GATE_RUNS);
+
+    for error in [
+        repository
+            .store
+            .load_gate_run_result(
+                &crate::test_utils::issue_id(2),
+                &crate::test_utils::gate_run_id(1),
+            )
+            .unwrap_err(),
+        repository
+            .store
+            .list_gate_runs_for_issue(&crate::test_utils::issue_id(2))
+            .unwrap_err(),
+    ] {
+        assert!(
+            format!("{error:#}").contains("ordinary directory"),
+            "{error:#}"
+        );
+    }
+}
+
+/// A special object in a run directory's place is refused when named and
+/// skipped when listed.
+fn test_gate_run_readers_refuse_a_named_special_run_directory_that_listing_skips<B: Backend>() {
+    let run_id = crate::test_utils::gate_run_id(1);
+    let repository = Repository::<B>::seeded(&initialized());
+    repository.plant_special(
+        &VirtualPath::data(
+            VirtualPath::gate_run_record(&run_id)
+                .relative()
+                .as_path()
+                .parent()
+                .unwrap(),
+        )
+        .unwrap(),
+    );
+
+    let named = repository
+        .store
+        .load_gate_run_result(&crate::test_utils::issue_id(2), &run_id)
+        .unwrap_err();
+    assert!(
+        format!("{named:#}").contains("ordinary directory"),
+        "{named:#}"
+    );
+    assert!(repository
+        .store
+        .list_gate_runs_for_issue(&crate::test_utils::issue_id(2))
+        .unwrap()
+        .is_empty());
 }
 
 /// A run directory holding no record holds no run.
@@ -1318,7 +1399,7 @@ conformance_suite!(
         test_list_issues_is_empty_before_any_issue_is_published,
         test_load_gate_registry_reads_the_declared_gates_and_none_when_absent,
         test_read_events_rejects_unknown_tags_and_malformed_records,
-        test_read_artifact_archive_events_keeps_only_archive_executions,
+        test_read_archive_evidence_record_is_target_addressed,
         test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found,
         test_list_gate_runs_for_issue_lists_only_that_issues_runs,
         test_list_gate_runs_for_issue_ignores_a_directory_not_named_by_a_run_id,
@@ -1329,6 +1410,8 @@ conformance_suite!(
         test_gate_run_readers_refuse_a_symlink_as_the_gate_run_root,
         test_gate_run_readers_refuse_a_named_symlinked_run_directory_that_listing_skips,
         test_gate_run_readers_refuse_a_symlink_as_a_result,
+        test_gate_run_readers_refuse_a_special_object_as_the_gate_run_root,
+        test_gate_run_readers_refuse_a_named_special_run_directory_that_listing_skips,
         test_load_gate_run_result_reports_a_run_directory_without_a_record_as_not_found,
         test_apply_admits_a_plan_only_against_its_exact_image,
         test_root_is_shared_by_clones_and_names_the_data_root_when_file_backed,

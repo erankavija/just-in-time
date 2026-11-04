@@ -26,7 +26,8 @@ use crate::validation::engine::SchemaEngine;
 use crate::validation::report::{BuiltInPass, ReportFinding, RuleReport, Selectable};
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 /// One named stage in whole-repository validation.
@@ -50,24 +51,52 @@ pub enum RepositoryValidationPass {
     Projections,
 }
 
-/// A captured image paired with the issue records the loader parsed from it.
+/// A captured image paired with the index and issue records parsed from it.
+/// Each loader failure is shared with each report that fails on it; the
+/// index's failure precedes the records'.
 #[derive(Debug)]
 pub struct CapturedValidation<'a> {
-    image: &'a RepositoryImage,
-    /// The loader's outcome, shared with each report.
-    records: std::result::Result<Arc<[Issue]>, Arc<anyhow::Error>>,
+    pub(crate) image: Cow<'a, RepositoryImage>,
+    pub(crate) index: std::result::Result<RepositoryIndex, Arc<anyhow::Error>>,
+    pub(crate) issues: std::result::Result<Arc<[Issue]>, Arc<anyhow::Error>>,
+    /// The JSON value each of `issues` decoded from, in order; empty when they failed.
+    pub(crate) values: Vec<serde_json::Value>,
 }
 
 impl<'a> CapturedValidation<'a> {
-    /// Parse `image`'s issue records through the records loader.
+    /// Parse `image`'s index and issue records.
     pub fn from_image(image: &'a RepositoryImage) -> Self {
-        Self {
-            image,
-            records: load_records(image)
-                .context("records validation pass")
-                .map(Arc::from)
-                .map_err(Arc::new),
+        match load_issues(image) {
+            Ok(records) => {
+                let (issues, values) = records.into_iter().unzip();
+                Self::new(Cow::Borrowed(image), Ok(issues), values)
+            }
+            Err(error) => Self::new(Cow::Borrowed(image), Err(error), Vec::new()),
         }
+    }
+
+    fn new(
+        image: Cow<'a, RepositoryImage>,
+        issues: Result<Vec<Issue>>,
+        values: Vec<serde_json::Value>,
+    ) -> Self {
+        Self {
+            index: records_pass(load_index(&image)),
+            issues: records_pass(issues).map(Arc::from),
+            values,
+            image,
+        }
+    }
+}
+
+impl CapturedValidation<'static> {
+    /// Parse `image`'s index beside the issue records and values its capture parsed.
+    pub(crate) fn with_records(
+        image: RepositoryImage,
+        issues: Vec<Issue>,
+        values: Vec<serde_json::Value>,
+    ) -> Self {
+        Self::new(Cow::Owned(image), Ok(issues), values)
     }
 }
 
@@ -170,7 +199,7 @@ fn image_read(image: &RepositoryImage, repo_rel: &str) -> Result<Option<Vec<u8>>
 /// ([`apply_overlay`](crate::repository_state::apply_overlay)) a proposed final
 /// state.
 pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> ValidationReport {
-    let image = captured.image;
+    let image = &*captured.image;
     let failed = |error: anyhow::Error| {
         let error = Arc::new(error);
         ValidationReport {
@@ -237,7 +266,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
     let gates = declarations.gates();
     passes.push(RepositoryValidationPass::Gates);
 
-    let issues = match &captured.records {
+    let issues = match captured.index.as_ref().and(captured.issues.as_ref()) {
         Ok(issues) => {
             passes.push(RepositoryValidationPass::Records);
             Some(&issues[..])
@@ -290,11 +319,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
             namespace_and_hierarchy_complete = false;
         }
     }
-    findings.extend(collect_enforcement_drift_findings(
-        config,
-        rules_loaded.then_some(rules),
-        gates,
-    ));
+    findings.extend(collect_enforcement_drift_findings(&declarations));
     findings.extend(collect_review_placeholder_findings(gates));
     if namespace_and_hierarchy_complete {
         passes.push(RepositoryValidationPass::NamespaceAndHierarchy);
@@ -335,7 +360,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
         }
     }
 
-    let selectable = match &captured.records {
+    let selectable = match captured.index.as_ref().and(captured.issues.as_ref()) {
         Ok(records) => Ok(Box::new(Selectable {
             records: Arc::clone(records),
             rules: rules_file_message.map_or_else(|| Ok(declarations.rules), Err),
@@ -367,13 +392,20 @@ fn read_text(read: &ReadBytes<'_>, path: &str) -> Result<Option<String>> {
         .transpose()
 }
 
-fn load_records(image: &RepositoryImage) -> Result<Vec<Issue>> {
+fn records_pass<T>(loaded: Result<T>) -> std::result::Result<T, Arc<anyhow::Error>> {
+    loaded.context("records validation pass").map_err(Arc::new)
+}
+
+fn load_index(image: &RepositoryImage) -> Result<RepositoryIndex> {
     let index_path = VirtualPath::INDEX.repository_relative();
     RepositoryIndex::parse(
         &image_read(image, &index_path)?
             .ok_or_else(|| anyhow!("required repository file '{index_path}' is missing"))?,
     )
-    .context(RepositoryJudgedInvalid(format!("invalid {index_path}")))?;
+    .context(RepositoryJudgedInvalid(format!("invalid {index_path}")))
+}
+
+fn load_issues(image: &RepositoryImage) -> Result<Vec<(Issue, serde_json::Value)>> {
     let ids = captured_issue_ids(image)?;
     parse_issue_records(&ids, |path| image.file_bytes(path)).map_err(|error| match error {
         IssueRecordsError::Malformed { id, error } => {
@@ -554,32 +586,19 @@ fn collect_rule_findings(
 }
 
 fn collect_enforcement_drift_findings(
-    config: &JitConfig,
-    rules: Option<&RuleSet>,
-    gates: &GateRegistry,
+    declarations: &crate::repository_state::CapturedRepositoryDeclarations,
 ) -> Vec<ReportFinding> {
-    use crate::validation::drift::{enforcement_drift, SourceState};
-
-    let rule_names: Option<BTreeSet<&str>> =
-        rules.map(|rules| rules.rules.iter().map(|rule| rule.name.as_str()).collect());
-    let gate_keys: BTreeSet<GateKey> = gates.gates.keys().cloned().collect();
-    enforcement_drift(
-        &config.invariants.invariants,
-        rule_names
-            .as_ref()
-            .map_or(SourceState::Unloadable, SourceState::Loaded),
-        SourceState::Loaded(&gate_keys),
-    )
-    .into_iter()
-    .map(|finding| {
-        ReportFinding::built_in(
-            BuiltInPass::EnforcementDrift,
-            None,
-            Severity::Error,
-            finding.message(),
-        )
-    })
-    .collect()
+    crate::validation::drift::from_declarations(declarations)
+        .into_iter()
+        .map(|finding| {
+            ReportFinding::built_in(
+                BuiltInPass::EnforcementDrift,
+                None,
+                Severity::Error,
+                finding.message(),
+            )
+        })
+        .collect()
 }
 
 fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportFinding> {

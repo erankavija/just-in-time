@@ -160,15 +160,14 @@ fn test_dispatch_findings_json_writes_failure_envelope_with_report_details() {
 }
 
 #[test]
-fn test_dispatch_findings_human_writes_report_and_one_error_diagnostic() {
+fn test_dispatch_findings_human_writes_report_and_unprefixed_message_line() {
     let run = run(&TestHarness::new(), flag_command(), false);
 
     let report = FlagReport {
         reason: "drift".to_owned(),
     };
     assert_eq!(run.out, report.render_human());
-    assert_eq!(run.err.lines().count(), 1);
-    assert!(run.err.starts_with("Error: ") && run.err.contains("drift"));
+    assert_eq!(run.err, "flagged because drift\n");
     assert_eq!(run.status.unwrap(), FINDINGS_CODE.exit_code());
 }
 
