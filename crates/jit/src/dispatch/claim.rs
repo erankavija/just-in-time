@@ -176,41 +176,30 @@ command_group! {
     }
 }
 
-/// `jit recover`, a leaf with no argument enum: its command is `()`.
-pub mod recover {
-    use super::*;
-
-    /// Recovery failures keep the `recovery_failed` classification.
-    fn recover<S: IssueStore + RepositoryStateStore>(
-        ctx: &CommandContext<'_, S>,
-    ) -> anyhow::Result<Outcome<RecoverResponse>> {
-        let report = ctx
-            .executor
-            .claims()
-            .recover()
-            .map_err(RecoveryFailedError)?;
-        warn(ctx, &report.warnings)?;
-        Ok(Outcome::Success {
-            message: Some(format!(
-                "Recovery: {} locks cleaned, {} leases evicted, {} leases reclaimed",
-                report.stale_locks_cleaned,
-                report.expired_leases_evicted,
-                report.stale_leases_reclaimed
-            )),
-            response: RecoverResponse {
-                success: true,
-                report,
-            },
-        })
-    }
-
-    command_group! {
-        command: (),
-        storage: [IssueStore + RepositoryStateStore],
-        leaves: {
-            "recover" => () => recover() -> RecoverResponse,
-        }
-    }
+/// `jit recover`; registers once the single-leaf handler form lands.
+///
+/// Recovery failures keep the `recovery_failed` classification.
+pub fn recover<S: IssueStore + RepositoryStateStore>(
+    ctx: &CommandContext<'_, S>,
+) -> anyhow::Result<Outcome<RecoverResponse>> {
+    let report = ctx
+        .executor
+        .claims()
+        .recover()
+        .map_err(RecoveryFailedError)?;
+    warn(ctx, &report.warnings)?;
+    Ok(Outcome::Success {
+        message: Some(format!(
+            "Recovery: {} locks cleaned, {} leases evicted, {} leases reclaimed",
+            report.stale_locks_cleaned,
+            report.expired_leases_evicted,
+            report.stale_leases_reclaimed
+        )),
+        response: RecoverResponse {
+            success: true,
+            report,
+        },
+    })
 }
 
 #[cfg(test)]
@@ -228,7 +217,6 @@ mod tests {
             ("claim_status", "LeaseListResponse"),
             ("claim_list", "LeaseListResponse"),
             ("claim_force-evict", "ClaimForceEvictResponse"),
-            ("recover", "RecoverResponse"),
         ];
 
         for (path, name) in names {

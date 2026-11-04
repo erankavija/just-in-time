@@ -6179,7 +6179,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
             }
         }
         Commands::Recover => {
-            return claim::recover::dispatch((), &ctx, &mut io::stdout(), &mut io::stderr());
+            return jit::output::emit_outcome(
+                &claim::recover(&ctx)?,
+                mode,
+                &mut io::stdout(),
+                &mut io::stderr(),
+            );
         }
         Commands::Serve {
             port,
