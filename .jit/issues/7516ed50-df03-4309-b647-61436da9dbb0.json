@@ -8,6 +8,7 @@
   ],
   "description": "Probe each distinct external URL once per link-check run, through one HTTP agent that has a request timeout, with a fixed bound on concurrent requests.\n\n## Background\n\n- `validate_external_url` (`crates/jit/src/commands/document.rs:1060-1083`) builds a new `ureq::Agent::new_with_defaults()` for every external asset and sends a `HEAD` request; `check_document_links` (`:1098` onwards) calls it inside its per-document, per-asset loop (`:1249-1280`), serially and once per occurrence. ureq 3.2's default configuration has no timeout, so an unresponsive host stalls the run.\n- `validate_external_url` never returns `Err`, so the `url_validation_failed` warning branch (`:1264-1277`) is unreachable; every failure is reported as an `unreachable_url` error.\n- `ureq` 3.2 offers `Agent::config_builder().timeout_global(...)` and `Agent::new_with_config`, and an `Agent` is `Clone + Send + Sync`; `std::thread::scope` needs no new dependency.\n- `crates/jit/Cargo.toml:60-71` says `Agent::new_with_defaults()` is the only call site; the module doc of `crates/jit/tests/cli_query_graph/remote_document_tls_tests.rs:6-12` says its agent is configured exactly like that call site. `tests/cli_query_graph/check_links_tests.rs:11-31` has an offline loopback HTTP server.\n\n## Success Criteria\n\n- [hard] REQ-01: A run collects the distinct external URLs of every checked document, probes each once through one agent with a request timeout, from a fixed number of `std::thread::scope` workers, and reports each occurrence from that probe's outcome.\n- [hard] REQ-02: A CLI test with a request-counting loopback server and two documents citing one URL shows one request; it fails on today's code, which sends two.\n- [hard] REQ-03: A unit test shows that a probe of a listener that accepts and never answers completes within the configured timeout and reports the URL unreachable.\n- [hard] REQ-04: The unreachable `url_validation_failed` branch is gone, and the `Cargo.toml` comment and the TLS test module doc describe the agent as configured now.\n\n## Notes\n\n- Behaviour change: an unresponsive host is reported unreachable after the timeout instead of stalling the run. Status classification is otherwise unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T12:18:16.857064530Z",
   "first_ready_at": "2026-10-21T20:31:28.613451335Z",
   "gates_required": [
     "cargo-ci",
@@ -18,6 +19,12 @@
       "run_id": "552b1db5-c369-4dba-a068-917ffa9d433a",
       "status": "passed",
       "updated_at": "2026-11-04T12:14:55.329728224Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b4ea0308-777d-481c-b06f-24671e3eaa18",
+      "status": "passed",
+      "updated_at": "2026-11-04T12:18:01.937409132Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,7 +39,7 @@
     "satisfies:9876a23a/REQ-15"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Link checking probes each distinct URL once through one timed agent",
-  "updated_at": "2026-11-04T12:14:55.329728224Z"
+  "updated_at": "2026-11-04T12:18:16.857064530Z"
 }
