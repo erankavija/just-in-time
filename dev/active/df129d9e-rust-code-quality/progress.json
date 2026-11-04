@@ -1443,8 +1443,9 @@
       "vendor": "Claude Opus"
     },
     "da30b92a": {
-      "status": "dispatched",
-      "vendor": "Codex gpt-6.1-sol"
+      "status": "waiting",
+      "vendor": "Codex gpt-6.1-sol",
+      "reason": "Codex pre-check 2026-11-04: table already gone; worktree exec has no registered response until 5687e281 lands. Redispatch after 5687e281 for the remaining fallback removal and visible-path test."
     }
   },
   "handoff": {
