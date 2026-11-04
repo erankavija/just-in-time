@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-03T23:56:59.046051487Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -8,14 +8,27 @@
     "977d01d8-2757-48c2-ad73-25f42c4b2105",
     "f968dfe1-64d2-4d37-8bdc-0f04bfca2bb8"
   ],
-  "description": "Derive the new issue's advisory findings inside the creation mutation, from the image it captured, through one captured graph-evaluation helper that also replaces the hand-built copies in the other mutation paths.\n\n## Background\n\n- `publish_issue_creation` (`crates/jit/src/commands/mod.rs:2510-2587`) captures a mutation base holding the image and every issue, discards the issues (`:2525`), evaluates local rules through `derive_write_validation` (`:1091-1115`) and returns its warnings. `create_issue` (`crates/jit/src/commands/issue.rs:209-274`) returns the created issue with those warnings.\n- Graph-rule findings for a new issue are computed only by the CLI's human path after the commit, through `evaluate_graph_rules` over a fresh issue list and a whole validation capture (the `IssueCommands::Create` arm of `crates/jit/src/main.rs`, `:1874-1886`).\n- The other mutation paths assemble the same captured evidence by hand. Each reads the declarations and projects plan content from the mutation image (`commands/mod.rs:2762,2773` field update; `:3189,3191` lifecycle; `commands/dependency.rs:382` dependency removal; `commands/bulk_update.rs:373-377` bulk-update verification) into `CapturedTransitionEvidence` (`mod.rs:561-567`), and `derive_state_transition` (`:1118-1318`) evaluates graph rules over it with the mutation timestamp (`:1226-1233`). Issue deletion projects plan content the same way (`commands/issue.rs:129`).\n- Issue-linked documents are not part of a mutation image, so document-reading passes are not evaluated here.\n- Readers of the returned warnings: the `issue create` arm in `main.rs` (`:1838-1841`) and `crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs:167`.\n\n## Success Criteria\n\n- [hard] REQ-01: Creation returns `findings`, in the wire `ReportedFinding` shape: the new issue's local-rule findings and the graph-rule findings attributed to it, evaluated over the captured issues plus the new record with the mutation's timestamp and plan content from the mutation image. It replaces the returned warnings.\n- [hard] REQ-02: One helper derives the captured evidence (declarations and plan content from the mutation image) and evaluates graph rules over it at the mutation timestamp. Issue creation, state transitions, field updates, lifecycle mutations, dependency removal and bulk-update verification go through it, and no other code under `crates/jit/src/commands/` pairs plan-content projection with graph evaluation.\n- [hard] REQ-03: A harness test over `InMemoryStorage` shows that creating an orphan leaf returns its `orphan-leaf` finding and creating a compliant issue returns none.\n- [hard] REQ-04: The listed readers read `findings`, `issue create` prints today's warning lines from them, and the transition, dependency and bulk-update suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged in this change; output changes land with the CLI rendering.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
+  "description": "Derive the new issue's advisory findings inside the creation mutation, from the image it captured, through one captured graph-evaluation helper that also replaces the hand-built copies in the other mutation paths.\n\n## Background\n\n- `publish_issue_creation` (`crates/jit/src/commands/mod.rs:2510-2587`) captures a mutation base holding the image and every issue, discards the issues (`:2525`), evaluates local rules through `derive_write_validation` (`:1091-1115`) and returns its warnings. `create_issue` (`crates/jit/src/commands/issue.rs:209-274`) returns the created issue with those warnings.\n- Graph-rule findings for a new issue are computed only by the CLI's human path after the commit, through `evaluate_graph_rules` over a fresh issue list and a whole validation capture (the `IssueCommands::Create` arm of `crates/jit/src/main.rs`, `:1874-1886`).\n- The other mutation paths assemble the same captured evidence by hand. Each reads the declarations and projects plan content from the mutation image (`commands/mod.rs:2762,2773` field update; `:3189,3191` lifecycle; `commands/dependency.rs:382` dependency removal; `commands/bulk_update.rs:373-377` bulk-update verification) into `CapturedTransitionEvidence` (`mod.rs:561-567`), and `derive_state_transition` (`:1118-1318`) evaluates graph rules over it with the mutation timestamp (`:1226-1233`). Issue deletion projects plan content the same way (`commands/issue.rs:129`).\n- Issue-linked documents are not part of a mutation image, so document-reading passes are not evaluated here.\n- Readers of the returned warnings: the `issue create` arm in `main.rs` (`:1838-1841`) and `crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs:167`.\n\n## Success Criteria\n\n- [hard] REQ-01: Creation returns `findings`, in the wire `ReportedFinding` shape: the new issue's local-rule findings and the graph-rule findings attributed to it, evaluated over the captured issues plus the new record with the mutation's timestamp and plan content from the mutation image. It replaces the returned warnings.\n- [hard] REQ-02: One helper derives the captured evidence (declarations and plan content from the mutation image) and evaluates graph rules over it at the mutation timestamp. Issue creation, state transitions, field updates, lifecycle mutations, dependency removal and bulk-update verification go through it, and no mutation path under `crates/jit/src/commands/` pairs plan-content projection with graph evaluation other than through the shared helper.\n- [hard] REQ-03: A harness test over `InMemoryStorage` shows that creating an orphan leaf returns its `orphan-leaf` finding and creating a compliant issue returns none.\n- [hard] REQ-04: The listed readers read `findings`, `issue create` prints today's warning lines from them, and the transition, dependency and bulk-update suites pass unchanged.\n\n## Notes\n\n- The validation views' own pairings of plan content and graph evaluation are removed by the epic's report work.\n- Behaviour is unchanged in this change; output changes land with the CLI rendering.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
   "first_ready_at": "2026-11-03T23:04:05.037735496Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cd6d4a6e-d1a2-4a3e-b065-4504698e2004",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:16:11.974845920Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "41cb9b76-44b9-4aa6-b2fc-975860a01fe1",
+      "status": "failed",
+      "updated_at": "2026-11-04T00:19:57.419072017Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5d5a1794-c98e-41d9-8329-344d1ae8b316",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue creation derives its findings inside its mutation",
-  "updated_at": "2026-11-03T23:56:59.046051487Z"
+  "updated_at": "2026-11-04T00:19:57.419072017Z"
 }

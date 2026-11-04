@@ -12,7 +12,19 @@ use serde::Serialize;
 
 use crate::declarations::rules::{RuleScope, Severity};
 use crate::domain::identity::IssueId;
+use crate::domain::vocabulary::wire_vocabulary;
 use crate::validation::engine::Finding;
+
+wire_vocabulary! {
+    /// Rule names emitted by the built-in repository validation passes.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    pub enum BuiltInPass {
+        RulesFile = "rules-file",
+        DanglingItemLink = "dangling-item-link",
+        EnforcementDrift = "enforcement-drift",
+        ReviewPlaceholder = "review-placeholder",
+    }
+}
 
 /// One reported finding, scoped to the issue it concerns (if any).
 ///

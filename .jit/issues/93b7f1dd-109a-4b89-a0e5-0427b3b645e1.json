@@ -17,6 +17,12 @@
     "npm-ci"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "2172f3f4-0496-42b1-9036-df2e35c8f785",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:19:37.439074826Z",
+      "updated_by": "auto:executor"
+    },
     "npm-ci": {
       "status": "pending",
       "updated_at": "2026-11-02T23:39:45.775948665Z",
@@ -38,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Reused verdicts name their source issue and source run",
-  "updated_at": "2026-11-04T00:02:41.194047695Z"
+  "updated_at": "2026-11-04T00:19:37.439074826Z"
 }
