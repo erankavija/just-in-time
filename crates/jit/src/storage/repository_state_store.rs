@@ -7,9 +7,9 @@
 
 use crate::repository_state::{
     CaptureError, CaptureSpec, CapturedAnswers, CapturedBytes, DirectoryListing, EntryIdentity,
-    EventLogTail, ExpectedPreimage, FileMode, MaterializationPlan, PinnedDocumentEvidence,
-    PinnedSourceClass, ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
+    EventLogTail, ExpectedPreimage, FileMode, ImageToken, MaterializationPlan,
+    PinnedDocumentEvidence, PinnedSourceClass, ReadMode, RepositoryAction, RepositoryDelta,
+    RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
 use crate::storage::atomic_write::sync_capability_directory;
@@ -425,7 +425,7 @@ struct JsonMutationSession {
     events_lock: Option<(FileLocker, PathBuf)>,
     _reentry: LayoutReentry,
     _order_guard: crate::storage::guard_order::RepositoryOrderGuard,
-    captured: Option<RepositoryImage>,
+    captured: Option<ImageToken>,
 }
 
 struct MemoryMutationSession {
@@ -435,7 +435,7 @@ struct MemoryMutationSession {
     _guard: RepoWriteGuard,
     _reentry: LayoutReentry,
     _order_guard: crate::storage::guard_order::RepositoryOrderGuard,
-    captured: Option<RepositoryImage>,
+    captured: Option<ImageToken>,
 }
 
 impl RepositoryStateStore for JsonFileStorage {
@@ -587,7 +587,7 @@ impl RepositoryMutationSession for JsonMutationSession {
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
         let image = plan.image();
         let delta = plan.delta();
-        ensure_session_image(&self.layout, self.captured.as_ref(), image)?;
+        ensure_session_image(&self.layout, self.captured, image)?;
         ensure_delta_is_captured(image, delta)?;
         let interruptions = self.storage.mutation_interruptions();
         interruptions.check(&MutationPoint::BeforeCommitCheck)?;
@@ -638,7 +638,7 @@ impl JsonMutationSession {
         revalidate_layout_capabilities(&self.layout, &self.roots)?;
         let image =
             capture_capability_image(&self.layout, &self.roots, &self.storage, spec, prior)?;
-        self.captured = Some(image.clone());
+        self.captured = Some(image.token());
         Ok(image)
     }
 
@@ -756,7 +756,7 @@ impl RepositoryMutationSession for MemoryMutationSession {
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
         let image = plan.image();
         let delta = plan.delta();
-        ensure_session_image(&self.layout, self.captured.as_ref(), image)?;
+        ensure_session_image(&self.layout, self.captured, image)?;
         ensure_delta_is_captured(image, delta)?;
         #[cfg(feature = "test-support")]
         if self.storage.consume_repository_state_apply_conflict() {
@@ -798,7 +798,7 @@ impl MemoryMutationSession {
         let state = self.storage.repository_state();
         let image = capture_memory_image(&self.layout, &state, spec, prior)?;
         drop(state);
-        self.captured = Some(image.clone());
+        self.captured = Some(image.token());
         Ok(image)
     }
 
@@ -882,10 +882,10 @@ fn publish_absent_memory_root(
 
 fn ensure_session_image(
     layout: &RepositoryLayout,
-    captured: Option<&RepositoryImage>,
+    captured: Option<ImageToken>,
     image: &RepositoryImage,
 ) -> Result<(), RepositoryStateStoreError> {
-    if image.layout() != layout || captured != Some(image) {
+    if image.layout() != layout || captured != Some(image.token()) {
         return Err(RepositoryStateStoreError::RetryableConflict {
             path: "image does not belong to this mutation session".into(),
         });

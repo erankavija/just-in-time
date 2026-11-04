@@ -422,11 +422,40 @@ pub fn is_serving_on_port(port: u16) -> bool {
         && status_prefix == HTTP_STATUS_PREFIX
 }
 
+/// The monotonic time a [`StartupWatch`] reads and waits on.
+///
+/// A seam of its own rather than [`crate::storage::clock::Clock`], which
+/// answers a calendar date and cannot wait: the watch measures elapsed time and
+/// pauses between observations, so a test that drives both expires the bound
+/// with no real time passing.
+pub trait WatchClock {
+    /// The current instant.
+    fn now(&self) -> Instant;
+    /// Waits `duration` before the next observation.
+    fn sleep(&self, duration: Duration);
+}
+
+/// The [`WatchClock`] a live `jit serve` runs on: [`Instant::now`] and
+/// [`std::thread::sleep`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SystemWatchClock;
+
+impl WatchClock for SystemWatchClock {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+
+    fn sleep(&self, duration: Duration) {
+        std::thread::sleep(duration);
+    }
+}
+
 /// How [`start_server`] observes a server it has spawned.
 ///
 /// The whole schedule arrives from the caller — what serving means, how often
-/// that is observed, and how long the observation runs — so a test supplies the
-/// observation that decides its case and orders its events by what it saw.
+/// that is observed, how long the observation runs, and the clock that time is
+/// read on — so a test supplies the observation that decides its case and
+/// orders its events by what it saw.
 /// [`StartupWatch::for_live_server`] is the schedule a live `jit serve` runs.
 pub struct StartupWatch<'a> {
     /// Answers whether the server is serving on the port it was handed.
@@ -435,11 +464,14 @@ pub struct StartupWatch<'a> {
     pub interval: Duration,
     /// Longest the watch runs while the child neither serves nor exits.
     pub bound: Duration,
+    /// Time the bound is measured on and the interval is waited on.
+    pub clock: &'a dyn WatchClock,
 }
 
 impl StartupWatch<'static> {
     /// The schedule a live `jit serve` runs: [`is_serving_on_port`] every
-    /// [`STARTUP_POLL_INTERVAL`], bounded at [`startup_bound`].
+    /// [`STARTUP_POLL_INTERVAL`], bounded at [`startup_bound`] on
+    /// [`SystemWatchClock`].
     #[must_use]
     pub fn for_live_server() -> Self {
         // A value with a stable address, so the watch borrows the production
@@ -449,6 +481,7 @@ impl StartupWatch<'static> {
             is_serving: &IS_SERVING,
             interval: STARTUP_POLL_INTERVAL,
             bound: startup_bound(),
+            clock: &SystemWatchClock,
         }
     }
 }
@@ -481,7 +514,7 @@ fn exit_status(child: &mut Child) -> Result<Option<std::process::ExitStatus>> {
 /// # Errors
 /// Returns an error when the child's exit state cannot be read.
 fn watch_startup(child: &mut Child, port: u16, watch: &StartupWatch<'_>) -> Result<StartupOutcome> {
-    let deadline = Instant::now() + watch.bound;
+    let deadline = watch.clock.now() + watch.bound;
     loop {
         if let Some(status) = exit_status(child)? {
             return Ok(StartupOutcome::Exited(status));
@@ -494,13 +527,13 @@ fn watch_startup(child: &mut Child, port: u16, watch: &StartupWatch<'_>) -> Resu
             // this whole path exists to prevent.
             return Ok(exit_status(child)?.map_or(StartupOutcome::Serving, StartupOutcome::Exited));
         }
-        let remaining = deadline.saturating_duration_since(Instant::now());
+        let remaining = deadline.saturating_duration_since(watch.clock.now());
         if remaining.is_zero() {
             return Ok(
                 exit_status(child)?.map_or(StartupOutcome::Unreached, StartupOutcome::Exited)
             );
         }
-        std::thread::sleep(watch.interval.min(remaining));
+        watch.clock.sleep(watch.interval.min(remaining));
     }
 }
 
@@ -1312,6 +1345,7 @@ mod tests {
             is_serving,
             interval: Duration::from_millis(1),
             bound,
+            clock: &SystemWatchClock,
         }
     }
 
@@ -1492,24 +1526,48 @@ mod tests {
 
     // ── startup failure: the child is unreachable ─────────────────────────────
 
+    /// A [`WatchClock`] on which time passes only by waiting: each wait moves
+    /// "now" forward by exactly what was asked and returns at once.
+    struct SteppedWatchClock {
+        now: std::cell::Cell<Instant>,
+    }
+
+    impl SteppedWatchClock {
+        fn new() -> Self {
+            Self {
+                now: std::cell::Cell::new(Instant::now()),
+            }
+        }
+    }
+
+    impl WatchClock for SteppedWatchClock {
+        fn now(&self) -> Instant {
+            self.now.get()
+        }
+
+        fn sleep(&self, duration: Duration) {
+            self.now.set(self.now.get() + duration);
+        }
+    }
+
     /// A child that neither serves nor exits ends the start at the watch's
     /// bound, terminated rather than left running untracked.
     ///
-    /// Nothing here can be flipped by load: the child sleeps well past the
-    /// bound, so it never serves and never exits, and a slower host delays the
-    /// bounded failure instead of changing it. The first observation waits for
-    /// the child's PID announcement through a FIFO, so the bound can be short
-    /// without racing the child's one `echo`.
+    /// Nothing here is timed. The child sleeps rather than serving or exiting,
+    /// the first observation reads the child's PID announcement from a FIFO,
+    /// and the watch runs on a [`SteppedWatchClock`] whose one wait between
+    /// rounds spans the whole bound. The bound is therefore reached after one
+    /// observation of the announced child, with no real time elapsing.
     #[test]
     #[cfg(unix)]
     fn test_start_server_bounds_a_child_that_neither_serves_nor_exits() {
-        let bound = Duration::from_millis(50);
+        let bound = startup_bound();
         let tmp = TempDir::new().unwrap();
         let data_dir = tmp.path();
         let announced_pid = data_dir.join("child.pid");
         nix::unistd::mkfifo(&announced_pid, nix::sys::stat::Mode::S_IRWXU).unwrap();
-        // The first observation blocks reading the announcement, so the bound
-        // starts counting down only after the child has named itself.
+        // The first observation blocks reading the announcement, so the watch
+        // reaches its bound only after the child has named itself.
         let child_pid = std::cell::OnceCell::<u32>::new();
         let never_serving_once_announced = |port: u16| {
             child_pid.get_or_init(|| {
@@ -1532,9 +1590,15 @@ mod tests {
             ),
         );
 
+        let clock = SteppedWatchClock::new();
         let result = start_server(
             opts_for(data_dir, fake_server),
-            watch_with(&never_serving_once_announced, bound),
+            StartupWatch {
+                is_serving: &never_serving_once_announced,
+                interval: bound,
+                bound,
+                clock: &clock,
+            },
         );
 
         let msg = result.unwrap_err().to_string();

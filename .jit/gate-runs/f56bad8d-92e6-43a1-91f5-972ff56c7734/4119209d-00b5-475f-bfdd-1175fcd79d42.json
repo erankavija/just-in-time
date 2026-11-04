@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6a2f5e11643eb170a4444d673e8aedbe1678bd2c",
+  "completed_at": "2026-11-04T13:05:54.597543082Z",
+  "duration_ms": 173401,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed change satisfies the issue criteria: parsing caches resolutions, all production consumers reuse them, and reachability is cached by normalized root with focused unit coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f56bad8d-92e6-43a1-91f5-972ff56c7734",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4119209d-00b5-475f-bfdd-1175fcd79d42",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T13:03:01.196256502Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fd2221df3 (`refactor(jit:f56bad8d): archive discovery resolves each reference once`)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/b697a3f7/requirement/REQ-08 (issue description); @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-04T13:01:11Z\nTruncation recovery: reread affected artifact-discovery ranges, policy sources, and targeted symbol searches\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed change satisfies the issue criteria: parsing caches resolutions, all production consumers reuse them, and reachability is cached by normalized root with focused unit coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

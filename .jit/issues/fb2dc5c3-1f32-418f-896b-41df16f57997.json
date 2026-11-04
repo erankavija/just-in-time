@@ -4,6 +4,7 @@
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "10fdad38-23f8-4094-8544-4d90ab767464",
+    "3b696589-81fa-4a01-a576-460c1e34a7dd",
     "a08c4b38-f5c2-4589-a195-a5ba1a8e6324",
     "b51291e4-8f88-44fe-92e6-90790e235ca3",
     "d952d057-f781-455b-9982-05678fd7e0e1"
@@ -27,5 +28,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Build hygiene and measured completion for crates/jit",
-  "updated_at": "2026-11-04T12:31:55.859599692Z"
+  "updated_at": "2026-11-04T12:46:01.196181194Z"
 }

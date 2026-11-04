@@ -216,67 +216,50 @@ impl HumanRender for GatePresetShowResponse {
     }
 }
 
+/// One checker line: the preset listing indents it under the gate and drops
+/// the `Checker:` label; the plain listing labels it.
 fn render_checker(checker: &GateChecker, preset: bool) -> String {
-    match checker {
+    let (preset_line, plain_line) = match checker {
         GateChecker::Exec {
             command,
             timeout_seconds,
             working_dir,
             ..
         } => {
-            let mut text = if preset {
-                String::new()
-            } else {
-                "  Checker:\n".to_owned()
-            };
-            let _ = write!(
-                text,
-                "    Command: {command}\n    Timeout: {timeout_seconds}s\n"
-            );
-            if !preset {
-                if let Some(dir) = working_dir {
-                    let _ = writeln!(text, "    Working dir: {dir}");
-                }
-            }
-            text
+            let body = format!("    Command: {command}\n    Timeout: {timeout_seconds}s\n");
+            let dir = working_dir
+                .as_ref()
+                .map(|dir| format!("    Working dir: {dir}\n"))
+                .unwrap_or_default();
+            (body.clone(), format!("  Checker:\n{body}{dir}"))
         }
-        GateChecker::RepositoryValidation => {
-            if preset {
-                "    Built-in: repository validation\n".to_owned()
-            } else {
-                "  Checker: repository validation (built-in)\n".to_owned()
-            }
-        }
-        GateChecker::IssueValidation => {
-            if preset {
-                "    Built-in: issue validation\n".to_owned()
-            } else {
-                "  Checker: issue validation (built-in)\n".to_owned()
-            }
-        }
-        GateChecker::LabelTargetValidation { label_namespace } => {
-            if preset {
-                format!("    Built-in: label-target validation ({label_namespace}:)\n")
-            } else {
-                format!(
-                    "  Checker: label-target validation (built-in, namespace: {label_namespace})\n"
-                )
-            }
-        }
-        GateChecker::RuleValidation { rule } => {
-            if preset {
-                format!("    Built-in: rule validation ({rule})\n")
-            } else {
-                format!("  Checker: rule validation (built-in, rule: {rule})\n")
-            }
-        }
-        GateChecker::ReviewPlaceholder => {
-            if preset {
-                "    Built-in: WARNING — external review placeholder\n".to_owned()
-            } else {
-                "  Checker: WARNING — external review placeholder\n".to_owned()
-            }
-        }
+        GateChecker::RepositoryValidation => (
+            "    Built-in: repository validation\n".to_owned(),
+            "  Checker: repository validation (built-in)\n".to_owned(),
+        ),
+        GateChecker::IssueValidation => (
+            "    Built-in: issue validation\n".to_owned(),
+            "  Checker: issue validation (built-in)\n".to_owned(),
+        ),
+        GateChecker::LabelTargetValidation { label_namespace } => (
+            format!("    Built-in: label-target validation ({label_namespace}:)\n"),
+            format!(
+                "  Checker: label-target validation (built-in, namespace: {label_namespace})\n"
+            ),
+        ),
+        GateChecker::RuleValidation { rule } => (
+            format!("    Built-in: rule validation ({rule})\n"),
+            format!("  Checker: rule validation (built-in, rule: {rule})\n"),
+        ),
+        GateChecker::ReviewPlaceholder => (
+            "    Built-in: WARNING — external review placeholder\n".to_owned(),
+            "  Checker: WARNING — external review placeholder\n".to_owned(),
+        ),
+    };
+    if preset {
+        preset_line
+    } else {
+        plain_line
     }
 }
 
