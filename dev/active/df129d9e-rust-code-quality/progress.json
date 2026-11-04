@@ -875,7 +875,8 @@
     "e5d618ee": 2,
     "153c9851": 1,
     "98cc2097": 1,
-    "20fc3b92": 1
+    "20fc3b92": 1,
+    "10751360": 1
   },
   "surfaced_pitfalls": [
     {
@@ -966,10 +967,10 @@
       "reason": "steward-assigned standalone task; node/process-spawning tests rule out the Codex sandbox"
     },
     "10751360": {
-      "status": "in_progress",
+      "status": "rework",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
-      "note": "worker holding for 12c0f3fb; resume with its landing commit"
+      "note": "lead review: list/search schema names regressed to generic; multi-id show lost load-error context"
     },
     "c9103fcf": {
       "status": "in_progress",
