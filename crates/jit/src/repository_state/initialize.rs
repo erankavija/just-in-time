@@ -33,7 +33,7 @@ use super::image::{
     RepositoryDelta, RepositoryEntry, RepositoryImage,
 };
 use super::mutation::{finalize_audit_append, fresh_index_bytes, MutationContext, MutationError};
-use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
+use super::path::{RepositoryLayoutError, VirtualPath};
 use super::profile_apply::ProfileTargetDecision;
 use super::rule_serialize::serialize_ruleset;
 use super::MaterializationDerivation;
@@ -42,6 +42,7 @@ use super::{
     ProfileApplicationInput, ProfileContributionMaterialization, ProfileTargetDisposition,
     ProfileTargetMaterialization,
 };
+use crate::domain::relative_path::RootRelativePath;
 
 /// The configuration schema version a fresh repository declares.
 pub const FRESH_CONFIG_SCHEMA_VERSION: u32 = 2;

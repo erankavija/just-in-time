@@ -1,8 +1,8 @@
 use crate::domain::identity::ProfileId;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
+use crate::domain::relative_path::RootRelativePath;
 use crate::profile::ProfilePackageModel;
 use crate::repository_state::FileMode;
-use crate::repository_state::RootRelativePath;
 use schemars::JsonSchema;
 use semver::Version;
 use serde::Serialize;

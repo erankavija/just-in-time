@@ -1,5 +1,6 @@
 use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::identity::ProfileId;
+use crate::domain::relative_path::RootRelativePath;
 use crate::domain::ProfileLifecycleOperation;
 use crate::profile::{
     build_profile_claims_from_resolved, capture_package_tree, pack_package_archive,
@@ -17,7 +18,7 @@ use crate::repository_state::{
     MaterializationRequest, MutationContext, PackageTreeCapture, ProfileApplicationInput,
     ProfileContributionClaim, RepositoryAction, RepositoryEntry, RepositoryExportDestination,
     RepositoryExportIntent, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryStateError, RootRelativePath, VirtualPath,
+    RepositoryStateError, VirtualPath,
 };
 use crate::storage::{IssueStore, RepositoryMutationSession, RepositoryStateStore, WorktreePaths};
 use anyhow::Result;
@@ -1476,8 +1477,7 @@ mod tests {
     use crate::profile::{ProfileApplyResult, ProfileContributionChange, ProfileTargetAction};
     use crate::repository_state::{
         Contribution, MapEntryTarget, ProfileTargetConflict, ProfileTargetConflictEntry,
-        ProfileTargetSubject, RepositoryStateError, RootRelativePath, ScalarTarget,
-        SetStringTarget,
+        ProfileTargetSubject, RepositoryStateError, ScalarTarget, SetStringTarget,
     };
     use crate::storage::JsonFileStorage;
     use crate::storage::{

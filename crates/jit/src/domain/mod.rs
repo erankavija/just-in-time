@@ -40,6 +40,7 @@ pub mod key_reference;
 pub mod list_envelope;
 pub mod projection;
 pub mod queries;
+pub mod relative_path;
 pub mod repository_inputs;
 pub mod store_divergence;
 pub mod type_taxonomy;

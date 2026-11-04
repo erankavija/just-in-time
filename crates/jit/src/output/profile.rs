@@ -1,11 +1,11 @@
 use super::{HumanRender, OutputMode};
 use crate::domain::identity::ProfileId;
+use crate::domain::relative_path::RootRelativePath;
 use crate::profile::{
     ProfileAddResult, ProfileApplicationStatus, ProfileComposedApplyResult,
     ProfileContributionChange, ProfilePackResult, ProfileShowResult, ProfileTargetAction,
     ProfileTargetChange,
 };
-use crate::repository_state::RootRelativePath;
 
 fn heading(
     id: &ProfileId,

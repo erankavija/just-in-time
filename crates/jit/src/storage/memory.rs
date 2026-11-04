@@ -9,10 +9,11 @@ use crate::domain::artifact_execution::ArchiveEvidenceRecord;
 use crate::domain::artifact_plan::PlanTarget;
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::{GateRunId, IssueId};
+use crate::domain::relative_path::RootRelativePath;
 use crate::domain::{Event, GateRunResult, Issue};
 use crate::repository_state::{
-    CapturedBytes, EntryIdentity, FileMode, RepositoryEntry, RepositoryRootClass, RootRelativePath,
-    VirtualPath,
+    CapturedBytes, EntryIdentity, FileMode, RepositoryEntry, RepositoryLayoutError,
+    RepositoryRootClass, VirtualPath,
 };
 use crate::storage::redo_apply::{check_interruption, occupied_directory};
 use crate::storage::{
@@ -412,6 +413,7 @@ impl InMemoryStorage {
                 break;
             }
             if let Ok(dir_path) = RootRelativePath::parse(dir)
+                .map_err(RepositoryLayoutError::from)
                 .and_then(|rel| VirtualPath::from_root(vpath.root_class(), rel))
             {
                 state
@@ -653,8 +655,10 @@ fn resolve(state: &MemoryRepositoryState, path: &VirtualPath) -> Result<(), Redo
             .unwrap_or_default()
             .to_string_lossy()
             .into_owned();
-        let ancestor =
-            VirtualPath::from_root(path.root_class(), RootRelativePath::parse(ancestor)?)?;
+        let ancestor = VirtualPath::from_root(
+            path.root_class(),
+            RootRelativePath::parse(ancestor).map_err(RepositoryLayoutError::from)?,
+        )?;
         match state.entries.get(&ancestor) {
             None | Some(RepositoryEntry::Absent) | Some(RepositoryEntry::Directory { .. }) => {
                 Ok(())
@@ -808,6 +812,7 @@ fn entry_without_following<'a>(
         .filter(|ancestor| !ancestor.as_os_str().is_empty())
         .map(|ancestor| {
             RootRelativePath::parse(ancestor)
+                .map_err(RepositoryLayoutError::from)
                 .and_then(|relative| VirtualPath::from_root(path.root_class(), relative))
                 .ok()
                 .and_then(|ancestor| state.entries.get(&ancestor))
