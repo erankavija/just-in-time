@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "796d66a7-6262-4a99-9cb1-92301c7b56be",
+      "status": "passed",
+      "updated_at": "2026-11-04T03:22:32.238884530Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "008d2b16-f93a-4283-833a-9d6c8ba42644",
+      "status": "failed",
+      "updated_at": "2026-11-04T03:28:18.412738737Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e5d618ee-a23a-4857-baa9-e0d5188b8614",
   "labels": [
     "type:task",
@@ -26,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derive server HTTP statuses from the library classification",
-  "updated_at": "2026-11-04T02:40:55.785095714Z"
+  "updated_at": "2026-11-04T03:28:18.412738737Z"
 }

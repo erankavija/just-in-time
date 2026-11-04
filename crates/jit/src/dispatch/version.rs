@@ -4,10 +4,7 @@ use super::Outcome;
 use crate::build_info::{version_info, VersionInfo};
 
 fn show() -> anyhow::Result<Outcome<VersionInfo>> {
-    Ok(Outcome::Success {
-        response: version_info(),
-        message: None,
-    })
+    Ok(Outcome::success(version_info()))
 }
 
 command_group! {
@@ -47,7 +44,13 @@ mod tests {
     fn test_dispatch_human_writes_version_info_rendering() {
         let (status, out) = run(false);
 
-        assert_eq!(out, version_info().render_human());
+        assert_eq!(
+            out,
+            version_info().render_human(OutputMode {
+                json: false,
+                quiet: false
+            })
+        );
         assert_eq!(status, ExitCode::Success);
     }
 
