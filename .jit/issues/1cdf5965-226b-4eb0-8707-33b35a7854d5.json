@@ -8,6 +8,7 @@
   ],
   "description": "Two existing graph bulk passes replace repeated lookups with pass-local indexes.\n\n## Success Criteria\n\n- [hard] REQ-01: Build node and cluster indexes once per bulk pass so GraphView and clusterAwareLayout avoid per-node array searches; tests preserve layout and refresh behavior without adding container selection policy.\n\n## Notes\n\nSee `dev/active/0f8efc37-frontends-share-core/plan.md` and its linked investigation for scope and existing consumers.\n",
   "documents": [],
+  "done_at": "2026-11-04T23:22:20.335407686Z",
   "first_ready_at": "2026-11-04T22:24:54.946576604Z",
   "gates_required": [
     "npm-ci",
@@ -15,9 +16,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "run_id": "68aded08-89b2-4278-afeb-660cbfc161ad",
+      "run_id": "7c79b366-4d6f-4cbd-b405-cd7cd27384d5",
       "status": "passed",
-      "updated_at": "2026-11-04T23:16:31.175947667Z",
+      "updated_at": "2026-11-04T23:21:33.770897588Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
@@ -37,7 +38,7 @@
     "satisfies:3a61ff16/REQ-01"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Index graph layout and refresh passes",
-  "updated_at": "2026-11-04T23:16:31.175947667Z"
+  "updated_at": "2026-11-04T23:22:20.335407686Z"
 }
