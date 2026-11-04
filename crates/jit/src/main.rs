@@ -6384,23 +6384,28 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
             ClaimCommands::Renew {
-                lease_id,
+                issue_id,
                 extension,
             } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match executor.claims().renew(&lease_id, extension) {
+                match resolve_issue(&storage, &issue_id)
+                    .and_then(|full_id| executor.claims().renew(&full_id, extension))
+                {
                     Ok((renewed_lease, warnings)) => {
                         if json {
                             let response = serde_json::json!({
+                                "message": format!(
+                                    "Renewed lease {} by {} seconds",
+                                    renewed_lease.lease_id, extension
+                                ),
                                 "lease": renewed_lease,
                                 "warnings": warnings,
-                                "message": format!("Renewed lease {} by {} seconds", lease_id, extension),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Renewed lease: {}", lease_id);
+                            println!("Renewed lease: {}", renewed_lease.lease_id);
                             println!("  Issue: {}", renewed_lease.issue_id);
                             println!("  Extended by: {} seconds", extension);
                             if let Some(expires_at) = renewed_lease.expires_at {
@@ -6423,21 +6428,25 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     }
                 }
             }
-            ClaimCommands::Heartbeat { lease_id } => {
+            ClaimCommands::Heartbeat { issue_id } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match executor.claims().heartbeat(&lease_id) {
-                    Ok(warnings) => {
+                match resolve_issue(&storage, &issue_id)
+                    .and_then(|full_id| executor.claims().heartbeat(&full_id))
+                {
+                    Ok((lease, warnings)) => {
                         if json {
                             let response = serde_json::json!({
-                                "lease_id": lease_id,
+                                "lease_id": lease.lease_id,
+                                "issue_id": lease.issue_id,
                                 "warnings": warnings,
-                                "message": format!("Heartbeat sent for lease {}", lease_id),
+                                "message": format!("Heartbeat sent for lease {}", lease.lease_id),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Heartbeat sent: {}", lease_id);
+                            println!("Heartbeat sent: {}", lease.lease_id);
+                            println!("  Issue: {}", lease.issue_id);
                             let output_ctx = OutputContext::new(quiet, json);
                             for warning in &warnings {
                                 output_ctx.print_warning(warning)?;
@@ -6519,22 +6528,30 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     }
                 }
             }
-            ClaimCommands::ForceEvict { lease_id, reason } => {
+            ClaimCommands::ForceEvict { issue_id, reason } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match executor.claims().force_evict(&lease_id, &reason) {
-                    Ok(warnings) => {
+                // Matched against stored leases, not issues, so a lease on a
+                // deleted issue stays evictable.
+                match issue_id
+                    .parse::<jit::domain::identity::IssueIdPrefix>()
+                    .map_err(anyhow::Error::from)
+                    .and_then(|prefix| executor.claims().force_evict(&prefix, &reason))
+                {
+                    Ok((evicted, warnings)) => {
                         if json {
                             let response = serde_json::json!({
-                                "lease_id": lease_id,
+                                "lease_id": evicted.lease_id,
+                                "issue_id": evicted.issue_id,
                                 "reason": reason,
                                 "warnings": warnings,
-                                "message": format!("Force-evicted lease {}", lease_id),
+                                "message": format!("Force-evicted lease {}", evicted.lease_id),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Force-evicted lease: {}", lease_id);
+                            println!("Force-evicted lease: {}", evicted.lease_id);
+                            println!("  Issue: {}", evicted.issue_id);
                             println!("  Reason: {}", reason);
                             let output_ctx = OutputContext::new(quiet, json);
                             for warning in &warnings {
@@ -6830,7 +6847,7 @@ fn print_lease(listed: &jit::commands::claim::ListedLease) {
             );
             println!(
                 "     Use 'jit claim heartbeat {}' to refresh",
-                lease.lease_id
+                lease.issue_id.short_id()
             );
         }
     }

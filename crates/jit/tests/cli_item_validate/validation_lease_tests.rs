@@ -124,6 +124,10 @@ fn test_validate_leases_detects_missing_worktree() {
         stderr.contains(&worktree_id),
         "Error should reference worktree ID"
     );
+    assert!(
+        stderr.contains(&format!("jit claim force-evict {}", &issue_id[..8])),
+        "Remedy should force-evict by issue: {stderr}"
+    );
 }
 
 #[test]
@@ -156,6 +160,10 @@ fn test_validate_leases_detects_missing_issue() {
     assert!(
         stderr.contains(&fake_issue_id[..8]),
         "Error should reference issue ID"
+    );
+    assert!(
+        stderr.contains(&format!("jit claim force-evict {}", &fake_issue_id[..8])),
+        "Remedy should force-evict by issue: {stderr}"
     );
 }
 
