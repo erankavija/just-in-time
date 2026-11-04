@@ -1,0 +1,89 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/41d07c6b-usability",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 6242,
+            "sha256": "20ddf1d2043deb0cbcbebca1235aa93434b11660a8c4a36c0a2f5f4e8e0a5bef"
+          },
+          "source": "dev/active/fdb039ee-modular-document-rendering.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 6242,
+            "sha256": "20ddf1d2043deb0cbcbebca1235aa93434b11660a8c4a36c0a2f5f4e8e0a5bef"
+          },
+          "destination": "dev/archive/41d07c6b-usability/dev/active/fdb039ee-modular-document-rendering.md",
+          "source": "dev/active/fdb039ee-modular-document-rendering.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "5b027353553f54ee4028bc22698466c9e7a55672edc5197634bf99eae9b6f856"
+          },
+          "destination": "dev/archive/41d07c6b-usability/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/fdb039ee-modular-document-rendering.md",
+          "issue": "fdb039ee-7073-4f19-8e52-71c1d99a66c6",
+          "to_path": "dev/archive/41d07c6b-usability/dev/active/fdb039ee-modular-document-rendering.md"
+        }
+      ],
+      "target": {
+        "id": "41d07c6b-24ff-4d4d-8f7f-56daba93bfd7",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/41d07c6b-usability",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 550,
+            "sha256": "1ef6b9006f185afaaa5c4e962bf918739e0c0ce7b8981baaaf15dbd22abc3dbf"
+          },
+          "source": "dev/active/41d07c6b-24ff-4d4d-8f7f-56daba93bfd7-plan.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 550,
+            "sha256": "1ef6b9006f185afaaa5c4e962bf918739e0c0ce7b8981baaaf15dbd22abc3dbf"
+          },
+          "destination": "dev/archive/41d07c6b-usability/dev/active/41d07c6b-24ff-4d4d-8f7f-56daba93bfd7-plan.md",
+          "source": "dev/active/41d07c6b-24ff-4d4d-8f7f-56daba93bfd7-plan.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/41d07c6b-24ff-4d4d-8f7f-56daba93bfd7-plan.md",
+          "issue": "41d07c6b-24ff-4d4d-8f7f-56daba93bfd7",
+          "to_path": "dev/archive/41d07c6b-usability/dev/active/41d07c6b-24ff-4d4d-8f7f-56daba93bfd7-plan.md"
+        }
+      ],
+      "target": {
+        "id": "41d07c6b-24ff-4d4d-8f7f-56daba93bfd7",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "41d07c6b-24ff-4d4d-8f7f-56daba93bfd7",
+    "kind": "container"
+  }
+}

@@ -1,0 +1,311 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/f3f7de97-guards-and-ergonomics",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 15750,
+            "sha256": "ba89ab8b5dd244c1d6a427843536415ba2bd1d69ae608c034d44d1bfb5c0d12d"
+          },
+          "source": "dev/active/06f1fa95/load-independence-verification.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 9249,
+            "sha256": "3c8d316b00748a5afba9bddae4df4696cc0dafa15e3418648c88cdd046ae103c"
+          },
+          "source": "dev/active/06f1fa95/load-trace-2026-08-05.csv"
+        },
+        {
+          "content_identity": {
+            "byte_size": 3216,
+            "sha256": "492ac6f0b027be60e8f8650325329ac5bfee134b1d692421ec1a6242406e1182"
+          },
+          "source": "dev/active/15afa1f8/15afa1f8-seeded-regression.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 6937,
+            "sha256": "4b5b9b7bbd234f5f44623c48767a1a7487859c9fb7febc4895e7925d11146985"
+          },
+          "source": "dev/active/3923fd06/measurement-report.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 4678,
+            "sha256": "7f4648564d133aa21fa1a92df0d373c27d2626780c7620b2252dd40af18423f3"
+          },
+          "source": "dev/active/400a8539/400a8539-seeded-regression.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 29069,
+            "sha256": "338bbe3294f9376dc893c6e26f9b8e4b6014253891ee320f6a25a543587c7fe2"
+          },
+          "source": "dev/active/4c700c80/4c700c80-host-load-survey.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 17620,
+            "sha256": "df6a2f89218df0d313435c8f336c717bae7fca8ac53ed1e038b853679fd2b9bd"
+          },
+          "source": "dev/active/57675b68/57675b68-host-load-survey.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 6158,
+            "sha256": "285c2d40efbfebce53191cbe362a1242aac39eb2922ba4017ded509cf380f7f8"
+          },
+          "source": "dev/active/91cc038c/91cc038c-unreachable-wait-evidence.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 3290,
+            "sha256": "2d120deec14ba3dfbaaa14f2cbffff99d4e6f7c334f5181a3dbb4e5b621356eb"
+          },
+          "source": "dev/active/e3c6c767/e3c6c767-seeded-regressions.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 12861,
+            "sha256": "3fb709d9112226a28d33645a0b7b34f0bf968762b390fafbb44f23f14a7edef4"
+          },
+          "source": "dev/active/f3f7de97-guards-and-ergonomics/completion-report.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 7679,
+            "sha256": "90ff725e6330929c6dfa2ed73000b17f81be6ce5e7513ec896daf9ceca734f0f"
+          },
+          "source": "dev/active/f3f7de97-guards-and-ergonomics/hosted-ci-evidence.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 4763,
+            "sha256": "608d6e1f68d953bad9401c1ff2db1404d93bc686bdede068e1235d44a5550aa4"
+          },
+          "source": "dev/active/f3f7de97-guards-and-ergonomics/plan.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 31582,
+            "sha256": "a2ec7aaa77c05e895179d2d4adffb9e111bf67343eddc3e222bdddd2596d00ba"
+          },
+          "source": "dev/active/f3f7de97-guards-and-ergonomics/progress.json"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 15750,
+            "sha256": "ba89ab8b5dd244c1d6a427843536415ba2bd1d69ae608c034d44d1bfb5c0d12d"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/06f1fa95/load-independence-verification.md",
+          "source": "dev/active/06f1fa95/load-independence-verification.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 9249,
+            "sha256": "3c8d316b00748a5afba9bddae4df4696cc0dafa15e3418648c88cdd046ae103c"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/06f1fa95/load-trace-2026-08-05.csv",
+          "source": "dev/active/06f1fa95/load-trace-2026-08-05.csv"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 3216,
+            "sha256": "492ac6f0b027be60e8f8650325329ac5bfee134b1d692421ec1a6242406e1182"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/15afa1f8/15afa1f8-seeded-regression.md",
+          "source": "dev/active/15afa1f8/15afa1f8-seeded-regression.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 6937,
+            "sha256": "4b5b9b7bbd234f5f44623c48767a1a7487859c9fb7febc4895e7925d11146985"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/3923fd06/measurement-report.md",
+          "source": "dev/active/3923fd06/measurement-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4678,
+            "sha256": "7f4648564d133aa21fa1a92df0d373c27d2626780c7620b2252dd40af18423f3"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/400a8539/400a8539-seeded-regression.md",
+          "source": "dev/active/400a8539/400a8539-seeded-regression.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 29069,
+            "sha256": "338bbe3294f9376dc893c6e26f9b8e4b6014253891ee320f6a25a543587c7fe2"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/4c700c80/4c700c80-host-load-survey.md",
+          "source": "dev/active/4c700c80/4c700c80-host-load-survey.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 17620,
+            "sha256": "df6a2f89218df0d313435c8f336c717bae7fca8ac53ed1e038b853679fd2b9bd"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/57675b68/57675b68-host-load-survey.md",
+          "source": "dev/active/57675b68/57675b68-host-load-survey.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 6158,
+            "sha256": "285c2d40efbfebce53191cbe362a1242aac39eb2922ba4017ded509cf380f7f8"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/91cc038c/91cc038c-unreachable-wait-evidence.md",
+          "source": "dev/active/91cc038c/91cc038c-unreachable-wait-evidence.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 3290,
+            "sha256": "2d120deec14ba3dfbaaa14f2cbffff99d4e6f7c334f5181a3dbb4e5b621356eb"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/e3c6c767/e3c6c767-seeded-regressions.md",
+          "source": "dev/active/e3c6c767/e3c6c767-seeded-regressions.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 12861,
+            "sha256": "3fb709d9112226a28d33645a0b7b34f0bf968762b390fafbb44f23f14a7edef4"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/completion-report.md",
+          "source": "dev/active/f3f7de97-guards-and-ergonomics/completion-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 7679,
+            "sha256": "90ff725e6330929c6dfa2ed73000b17f81be6ce5e7513ec896daf9ceca734f0f"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/hosted-ci-evidence.md",
+          "source": "dev/active/f3f7de97-guards-and-ergonomics/hosted-ci-evidence.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4763,
+            "sha256": "608d6e1f68d953bad9401c1ff2db1404d93bc686bdede068e1235d44a5550aa4"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/plan.md",
+          "source": "dev/active/f3f7de97-guards-and-ergonomics/plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 31582,
+            "sha256": "a2ec7aaa77c05e895179d2d4adffb9e111bf67343eddc3e222bdddd2596d00ba"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/active/progress.json",
+          "source": "dev/active/f3f7de97-guards-and-ergonomics/progress.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "ba0dab9c1c3c53fbd953b206913c2c1d521d46e422516237dd6d4473839f90de"
+          },
+          "destination": "dev/archive/f3f7de97-guards-and-ergonomics/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/06f1fa95/load-independence-verification.md",
+          "issue": "06f1fa95-2aa4-4493-a31e-1f149f3deee9",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/06f1fa95/load-independence-verification.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/15afa1f8/15afa1f8-seeded-regression.md",
+          "issue": "15afa1f8-5b3a-4c18-bc63-b7e237b837ee",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/15afa1f8/15afa1f8-seeded-regression.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/3923fd06/measurement-report.md",
+          "issue": "3923fd06-5bed-4ff9-934c-0e6ceb453c67",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/3923fd06/measurement-report.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/400a8539/400a8539-seeded-regression.md",
+          "issue": "400a8539-178e-406c-b4fc-7bc51d7155dd",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/400a8539/400a8539-seeded-regression.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/4c700c80/4c700c80-host-load-survey.md",
+          "issue": "4c700c80-09af-4cd9-83b6-9a71309e9007",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/4c700c80/4c700c80-host-load-survey.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/57675b68/57675b68-host-load-survey.md",
+          "issue": "57675b68-78dd-470b-a524-30061b488062",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/57675b68/57675b68-host-load-survey.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/91cc038c/91cc038c-unreachable-wait-evidence.md",
+          "issue": "91cc038c-8897-482d-ac69-da72a30bd739",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/91cc038c/91cc038c-unreachable-wait-evidence.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/e3c6c767/e3c6c767-seeded-regressions.md",
+          "issue": "e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/e3c6c767/e3c6c767-seeded-regressions.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/f3f7de97-guards-and-ergonomics/plan.md",
+          "issue": "f3f7de97-7315-4780-8389-9c857da29239",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/plan.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/f3f7de97-guards-and-ergonomics/hosted-ci-evidence.md",
+          "issue": "f3f7de97-7315-4780-8389-9c857da29239",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/hosted-ci-evidence.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/f3f7de97-guards-and-ergonomics/completion-report.md",
+          "issue": "f3f7de97-7315-4780-8389-9c857da29239",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/completion-report.md"
+        },
+        {
+          "document_index": 3,
+          "from_path": "dev/active/f3f7de97-guards-and-ergonomics/progress.json",
+          "issue": "f3f7de97-7315-4780-8389-9c857da29239",
+          "to_path": "dev/archive/f3f7de97-guards-and-ergonomics/active/progress.json"
+        }
+      ],
+      "target": {
+        "id": "f3f7de97-7315-4780-8389-9c857da29239",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "f3f7de97-7315-4780-8389-9c857da29239",
+    "kind": "container"
+  }
+}

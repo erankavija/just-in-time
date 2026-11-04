@@ -1,0 +1,422 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/4b7c06d0-test-suite-performance",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 38297,
+            "sha256": "4dff38d72e023f89b1f39fd01fbc71d14f2af95c0a4ba4913158d697a09a33bc"
+          },
+          "source": "dev/active/4b7c06d0-test-suite-performance/breakdown.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 7358,
+            "sha256": "205432fb8a256751dcaab47f6590dfe8862bcf589f32edc8fe08491156c23c9d"
+          },
+          "source": "dev/active/4b7c06d0-test-suite-performance/completion-report.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 4106,
+            "sha256": "c7fe96771aa104e7ef4cd2c523a2a5cdc9cc1bcc392fd1f2d898a563c67d4479"
+          },
+          "source": "dev/active/4b7c06d0-test-suite-performance/handoff-2.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 9422,
+            "sha256": "f2968c200d5281caf17b2025b1a407322da1f4301dcfbb4608cb4e26b47d690c"
+          },
+          "source": "dev/active/4b7c06d0-test-suite-performance/handoff.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 35731,
+            "sha256": "06179a7e3e28c58149810360fd99e138eae21e8f835cfd8788d3aec39dfb8ef2"
+          },
+          "source": "dev/active/4b7c06d0-test-suite-performance/investigation.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 14561,
+            "sha256": "ec80981de2073b5f3d7456edb779203bfe3d59cf197a6779eeb6411f08421cb0"
+          },
+          "source": "dev/active/4b7c06d0-test-suite-performance/plan.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 33562,
+            "sha256": "7c76913bd9d0596854084b372929a0878f344335e976e25833c46e7f3490b6e1"
+          },
+          "source": "dev/active/4b7c06d0-test-suite-performance/progress.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 1906,
+            "sha256": "01d03839fbb6a9f7d2879ec7481604b593d0b50d22b014f795ba4b89fc8066b3"
+          },
+          "source": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/README.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 11562,
+            "sha256": "339931b24c54d0279d7f7e2cb178494ea2e0e2368538c1b1c6fba437dae7ca21"
+          },
+          "source": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/compiler-audit.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 31414,
+            "sha256": "1596a035608fb84242b3e1c784449027dc30867f057f57896705b00a74c7d598"
+          },
+          "source": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/rejected-candidate.patch"
+        },
+        {
+          "content_identity": {
+            "byte_size": 7006,
+            "sha256": "5ce16793e67d820e2cf99ff51ec3dfa3127de151e0ed34933742477e9cb7fd55"
+          },
+          "source": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/summary.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 2324,
+            "sha256": "b720c26a7d3e51c86703bc6c6bbb838e5bab4fdbc62ddd36b3e9c9daea0a7e7f"
+          },
+          "source": "dev/benchmarks/provenance-removal-355565c2/README.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 60199,
+            "sha256": "6cc81c6e3572de230304ecc2709d4662630ec28a3117fff7e7c4b7e57cc48cd3"
+          },
+          "source": "dev/benchmarks/test-suite-performance-4b7c06d0.json"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 42742,
+            "sha256": "222b44b4ca605c5ecd63ac97e3702d23d562327660ddbdbfe2db2ed472c14d2c"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/TESTING.md",
+          "source": "dev/TESTING.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 38297,
+            "sha256": "4dff38d72e023f89b1f39fd01fbc71d14f2af95c0a4ba4913158d697a09a33bc"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/active/breakdown.json",
+          "source": "dev/active/4b7c06d0-test-suite-performance/breakdown.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 7358,
+            "sha256": "205432fb8a256751dcaab47f6590dfe8862bcf589f32edc8fe08491156c23c9d"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/active/completion-report.md",
+          "source": "dev/active/4b7c06d0-test-suite-performance/completion-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4106,
+            "sha256": "c7fe96771aa104e7ef4cd2c523a2a5cdc9cc1bcc392fd1f2d898a563c67d4479"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/active/handoff-2.md",
+          "source": "dev/active/4b7c06d0-test-suite-performance/handoff-2.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 9422,
+            "sha256": "f2968c200d5281caf17b2025b1a407322da1f4301dcfbb4608cb4e26b47d690c"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/active/handoff.md",
+          "source": "dev/active/4b7c06d0-test-suite-performance/handoff.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 35731,
+            "sha256": "06179a7e3e28c58149810360fd99e138eae21e8f835cfd8788d3aec39dfb8ef2"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/active/investigation.md",
+          "source": "dev/active/4b7c06d0-test-suite-performance/investigation.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 14561,
+            "sha256": "ec80981de2073b5f3d7456edb779203bfe3d59cf197a6779eeb6411f08421cb0"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/active/plan.md",
+          "source": "dev/active/4b7c06d0-test-suite-performance/plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 33562,
+            "sha256": "7c76913bd9d0596854084b372929a0878f344335e976e25833c46e7f3490b6e1"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/active/progress.json",
+          "source": "dev/active/4b7c06d0-test-suite-performance/progress.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 21802,
+            "sha256": "72a6ea2226c5fc3496473e27566ae98cb90c2eacc50491a9009434f3f0145d2c"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/architecture/repository-state-materialization.md",
+          "source": "dev/architecture/repository-state-materialization.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4606,
+            "sha256": "b31238e91ee7bed867b363705ea8906e6c1d50ceef1a99ed0db9da77d8207ea0"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/cold-warm-verdict-0708d692/README.md",
+          "source": "dev/benchmarks/cold-warm-verdict-0708d692/README.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 1906,
+            "sha256": "01d03839fbb6a9f7d2879ec7481604b593d0b50d22b014f795ba4b89fc8066b3"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/jit-library-artifact-wrapper-b883f916/README.md",
+          "source": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/README.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 11562,
+            "sha256": "339931b24c54d0279d7f7e2cb178494ea2e0e2368538c1b1c6fba437dae7ca21"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/jit-library-artifact-wrapper-b883f916/compiler-audit.json",
+          "source": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/compiler-audit.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 31414,
+            "sha256": "1596a035608fb84242b3e1c784449027dc30867f057f57896705b00a74c7d598"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/jit-library-artifact-wrapper-b883f916/rejected-candidate.patch",
+          "source": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/rejected-candidate.patch"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 7006,
+            "sha256": "5ce16793e67d820e2cf99ff51ec3dfa3127de151e0ed34933742477e9cb7fd55"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/jit-library-artifact-wrapper-b883f916/summary.json",
+          "source": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/summary.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 2324,
+            "sha256": "b720c26a7d3e51c86703bc6c6bbb838e5bab4fdbc62ddd36b3e9c9daea0a7e7f"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/provenance-removal-355565c2/README.md",
+          "source": "dev/benchmarks/provenance-removal-355565c2/README.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 6740,
+            "sha256": "44257b0c38515c9150cd8ee1f89dc59093772ef0a0e653a6946f5944906a088a"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/rust-build-budgets/README.md",
+          "source": "dev/benchmarks/rust-build-budgets/README.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 5013,
+            "sha256": "80aa4dbd99abed89d5d4edaf1480c13c1885471de9d96c7c4598e8a5b741e4bf"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/rust-build-efficiency/baseline.json",
+          "source": "dev/benchmarks/rust-build-efficiency/baseline.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4399,
+            "sha256": "9261a47f942f6e6312e913def9927a4fd6fc9639325cbd0f6d8d29f1fd868390"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/rust-build-efficiency/optimized.json",
+          "source": "dev/benchmarks/rust-build-efficiency/optimized.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 471662,
+            "sha256": "ccd40904bb046626b165d30e40564d4329b56b496ba402e842d813c47f86eff0"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/rust-build-efficiency/post-change-test-inventory.json",
+          "source": "dev/benchmarks/rust-build-efficiency/post-change-test-inventory.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 478622,
+            "sha256": "a9798c9b7848d34d3bf6568380582cf439526fc52048eb254b09ea006c6b12e8"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/rust-build-efficiency/pre-change-test-inventory.json",
+          "source": "dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 31387,
+            "sha256": "4da3d262647ed29067c08ad72d7732ddcf9f464394d816f126c72f80b0ba188d"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/rust-build-efficiency/raw/clean-1/executable-remeasure.json",
+          "source": "dev/benchmarks/rust-build-efficiency/raw/clean-1/executable-remeasure.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 28160,
+            "sha256": "2c04f2b39aeb35eb79a7456bcc4fb91d4b39f7e0de27a68f4225113a51e9c4c5"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/rust-build-efficiency/report.md",
+          "source": "dev/benchmarks/rust-build-efficiency/report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 3051,
+            "sha256": "64f4b299ec879433754f51911f52d6a670b75c085d01c8102d365c331e321fe6"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/suite-enforcement-4b7c06d0/README.md",
+          "source": "dev/benchmarks/suite-enforcement-4b7c06d0/README.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 60199,
+            "sha256": "6cc81c6e3572de230304ecc2709d4662630ec28a3117fff7e7c4b7e57cc48cd3"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/test-suite-performance-4b7c06d0.json",
+          "source": "dev/benchmarks/test-suite-performance-4b7c06d0.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "7a921386dd6222764c4d87504b71e131cff306f7bfc6e8ee0fe97cd50c99cbda"
+          },
+          "destination": "dev/archive/4b7c06d0-test-suite-performance/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/architecture/repository-state-materialization.md",
+          "issue": "007f598b-424d-4df3-8191-12d7d2378527",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/architecture/repository-state-materialization.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/benchmarks/test-suite-performance-4b7c06d0.json",
+          "issue": "0369e563-9bde-4695-bdf2-0166172f1d6e",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/test-suite-performance-4b7c06d0.json"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/benchmarks/provenance-removal-355565c2/README.md",
+          "issue": "355565c2-2f98-45f0-b655-7bb29117e54d",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/provenance-removal-355565c2/README.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/4b7c06d0-test-suite-performance/handoff.md",
+          "issue": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/active/handoff.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/4b7c06d0-test-suite-performance/progress.json",
+          "issue": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/active/progress.json"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/4b7c06d0-test-suite-performance/handoff-2.md",
+          "issue": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/active/handoff-2.md"
+        },
+        {
+          "document_index": 3,
+          "from_path": "dev/active/4b7c06d0-test-suite-performance/completion-report.md",
+          "issue": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/active/completion-report.md"
+        },
+        {
+          "document_index": 4,
+          "from_path": "dev/benchmarks/suite-enforcement-4b7c06d0/README.md",
+          "issue": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/suite-enforcement-4b7c06d0/README.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/README.md",
+          "issue": "b883f916-e53a-4c77-b104-10fb4defb456",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/jit-library-artifact-wrapper-b883f916/README.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/TESTING.md",
+          "issue": "ee809651-fdd6-47c6-8a6d-4b8f6e819c3b",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/TESTING.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/4b7c06d0-test-suite-performance/investigation.md",
+          "issue": "eebb3fee-b234-47bf-9859-24b6de87a347",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/active/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/4b7c06d0-test-suite-performance/plan.md",
+          "issue": "eebb3fee-b234-47bf-9859-24b6de87a347",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/active/plan.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/4b7c06d0-test-suite-performance/breakdown.json",
+          "issue": "eebb3fee-b234-47bf-9859-24b6de87a347",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/active/breakdown.json"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/benchmarks/test-suite-performance-4b7c06d0.json",
+          "issue": "efebd963-e33a-4ac8-9e9f-225de607fb44",
+          "to_path": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/test-suite-performance-4b7c06d0.json"
+        }
+      ],
+      "target": {
+        "id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
+    "kind": "container"
+  }
+}

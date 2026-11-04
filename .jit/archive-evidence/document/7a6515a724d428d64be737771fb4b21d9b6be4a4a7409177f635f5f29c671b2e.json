@@ -1,0 +1,37 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 15462,
+            "sha256": "2fc74346ff6cd34145cdfc1264ac4b1fa593770ee9c25bb15b10632fe9b075f7"
+          },
+          "source": "dev/active/a2546471-json-error-contract/progress.json"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 15462,
+            "sha256": "2fc74346ff6cd34145cdfc1264ac4b1fa593770ee9c25bb15b10632fe9b075f7"
+          },
+          "destination": "dev/archive/dev/active/a2546471-json-error-contract/progress.json",
+          "source": "dev/active/a2546471-json-error-contract/progress.json"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "kind": "document",
+        "path": "dev/active/a2546471-json-error-contract/progress.json"
+      }
+    }
+  ],
+  "target": {
+    "kind": "document",
+    "path": "dev/active/a2546471-json-error-contract/progress.json"
+  }
+}
