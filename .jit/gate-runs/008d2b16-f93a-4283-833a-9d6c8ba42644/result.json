@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d735276b5d6260473734071b383e36b6d1266e09",
+  "completed_at": "2026-11-04T03:28:18.105922676Z",
+  "duration_ms": 345437,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/server/src/routes.rs",
+        "id": "F1",
+        "line": 1010,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e5d618ee/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "Malformed gate-run IDs are rejected by Axum before classification, so this route does not derive its status from classify."
+      }
+    ],
+    "summary": "Malformed gate-run IDs bypass the shared classification-to-status projection.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e5d618ee-a23a-4857-baa9-e0d5188b8614",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "008d2b16-f93a-4283-833a-9d6c8ba42644",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T03:22:32.668602760Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8603 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a494-6f2f-70e1-a686-477cfd9bc4a2\n--------\nuser\n--- 8590 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2ae4b45ec, 358b8a0fb, 581febe27, 8a1398ccf (`jit:e5d618ee`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e5d618ee/requirement/REQ-01–REQ-04 and @/issue/df129d9e/requirement/REQ-14 — issue descriptions (markdown-first); @/invariant/orthogonal-tests and @/invariant/essential-code-prose — .jit/invariants.toml\nGate evidence: cargo-ci — passed, exit 0 (2026-11-04T03:22:01Z)\nTruncation recovery: individual commit patches/stats, split primary patch reads, and narrow current route, test, identity, and classifier reads\n\n1. **[blocking][issue-impact] F1** — `get_gate_run` extracts `GateRunId` directly in the Axum path extractor at [routes.rs](/home/vkaskivuo/Projects/just-in-time/crates/server/src/routes.rs:1010), so malformed run IDs are rejected before `reject` calls `status_of(classify(...))`. `InvalidGateRunIdError` has no classifier case and would fall through to `GenericError` (500), while the extractor returns its own 400. This violates the requirement that every route failure derive its status from classification. References: @/issue/e5d618ee/requirement/REQ-02.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Malformed gate-run IDs bypass the shared classification-to-status projection.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Malformed gate-run IDs are rejected by Axum before classification, so this route does not derive its status from classify.\",\"file\":\"crates/server/src/routes.rs\",\"line\":1010,\"references\":[\"@/issue/e5d618ee/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

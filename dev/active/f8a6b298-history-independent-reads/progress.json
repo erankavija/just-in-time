@@ -670,6 +670,12 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "critical path: gate-run records under their issue (format-4 layout)"
+    },
+    {
+      "id": "944edb32",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "format-4 rewrite tooling; reads five repos read-only, scratch copies"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
