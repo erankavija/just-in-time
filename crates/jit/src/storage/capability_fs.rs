@@ -31,7 +31,11 @@ pub struct CapabilityRoots {
 ///
 /// Holding it pins the directory it opened: a record committed through it
 /// lands there however the path is rebound afterwards.
-pub struct DataRoot(Dir);
+pub struct DataRoot {
+    directory: Dir,
+    #[cfg(test)]
+    refuse_sync: bool,
+}
 
 impl DataRoot {
     /// Open the directory at the absolute `path` without following links.
@@ -41,15 +45,35 @@ impl DataRoot {
     /// Returns an error when `path` is relative, is absent, or resolves
     /// through a link.
     pub fn open(path: &Path) -> Result<Self, CapabilityFsError> {
-        open_absolute_dir_nofollow(path).map(Self)
+        open_absolute_dir_nofollow(path).map(Self::from_dir)
     }
 
     pub(in crate::storage) fn from_dir(directory: Dir) -> Self {
-        Self(directory)
+        Self {
+            directory,
+            #[cfg(test)]
+            refuse_sync: false,
+        }
     }
 
     pub(in crate::storage) fn dir(&self) -> &Dir {
-        &self.0
+        &self.directory
+    }
+
+    /// Fsync the root, so entries created in it are durable.
+    pub(in crate::storage) fn sync(&self) -> std::io::Result<()> {
+        #[cfg(test)]
+        if self.refuse_sync {
+            return Err(std::io::Error::other("injected root fsync failure"));
+        }
+        sync_capability_directory(&self.directory)
+    }
+
+    /// Test seam: a handle whose root fsync fails.
+    #[cfg(test)]
+    pub(in crate::storage) fn refusing_sync(mut self) -> Self {
+        self.refuse_sync = true;
+        self
     }
 }
 

@@ -44,16 +44,16 @@ use std::sync::Arc;
 /// occupied, or a write or sync fails.
 pub fn commit_redo_record(root: &DataRoot, record: &RedoRecord) -> anyhow::Result<()> {
     let bytes = record.serialize()?;
-    let root = root.dir();
-    let scratch = match root.create_dir(RECORD_SCRATCH_DIR) {
+    let dir = root.dir();
+    let scratch = match dir.create_dir(RECORD_SCRATCH_DIR) {
         Ok(()) => {
-            adopt_mode(root, RECORD_SCRATCH_DIR)?;
-            let scratch = open_child_dir_nofollow(root, RECORD_SCRATCH_DIR)?;
-            sync_capability_directory(root)?;
+            adopt_mode(dir, RECORD_SCRATCH_DIR)?;
+            let scratch = open_child_dir_nofollow(dir, RECORD_SCRATCH_DIR)?;
+            root.sync()?;
             scratch
         }
         Err(error) if error.kind() == ErrorKind::AlreadyExists => {
-            open_child_dir_nofollow(root, RECORD_SCRATCH_DIR)?
+            open_child_dir_nofollow(dir, RECORD_SCRATCH_DIR)?
         }
         Err(error) => return Err(error.into()),
     };
@@ -761,6 +761,22 @@ mod tests {
             mode(&data_root.join(RECORD_SCRATCH_DIR)),
             mode(&data_root),
             "the scratch directory does not carry the data root's mode"
+        );
+    }
+
+    /// The record write follows the root's fsync: a root whose fsync fails
+    /// receives no record.
+    #[test]
+    fn test_commit_redo_record_writes_nothing_when_the_root_fsync_fails() {
+        let data_root = tempfile::tempdir().unwrap();
+        let root = held(data_root.path()).refusing_sync();
+
+        let outcome = commit_redo_record(&root, &sample_record());
+
+        assert!(outcome.is_err(), "the unsyncable data root went unreported");
+        assert!(
+            !committed_path(data_root.path()).exists(),
+            "the record was written under a scratch directory the data root never made durable"
         );
     }
 
