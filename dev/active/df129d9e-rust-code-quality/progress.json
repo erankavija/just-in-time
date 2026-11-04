@@ -1369,10 +1369,10 @@
       "review": "lead PASS at 1f76f1deb: gate status/status-all handlers, transposed-arg predicate typed INVALID_ARGUMENT, not-run typed, status-all findings GATE_FAILED; whole-crate -114"
     },
     "24a982b7": {
-      "status": "rework",
+      "status": "landing",
       "vendor": "Claude Sonnet",
       "reason": "query/status handler move; parallel with f87f9b00 (disjoint arms)",
-      "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44) Landed; code-review 993773cc F1: commands constructs output StatusResponse (dependency direction). Rework 1 to same worker."
+      "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44) Landed; code-review 993773cc F1: commands constructs output StatusResponse (dependency direction). Rework 1 to same worker. Rework 1 at 3c9dd70af: lead PASS; StatusSummary restored, From into output; +35 on top of the first landing's -8."
     },
     "ceaaf0ab": {
       "status": "done",
@@ -1382,13 +1382,20 @@
       "review": "lead PASS at 6d721625c: ProposedLayoutViolation domain error, typed repository_inputs errors, no anyhow in domain types; +19 (b697a3f7 ledger). Worker checked out the merge base to measure (forbidden; restored). Landing CI: all tests passed, suite-clock budget failed (38.9 s vs 30 s) from a cold doctest build (25.2 s; cold 20.3 s / warm 3.2 s on rerun). Asked 6a for a fresh landing. Steward approved one fresh landing (D-56); land-one now retries a budget-only overrun with a cold doctest step once."
     },
     "3f816619": {
-      "status": "dispatched",
+      "status": "reviewed",
       "vendor": "Claude Opus",
-      "reason": "largest remaining move (~580 main.rs lines, 10 leaves)"
+      "reason": "largest remaining move (~580 main.rs lines, 10 leaves)",
+      "review": "lead PASS at b2cda2c59: ten write leaves in dispatch/issue.rs, unmigrated clause and output_macros.rs gone, batch-create payload per REQ-03; -101. Awaiting steward D-01 (uniform warnings rule) before landing."
     },
     "5d09e74b": {
-      "status": "landing",
+      "status": "done",
       "review": "lead PASS at ec563eba2: domain/relative_path.rs, all importers moved, stale comment gone, structural test; +27 (b697a3f7 ledger)",
+      "epic": "b697a3f7"
+    },
+    "d58f80c9": {
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "b697a3f7 track B after 5d09e74b; worker checks criteria first",
       "epic": "b697a3f7"
     }
   },
@@ -1447,11 +1454,14 @@
       "what": "gf2 benchmark",
       "when": "2026-11-05 04:00 Europe/Helsinki (~15 min)",
       "rules": "from 03:30 no new dispatch/landing/CI; by 03:55 no cargo/npm/test from lead or workers; hold until 6a releases",
-      "mechanism": "background timer touches the landing hold file at 03:30; lead stops any running worker cargo by 03:55 (TaskStop on owned tasks)"
+      "mechanism": "background timer touches the landing hold file at 03:30; lead stops any running worker cargo by 03:55 (TaskStop on owned tasks)",
+      "status": "cancelled by 6a 2026-11-04 (gf2 session closed); 03:30 timer disarmed; full parallelism"
     }
   ],
   "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)",
   "notes_for_tasks": {
-    "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)"
-  }
+    "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)",
+    "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)"
+  },
+  "coordination": "All other lead sessions closed by the user (6a, 2026-11-04); df129d9e lead is the only active lead. Escalations and milestone ledgers go to 6a."
 }

@@ -3,8 +3,9 @@
 use super::{
     CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan,
     RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryEntry, RepositoryImage,
-    RepositoryLayout, RepositoryLayoutError, RootRelativePath, VirtualPath,
+    RepositoryLayout, RepositoryLayoutError, VirtualPath,
 };
+use crate::domain::relative_path::RootRelativePath;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
 
@@ -250,7 +251,7 @@ fn tree_path(
     let joined = target.relative().as_path().join(relative.as_path());
     Ok(VirtualPath::from_root(
         target.root_class(),
-        RootRelativePath::parse(joined)?,
+        RootRelativePath::parse(joined).map_err(RepositoryLayoutError::from)?,
     )?)
 }
 
@@ -261,7 +262,8 @@ fn immediate_parent(path: &VirtualPath) -> Result<VirtualPath, RepositoryExportE
     }
     Ok(VirtualPath::from_root(
         path.root_class(),
-        RootRelativePath::parse(relative.parent().unwrap_or_else(|| Path::new("")))?,
+        RootRelativePath::parse(relative.parent().unwrap_or_else(|| Path::new("")))
+            .map_err(RepositoryLayoutError::from)?,
     )?)
 }
 
