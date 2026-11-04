@@ -179,6 +179,33 @@ impl GitCheckout {
         Ok(Some(Head { commit, branch }))
     }
 
+    // Temporary @/inv/convention-convergence exception: claim release's actor
+    // fallback still queries user.name directly until ea4b7363.
+    /// Read the configured user name, if this checkout has one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when git cannot start, fails for a reason other than
+    /// the name being unset, or reports non-UTF-8 output.
+    pub fn user_name(&self) -> Result<Option<String>, GitError> {
+        const ARGS: [&str; 2] = ["config", "user.name"];
+        let output = self.git.run(&self.worktree_root, &ARGS)?;
+        if !output.status.success() {
+            if output.status.code() == Some(1) {
+                return Ok(None);
+            }
+            return Err(GitError::UnexpectedOutput {
+                command: ARGS.join(" "),
+                output: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
+        }
+        let name = std::str::from_utf8(&output.stdout).map_err(|_| GitError::UnexpectedOutput {
+            command: ARGS.join(" "),
+            output: String::from_utf8_lossy(&output.stdout).into_owned(),
+        })?;
+        Ok(Some(name.strip_suffix('\n').unwrap_or(name).to_owned()))
+    }
+
     /// The checkout's top level, which [`Self::dirty_paths`] reports relative to.
     pub fn worktree_root(&self) -> &Path {
         &self.worktree_root
