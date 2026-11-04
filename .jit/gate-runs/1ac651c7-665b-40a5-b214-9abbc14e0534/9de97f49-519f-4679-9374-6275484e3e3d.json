@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "54b5c98506f29987d475c281b6b096bdf03d29ee",
+  "completed_at": "2026-11-04T11:59:12.108103169Z",
+  "duration_ms": 267538,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior warning-format finding is accepted by D-02.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1ac651c7-665b-40a5-b214-9abbc14e0534",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9de97f49-519f-4679-9374-6275484e3e3d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T11:54:44.569756012Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:1ac651c7` commits 86c4ab98c, ac9220229, c269f5554, dede3af31, ac03aa9f, 54b5c9850\nPolicy sources: AGENTS.md\nResolved items: @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (issue Markdown)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T11:01:43Z); mcp-ci passed (exit 0, 2026-11-04T11:03:21Z)\nTruncation recovery: narrowed merge and large-patch reads to the gate handler, output, schema, tests, and exit-code documentation; unrelated merge imports and historical records were outside the impact cone\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior warning-format finding is accepted by D-02.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
