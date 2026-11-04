@@ -69,7 +69,7 @@ impl HumanRender for IssueProjection {
 #[serde(untagged)]
 pub enum IssueShowOutput {
     /// One issue.
-    Issue(IssueShowResponse),
+    Issue(Box<IssueShowResponse>),
     /// One issue under `--summary --json`.
     Summary(IssueShowSummaryResponse),
     /// Several issues, in argument order.

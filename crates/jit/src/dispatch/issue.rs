@@ -97,7 +97,7 @@ fn show<S: IssueStore>(
         shown.title,
         shown.state
     );
-    Ok(success(IssueShowOutput::Issue(shown), message))
+    Ok(success(IssueShowOutput::Issue(Box::new(shown)), message))
 }
 
 /// `jit issue list`, `jit list`, `jit query all` and bare `jit query`.
