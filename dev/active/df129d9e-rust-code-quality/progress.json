@@ -1,7 +1,7 @@
 {
   "epic_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "epic_short_id": "df129d9e",
-  "current_wave": 7,
+  "current_wave": 8,
   "waves": [
     {
       "wave_number": 1,
@@ -904,7 +904,7 @@
       "kind": "line-target",
       "issue": "df129d9e REQ-10",
       "summary": "planned deletions cannot close 721-line gap; options: amend counted modules, survey+deletion task, or survey first",
-      "status": "open"
+      "status": "ruled (c): survey + whole-crate ledger dispatched; target change is the user's decision"
     }
   ],
   "rework_counts": {
@@ -1210,7 +1210,10 @@
       "note": "on main f1e434642; code-review F1/F2; rework 1 drops AssetListScope.warnings and the exemption list (D-49)"
     },
     "4a01ccba": {
-      "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43)."
+      "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43).",
+      "status": "dispatched",
+      "vendor": "Claude Sonnet",
+      "reason": "test refactors needing judgement on seams; f487aeef stays held (D-43)"
     },
     "8a14e8e9": {
       "status": "done",
