@@ -177,7 +177,7 @@
         },
         {
           "short_id": "2b5f452c",
-          "status": "rework 2 c4b4cbc27 (dup-key rejection with position); pipeline waits for load",
+          "status": "landed 6d4a8b704; code-review F1 (--fix repair planning re-decodes); rework 3 of 3 (final before escalation)",
           "worker": "claude opus",
           "worker_reason": "fidelity on parsed records (REQ-10)"
         },
@@ -334,7 +334,7 @@
     "f968dfe1": 1,
     "5d5a1794": 2,
     "6ba4f623": 1,
-    "2b5f452c": 2,
+    "2b5f452c": 3,
     "3acaa5a3": 2,
     "612ee9d4": 1
   },
