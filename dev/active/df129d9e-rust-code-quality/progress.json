@@ -1082,12 +1082,13 @@
         "da30b92a": -8,
         "ae3f4f8b": -13,
         "0bc448fb": 31,
-        "8b3cce62": -106
+        "8b3cce62": -106,
+        "8b3cce62-r1": -21
       },
       "epic_net_running": 951,
-      "epic_net_latest": 188,
-      "merges_latest": 98,
-      "crate_main_latest": 73644,
+      "epic_net_latest": 167,
+      "merges_latest": 99,
+      "crate_main_latest": 73627,
       "file_latest": "ledger-2026-11-05.txt",
       "projected_end": "+70..+250 (ceiling +375)",
       "b697a3f7_merges": {
@@ -1489,7 +1490,7 @@
       "note": "merged ce7406bbd; code-review F1 rejection same-session proof, F2 batch first_ready_at/no-demotion assertions"
     },
     "8b3cce62": {
-      "status": "rework 1",
+      "status": "done",
       "vendor": "Claude Opus",
       "note": "merged 87938c3d3 (cargo-ci, mcp-ci passed); code-review F1: admit exempts universal codes from findings declarations"
     },
