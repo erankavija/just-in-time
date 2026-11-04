@@ -5,7 +5,7 @@
   "dependencies": [
     "6fdb2d53-bc92-424e-bc74-455f21f2cc26"
   ],
-  "description": "State on the git-requirement pages that git-backed operations need the git executable as well as a repository, and that the server image ships it.\n\n## Background\n\n- `docs/concepts/guarantees.md:233` lists what requires git, which with libgit2 linked in meant a repository only: document history, diffs and reads at a commit worked without an executable.\n- `INSTALL.md:135` lists Git as optional for leases and worktree coordination.\n- `docs/how-to/deployment.md` describes the server image without listing its tools.\n- Without an executable, core commands behave as outside git, and claim commands fail with `CLAIM_REQUIRES_GIT`.\n\n## Success Criteria\n\n- [hard] REQ-01: `guarantees.md` states that leases, document history and diff, reads at a commit and snapshot export from a commit need the git executable on `PATH` as well as a repository, and that with no executable core commands behave as outside git.\n- [hard] REQ-02: `INSTALL.md`'s optional Git entry names the operations that need the git executable.\n- [hard] REQ-03: `deployment.md` states that the image includes git for document history, diffs and reads at a commit.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "State on the git-requirement pages that git-backed operations need the git executable as well as a repository, and that the server image ships it.\n\n## Background\n\n- `docs/concepts/guarantees.md:233` lists what requires git, which with libgit2 linked in meant a repository only: document history, diffs and reads at a commit worked without an executable.\n- `INSTALL.md:135` lists Git as optional for leases and worktree coordination.\n- `docs/how-to/deployment.md` describes the server image without listing its tools.\n- Without an executable, core commands behave as outside git, and claim commands fail with `REQUIRES_GIT`.\n\n## Success Criteria\n\n- [hard] REQ-01: `guarantees.md` states that leases, document history and diff, reads at a commit and snapshot export from a commit need the git executable on `PATH` as well as a repository, and that with no executable core commands behave as outside git.\n- [hard] REQ-02: `INSTALL.md`'s optional Git entry names the operations that need the git executable.\n- [hard] REQ-03: `deployment.md` states that the image includes git for document history, diffs and reads at a commit.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
   "gates_required": [
     "doc-review",
@@ -26,5 +26,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Git requirement pages name the git executable",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-04T23:02:06.285922064Z"
 }
