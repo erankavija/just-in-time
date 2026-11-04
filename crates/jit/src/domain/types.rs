@@ -599,15 +599,6 @@ impl Issue {
         }
     }
 
-    /// Check if this issue should auto-transition to Ready state
-    /// A Backlog issue transitions to Ready when it becomes unblocked
-    pub fn should_auto_transition_to_ready(
-        &self,
-        resolved_issues: &HashMap<IssueId, &Issue>,
-    ) -> bool {
-        self.derive_readiness_correction(resolved_issues) == Some(ReadinessCorrection::Promote)
-    }
-
     /// Check if this issue should auto-transition to Done state
     /// A Gated issue transitions to Done when all required gates pass
     pub fn should_auto_transition_to_done(&self) -> bool {
@@ -2274,28 +2265,6 @@ mod tests {
     }
 
     #[test]
-    fn test_backlog_issue_should_auto_transition_to_ready_when_unblocked() {
-        let issue = fixture_issue("Test".to_string(), "Description".to_string());
-        let resolved = HashMap::new();
-
-        assert_eq!(issue.state, State::Backlog);
-        assert!(issue.should_auto_transition_to_ready(&resolved));
-    }
-
-    #[test]
-    fn test_backlog_issue_should_not_transition_to_ready_when_blocked() {
-        let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
-        let dependency = fixture_issue("Dependency".to_string(), "Desc".to_string());
-        issue.dependencies.push(dependency.id.clone());
-
-        let mut resolved = HashMap::new();
-        resolved.insert(dependency.id.clone(), &dependency);
-
-        assert_eq!(issue.state, State::Backlog);
-        assert!(!issue.should_auto_transition_to_ready(&resolved));
-    }
-
-    #[test]
     fn test_derive_readiness_correction_demotes_a_ready_issue_an_unmet_dependency_blocks() {
         let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         let dependency = fixture_issue("Dependency".to_string(), "Desc".to_string());
@@ -2423,8 +2392,6 @@ mod tests {
         let mut issue = fixture_issue("Test".to_string(), "Description".to_string());
         issue.state = State::InProgress;
 
-        let resolved = HashMap::new();
-        assert!(!issue.should_auto_transition_to_ready(&resolved));
         assert!(!issue.should_auto_transition_to_done());
     }
 
