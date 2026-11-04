@@ -216,7 +216,7 @@ pub enum ProducerError {
     InvariantConfig(#[from] crate::declarations::invariants::InvariantConfigError),
     /// Addressable item declarations or source content were invalid.
     #[error(transparent)]
-    Item(#[from] crate::domain::item::ItemError),
+    Item(#[from] std::sync::Arc<crate::domain::item::ItemError>),
     /// Captured rule declarations were invalid.
     #[error(transparent)]
     RuleConfig(#[from] crate::declarations::rules::RuleConfigError),
@@ -300,6 +300,12 @@ pub enum ProfileRegistryParseError {
     ValueNotTable,
 }
 
+impl From<crate::domain::item::ItemError> for ProducerError {
+    fn from(error: crate::domain::item::ItemError) -> Self {
+        Self::Item(std::sync::Arc::new(error))
+    }
+}
+
 /// A typed failure raised while parsing captured declaration files into the
 /// canonical bundle ([`declarations_from_image`] /
 /// [`validation_declarations_from_image`]).
@@ -338,8 +344,21 @@ pub enum DeclarationParseError {
     Rule(#[from] crate::declarations::rules::RuleConfigError),
 }
 
+type ResolvedItemKinds = Result<
+    std::sync::Arc<[crate::domain::item::ItemKind]>,
+    std::sync::Arc<crate::domain::item::ItemError>,
+>;
+
+fn resolved_item_kinds(config: &crate::config::JitConfig) -> ResolvedItemKinds {
+    crate::domain::item::resolve_item_kinds(config.item_kinds.as_ref())
+        .map(std::sync::Arc::from)
+        .map_err(std::sync::Arc::new)
+}
+
 /// Explicit declaration bundle consumed by the closed producer call graph.
 pub struct RepositoryDeclarations<'a> {
+    /// Resolved kinds, retaining errors for the effective-configuration pass.
+    pub item_kinds: ResolvedItemKinds,
     /// Parsed repository configuration.
     pub configuration: &'a ConfigurationDeclarations,
     /// Authored gate registry.
@@ -351,6 +370,7 @@ pub struct RepositoryDeclarations<'a> {
 /// One owned parse of every captured declaration consumed by materialization or
 /// validation.
 pub(crate) struct CapturedRepositoryDeclarations {
+    item_kinds: ResolvedItemKinds,
     pub(crate) configuration: ConfigurationDeclarations,
     pub(crate) config: crate::config::JitConfig,
     pub(crate) gates: GateRegistry,
@@ -366,6 +386,7 @@ impl CapturedRepositoryDeclarations {
         rules: RuleSet,
     ) -> Self {
         Self {
+            item_kinds: resolved_item_kinds(&config),
             configuration,
             config,
             gates,
@@ -376,6 +397,7 @@ impl CapturedRepositoryDeclarations {
 
     pub(crate) fn borrowed(&self) -> RepositoryDeclarations<'_> {
         RepositoryDeclarations {
+            item_kinds: self.item_kinds.clone(),
             configuration: &self.configuration,
             gates: &self.gates,
             rules: &self.rules,
@@ -384,6 +406,12 @@ impl CapturedRepositoryDeclarations {
 
     pub(crate) fn config(&self) -> &crate::config::JitConfig {
         &self.config
+    }
+
+    pub(crate) fn item_kinds(&self) -> Result<&[crate::domain::item::ItemKind], ProducerError> {
+        self.item_kinds
+            .as_deref()
+            .map_err(|error| error.clone().into())
     }
 
     pub(crate) fn rules(&self) -> &RuleSet {
@@ -478,13 +506,10 @@ pub(crate) fn validation_declarations_from_image(
         Ok(rules) => (rules, None),
         Err(error) => (RuleSet { rules: Vec::new() }, Some(error)),
     };
-    Ok(CapturedRepositoryDeclarations {
-        configuration,
-        config,
-        gates,
-        rules,
-        rules_load_error,
-    })
+    let mut declarations =
+        CapturedRepositoryDeclarations::from_parts(configuration, config, gates, rules);
+    declarations.rules_load_error = rules_load_error;
+    Ok(declarations)
 }
 
 /// Complete deterministic pure materialization result.
@@ -798,7 +823,10 @@ pub fn finalize_config_edit(
         bytes: edited_config_bytes.to_vec(),
         mode: FileMode::Regular,
     }];
+    let edited_config =
+        materialize::assemble_config_from_declarations(&overlaid, &edited_configuration)?;
     let edited_declarations = RepositoryDeclarations {
+        item_kinds: resolved_item_kinds(&edited_config),
         configuration: &edited_configuration,
         gates: declarations.gates,
         rules: declarations.rules,
@@ -1248,6 +1276,7 @@ mod tests {
         let context = MutationContext::preview();
         let (configuration, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
+            item_kinds: Ok(std::sync::Arc::from([])),
             configuration: &configuration,
             gates: &gates,
             rules: &rules,
@@ -1267,6 +1296,7 @@ mod tests {
         let context = MutationContext::preview();
         let (configuration, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
+            item_kinds: Ok(std::sync::Arc::from([])),
             configuration: &configuration,
             gates: &gates,
             rules: &rules,
@@ -1303,6 +1333,7 @@ mod tests {
             .gates
             .insert("distinct".parse().unwrap(), gate_definition("distinct"));
         let declarations = RepositoryDeclarations {
+            item_kinds: Ok(std::sync::Arc::from([])),
             configuration: &configuration,
             gates: &mismatched,
             rules: &rules,
@@ -1341,6 +1372,7 @@ mod tests {
         let context = MutationContext::preview();
         let (configuration, gates, rules) = empty_declarations();
         let declarations = RepositoryDeclarations {
+            item_kinds: Ok(std::sync::Arc::from([])),
             configuration: &configuration,
             gates: &gates,
             rules: &rules,

@@ -323,12 +323,6 @@ pub(crate) fn compose_configured_projections(
         });
     };
 
-    let inputs = ProjectionInputs {
-        config,
-        rules: declarations.rules,
-        gates: declarations.gates,
-    };
-
     // Phase one: render every in-scope projection body and build its
     // managed-document claim. Iterating the name-ordered projection registry keeps
     // claim order deterministic. `selected` scopes WHICH declared projections
@@ -340,6 +334,15 @@ pub(crate) fn compose_configured_projections(
         if selected.is_some_and(|names| !names.contains(name)) {
             continue;
         }
+        let inputs = ProjectionInputs {
+            kinds: declarations
+                .item_kinds
+                .as_deref()
+                .map_err(std::sync::Arc::clone)?,
+            config,
+            rules: declarations.rules,
+            gates: declarations.gates,
+        };
         let mut read = |path: &str| read_text(image, path);
         let (body, count) = render_projection_body(projection, &inputs, &mut read)?;
         counts.insert(name.clone(), count);
@@ -853,6 +856,9 @@ kind = "advisory"
         rules: &'a RuleSet,
     ) -> RepositoryDeclarations<'a> {
         RepositoryDeclarations {
+            item_kinds: crate::repository_state::resolved_item_kinds(
+                &config.materialization_config(InvariantRegistry::empty()),
+            ),
             configuration: config,
             gates,
             rules,

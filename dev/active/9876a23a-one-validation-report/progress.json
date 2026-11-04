@@ -1,7 +1,7 @@
 {
   "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
   "epic_short_id": "9876a23a",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -142,13 +142,13 @@
       "issues": [
         {
           "short_id": "001a9c46",
-          "status": "dispatched",
+          "status": "done 07baa8b46",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "address index over existing set"
         },
         {
           "short_id": "03c59566",
-          "status": "dispatched 02:49 (first dispatch failed on dirty main)",
+          "status": "done 70f80ae6f (criteria amended by steward)",
           "worker": "codex gpt-6-luna xhigh"
         }
       ]
@@ -199,6 +199,14 @@
           "ccd6e1fb": 12,
           "5d5a1794": 5,
           "8b56c215": 18
+        }
+      },
+      {
+        "wave": 5,
+        "test_support_as_test": 55,
+        "by_issue": {
+          "03c59566": -24,
+          "001a9c46": 79
         }
       }
     ]

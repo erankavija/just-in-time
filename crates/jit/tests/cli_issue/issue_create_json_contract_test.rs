@@ -161,28 +161,66 @@ fn test_issue_create_forced_reports_same_findings_in_json_and_human_output() {
     let leaf = jit::test_taxonomy::type_label(&taxonomy, 4);
     let args = ["issue", "create", "-t", "Leaf", "--label", &leaf, "--force"];
 
-    let json = repo.run_json(args).unwrap();
+    let json_output = repo
+        .command(args.iter().copied().chain(["--json"]))
+        .output()
+        .unwrap();
+    assert!(json_output.status.success());
+    assert!(
+        json_output.stderr.is_empty(),
+        "JSON create must not print human findings to stderr: {}",
+        String::from_utf8_lossy(&json_output.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&json_output.stdout).unwrap();
     let human = repo.command(args).output().unwrap();
 
     let findings = json["findings"]
         .as_array()
         .filter(|findings| !findings.is_empty())
         .unwrap_or_else(|| panic!("create --json must report findings; got: {json}"));
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding["rule"] == "orphan-leaf"),
+        "create --json must report the orphan-leaf finding; got: {findings:?}"
+    );
     let human_stdout = String::from_utf8_lossy(&human.stdout);
     let human_id = human_stdout
-        .trim()
+        .lines()
+        .next()
+        .unwrap_or_default()
         .strip_prefix("Created issue: ")
         .unwrap_or_else(|| panic!("human create prints the id; got: {human_stdout}"));
     let human_stderr = String::from_utf8_lossy(&human.stderr);
-    for finding in findings {
+    assert!(
+        human_stderr.is_empty(),
+        "create findings use the shared renderer on stdout: {human_stderr}"
+    );
+    let human_findings = human_stdout.lines().skip(1).collect::<Vec<_>>();
+    assert_eq!(human_findings.len(), findings.len());
+    for (index, finding) in findings.iter().enumerate() {
         let expected = finding["message"]
             .as_str()
             .unwrap()
             .replace(json["id"].as_str().unwrap(), human_id)
             .replace(json["short_id"].as_str().unwrap(), &human_id[..8]);
-        assert!(
-            human_stderr.contains(&expected),
-            "human create must print the finding {expected:?}; got: {human_stderr}"
+        assert_eq!(
+            human_findings[index],
+            format!("warning [{}] {expected}", finding["rule"].as_str().unwrap()),
+            "human create must print the same finding in the same order"
         );
     }
+
+    let quiet = repo
+        .command(args.iter().copied().chain(["--quiet"]))
+        .output()
+        .unwrap();
+    assert!(quiet.status.success());
+    assert!(quiet.stderr.is_empty());
+    let quiet_stdout = String::from_utf8_lossy(&quiet.stdout);
+    assert_eq!(quiet_stdout.lines().count(), 1);
+    assert!(
+        jit::domain::identity::IssueId::try_from(quiet_stdout.trim()).is_ok(),
+        "quiet create prints only the full issue id: {quiet_stdout}"
+    );
 }
