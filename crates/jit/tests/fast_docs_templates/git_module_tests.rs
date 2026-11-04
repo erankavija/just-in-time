@@ -223,7 +223,7 @@ fn test_head_unstartable_program_returns_unavailable_error() {
         .head()
         .unwrap_err();
 
-    assert!(matches!(error, GitError::Unavailable { program: named, .. } if named == program));
+    assert!(matches!(error, GitError::GitUnavailable { program: named, .. } if named == program));
 }
 
 fn dirty_paths(repository: &GitRepository) -> BTreeSet<PathBuf> {

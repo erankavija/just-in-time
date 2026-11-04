@@ -187,6 +187,9 @@
      "touches": [
       "crates/jit/src/storage/worktree_paths.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The already-completed layout adapter owns WorktreePaths wiring and its regression; the shared probe behavior belongs to its separate producer. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -433,7 +436,7 @@
  {
   "key": "git-head-lookup",
   "title": "One head lookup in the git module",
-  "description": "Add the module's single lookup of the checked-out commit and branch, so every consumer of either fact asks one operation backed by one git process.\n\n## Background\n\nSix branch lookups exist, with differing semantics:\n\n| Site | Command | Detached HEAD | Unborn branch |\n|---|---|---|---|\n| `crates/jit/src/commands/claim.rs:46-64` | `rev-parse --abbrev-ref HEAD` | `HEAD` | second process, then a typed no-commits error |\n| `crates/jit/src/commands/worktree.rs:46-63` | same | `HEAD` | generic error |\n| `crates/jit/src/storage/claim_coordinator.rs:974-993` | same | `HEAD` | error, read as no branch |\n| `crates/jit/src/commands/mod.rs:3350` | `branch --show-current` | empty string | the unborn branch's name |\n| `crates/jit/src/gate_execution.rs:551`, `crates/jit/src/gate_execution.rs:567` | `rev-parse HEAD`, `rev-parse --abbrev-ref HEAD` | `HEAD` | none |\n| `crates/jit/src/commands/snapshot.rs:25-29` | libgit2 `head().shorthand()` | `HEAD` | none |\n\n`git rev-parse HEAD --abbrev-ref HEAD` prints the commit and the abbreviated ref in one process (`HEAD` when detached) and exits nonzero on an unborn branch. The domain's canonical commit type is `CanonicalCommitOid` (`crates/jit/src/domain/artifact_plan.rs:112`).\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::head()` starts one git process. It returns `Ok(None)` on an unborn branch, and otherwise a `Head` holding the commit as `CanonicalCommitOid` and the branch name, absent on a detached HEAD.\n- [hard] REQ-02: `Head` renders its branch as the branch name, or `HEAD` when detached, which is what `git rev-parse --abbrev-ref HEAD` prints.\n- [hard] REQ-03: An executable that cannot start returns the module's unavailable error. A nonzero exit is an unborn branch, since a `GitCheckout` exists only for a checkout git already recognized.\n- [hard] REQ-04: The behaviour suite covers a branch, a detached HEAD, an unborn branch and a missing executable, and counts one process per lookup.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Add the module's single lookup of the checked-out commit and branch, so every consumer of either fact asks one bounded operation backed by at most two git processes.\n\n## Background\n\nSix branch lookups exist, with differing semantics:\n\n| Site | Command | Detached HEAD | Unborn branch |\n|---|---|---|---|\n| `crates/jit/src/commands/claim.rs:46-64` | `rev-parse --abbrev-ref HEAD` | `HEAD` | second process, then a typed no-commits error |\n| `crates/jit/src/commands/worktree.rs:46-63` | same | `HEAD` | generic error |\n| `crates/jit/src/storage/claim_coordinator.rs:974-993` | same | `HEAD` | error, read as no branch |\n| `crates/jit/src/commands/mod.rs:3350` | `branch --show-current` | empty string | the unborn branch's name |\n| `crates/jit/src/gate_execution.rs:551`, `crates/jit/src/gate_execution.rs:567` | `rev-parse HEAD`, `rev-parse --abbrev-ref HEAD` | `HEAD` | none |\n| `crates/jit/src/commands/snapshot.rs:25-29` | libgit2 `head().shorthand()` | `HEAD` | none |\n\nA previously recognized checkout can become invalid, so a nonzero exit cannot establish an unborn branch. Read HEAD identity with `rev-parse --revs-only HEAD --symbolic-full-name HEAD`, then validate the captured OID with `rev-list --no-walk --missing=print <oid> --`, or validate a successful empty identity result with `symbolic-ref --quiet HEAD`. Both processes use `--no-replace-objects`; commit validation also uses child-local `-c core.commitGraph=false`. The domain's commit identity is `CanonicalCommitOid`. [The approved experiment](dev/active/f4d9502a-git-cli-module/head-lookup-experiment.md) records the protocol and failure evidence.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::head()` starts at most two configured git processes, reading only HEAD identity and its captured commit or validating the unborn symbolic target, with no unrelated ref, reflog, ancestor or worktree traversal and no lazy fetch. It returns `Ok(None)` only on a confirmed unborn branch, and otherwise a `Head` holding the commit as `CanonicalCommitOid` and the branch name, absent on a detached HEAD.\n- [hard] REQ-02: `Head` renders its branch as the branch name, or `HEAD` when detached, which is what `git rev-parse --abbrev-ref HEAD` prints.\n- [hard] REQ-03: An executable that cannot start returns the module's unavailable error. Only a successfully validated unborn branch returns `Ok(None)`; command failures, missing, corrupt or non-commit objects, and malformed output return typed errors, including after a previously recognized checkout becomes invalid.\n- [hard] REQ-04: The owning behavior suite covers branch, detached, unborn, missing executable, stale or invalid checkout, malformed refs, missing or corrupt commit and non-commit objects, and bounds each lookup at two processes. Focused regressions prove no promisor fetch or unrelated history/worktree traversal, and rejection of missing objects masked by commit graphs or replacements.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -452,7 +455,7 @@
    "git-module-foundation"
   ],
   "planning": {
-   "outcome": "The git module answers commit and branch with one head lookup process.",
+   "outcome": "The git module validates commit and branch with one bounded head operation using at most two processes.",
    "contract_refs": [
     "git-module"
    ],
@@ -462,7 +465,8 @@
    "source_refs": [
     "REQ-05",
     "DEC-10",
-    "DEC-18"
+    "DEC-18",
+    "DEC-23"
    ],
    "terminal": {
     "consumer_family": "head lookup",
@@ -473,6 +477,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The assigned head producer owns bounded commit validation and the failure matrix shared by claims, init, worktree info, gate evidence and snapshots; those adapters have distinct ownership. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -573,6 +580,9 @@
       "crates/jit/src/commands/worktree.rs",
       "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated worktree-info adapter owns current-branch reporting and CLI error composition; the head producer owns Git failure semantics. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -619,6 +629,9 @@
      "touches": [
       "crates/jit/src/commands/mod.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated init adapter owns identity persistence and detached/unborn defaults; it does not own the shared head protocol. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -671,6 +684,9 @@
       "crates/jit/src/commands/claim.rs",
       "crates/jit/src/storage/claim_coordinator.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated claims family owns typed Git requirements and coordinator branch wiring across command and storage boundaries; shared head behavior remains producer-owned. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -713,7 +729,9 @@
     "footprint": {
      "touches": [
       "crates/jit/src/storage/git.rs",
-      "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
+      "crates/jit/tests/fast_docs_templates/git_module_tests.rs",
+      "crates/jit/src/test_harness/git.rs",
+      "crates/jit/src/test_harness/git_tests.rs"
      ]
     }
    }
@@ -761,6 +779,9 @@
      "touches": [
       "crates/jit/src/commands/claim.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated release-actor adapter owns fallback precedence in claim commands; it consumes the separately assigned config-query primitive. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -807,6 +828,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The already-reviewed listing producer owns porcelain parsing and path fidelity for both command listing and lease validation, which have separate consumer behavior. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -853,6 +877,9 @@
       "crates/jit/src/commands/worktree.rs",
       "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated list adapter owns CLI filtering/errors and removal of its private parser; module parsing is shared with lease validation. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -953,6 +980,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated producer owns the three-outcome comparison contract shared by drift validation and the main-history guard, whose command policies differ. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1498,6 +1528,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated object-reader producer owns incremental subprocess I/O and presence semantics shared by document, snapshot and pinned-inspection consumers. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1543,6 +1576,9 @@
      "touches": [
       "crates/jit/src/storage/git.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated pinned-inspection migration removes the prior batch parser and preserves target-classification behavior after the shared reader contract exists. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1791,6 +1827,9 @@
       "crates/jit/src/commands/document.rs",
       "crates/jit/tests/cli_repo_workflow/document_history_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated diff adapter owns two command variants and exact rendered output; the object-reader producer and document-show adapter do not own diff composition. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1838,6 +1877,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The assigned history producer owns Git simplification and record parsing; the document-history adapter separately owns command output composition. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -1982,6 +2024,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The completed dirty-path producer is also consumed outside this epic; preserving its recorded identity avoids rewriting accepted implementation history. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -2026,6 +2071,9 @@
       "crates/jit/src/storage/git.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The assigned origin-query producer owns absence/failure semantics and process-count coverage; snapshot metadata owns composition of several repository facts. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -2080,6 +2128,9 @@
      "touches": [
       "crates/jit/src/commands/snapshot.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated metadata adapter owns source selection, branch/origin/dirtiness composition and helper deletion; each shared Git primitive has its own behavior owner. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
@@ -2128,6 +2179,9 @@
       "crates/jit/src/commands/snapshot.rs",
       "crates/jit/tests/cli_issue/snapshot_export_tests.rs"
      ]
+    },
+    "warning_overrides": {
+     "chain-link": "The instantiated snapshot capture adapter owns exporter lifetime/batching and capture assembly; the shared object-reader protocol is independently owned. Scoped preservation of the existing reviewed graph under plan DEC-24; expires when f4d9502a closes and does not authorize new fan-out."
     }
    }
   }
