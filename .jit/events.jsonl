@@ -24225,3 +24225,4 @@
 {"gate_key":"code-review","id":"7365e80e-edd6-496a-946d-ee198435b2f7","issue_id":"4575a03d-f938-4c6b-bf01-929c9d902d40","timestamp":"2026-11-04T12:45:42.488482912Z","type":"gate_added"}
 {"id":"98712c35-3b01-4565-aa2f-6671caa5ca15","issue_id":"3b696589-81fa-4a01-a576-460c1e34a7dd","priority":"high","timestamp":"2026-11-04T12:46:00.591619520Z","title":"Graceful-shutdown tests observe the server through explicit signals","type":"issue_created"}
 {"fields":["dependencies"],"id":"9ecd1ac5-184e-4b9a-8550-3a41826c0220","issue_id":"fb2dc5c3-1f32-418f-896b-41df16f57997","timestamp":"2026-11-04T12:46:01.196181194Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:df129d9e-lead","id":"9b816759-a7af-411c-a31f-883e436ad846","issue_id":"3b696589-81fa-4a01-a576-460c1e34a7dd","timestamp":"2026-11-04T12:46:34.652832377Z","type":"issue_claimed"}
