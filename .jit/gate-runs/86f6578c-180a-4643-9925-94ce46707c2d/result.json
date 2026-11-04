@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7f785b006f6d1c096e7de33420ea67800c8d5401",
+  "completed_at": "2026-11-04T06:49:55.995463101Z",
+  "duration_ms": 282505,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Document commands are handler-dispatched with typed responses; link findings, warning behavior, schemas, and exit-code documentation satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c9103fcf-aa0c-4642-8531-5360f5fdd58d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "86f6578c-180a-4643-9925-94ce46707c2d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T06:45:13.490441622Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c0d46d794, 1ff4458f0, acac8bd22, 8186013b3, b13ba0671, 697ef1f72, 0c0a4fd50, ccecd2ab4, f41a1dd44, e8956a66b, 890b35ddf, 2853b23b2, 99318307d (`jit:c9103fcf`)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (issue Markdown); @/issue/c9103fcf/decision/D-01, D-02 (issue Markdown); @/inv/architecture-dependency-direction, @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/semantic-types (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T06:42:51Z); mcp-ci passed (exit 0, 2026-11-04T06:44:55Z)\nTruncation recovery: Re-read tagged patches by affected path and merge parent, then current handlers, renderers, schemas, tests, and generated exit-code reference; unrelated changes in the batch merge were outside the document-command impact cone.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Document commands are handler-dispatched with typed responses; link findings, warning behavior, schemas, and exit-code documentation satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
