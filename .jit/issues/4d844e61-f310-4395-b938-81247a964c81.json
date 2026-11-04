@@ -14,15 +14,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "fae95d46-d981-45c9-8658-dd05e415c93b",
+      "run_id": "b741bcc7-192b-4e48-8ad4-a00755efdfe2",
       "status": "failed",
-      "updated_at": "2026-11-04T22:15:03.506244773Z",
+      "updated_at": "2026-11-04T22:22:56.194137396Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "run_id": "84b511c0-4aad-466a-ab42-7eba18b4df1b",
+      "run_id": "3b85fc1c-eece-4fb5-9aea-24fb7516456e",
       "status": "passed",
-      "updated_at": "2026-11-04T22:12:58.753022137Z",
+      "updated_at": "2026-11-04T22:21:59.086376807Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
@@ -40,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Retire the MCP server and consolidate quality gates",
-  "updated_at": "2026-11-04T22:16:54.990873349Z"
+  "updated_at": "2026-11-04T22:22:56.194137396Z"
 }
