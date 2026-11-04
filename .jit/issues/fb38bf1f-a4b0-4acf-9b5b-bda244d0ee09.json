@@ -33,7 +33,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Commands import nothing from the output layer",
-  "updated_at": "2026-11-04T17:43:09.768165892Z"
+  "updated_at": "2026-11-04T21:46:31.204948913Z"
 }
