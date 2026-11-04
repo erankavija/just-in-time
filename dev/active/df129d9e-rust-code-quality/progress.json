@@ -872,7 +872,7 @@
     "1539da29": 2,
     "abe555e9": 1,
     "b23faa59": 2,
-    "e5d618ee": 1
+    "e5d618ee": 2
   },
   "surfaced_pitfalls": [
     {
@@ -1001,7 +1001,7 @@
       "status": "rework",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
-      "note": "landed 4ec8f06cc; main fails its gate-run test after 1630015d moved gate-run records; fix with worker"
+      "note": "on main (4ec8f06cc, fix d735276b5); code-review F1: GateRunId path extractor rejects before classify (REQ-02); rework 2 of 2"
     },
     "20fc3b92": {
       "status": "in_progress",
