@@ -1065,7 +1065,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                     event: Box::new(event),
                 },
             ];
-            let plan = finalize(&layout, &final_image, &mutation, &intents)?;
+            let plan = finalize(&layout, &final_image, &mutation, &intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }

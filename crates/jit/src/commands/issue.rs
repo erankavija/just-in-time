@@ -576,7 +576,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 state,
                 add_labels,
                 remove_labels,
-                label_edit: None,
+                append_label: None,
                 content_format,
                 issue_type,
                 add_gates: local.add_gates,
@@ -690,7 +690,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 claims_guard.as_ref(),
             )?;
             let derived = derive_issue_deletion(&image, &context, &issues, &target_id)?;
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -841,21 +841,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let full_id = issue_id.clone();
         self.publish_captured_auto_transition(&full_id, State::Ready)
-    }
-
-    /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`.
-    ///
-    /// The inverse of [`auto_transition_to_ready`](Self::auto_transition_to_ready):
-    /// both consult [`Issue::derive_readiness_correction`], so a repository whose
-    /// stored readiness drifted from its graph converges from either side. Returns
-    /// whether the issue changed state; an issue whose stored state already agrees
-    /// with the graph is left untouched.
-    pub(super) fn auto_transition_to_backlog(&self, issue_id: &IssueId) -> Result<bool>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let full_id = issue_id.clone();
-        self.publish_captured_auto_transition(&full_id, State::Backlog)
     }
 
     pub(super) fn auto_transition_to_done(&self, issue_id: &IssueId) -> Result<bool>
