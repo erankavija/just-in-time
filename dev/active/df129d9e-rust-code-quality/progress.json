@@ -1412,11 +1412,11 @@
       "reason": "last handler move; empties the legacy schema table"
     },
     "01a88d32": {
-      "status": "rework",
+      "status": "landing",
       "vendor": "Claude Sonnet",
       "reason": "b697a3f7 track B after d58f80c9; worker checks criteria first",
       "epic": "b697a3f7",
-      "review": "lead R1 FAIL: deleted the fsync-before-write test leaving the property unowned (orthogonal-tests); rest PASS (DataRoot handle commit, -3)."
+      "review": "lead R1 FAIL: deleted the fsync-before-write test leaving the property unowned (orthogonal-tests); rest PASS (DataRoot handle commit, -3). Rework 1 at 41838806d: lead PASS; DataRoot::sync with cfg(test) refusal seam, test owns fsync-before-write; rebind argument sound; -1 (b697a3f7 ledger)."
     },
     "945f9181": {
       "status": "dispatched",
