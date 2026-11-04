@@ -874,7 +874,7 @@
     "b23faa59": 2,
     "e5d618ee": 2,
     "153c9851": 1,
-    "98cc2097": 1,
+    "98cc2097": 2,
     "20fc3b92": 1,
     "10751360": 1
   },
@@ -1049,10 +1049,10 @@
       "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "98cc2097": {
-      "status": "landing",
+      "status": "rework",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
-      "note": "lead review: Search{flatten args} is a second top-level-leaf shape; use Search(SearchArgs) like Serve/Init/Apply"
+      "note": "branch CI: two new search exit-code rows (1, 10) lack binding cases; rework 2 of 2"
     },
     "0fe46027": {
       "status": "landing",
