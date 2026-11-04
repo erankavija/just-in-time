@@ -24826,3 +24826,7 @@
 {"from":"backlog","id":"7ce90ad1-5bb6-437b-baa3-e2961f896793","issue_id":"f9977efd-9626-4075-9cdb-d8f74dd9881d","timestamp":"2026-11-04T23:31:56.688940862Z","to":"ready","type":"issue_state_changed"}
 {"from":"ready","id":"d1eaf75c-24b5-4793-9104-2ca8fac9fc3e","issue_id":"f9977efd-9626-4075-9cdb-d8f74dd9881d","timestamp":"2026-11-04T23:31:57.119628998Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:df129d9e-lead","id":"7ca72dd0-c966-49e0-a5ec-86170f3f8cc8","issue_id":"f9977efd-9626-4075-9cdb-d8f74dd9881d","timestamp":"2026-11-04T23:31:57.119628998Z","type":"issue_claimed"}
+{"id":"02ff26ba-317f-41c3-8b2f-eb86dc1f12de","issue_id":"6d93ab14-4c72-4ec5-9c50-471cf0d95746","priority":"high","timestamp":"2026-11-04T23:33:27.949036691Z","title":"Split oversized web rendering chunks","type":"issue_created"}
+{"fields":["dependencies"],"id":"4445a9a2-57ad-440e-9d54-99e11bf4d59c","issue_id":"bb03df0a-65c7-496a-bb09-2620eb253fd5","timestamp":"2026-11-04T23:33:37.730046421Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"cf319c1d-946d-49ab-899b-a922269498df","issue_id":"6d93ab14-4c72-4ec5-9c50-471cf0d95746","timestamp":"2026-11-04T23:33:37.946874373Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:web-bundle-warning","id":"602a4272-6186-4f7b-b30d-b43ba96b547e","issue_id":"6d93ab14-4c72-4ec5-9c50-471cf0d95746","timestamp":"2026-11-04T23:33:37.946874373Z","type":"issue_claimed"}
