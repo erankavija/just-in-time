@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f004e7cd31196f986faaeeb2e57953bf6f786573",
+  "completed_at": "2026-11-04T19:25:52.867253211Z",
+  "duration_ms": 314446,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met in the attributable current tree; the prior documentation finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6acd7a05-b199-43f8-b619-554b536dc420",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5a236f46-12df-465a-ae85-973a7f8ba796",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T19:20:38.421137848Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `6c890025`, `e7c4ad68`, `d37aa751`\nPolicy sources: `AGENTS.md`; `.jit/invariants.toml`; `dev/vision/9db27a3a-charter.md`; issue `df129d9e`\nResolved items: `@/invariant/architecture-dependency-direction`, `@/invariant/canonical-cutover`, `@/invariant/essential-code-prose`, `@/invariant/orthogonal-tests`, `@/charter/D-13`, `@/charter/D-20`, `@/issue/df129d9e/decision/D-03`, `@/issue/df129d9e/decision/D-04`\nGate evidence: `cargo-ci` passed (exit 0); `mcp-ci` passed (exit 0)\nTruncation recovery: Re-read tagged patches and affected current paths in bounded slices; inspected generated `validate` schema variants; excluded unrelated unmodified warning matches.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met in the attributable current tree; the prior documentation finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
