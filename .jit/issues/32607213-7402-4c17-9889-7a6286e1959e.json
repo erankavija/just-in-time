@@ -22,9 +22,10 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-11-04T21:59:02.643703922Z",
-      "updated_by": null
+      "run_id": "b442f1f7-20fd-4fcc-b640-b081fec8d79f",
+      "status": "failed",
+      "updated_at": "2026-11-04T22:31:31.826268201Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
       "status": "pending",
@@ -48,5 +49,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Break down the server and web shared mechanisms",
-  "updated_at": "2026-11-04T22:29:10.280775574Z"
+  "updated_at": "2026-11-04T22:31:31.826268201Z"
 }

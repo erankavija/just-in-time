@@ -1,0 +1,23 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dd28b3d32b90a63fb01c1c320c998d0a7a737dbe",
+  "completed_at": "2026-11-04T22:31:31.818496267Z",
+  "duration_ms": 105505,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 75,
+  "gate_key": "breakdown-review",
+  "issue_id": "32607213-7402-4c17-9889-7a6286e1959e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b442f1f7-20fd-4fcc-b640-b081fec8d79f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:29:46.312836132Z",
+  "status": "error",
+  "stderr": "---\nERROR: Agent produced no output.\n--- agent stderr (first 13 of 4030 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a8ae-bd88-7e02-b9ca-d0a3a7b77a03\n--------\nuser\n--- 4017 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": ""
+}
