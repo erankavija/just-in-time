@@ -70,6 +70,10 @@ pub enum RepositoryStateStoreError {
     /// leave partly written files nothing can replay.
     #[error("mutation writes worktree targets and creates no data root at {path}, so no redo record can commit it")]
     UncommittableWorktreeMutation { path: PathBuf },
+    /// A redo record over a present data root appends no event, so the event
+    /// log's length would not count its commit.
+    #[error("redo record over a present data root appends no event")]
+    RecordWithoutEventAppend,
     #[error("repository recovery or publication failed: {0}")]
     Publication(#[source] anyhow::Error),
     #[error("leftover redo record {path} is not readable: {source}")]
@@ -535,7 +539,7 @@ impl RepositoryMutationSession for JsonMutationSession {
         plan: &MaterializationPlan,
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
         let image = plan.image();
-        let delta = plan.delta();
+        let delta = plan.publication();
         ensure_session_image(&self.layout, self.captured, image)?;
         ensure_delta_is_captured(image, delta)?;
         let interruptions = self.storage.mutation_interruptions();
@@ -602,7 +606,7 @@ impl JsonMutationSession {
         delta: &RepositoryDelta,
         interruptions: Arc<dyn MutationInterruptionInjector>,
     ) -> Result<(), RepositoryStateStoreError> {
-        let record = redo_record_for(image, delta.actions().iter())?;
+        let record = appending_record(image, delta)?;
         ensure_write_set_unchanged(&self.roots, image, &record)?;
         let root = self.roots.data_root().ok_or_else(|| {
             RepositoryStateStoreError::UnsafeTarget(self.layout.data_root().display().to_string())
@@ -706,7 +710,7 @@ impl RepositoryMutationSession for MemoryMutationSession {
         plan: &MaterializationPlan,
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError> {
         let image = plan.image();
-        let delta = plan.delta();
+        let delta = plan.publication();
         ensure_session_image(&self.layout, self.captured, image)?;
         ensure_delta_is_captured(image, delta)?;
         #[cfg(feature = "test-support")]
@@ -761,7 +765,7 @@ impl MemoryMutationSession {
         delta: &RepositoryDelta,
         interruptions: Arc<dyn MutationInterruptionInjector>,
     ) -> Result<(), RepositoryStateStoreError> {
-        let record = redo_record_for(image, delta.actions().iter())?;
+        let record = appending_record(image, delta)?;
         ensure_memory_write_set_unchanged(&self.storage.repository_state(), image, &record)?;
         self.storage
             .commit_record(&record)
@@ -1021,6 +1025,19 @@ fn redo_record_for<'a>(
         .collect();
     RedoRecord::new(make_directories, puts, deletes, event_append)
         .map_err(|source| RepositoryStateStoreError::Other(source.into()))
+}
+
+/// The redo record publishing `delta` over a present data root, refused
+/// when it appends no event: the event log's length counts every commit.
+fn appending_record(
+    image: &RepositoryImage,
+    delta: &RepositoryDelta,
+) -> Result<RedoRecord, RepositoryStateStoreError> {
+    let record = redo_record_for(image, delta.actions().iter())?;
+    match record.event_append() {
+        Some(_) => Ok(record),
+        None => Err(RepositoryStateStoreError::RecordWithoutEventAppend),
+    }
 }
 
 fn event_append_of(action: &RepositoryAction) -> Option<EventAppend> {

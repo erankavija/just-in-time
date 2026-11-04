@@ -2,8 +2,8 @@
 
 use super::{
     CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan,
-    RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryEntry, RepositoryImage,
-    RepositoryLayout, RepositoryLayoutError, VirtualPath,
+    MutationContext, RepositoryAction, RepositoryActionOwner, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryLayout, RepositoryLayoutError, VirtualPath,
 };
 use crate::domain::relative_path::RootRelativePath;
 use std::collections::{BTreeMap, BTreeSet};
@@ -88,7 +88,8 @@ impl RepositoryExportIntent {
     /// Build the bounded capture declaration for this export.
     ///
     /// The exact target, its immediate parent, and the parent's complete
-    /// non-recursive listing are revalidated before publication.
+    /// non-recursive listing are revalidated before publication; the event
+    /// log's tail positions the record's append.
     pub(crate) fn capture_spec(
         &self,
         budget: CaptureBudget,
@@ -102,6 +103,7 @@ impl RepositoryExportIntent {
         }
         let mut spec = CaptureSpec::new(paths, budget)?;
         spec.discover_listing(parent)?;
+        spec.discover_tail(VirtualPath::EVENTS)?;
         Ok(spec)
     }
 }
@@ -123,6 +125,8 @@ pub(crate) enum RepositoryExportError {
     UnsafeTarget(VirtualPath),
     #[error("repository export target already exists: {0:?}")]
     OccupiedTarget(VirtualPath),
+    #[error(transparent)]
+    Mutation(#[from] super::MutationError),
 }
 
 /// Lexically normalize and classify a requested output path.
@@ -152,13 +156,15 @@ pub(crate) fn classify_repository_export(
 /// Finalize one repository-contained export as an exact recoverable plan.
 pub(crate) fn finalize_repository_export(
     base: &RepositoryImage,
+    context: &MutationContext,
     intent: &RepositoryExportIntent,
 ) -> Result<MaterializationPlan, RepositoryExportError> {
-    finalize_export_payload(base, &intent.target, intent.payload.clone())
+    finalize_export_payload(base, context, &intent.target, intent.payload.clone())
 }
 
 fn finalize_export_payload(
     base: &RepositoryImage,
+    context: &MutationContext,
     target: &VirtualPath,
     payload: RepositoryExportPayload,
 ) -> Result<MaterializationPlan, RepositoryExportError> {
@@ -227,7 +233,7 @@ fn finalize_export_payload(
         }
     };
     let delta = RepositoryDelta::new(base.layout(), actions)?;
-    Ok(MaterializationPlan::new(base, delta))
+    Ok(MaterializationPlan::new(base, delta, context)?)
 }
 
 fn require_absent(
@@ -363,7 +369,8 @@ mod tests {
             )
             .listing(parent, DirectoryListing::default())
             .build();
-        let plan = finalize_repository_export(&image, &intent).unwrap();
+        let plan =
+            finalize_repository_export(&image, &MutationContext::preview(), &intent).unwrap();
         assert!(matches!(
             &plan.delta().actions()[0],
             RepositoryAction::WriteFile {
@@ -399,7 +406,7 @@ mod tests {
             )
             .listing(parent, DirectoryListing::default())
             .build();
-        let result = finalize_repository_export(&image, &intent);
+        let result = finalize_repository_export(&image, &MutationContext::preview(), &intent);
         assert!(matches!(
             result,
             Err(RepositoryExportError::UnsafeTarget(path)) if path == target
@@ -427,6 +434,7 @@ mod tests {
         assert_eq!(
             captured,
             BTreeSet::from([
+                VirtualPath::EVENTS,
                 parent.clone(),
                 target.clone(),
                 VirtualPath::data("exports/snapshot/a").unwrap(),
@@ -451,7 +459,8 @@ mod tests {
             })
             .listing(parent, DirectoryListing::default())
             .build();
-        let plan = finalize_repository_export(&image, &intent).unwrap();
+        let plan =
+            finalize_repository_export(&image, &MutationContext::preview(), &intent).unwrap();
         assert_eq!(plan.delta().actions().len(), 4);
         assert!(matches!(
             &plan.delta().actions()[0],
@@ -482,7 +491,7 @@ mod tests {
             )
             .listing(parent, DirectoryListing::default())
             .build();
-        let result = finalize_repository_export(&image, &intent);
+        let result = finalize_repository_export(&image, &MutationContext::preview(), &intent);
         assert!(matches!(
             result,
             Err(RepositoryExportError::OccupiedTarget(path)) if path == target

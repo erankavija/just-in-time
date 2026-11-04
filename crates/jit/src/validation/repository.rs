@@ -219,6 +219,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
         .then(|| {
             crate::repository_state::derive_materialization(
                 image,
+                &crate::repository_state::MutationContext::preview(),
                 crate::repository_state::MaterializationRequest::RepairDerivedState {
                     declarations: declarations.borrowed(),
                 },

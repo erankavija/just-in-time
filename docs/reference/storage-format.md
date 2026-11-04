@@ -87,8 +87,12 @@ Lease records live under `.git/jit/`, not `.jit/`. See
 A repository mutation publishes through one **redo record**: the directories it
 creates, the new contents of every file it writes, and the paths it removes, except
 that the event log is the one file the record extends rather than replaces,
-with new lines positioned at its committed length (`@/charter/D-17`). The
-mutation fails, before anything durable is written, if
+with new lines positioned at its committed length (`@/charter/D-17`). Every
+redo record over an existing data root appends at least one event, so the log's
+length counts every commit: a write that records no domain event, such as
+`jit config set` or `jit project render`, appends one `files_published` event
+naming the paths it writes, and a record without an append is refused before it
+commits. The mutation fails, before anything durable is written, if
 any path it creates, writes, or removes changed since it read it. The record is
 then written and synced under the scratch directory; that write is the
 mutation's commit point. Application creates the directories, replaces each
