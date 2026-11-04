@@ -9,14 +9,14 @@
  */
 
 import { execFile, spawn } from 'child_process';
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { appendFileSync, cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { fileURLToPath } from 'url';
 import { promisify } from 'node:util';
 import { strict as assert } from 'node:assert';
 import { CURATION, getCommandByPath } from './lib/tool-generator.js';
 import { loadSchema } from './lib/schema-loader.js';
+import { JIT_BINARY } from './lib/jit-binary.js';
 
 const TIMEOUT = 5000;
 
@@ -24,9 +24,47 @@ const TIMEOUT = 5000;
 // instead of restating command shapes here.
 const { schema } = await loadSchema();
 
+// Repository vocabulary the guards below keep out of the bridge's prose. The
+// suite declares it in a fixture repository it creates and owns, so no
+// checkout's data root is read and the binary under test may be any storage
+// format.
+const FIXTURE_VOCABULARY = `
+[type_hierarchy]
+types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4 }
+
+[item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = ["[hard]", "[aspirational]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[item_kinds.decision]
+section = "decisions"
+id-pattern = "D-[0-9]+"
+markers = []
+link-namespaces = ["per"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[item_kinds.risk]
+section = "risks"
+id-pattern = "RISK-[0-9]+"
+markers = []
+link-namespaces = ["mitigates", "resolves"]
+scope = "issue"
+source-of-truth = "markdown-first"
+`;
+
+const fixtureRepository = mkdtempSync(join(tmpdir(), 'jit-mcp-fixture-'));
+process.on('exit', () => rmSync(fixtureRepository, { recursive: true, force: true }));
+await promisify(execFile)(JIT_BINARY, ['init'], { cwd: fixtureRepository, timeout: TIMEOUT });
+appendFileSync(join(fixtureRepository, '.jit', 'config.toml'), FIXTURE_VOCABULARY);
+
 // Item kinds are repository configuration, not MCP vocabulary. Read the
-// repository's declaration so this guard never hardcodes this project's kinds.
-const itemKindsConfig = readFileSync(new URL('../.jit/config.toml', import.meta.url), 'utf8');
+// fixture's declaration so this guard never hardcodes any project's kinds.
+const itemKindsConfig = readFileSync(join(fixtureRepository, '.jit', 'config.toml'), 'utf8');
 const itemKinds = [...itemKindsConfig.matchAll(/^\[item_kinds\.([^\]]+)\]/gm)]
   .map(([, kind]) => kind);
 const itemKindForms = new Map();
@@ -60,8 +98,8 @@ function presentsConfiguredKindVocabulary(text) {
 // from whatever the repository declares instead of naming this project's.
 const declaredHierarchyTypes = Object.keys(
   JSON.parse(
-    (await promisify(execFile)('jit', ['config', 'get', 'type_hierarchy.types', '--json'], {
-      cwd: fileURLToPath(new URL('..', import.meta.url)),
+    (await promisify(execFile)(JIT_BINARY, ['config', 'get', 'type_hierarchy.types', '--json'], {
+      cwd: fixtureRepository,
       timeout: TIMEOUT,
     })).stdout
   ).value
@@ -164,8 +202,7 @@ class MCPTester {
   }
 
   async start() {
-    this.testDir = join(tmpdir(), `jit-mcp-integ-${Date.now()}`);
-    mkdirSync(this.testDir, { recursive: true });
+    this.testDir = mkdtempSync(join(tmpdir(), 'jit-mcp-integ-'));
 
     const serverPath = join(process.cwd(), 'index.js');
 
