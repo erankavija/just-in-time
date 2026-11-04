@@ -74,7 +74,7 @@ impl UpdateOperations {
 }
 
 /// Result of bulk update operation
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct BulkUpdateResult {
     /// IDs that matched the filter
     pub matched: Vec<IssueId>,
@@ -86,15 +86,16 @@ pub struct BulkUpdateResult {
     pub errors: Vec<(IssueId, String)>,
     /// Per-issue non-enforcing graph-rule warnings (id, message).
     /// Warnings never block the transition; they are informational findings
-    /// from rules with `enforce = false`.  Empty when no rules fired.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// from rules with `enforce = false`.  Empty when no rules fired. Reported
+    /// as outcome warnings, not in the payload.
+    #[serde(skip)]
     pub warnings: Vec<(IssueId, String)>,
     /// Summary statistics
     pub summary: BulkUpdateSummary,
 }
 
 /// Summary statistics for bulk update
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct BulkUpdateSummary {
     pub total_matched: usize,
     pub total_modified: usize,

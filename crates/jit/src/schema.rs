@@ -534,42 +534,12 @@ impl CommandSchema {
     }
 
     /// Legacy output schema table for leaves not yet registered with a
-    /// handler group (e.g., "issue_create").
-    pub(crate) fn get_output_schema_for_command(cmd_path: &str) -> Option<OutputSchema> {
-        use crate::domain::Issue;
-        use crate::output::*;
-
-        // Helper to convert schemars schema to serde_json Value
-        fn schema_to_value<T: JsonSchema>() -> Value {
-            serde_json::to_value(schema_for!(T)).unwrap_or(json!({}))
-        }
-
-        let (schema, type_name) = match cmd_path {
-            // Issue commands
-            //
-            // `issue create --json` returns the `issue show` projection with its
-            // findings, so its gate list is the `gates` array, not the raw
-            // stored record.
-            "issue_create" => (
-                Some(schema_to_value::<crate::output::IssueCreateResponse>()),
-                "IssueCreateResponse",
-            ),
-            // Lifecycle mutation confirmations echo the raw stored record, so the
-            // gate list stays under gates_required / gates_status.
-            "issue_assign" | "issue_unassign" | "issue_reject" | "issue_release"
-            | "issue_claim" | "issue_claim-next" => (Some(schema_to_value::<Issue>()), "Issue"),
-            "issue_update" => (
-                Some(schema_to_value::<IssueUpdateResponse>()),
-                "IssueUpdateResponse",
-            ),
-
-            // Default: no specific schema
-            _ => (None, "CommandResponse"),
-        };
-
+    /// handler group; it has no rows left, so every such leaf takes the
+    /// untyped `CommandResponse`.
+    pub(crate) fn get_output_schema_for_command(_cmd_path: &str) -> Option<OutputSchema> {
         Some(OutputSchema {
-            success_schema: schema,
-            success: type_name.to_string(),
+            success_schema: None,
+            success: "CommandResponse".to_string(),
             error: "ErrorResponse".to_string(),
         })
     }
@@ -1598,14 +1568,6 @@ mod tests {
         walk(&CommandSchema::generate().commands, "", &mut mismatched);
 
         assert!(mismatched.is_empty(), "mismatched: {mismatched:?}");
-    }
-
-    #[test]
-    fn test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema() {
-        let resolved = CommandSchema::resolve_output_schema("issue_create").unwrap();
-        let legacy = CommandSchema::get_output_schema_for_command("issue_create").unwrap();
-        assert_eq!(resolved.success, legacy.success);
-        assert_eq!(resolved.success_schema, legacy.success_schema);
     }
 
     /// Regression (jit:c505031a): `gate status-all`'s output schema lookup

@@ -38,7 +38,7 @@ pub fn publish_fixture_directory_noreplace(source: &Path, destination: &Path) ->
     let destination_name = destination
         .file_name()
         .context("fixture destination has no file name")?;
-    let parent = super::repository_state_store::open_absolute_dir_nofollow(source_parent)
+    let parent = super::capability_fs::open_absolute_dir_nofollow(source_parent)
         .with_context(|| format!("open fixture cache parent {}", source_parent.display()))?;
     rename_noreplace_cap(&parent, source_name, &parent, destination_name).map_err(Into::into)
 }

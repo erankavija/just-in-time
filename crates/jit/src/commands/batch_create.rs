@@ -194,7 +194,7 @@ pub struct BatchCreateOutcome {
 }
 
 /// Successful validation-only result for `batch-create --dry-run`.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
 pub struct BatchDryRunOutcome {
     /// Always true for a successful validation result.
     pub valid: bool,

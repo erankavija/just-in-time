@@ -1146,14 +1146,16 @@ events, or edges. Human output reports counts. JSON returns:
 ```
 
 **Output.** On success the command returns the `{key: full_id}` map. With
-`--json` the output is EXACTLY that map as the top-level JSON object — every
-entry is a symbolic key mapping to the created issue's full id, with no envelope
-or `message` field (keys are emitted sorted). Human output lists each `key -> id`.
+`--json` the success envelope carries it as `ids`, mapping each symbolic key to
+the created issue's full id. Human output lists each `key -> id`.
 
 ```json
 {
-  "impl": "54a9f64c-7117-483e-b59d-3ccc16c5b55e",
-  "spec": "48453126-9f6b-4f7a-a5a6-cb30ef833f92"
+  "ids": {
+    "impl": "54a9f64c-7117-483e-b59d-3ccc16c5b55e",
+    "spec": "48453126-9f6b-4f7a-a5a6-cb30ef833f92"
+  },
+  "message": "Created 2 issue(s)"
 }
 ```
 

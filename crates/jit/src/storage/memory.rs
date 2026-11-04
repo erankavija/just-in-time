@@ -15,11 +15,11 @@ use crate::repository_state::{
     CapturedBytes, EntryIdentity, FileMode, RepositoryEntry, RepositoryLayoutError,
     RepositoryRootClass, VirtualPath,
 };
+use crate::storage::capability_fs::CapabilityFsError;
 use crate::storage::redo_apply::{check_interruption, occupied_directory};
 use crate::storage::{
     EventAppend, IssueNotFoundError, IssueStore, PresetNotFoundError, PutFile, RedoApplyError,
     RedoInterruptionInjector, RedoPoint, RedoRecord, RepoWriteGuard, RepoWriteLock,
-    RepositoryStateStoreError,
 };
 use anyhow::{anyhow, Context, Result};
 use std::collections::BTreeMap;
@@ -500,7 +500,7 @@ impl InMemoryStorage {
     /// Install `record` as the residue this backend applies forward, changing no
     /// state entry.
     ///
-    /// The in-memory commit point, mirroring [`RedoRecord::commit`]: an
+    /// The in-memory commit point, mirroring [`commit_redo_record`](super::commit_redo_record): an
     /// installed record is refused rather than replaced, because what occupies
     /// the slot is a mutation no application consumed.
     ///
@@ -663,7 +663,7 @@ fn resolve(state: &MemoryRepositoryState, path: &VirtualPath) -> Result<(), Redo
             None | Some(RepositoryEntry::Absent) | Some(RepositoryEntry::Directory { .. }) => {
                 Ok(())
             }
-            Some(_) => Err(RepositoryStateStoreError::UnsafeTarget(component).into()),
+            Some(_) => Err(CapabilityFsError::UnsafeTarget(component).into()),
         }
     })
 }
@@ -1503,7 +1503,7 @@ mod record_tests {
         assert!(
             matches!(
                 outcome,
-                Err(RedoApplyError::Roots(RepositoryStateStoreError::UnsafeTarget(
+                Err(RedoApplyError::Roots(CapabilityFsError::UnsafeTarget(
                     ref component
                 ))) if component == VirtualPath::ISSUES.relative().as_str()
             ),

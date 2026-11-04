@@ -187,6 +187,13 @@ pub struct IssueMutation<W = String> {
     pub warnings: Vec<W>,
 }
 
+/// The id a deletion removed, with its advisory warnings.
+#[derive(Debug, Clone)]
+pub struct IssueDeletion {
+    pub id: IssueId,
+    pub warnings: Vec<String>,
+}
+
 /// Issue lifecycle operations of a [`CommandExecutor`].
 pub struct IssueOps<'a, S: IssueStore> {
     pub(super) exec: &'a CommandExecutor<S>,
@@ -394,10 +401,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
     ///
     /// Containment follows the dependency DAG (membership labels are advisory
     /// and not consulted). The container id is resolved the same way as
-    /// `issue show`, so a bad id yields the typed id-resolution error unwrapped
-    /// (the caller routes it through `handle_json_error!`). Children are ordered
-    /// by ascending short id, since stored dependency order is set-derived and
-    /// not meaningful.
+    /// `issue show`, so a bad id yields the typed id-resolution error unwrapped.
+    /// Children are ordered by ascending short id, since stored dependency
+    /// order is set-derived and not meaningful.
     ///
     /// # Examples
     ///
@@ -645,9 +651,10 @@ impl<S: IssueStore> IssueOps<'_, S> {
         }
     }
 
-    /// Delete an issue.
+    /// Delete the issue `requested` resolves to, once `allowed` confirms
+    /// operator intent ([`Self::confirm_deletion_allowed`]).
     ///
-    /// Returns warnings (e.g., lease warnings) if any.
+    /// Returns the deleted id and any warnings (e.g., lease warnings).
     ///
     /// Also strips `id` from the `dependencies` array of every issue that
     /// referenced it (jit:f847df3f). Without this cascade a deleted issue left
@@ -665,13 +672,14 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// requiring target resolution) and `jit issue show --json`'s
     /// `dangling_dependency_ids` field remain as defense-in-depth for legacy or
     /// externally edited data.
-    pub fn delete_issue(&self, id: &IssueId) -> Result<Vec<String>>
+    pub fn delete_issue(&self, requested: &IssueIdPrefix, allowed: bool) -> Result<IssueDeletion>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::finalize;
 
-        let id = &id.clone();
+        let id = &self.exec.storage.resolve_issue_id(requested)?;
+        self.confirm_deletion_allowed(id, allowed)?;
         let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("issue deletion", || {
@@ -718,7 +726,10 @@ impl<S: IssueStore> IssueOps<'_, S> {
             if let Some(error) = derived.error_after_apply {
                 return Err(error.into());
             }
-            Ok(AttemptOutcome::Done(warnings))
+            Ok(AttemptOutcome::Done(IssueDeletion {
+                id: target_id,
+                warnings,
+            }))
         })
     }
 
@@ -2374,7 +2385,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let events_before = executor.storage.read_events().unwrap().len();
 
         // Deletion is a state change and must be captured in the event log.
-        executor.issues().delete_issue(&issue_id).unwrap();
+        executor
+            .issues()
+            .delete_issue(&IssueIdPrefix::from(&issue_id), true)
+            .unwrap();
 
         let events = executor.storage.read_events().unwrap();
         assert_eq!(
@@ -2423,7 +2437,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, unrelated);
         let events_before = executor.storage.read_events().unwrap().len();
 
-        executor.issues().delete_issue(&dependency_id).unwrap();
+        executor
+            .issues()
+            .delete_issue(&IssueIdPrefix::from(&dependency_id), true)
+            .unwrap();
 
         let events = executor.storage.read_events().unwrap();
         let bodies = events[events_before..]
@@ -2468,7 +2485,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let dependent_id = dependent.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
 
-        executor.issues().delete_issue(&dependency_id).unwrap();
+        executor
+            .issues()
+            .delete_issue(&IssueIdPrefix::from(&dependency_id), true)
+            .unwrap();
 
         let updated = executor.storage.load_issue(&dependent_id).unwrap();
         assert!(updated.dependencies.is_empty());
@@ -2528,7 +2548,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .entries
             .remove(&crate::repository_state::VirtualPath::INDEX);
 
-        assert!(executor.issues().delete_issue(&issue.id).is_err());
+        assert!(executor
+            .issues()
+            .delete_issue(&IssueIdPrefix::from(&issue.id), true)
+            .is_err());
         assert_eq!(
             storage.read_repo_file(&issue_path).unwrap(),
             Some(issue_bytes)
@@ -2558,7 +2581,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::repository_state::VirtualPath::issue_record(&issue_id).repository_relative();
         let issue_before = executor.storage.read_repo_file(&issue_path).unwrap();
 
-        assert!(executor.issues().delete_issue(&issue_id).is_err());
+        assert!(executor
+            .issues()
+            .delete_issue(&IssueIdPrefix::from(&issue_id), true)
+            .is_err());
         assert_eq!(
             executor.storage.read_repo_file(".jit/index.json").unwrap(),
             Some("not valid JSON".to_string())
@@ -2587,7 +2613,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        executor.issues().delete_issue(&issue_id).unwrap();
+        executor
+            .issues()
+            .delete_issue(&IssueIdPrefix::from(&issue_id), true)
+            .unwrap();
 
         assert!(executor.storage.load_issue(&issue_id).is_err());
         assert_eq!(
@@ -2618,7 +2647,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
-        executor.issues().delete_issue(&target.id).unwrap();
+        executor
+            .issues()
+            .delete_issue(&IssueIdPrefix::from(&target.id), true)
+            .unwrap();
 
         assert!(executor.storage.load_issue(&target.id).is_err());
         assert!(executor.storage.load_issue(&collision.id).is_ok());
@@ -2647,7 +2679,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&storage, dependent);
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
 
-        assert!(executor.issues().delete_issue(&dependency_id).is_err());
+        assert!(executor
+            .issues()
+            .delete_issue(&IssueIdPrefix::from(&dependency_id), true)
+            .is_err());
         drop(recovered.open_mutation_session(layout.clone()).unwrap());
 
         let unchanged = recovered.load_issue(&dependent_id).unwrap();
@@ -2659,7 +2694,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         CommandExecutor::new(recovered.clone())
             .with_layout(layout)
             .issues()
-            .delete_issue(&dependency_id)
+            .delete_issue(&IssueIdPrefix::from(&dependency_id), true)
             .unwrap();
         let updated = recovered.load_issue(&dependent_id).unwrap();
         assert_eq!(updated.state, State::Ready);
@@ -2899,7 +2934,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         assert!(executor.storage.load_issue(&a_id).unwrap().dependencies == vec![b_id.clone()]);
 
         let events_before = executor.storage.read_events().unwrap().len();
-        executor.issues().delete_issue(&b_id).unwrap();
+        executor
+            .issues()
+            .delete_issue(&IssueIdPrefix::from(&b_id), true)
+            .unwrap();
 
         let a_after = executor.storage.load_issue(&a_id).unwrap();
         assert!(
@@ -2994,7 +3032,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             "validation should pass before deletion"
         );
 
-        executor.issues().delete_issue(&b_id).unwrap();
+        executor
+            .issues()
+            .delete_issue(&IssueIdPrefix::from(&b_id), true)
+            .unwrap();
 
         let result = executor.validation().validate_silent();
         assert!(

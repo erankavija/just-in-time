@@ -49,8 +49,9 @@ pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 pub use graph::{GraphExportOutput, GraphExportText, GraphExportWritten};
 pub use issue::{
-    BlockedListing, IssueListing, IssueProjection, IssueSearchResults, IssueShowOutput,
-    IssueStatusOutput, QuerySubset, SubsetListing,
+    BatchCreateResponse, BlockedListing, IssueBatchCreateOutput, IssueDeleteResponse,
+    IssueLifecycleResponse, IssueListing, IssueProjection, IssueSearchResults, IssueShowOutput,
+    IssueStatusOutput, IssueUpdateOutput, QuerySubset, SubsetListing,
 };
 pub use search::{SearchHit, SearchKey, SearchQuery, SearchResponse};
 pub use serve::{ServeResponse, WebUiSource};

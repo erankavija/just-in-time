@@ -10,10 +10,7 @@
 
 use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::{FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath};
-use crate::storage::atomic_write::{create_file_synced, sync_directory};
-use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
 
 pub use crate::repository_state::RECORD_SCRATCH_DIR;
 
@@ -198,34 +195,6 @@ impl RedoRecord {
         Ok(bytes)
     }
 
-    /// Write the record under `data_root`'s scratch directory, returning its
-    /// path once it is durable: the bytes are synced and every directory entry
-    /// naming them is fsynced. This is the mutation's commit point — the first
-    /// live write follows it, because a redo-only protocol has no way back once
-    /// a live file is replaced.
-    ///
-    /// The record is written in place rather than staged and renamed: an
-    /// interrupted write leaves a truncated record, which [`Self::parse`]
-    /// rejects; session open then refuses to proceed with
-    /// `UnreadableRedoRecord` rather than skipping it. An occupied record path
-    /// is refused instead of replaced: what occupies it is a mutation no
-    /// session applied, and session open decides its fate.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the record cannot be serialized, the data root is
-    /// absent, the record path is occupied, or a write or sync fails.
-    pub fn commit(&self, data_root: &Path) -> anyhow::Result<PathBuf> {
-        let scratch = data_root.join(RECORD_SCRATCH_DIR);
-        if create_scratch(data_root, &scratch)? {
-            sync_directory(data_root)?;
-        }
-        let path = scratch.join(RECORD_FILE_NAME);
-        create_file_synced(&path, &self.serialize()?)?;
-        sync_directory(&scratch)?;
-        Ok(path)
-    }
-
     /// Parse a record from its serialized form.
     ///
     /// # Errors
@@ -341,37 +310,6 @@ struct PathHeader {
 struct AppendHeader {
     offset: u64,
     length: u64,
-}
-
-/// Create the scratch directory when absent, with the data root's own mode,
-/// reporting whether this call created it: a created entry is durable only once
-/// its parent is fsynced, and a mode left to the umask is not the one the rest
-/// of the data root carries. An absent data root is not created here.
-fn create_scratch(data_root: &Path, scratch: &Path) -> anyhow::Result<bool> {
-    match std::fs::create_dir(scratch) {
-        Ok(()) => adopt_mode(data_root, scratch).map(|()| true),
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
-        Err(error) => Err(error).with_context(|| format!("creating {}", scratch.display())),
-    }
-}
-
-/// Give `directory` the permission bits `source` carries. The mode is set after
-/// creation rather than passed to `mkdir`, whose mode the umask masks.
-#[cfg(unix)]
-fn adopt_mode(source: &Path, directory: &Path) -> anyhow::Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let mode = std::fs::metadata(source)
-        .with_context(|| format!("reading the mode of {}", source.display()))?
-        .permissions()
-        .mode();
-    std::fs::set_permissions(directory, std::fs::Permissions::from_mode(mode & 0o7777))
-        .with_context(|| format!("setting the mode of {}", directory.display()))
-}
-
-#[cfg(not(unix))]
-fn adopt_mode(_source: &Path, _directory: &Path) -> anyhow::Result<()> {
-    Ok(())
 }
 
 /// The wire spelling of a path's root-relative portion.
@@ -714,125 +652,14 @@ mod tests {
     }
 
     #[test]
-    fn test_commit_writes_a_record_a_later_session_parses() {
-        let data_root = tempfile::tempdir().unwrap();
-        let record = sample_record();
-
-        let path = record.commit(data_root.path()).unwrap();
-
-        assert_eq!(
-            path,
-            data_root
-                .path()
-                .join(RECORD_SCRATCH_DIR)
-                .join(RECORD_FILE_NAME)
-        );
-        assert_eq!(
-            RedoRecord::parse(&std::fs::read(&path).unwrap()).unwrap(),
-            record
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_commit_creates_an_absent_scratch_directory_with_the_data_root_mode() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let mode = |directory: &std::path::Path| {
-            std::fs::metadata(directory).unwrap().permissions().mode() & 0o7777
-        };
-        let parent = tempfile::tempdir().unwrap();
-        // A directory the ambient umask alone shaped, so the mode the data root
-        // is given differs from it whatever that umask is: a scratch directory
-        // left to the umask carries this control's mode, not the data root's.
-        let control = parent.path().join("control");
-        std::fs::create_dir(&control).unwrap();
-        let data_mode = if mode(&control) == 0o700 {
-            0o750
-        } else {
-            0o700
-        };
-
-        let data_root = parent.path().join("data");
-        std::fs::create_dir(&data_root).unwrap();
-        std::fs::set_permissions(&data_root, std::fs::Permissions::from_mode(data_mode)).unwrap();
-
-        let path = sample_record().commit(&data_root).unwrap();
-
-        assert_eq!(
-            mode(path.parent().unwrap()),
-            mode(&data_root),
-            "the scratch directory does not carry the data root's mode"
-        );
-    }
-
-    /// A data root entries can be created in but not opened for reading: its
-    /// fsync fails, and the record write that follows it never runs. A commit
-    /// that skips that fsync reaches the write, and the record is there to find.
-    #[cfg(unix)]
-    #[test]
-    fn test_commit_fsyncs_the_data_root_before_writing_into_a_scratch_it_created() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let parent = tempfile::tempdir().unwrap();
-        let data_root = parent.path().join("data");
-        std::fs::create_dir(&data_root).unwrap();
-        let restrict = |mode| {
-            std::fs::set_permissions(&data_root, std::fs::Permissions::from_mode(mode)).unwrap()
-        };
-        restrict(0o300);
-
-        let outcome = sample_record().commit(&data_root);
-
-        let record = data_root.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
-        let wrote_record = record.exists();
-        restrict(0o700);
-        assert!(outcome.is_err(), "the unsyncable data root went unreported");
-        assert!(
-            !wrote_record,
-            "the record was written under a scratch directory the data root never made durable"
-        );
-    }
-
-    #[test]
-    fn test_commit_writes_into_a_scratch_directory_that_already_exists() {
-        let data_root = tempfile::tempdir().unwrap();
-        let scratch = data_root.path().join(RECORD_SCRATCH_DIR);
-        std::fs::create_dir(&scratch).unwrap();
-
-        let path = sample_record().commit(data_root.path()).unwrap();
-
-        assert!(path.starts_with(&scratch));
-        assert!(RedoRecord::parse(&std::fs::read(&path).unwrap()).is_ok());
-    }
-
-    #[test]
-    fn test_commit_leaves_a_record_a_previous_mutation_left_behind() {
-        let data_root = tempfile::tempdir().unwrap();
-        let path = sample_record().commit(data_root.path()).unwrap();
-        let leftover = std::fs::read(&path).unwrap();
-
-        assert!(RedoRecord::default().commit(data_root.path()).is_err());
-
-        assert_eq!(
-            std::fs::read(&path).unwrap(),
-            leftover,
-            "the commit overwrote a record no session had applied"
-        );
-    }
-
-    #[test]
-    fn test_commit_interrupted_partway_leaves_bytes_no_later_session_parses() {
-        let data_root = tempfile::tempdir().unwrap();
-        let path = sample_record().commit(data_root.path()).unwrap();
-        let complete = std::fs::read(&path).unwrap();
+    fn test_parse_rejects_every_proper_prefix_of_a_serialized_record() {
+        let complete = sample_record().serialize().unwrap();
 
         // The record is written in place, so every interruption of the write
         // leaves a proper prefix of these bytes at the record's path.
         (0..complete.len()).for_each(|length| {
-            std::fs::write(&path, &complete[..length]).unwrap();
             assert!(
-                RedoRecord::parse(&std::fs::read(&path).unwrap()).is_err(),
+                RedoRecord::parse(&complete[..length]).is_err(),
                 "a {length}-byte residue of an interrupted write parsed as a record"
             );
         });

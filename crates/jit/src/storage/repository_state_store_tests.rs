@@ -4,6 +4,12 @@ use crate::repository_state::{
     serialize_gate_run, CaptureBudget, RepositoryAction, RepositoryActionOwner,
     EVENT_LOG_TAIL_WINDOW,
 };
+#[cfg(windows)]
+use crate::storage::capability_fs::capability_metadata_identity;
+use crate::storage::capability_fs::DataRoot;
+use crate::storage::capability_fs::{
+    open_regular_file_nofollow, CapabilityFsError, CapabilityRoots,
+};
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
     data_root as redo_root, record_relative_path, record_scratch_relative_path,
@@ -11,6 +17,7 @@ use crate::storage::redo_apply::test_fixtures::{
 };
 use crate::storage::{EventAppend, PutFile, RedoPoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
 use crate::test_harness::git::GitStandIn;
+use cap_std::ambient_authority;
 use std::collections::{BTreeMap, BTreeSet};
 use std::process::Command;
 use std::sync::Mutex;
@@ -272,7 +279,7 @@ fn test_open_regular_file_nofollow_refuses_a_symbolic_link() {
 
     let error = open_regular_file_nofollow(&dir, "link.txt").unwrap_err();
 
-    assert!(matches!(error, RepositoryStateStoreError::UnsafeTarget(_)));
+    assert!(matches!(error, CapabilityFsError::UnsafeTarget(_)));
 }
 
 #[test]
@@ -283,7 +290,7 @@ fn test_open_regular_file_nofollow_refuses_a_directory() {
 
     let error = open_regular_file_nofollow(&dir, "subdir").unwrap_err();
 
-    assert!(matches!(error, RepositoryStateStoreError::UnsafeTarget(_)));
+    assert!(matches!(error, CapabilityFsError::UnsafeTarget(_)));
 }
 
 #[test]
@@ -2419,7 +2426,7 @@ impl SessionRecordBackend for FileSessionBackend {
     }
 
     fn commit(&self, record: &RedoRecord) {
-        record.commit(&redo_root(&self.worktree)).unwrap();
+        commit_redo_record(&DataRoot::open(&redo_root(&self.worktree)).unwrap(), record).unwrap();
     }
 
     fn open(&self) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {

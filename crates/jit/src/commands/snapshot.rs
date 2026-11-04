@@ -174,7 +174,7 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
     /// Read file content from working tree filesystem
     fn read_from_filesystem(&self, path: &str) -> Result<(Vec<u8>, SourceInfo)> {
         let relative = crate::domain::relative_path::RootRelativePath::parse(path)?;
-        let content = crate::storage::repository_state_store::read_repository_file_nofollow(
+        let content = crate::storage::capability_fs::read_repository_file_nofollow(
             &self.worktree_root,
             &relative,
         )?
@@ -467,12 +467,10 @@ This is a read-only export. Future versions may support:
             crate::repository_state::VirtualPath::GATES,
         ] {
             let relative = path.relative();
-            if let Some(bytes) =
-                crate::storage::repository_state_store::read_repository_file_nofollow(
-                    &self.data_root,
-                    relative,
-                )?
-            {
+            if let Some(bytes) = crate::storage::capability_fs::read_repository_file_nofollow(
+                &self.data_root,
+                relative,
+            )? {
                 std::fs::write(jit_dir.join(relative.as_path()), bytes)?;
             }
         }

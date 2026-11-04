@@ -13,6 +13,7 @@ use anyhow::Result;
 pub mod artifact_discovery;
 pub mod artifact_planning;
 pub(crate) mod atomic_write;
+pub(crate) mod capability_fs;
 pub mod claim_coordinator;
 pub mod clock;
 #[cfg(test)]
@@ -55,6 +56,7 @@ pub mod worktree_paths;
 pub use artifact_discovery::{discover_archive_artifacts, ArtifactDiscoveryError};
 pub(crate) use artifact_planning::collect_citation_scan_evidence;
 pub use artifact_planning::{collect_artifact_classification_facts, resolve_container_destination};
+pub use capability_fs::DataRoot;
 pub use claim_coordinator::{ClaimAcquireLimits, ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{
@@ -78,7 +80,8 @@ pub use mutation_interruption::{
 };
 pub use path_errors::{validate_repo_relative_path, PathReadError};
 pub use redo_apply::{
-    NoRedoInterruptions, RedoApplier, RedoApplyError, RedoInterruptionInjector, RedoPoint,
+    commit_redo_record, NoRedoInterruptions, RedoApplier, RedoApplyError, RedoInterruptionInjector,
+    RedoPoint,
 };
 pub use redo_record::{
     EventAppend, PutFile, RedoRecord, RedoRecordError, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,

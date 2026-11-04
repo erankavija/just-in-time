@@ -1,18 +1,20 @@
-//! Responses and human renderings of the `jit issue` read commands.
+//! Responses and human renderings of the `jit issue` commands.
 
 use super::{
     minimal_blocked_reason, plain_issue_rows, render_issue_list, BlockedFullListResponse,
     BlockedIssue, BlockedListResponse, BlockedReason, ContainerProgressResponse, HumanRender,
-    IssueChildrenResponse, IssueColumn, IssueListFullResponse, IssueListResponse,
-    IssueSearchFullResponse, IssueSearchResponse, IssueShowListResponse, IssueShowResponse,
-    IssueShowSummaryResponse, IssueStatusListResponse, IssueStatusResponse, ListedIssue,
-    OutputMode,
+    IssueChildrenResponse, IssueColumn, IssueCreateResponse, IssueListFullResponse,
+    IssueListResponse, IssueSearchFullResponse, IssueSearchResponse, IssueShowListResponse,
+    IssueShowResponse, IssueShowSummaryResponse, IssueStatusListResponse, IssueStatusResponse,
+    IssueUpdateResponse, ListedIssue, OutputMode,
 };
-use crate::commands::ItemShowResult;
+use crate::commands::{BatchCreateOutcome, BatchDryRunOutcome, BulkUpdateResult, ItemShowResult};
+use crate::domain::identity::IssueId;
 use crate::domain::queries::BlockingReason;
 use crate::domain::{Issue, MinimalBlockedIssue, MinimalIssue};
 use schemars::JsonSchema;
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::fmt::Write;
 
 /// The named top-level field(s) of one issue's show response: plain text for
@@ -405,6 +407,166 @@ impl HumanRender for IssueSearchResults {
         match self {
             Self::Summary(list) => list_text(header, &list.items, STATE_AND_PRIORITY, mode.quiet),
             Self::Full(list) => list_text(header, &list.items, STATE_AND_PRIORITY, mode.quiet),
+        }
+    }
+}
+
+/// `line` and a newline, or nothing under `-q`.
+fn confirmation(line: impl std::fmt::Display, mode: OutputMode) -> String {
+    if mode.quiet {
+        String::new()
+    } else {
+        format!("{line}\n")
+    }
+}
+
+impl HumanRender for IssueCreateResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        if mode.quiet {
+            return format!("{}\n", self.issue.id);
+        }
+        format!("Created issue: {}\n", self.issue.id)
+            + &super::render_validation_findings(&self.findings, None).stdout
+    }
+}
+
+/// Response of `jit issue update`: one issue's confirmation, or the
+/// `--filter` batch result.
+#[derive(Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum IssueUpdateOutput {
+    One(IssueUpdateResponse),
+    Bulk(BulkUpdateResult),
+}
+
+impl HumanRender for IssueUpdateOutput {
+    fn render_human(&self, mode: OutputMode) -> String {
+        let result = match self {
+            Self::One(updated) => {
+                return confirmation(format!("Updated issue: {}", updated.id), mode)
+            }
+            Self::Bulk(result) => result,
+        };
+        let summary = &result.summary;
+        let mut text = if summary.total_modified > 0 {
+            confirmation(
+                format!("Modified {} issue(s)", summary.total_modified),
+                mode,
+            )
+        } else {
+            String::new()
+        };
+        let mut section = |title: String, entries: &[(IssueId, String)]| {
+            if !entries.is_empty() {
+                let _ = writeln!(text, "\n{title}");
+                for (id, detail) in entries {
+                    let _ = writeln!(text, "  • {}: {detail}", id.short_id());
+                }
+            }
+        };
+        section(
+            format!("Skipped {} issue(s):", summary.total_skipped),
+            &result.skipped,
+        );
+        section(
+            format!("Failed {} issue(s):", summary.total_errors),
+            &result.errors,
+        );
+        if summary.total_matched > 0 {
+            let _ = writeln!(
+                text,
+                "\nSummary: {}/{} succeeded ({:.0}%)",
+                summary.total_modified,
+                summary.total_matched,
+                (summary.total_modified as f64 / summary.total_matched as f64) * 100.0
+            );
+        } else {
+            text.push_str("No issues matched filter\n");
+        }
+        text
+    }
+}
+
+/// Response of `jit issue delete`.
+#[derive(Serialize, JsonSchema)]
+pub struct IssueDeleteResponse {
+    pub id: IssueId,
+    /// Always true: a refused deletion is a failure.
+    pub deleted: bool,
+}
+
+impl HumanRender for IssueDeleteResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        confirmation(format!("Deleted issue: {}", self.id), mode)
+    }
+}
+
+/// Response of an issue lifecycle mutation (`assign`, `claim`, `unassign`,
+/// `reject`, `release`, `claim-next`): the stored record it returns.
+#[derive(Serialize, JsonSchema)]
+#[serde(transparent)]
+pub struct IssueLifecycleResponse {
+    issue: Issue,
+    #[serde(skip)]
+    #[schemars(skip)]
+    line: String,
+}
+
+impl IssueLifecycleResponse {
+    /// `issue`, confirmed in human mode by `line`.
+    pub fn new(issue: Issue, line: impl Into<String>) -> Self {
+        Self {
+            issue,
+            line: line.into(),
+        }
+    }
+}
+
+impl HumanRender for IssueLifecycleResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        confirmation(&self.line, mode)
+    }
+}
+
+/// Response of `jit issue batch-create`: the validation result under
+/// `--dry-run`, else the created ids.
+#[derive(Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum IssueBatchCreateOutput {
+    DryRun(BatchDryRunOutcome),
+    Created(BatchCreateResponse),
+}
+
+/// The issues a batch created.
+#[derive(Serialize, JsonSchema)]
+pub struct BatchCreateResponse {
+    /// Each entry's symbolic key mapped to its created issue's full id.
+    pub ids: BTreeMap<String, IssueId>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    in_input_order: Vec<(String, IssueId)>,
+}
+
+impl From<BatchCreateOutcome> for BatchCreateResponse {
+    fn from(outcome: BatchCreateOutcome) -> Self {
+        Self {
+            ids: outcome.key_to_id.iter().cloned().collect(),
+            in_input_order: outcome.key_to_id,
+        }
+    }
+}
+
+impl HumanRender for IssueBatchCreateOutput {
+    fn render_human(&self, mode: OutputMode) -> String {
+        match self {
+            Self::DryRun(outcome) => format!(
+                "Valid batch: {} issue(s), {} dependency edge(s); no changes made.\n",
+                outcome.issue_count, outcome.dependency_count
+            ),
+            Self::Created(created) => created.in_input_order.iter().fold(
+                confirmation(format!("Created {} issue(s):", created.ids.len()), mode),
+                |text, (key, id)| text + &format!("  {key} -> {id}\n"),
+            ),
         }
     }
 }
