@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d36f3ca7-5555-438f-b323-d8d6ab02f2b9",
+      "status": "passed",
+      "updated_at": "2026-11-04T21:59:40.051820592Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b22aabce-7c9b-4af5-ad75-d807fd062c1c",
   "labels": [
     "epic:rust-code-quality",
@@ -23,5 +30,5 @@
   "priority": "critical",
   "state": "in_progress",
   "title": "The jit crate's integration tests build as one or two suites",
-  "updated_at": "2026-11-04T21:44:13.294998553Z"
+  "updated_at": "2026-11-04T21:59:40.051820592Z"
 }
