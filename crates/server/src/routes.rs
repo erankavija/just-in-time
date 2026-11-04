@@ -255,7 +255,7 @@ fn resolve_issue_path_id<S: IssueStore>(
     requested: &str,
 ) -> anyhow::Result<IssueId> {
     let prefix = requested.parse::<IssueIdPrefix>()?;
-    Ok(executor.issues().resolve_issue_id(&prefix)?)
+    executor.issues().resolve_issue_id(&prefix)
 }
 
 /// Get single issue by ID, its `documents` explicit and derived.
@@ -1037,7 +1037,7 @@ async fn list_gate_runs<S: IssueStore + Send + Sync + 'static>(
             .gate_key
             .map(|key| key.parse::<GateKey>())
             .transpose()?;
-        Ok(executor.gates().list_gate_runs(&id, gate_key.as_ref())?)
+        executor.gates().list_gate_runs(&id, gate_key.as_ref())
     })
     .await?;
     Ok(Json(runs.iter().map(GateRunSummary::lean).collect()))
@@ -1068,7 +1068,7 @@ async fn get_strategic_types<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<StrategicTypesResponse>, StatusCode> {
     let namespaces =
-        execute_blocking(&state, |executor| Ok(executor.config().get_namespaces()?)).await?;
+        execute_blocking(&state, |executor| executor.config().get_namespaces()).await?;
 
     let strategic_types = namespaces.strategic_types.unwrap_or_default();
 
@@ -1121,7 +1121,7 @@ async fn get_namespaces<S: IssueStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<NamespacesResponse>, StatusCode> {
     let label_namespaces =
-        execute_blocking(&state, |executor| Ok(executor.config().get_namespaces()?)).await?;
+        execute_blocking(&state, |executor| executor.config().get_namespaces()).await?;
 
     let namespaces = label_namespaces
         .namespaces
