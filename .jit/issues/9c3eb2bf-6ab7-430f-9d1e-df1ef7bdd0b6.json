@@ -21,9 +21,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "7c0a4f51-dd4b-4595-af2b-d633493ae12f",
+      "run_id": "de67f52c-f66e-47a9-85be-b2b9081bac12",
       "status": "failed",
-      "updated_at": "2026-11-04T23:21:33.209619378Z",
+      "updated_at": "2026-11-04T23:42:28.003663095Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Reject incompatible repository layout bindings",
-  "updated_at": "2026-11-04T23:37:40.417297161Z"
+  "updated_at": "2026-11-04T23:42:28.003663095Z"
 }
