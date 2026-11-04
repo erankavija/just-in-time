@@ -10,6 +10,7 @@
   ],
   "description": "Prove the selection contract once, by property: for generated repository images and selections, each selected report is the whole report restricted to what the membership contract admits.\n\n## Background\n\n- `ValidationReport::select` and `ValidationReport::explain` compute every view through one production membership predicate; example tests in the validation layer show single cases.\n- The plan's `selection-membership` contract (`dev/active/9876a23a-one-validation-report/plan.md`) states, per selection, which findings it admits by origin, firing subject, attribution and configuration-error flag, and when the structural failure is reported.\n- `jit::test_harness` offers the image builder and an acyclic dependency-graph strategy. Unit tests under `crates/jit/src/validation/` add no Cargo target (`@/inv/bounded-rust-build-footprint`).\n\n## Success Criteria\n\n- [hard] REQ-01: A `cfg(test)` module under `crates/jit/src/validation/` generates images from: a configuration declaring an issue-scoped and a project-scoped item kind and a breakable type with a bracket template; a rule set from a fixed menu (a local schema rule, `label-coverage` with `container-from-label`, `label-uniqueness`, `dependency-shape`, each at a generated severity) or an unloadable `rules.toml`; invariants bound to generated rules and gates; a gate registry with an optional passing placeholder; 2-7 issues over an acyclic dependency graph, two of whose ids share a prefix, with valid, dangling and unqualified link labels.\n- [hard] REQ-02: For each image and each selection (whole, every issue, an ambiguous and a non-matching prefix, every breakable container's scope, every graph rule with every issue), an oracle written in the test from the contract's clauses over each finding's provenance, and not calling the production predicate, decides membership; the selected findings, and whether the structural failure is reported or the selection fails, equal the oracle's.\n- [hard] REQ-03: For each image, each finding in an issue I's selection is a whole-report finding reattributed to I, and the union of those source findings plus the unattributed and built-in findings equals the whole report's findings exactly; in each issue I's explain report, a matched rule fails exactly when I's selection holds a finding of it (`selection-membership`).\n\n## Decisions\n\n- **D-01** — Steward ruling 2026-11-04: REQ-01's generated disagreement between the issue listing and the index is deleted. Since c47d78c8 the index holds only tombstones and membership comes from the listing, so no such disagreement exists to generate.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T08:16:55.499817981Z",
   "first_ready_at": "2026-11-04T07:01:27.626383687Z",
   "gates_required": [
     "cargo-ci",
@@ -20,6 +21,12 @@
       "run_id": "6c7b502c-558b-4c38-852b-69f73747da89",
       "status": "passed",
       "updated_at": "2026-11-04T08:08:31.862285294Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ef33d3a9-3f0e-4810-a447-dfa7cfc12605",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:16:32.088912342Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,7 +43,7 @@
     "satisfies:9876a23a/REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "One property test owns the selection contract",
-  "updated_at": "2026-11-04T08:08:31.862285294Z"
+  "updated_at": "2026-11-04T08:16:55.499817981Z"
 }
