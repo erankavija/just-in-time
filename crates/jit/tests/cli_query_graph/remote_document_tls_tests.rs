@@ -3,13 +3,10 @@
 //! still perform real HTTPS remote-document access and transparently decode a
 //! gzip-compressed response, using exactly the rustls backend.
 //!
-//! `crate::commands::document::validate_external_url` (the only remote-
-//! document call site in this crate) only issues HEAD requests, which never
-//! carry a compressed body, so it cannot exercise gzip decoding itself. These
-//! tests instead drive a `ureq::Agent` configured exactly like that call site
-//! (`ureq::Agent::new_with_defaults()`, i.e. the crate's default TLS/gzip
-//! feature selection) against a real local TLS server, proving the selected
-//! feature set — not jit's own business logic — supports both behaviors.
+//! `crate::commands::document::validate_external_url` issues only HEAD
+//! requests, so these tests exercise gzip decoding with GET through the same
+//! default TLS/gzip configuration. Link checks share one timed agent across a
+//! bounded worker pool; these tests use a timed agent against a local TLS server.
 //!
 //! The server is a raw `rustls::ServerConnection` over a loopback
 //! `TcpListener`, certified with an ephemeral self-signed certificate from
@@ -100,18 +97,16 @@ fn spawn_https_server(body: Vec<u8>, extra_headers: &'static str) -> String {
     format!("https://localhost:{}/", addr.port())
 }
 
-/// `ureq::Agent` configured the way `validate_external_url` configures its
-/// agent (`Agent::new_with_defaults()`), except with certificate verification
-/// disabled — the local server's certificate is self-signed and not chained
-/// to any root store. This changes nothing about which TLS backend or which
-/// content-decoding feature runs: the handshake, record layer, and gzip
-/// decoder are exactly what `Agent::new_with_defaults()` would use against a
-/// publicly-trusted HTTPS server.
+/// Retain the default TLS backend and gzip decoder, trusting the local server's
+/// self-signed certificate and bounding requests with a global timeout.
 fn agent_trusting_test_server() -> ureq::Agent {
     let tls_config = ureq::tls::TlsConfig::builder()
         .disable_verification(true)
         .build();
-    let config = ureq::Agent::config_builder().tls_config(tls_config).build();
+    let config = ureq::Agent::config_builder()
+        .tls_config(tls_config)
+        .timeout_global(Some(std::time::Duration::from_secs(2)))
+        .build();
     ureq::Agent::new_with_config(config)
 }
 
