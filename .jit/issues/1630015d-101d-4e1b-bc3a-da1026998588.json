@@ -24,14 +24,16 @@
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "pending",
-      "updated_at": "2026-11-02T23:39:46.377198641Z",
-      "updated_by": null
+      "run_id": "e7d8b4f7-5007-4b82-8fac-359b90c9cfcf",
+      "status": "passed",
+      "updated_at": "2026-11-04T03:19:08.691999010Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-11-02T23:39:46.377198641Z",
-      "updated_by": null
+      "run_id": "83146a7b-33bb-4eb0-84a9-b46354a427a8",
+      "status": "passed",
+      "updated_at": "2026-11-04T03:19:11.533246848Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "1630015d-101d-4e1b-bc3a-da1026998588",
@@ -54,5 +56,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Gate-run records live under their issue",
-  "updated_at": "2026-11-04T03:17:30.641229502Z"
+  "updated_at": "2026-11-04T03:19:11.533246848Z"
 }
