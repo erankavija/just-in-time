@@ -2719,6 +2719,7 @@ impl Commands {
             Self::Item(command) => command.coordinates_claims_first(),
             Self::Invariant(command) => command.coordinates_claims_first(),
             Self::Project(command) => command.coordinates_claims_first(),
+            Self::Recover => true,
             Self::Init { .. }
             | Self::List { .. }
             | Self::Apply { .. }
@@ -2728,7 +2729,6 @@ impl Commands {
             }
             | Self::Search { .. }
             | Self::Validate { .. }
-            | Self::Recover { .. }
             | Self::Serve { .. }
             | Self::Version { .. }
             | Self::Status { .. } => false,
@@ -3283,6 +3283,7 @@ mod recovery_dispatch_tests {
         "issue delete",
         "issue reject",
         "issue update",
+        "recover",
     ];
 
     fn collect_leaf_commands(
@@ -3437,6 +3438,7 @@ mod recovery_dispatch_tests {
                     "stale",
                 ],
             ),
+            ("recover", &["jit", "recover"]),
         ];
         let classified = claim_first
             .iter()
