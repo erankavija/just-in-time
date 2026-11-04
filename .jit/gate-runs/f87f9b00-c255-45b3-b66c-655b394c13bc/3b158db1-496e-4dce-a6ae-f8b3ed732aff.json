@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b7ebfe56977503d6e049a17ca8b62ffc072657e2",
+  "completed_at": "2026-11-04T15:19:53.864598790Z",
+  "duration_ms": 245855,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/output/gate.rs",
+        "id": "F1",
+        "line": 438,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/requirement/REQ-09"
+        ],
+        "severity": "medium",
+        "summary": "Manual-attestation timestamps no longer use the prior RFC 3339 human-output format."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/gate.rs",
+        "id": "F2",
+        "line": 527,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/requirement/REQ-09"
+        ],
+        "severity": "medium",
+        "summary": "Failed status-all now emits an additional summary line to stderr in human mode."
+      }
+    ],
+    "summary": "Two issue-impact regressions alter required human gate-status output.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f87f9b00-c255-45b3-b66c-655b394c13bc",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3b158db1-496e-4dce-a6ae-f8b3ed732aff",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T15:15:48.009079612Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7529 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a721-6d5a-75d3-9993-952f831181bb\n--------\nuser\n--- 7516 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: a5c2fb794 (claim), 1f76f1deb (implementation), 8e9b1242e (merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-09, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 (.jit/issues/df129d9e-c795-4d92-9ee5-ffd776339252.json); @/invariant/architecture-dependency-direction, orthogonal-tests, essential-code-prose, single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T15:13:45Z); mcp-ci passed (exit 0, 2026-11-04T15:15:29Z)\nTruncation recovery: narrower reads of linked plans, individual patches, dispatch/output/schema, and relevant tests\n\n1. **[blocking, issue-impact, medium]** `render_run_details` now formats manual-attestation timestamps with `DateTime`’s display format rather than the prior RFC 3339 format (`to_rfc3339()`), changing human output for latest, history, and status-all views. Preserve the established timestamp representation. [`crates/jit/src/output/gate.rs:438`](@/crates/jit/src/output/gate.rs:438) `@/issue/df129d9e/requirement/REQ-09`\n\n2. **[blocking, issue-impact, medium]** Failed `gate status-all` now passes a nonempty findings message; the shared emitter writes that message to stderr after the human report. Previously the command printed its report and exited 4 without this extra stderr line. This violates the required preservation of human output and is not covered by the existing stdout-only test. [`crates/jit/src/dispatch/gate.rs:527`](@/crates/jit/src/dispatch/gate.rs:527) `@/issue/df129d9e/requirement/REQ-09`\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact regressions alter required human gate-status output.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Manual-attestation timestamps no longer use the prior RFC 3339 human-output format.\",\"file\":\"crates/jit/src/output/gate.rs\",\"line\":438,\"references\":[\"@/issue/df129d9e/requirement/REQ-09\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Failed status-all now emits an additional summary line to stderr in human mode.\",\"file\":\"crates/jit/src/dispatch/gate.rs\",\"line\":527,\"references\":[\"@/issue/df129d9e/requirement/REQ-09\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

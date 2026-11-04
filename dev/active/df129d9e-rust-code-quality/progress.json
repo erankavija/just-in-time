@@ -961,7 +961,8 @@
     "9be5b0de": 2,
     "3b696589": 1,
     "24a982b7": 1,
-    "f87f9b00": 1
+    "f87f9b00": 1,
+    "d58f80c9": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1065,7 +1066,8 @@
         "f82a2e4a": -60,
         "10fdad38": -221,
         "9be5b0de": -23,
-        "8fbf8c43": -31
+        "8fbf8c43": -31,
+        "24a982b7": 27
       },
       "epic_net_running": 951
     },
@@ -1364,13 +1366,13 @@
       "review": "lead PASS at db05aa795: declarations::assemble_configuration; JitConfig::load and ConfigManager::load route through it; -191 (b697a3f7 ledger); 5013 workspace tests passed (worker). Minor: ConfigManager::load rustdoc still says 'from config.toml'."
     },
     "f87f9b00": {
-      "status": "rework",
+      "status": "landing",
       "vendor": "Claude Sonnet",
       "reason": "gate status handler move; first of the four remaining moves",
-      "review": "lead PASS at 1f76f1deb: gate status/status-all handlers, transposed-arg predicate typed INVALID_ARGUMENT, not-run typed, status-all findings GATE_FAILED; whole-crate -114 Lead merged main (8e9b1242e); landed; code-review 3b158db1: F1 RFC 3339 attestation timestamp regression (rework 1), F2 uniform findings-stderr (D-01 asked)."
+      "review": "lead PASS at 1f76f1deb: gate status/status-all handlers, transposed-arg predicate typed INVALID_ARGUMENT, not-run typed, status-all findings GATE_FAILED; whole-crate -114 Lead merged main (8e9b1242e); landed; code-review 3b158db1: F1 RFC 3339 attestation timestamp regression (rework 1), F2 uniform findings-stderr (D-01 asked). Rework 1 at 33459be46: F1 not reproducible (same format string over the same to_rfc3339 String; lead verified GateRunSummary.started_at: String from to_rfc3339); pinning test added. D-01 recorded for F2. Re-landing with one code-review rerun."
     },
     "24a982b7": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "query/status handler move; parallel with f87f9b00 (disjoint arms)",
       "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44) Landed; code-review 993773cc F1: commands constructs output StatusResponse (dependency direction). Rework 1 to same worker. Rework 1 at 3c9dd70af: lead PASS; StatusSummary restored, From into output; +35 on top of the first landing's -8."
@@ -1383,10 +1385,11 @@
       "review": "lead PASS at 6d721625c: ProposedLayoutViolation domain error, typed repository_inputs errors, no anyhow in domain types; +19 (b697a3f7 ledger). Worker checked out the merge base to measure (forbidden; restored). Landing CI: all tests passed, suite-clock budget failed (38.9 s vs 30 s) from a cold doctest build (25.2 s; cold 20.3 s / warm 3.2 s on rerun). Asked 6a for a fresh landing. Steward approved one fresh landing (D-56); land-one now retries a budget-only overrun with a cold doctest step once."
     },
     "3f816619": {
-      "status": "reviewed",
+      "status": "landing",
       "vendor": "Claude Opus",
       "reason": "largest remaining move (~580 main.rs lines, 10 leaves)",
-      "review": "lead PASS at b2cda2c59: ten write leaves in dispatch/issue.rs, unmigrated clause and output_macros.rs gone, batch-create payload per REQ-03; -101. Awaiting steward D-01 (uniform warnings rule) before landing."
+      "review": "lead PASS at b2cda2c59: ten write leaves in dispatch/issue.rs, unmigrated clause and output_macros.rs gone, batch-create payload per REQ-03; -101. Awaiting steward D-01 (uniform warnings rule) before landing.",
+      "note": "worker merged main (551de466c, 55aeef4c7); one listing helper; -105"
     },
     "5d09e74b": {
       "status": "done",
@@ -1398,7 +1401,7 @@
       "vendor": "Claude Sonnet",
       "reason": "b697a3f7 track B after 5d09e74b; worker checks criteria first",
       "epic": "b697a3f7",
-      "review": "lead PASS at a3a13724d: capability_fs.rs with 3-variant CapabilityFsError, inspect_capability_leaf stays, redo_apply no longer imports repository_state_store; +24 (b697a3f7 ledger)"
+      "review": "lead PASS at a3a13724d: capability_fs.rs with 3-variant CapabilityFsError, inspect_capability_leaf stays, redo_apply no longer imports repository_state_store; +24 (b697a3f7 ledger) Branch CI: archive preview/execute fail beside an unreadable subtree (regression). Rework 1 to same worker. Rework 1 at fd8febcf6: is_permission_denied also matches CapabilityFsError::Io PermissionDenied; lead checked remaining RepositoryStateStoreError downcasts (lock timeout, leftover record) are unaffected. +31 (b697a3f7 ledger)."
     }
   },
   "handoff": {
@@ -1463,7 +1466,8 @@
   "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)",
   "notes_for_tasks": {
     "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)",
-    "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)"
+    "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)",
+    "b23b1bf3": "gate_evaluate-many is the last legacy schema-table row; test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema targets it: repoint or delete with the row (or leave to da30b92a)"
   },
   "coordination": "All other lead sessions closed by the user (6a, 2026-11-04); df129d9e lead is the only active lead. Escalations and milestone ledgers go to 6a."
 }

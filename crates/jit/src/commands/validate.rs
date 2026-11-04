@@ -1144,7 +1144,7 @@ pub(crate) fn plan_content_with_issues(
 }
 
 impl<S: IssueStore> ValidationOps<'_, S> {
-    pub fn get_status(&self) -> Result<crate::output::StatusResponse> {
+    pub fn get_status(&self) -> Result<StatusSummary> {
         let issues = self.exec.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
 
@@ -1159,7 +1159,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         let rejected = issues.iter().filter(|i| i.state == State::Rejected).count();
         let blocked = issues.iter().filter(|i| i.is_blocked(&resolved)).count();
 
-        Ok(crate::output::StatusResponse {
+        Ok(StatusSummary {
             backlog,
             ready,
             in_progress,
