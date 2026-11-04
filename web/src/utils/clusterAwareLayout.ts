@@ -75,6 +75,8 @@ function buildEdgeMaps(
     nodeToCluster.set(orphan.id, orphan.id);
   });
   
+  const allNodeIdSet = new Set(allNodeIds);
+
   // Collect all relevant edges
   const relevantEdges = [...crossClusterEdges];
   
@@ -87,8 +89,8 @@ function buildEdgeMaps(
   // This ensures edges between collapsed clusters are included
   allEdges.forEach(edge => {
     // Check if either endpoint is in our node set (clusters or orphans)
-    const fromInSet = allNodeIds.includes(edge.from);
-    const toInSet = allNodeIds.includes(edge.to);
+    const fromInSet = allNodeIdSet.has(edge.from);
+    const toInSet = allNodeIdSet.has(edge.to);
     
     if (fromInSet || toInSet) {
       relevantEdges.push(edge);
@@ -100,7 +102,7 @@ function buildEdgeMaps(
     const fromCluster = nodeToCluster.get(edge.from);
     const toCluster = nodeToCluster.get(edge.to);
     
-    if (fromCluster && toCluster && allNodeIds.includes(fromCluster) && allNodeIds.includes(toCluster)) {
+    if (fromCluster && toCluster && allNodeIdSet.has(fromCluster) && allNodeIdSet.has(toCluster)) {
       outgoingEdges.get(toCluster)?.add(fromCluster);
       incomingEdges.get(fromCluster)?.add(toCluster);
     }

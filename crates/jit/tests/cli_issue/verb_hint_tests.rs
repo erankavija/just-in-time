@@ -18,26 +18,27 @@ use jit::test_cli::JitCli;
 fn assert_wrong_verb_hint(args: &[&str], expect_in_hint: &str) {
     let repo = JitCli::initialised().unwrap();
     let outside = JitCli::uninitialised().unwrap();
-    let json_args: Vec<&str> = args.iter().copied().chain(["--json"]).collect();
+    let invocations = std::iter::once(args.to_vec()).chain([0, 1, args.len()].map(|position| {
+        let mut argv = args.to_vec();
+        argv.insert(position, "--json");
+        argv
+    }));
 
-    for (cli, argv) in [
-        (&repo, args),
-        (&repo, json_args.as_slice()),
-        (&outside, args),
-        (&outside, json_args.as_slice()),
-    ] {
-        let output = cli.command(argv).output().unwrap();
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(!output.status.success(), "{argv:?}: {stderr}");
-        assert!(output.stdout.is_empty(), "{argv:?}: stdout must be empty");
-        assert!(
-            stderr.contains("Hint:") && stderr.contains(expect_in_hint),
-            "{argv:?}: expected hint {expect_in_hint:?}, got: {stderr}"
-        );
-        assert!(
-            stderr.contains("unrecognized subcommand"),
-            "{argv:?}: expected clap diagnostic, got: {stderr}"
-        );
+    for argv in invocations {
+        for cli in [&repo, &outside] {
+            let output = cli.command(&argv).output().unwrap();
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert_eq!(output.status.code(), Some(2), "{argv:?}: {stderr}");
+            assert!(output.stdout.is_empty(), "{argv:?}: stdout must be empty");
+            assert!(
+                stderr.contains("Hint:") && stderr.contains(expect_in_hint),
+                "{argv:?}: expected hint {expect_in_hint:?}, got: {stderr}"
+            );
+            assert!(
+                stderr.contains("unrecognized subcommand"),
+                "{argv:?}: expected clap diagnostic, got: {stderr}"
+            );
+        }
     }
 }
 
