@@ -288,8 +288,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         }))
     }
 
-    /// The base an archive plan reads: the log whole, with a listing budget
-    /// for every directory below the archive roots.
+    /// The base an archive plan reads: the event log's length and tail, with
+    /// a listing budget for every directory below the archive roots.
     pub(crate) fn capture_archive_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -307,12 +307,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// One capture round of the base, from `start` when the caller has read
     /// part of it already.
     ///
-    /// The round reads the registries, the event log (whole for an archive,
-    /// otherwise its committed length and final-line tail, which determine the
-    /// append offset; a `mutation` also parses issues
-    /// strictly) and the caller's paths; then the closure those registries
-    /// plan. Validation and mutation passes also read linked plan documents; a
-    /// mutation's precheck target adds prompt files and gate-run results.
+    /// The round reads the registries, the event log's committed length and
+    /// final-line tail, which determine the append offset, and the caller's
+    /// paths (a `mutation` also parses issues strictly); then the closure those
+    /// registries plan. Validation and mutation passes also read linked plan
+    /// documents; a mutation's precheck target adds prompt files and gate-run
+    /// results.
     /// Repair and archive omit these rule-evaluation inputs.
     fn capture_proposed_base_inner(
         &self,
@@ -360,12 +360,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 .chain(extra_paths.iter().cloned()),
             )?;
             spec.discover_listings([VirtualPath::ISSUES])?;
-            // Archive planning parses the log; every other base reads its
-            // committed length and final-line tail to determine the append offset.
-            match purpose {
-                BaseCapturePurpose::Archive => spec.discover_paths([VirtualPath::EVENTS])?,
-                _ => spec.discover_tail(VirtualPath::EVENTS)?,
-            }
+            spec.discover_tail(VirtualPath::EVENTS)?;
             Ok(())
         };
         let effective_virtual_path =
@@ -3257,10 +3252,8 @@ priority = 100
         assert!(mutation.capture_spec().pinned().is_empty());
     }
 
-    /// Only an archive base reads the event log whole; every other base reads
-    /// its length and tail, a whole-repository precheck target's included.
     #[test]
-    fn test_capture_proposed_base_inner_reads_the_event_log_whole_only_for_archive() {
+    fn test_capture_proposed_base_inner_reads_only_the_event_log_tail_for_every_purpose() {
         use crate::commands::test_helpers::{seed_gate_registry, seed_issue, setup};
         use crate::declarations::{GateChecker, GateDefinition, GateMode, GateRegistry, GateStage};
         use crate::repository_state::{ReadMode, VirtualPath};
@@ -3301,7 +3294,7 @@ priority = 100
                 ReadMode::Tail,
             ),
             (BaseCapturePurpose::Repair, ReadMode::Tail),
-            (BaseCapturePurpose::Archive, ReadMode::Whole),
+            (BaseCapturePurpose::Archive, ReadMode::Tail),
         ] {
             let (image, _) = executor
                 .capture_proposed_base_inner(

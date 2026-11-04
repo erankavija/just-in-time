@@ -7,33 +7,32 @@ use super::{
     RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
 };
 use crate::domain::artifact_execution::{
-    archive_executions, ArchiveEvidenceRecord, ArchiveExecution, ArchiveExecutionResult,
-    ArchivePublication,
+    ArchiveEvidenceRecord, ArchiveExecution, ArchiveExecutionResult, ArchivePublication,
 };
 use crate::domain::artifact_plan::{
     ArtifactAction, ArtifactPlan, ContentIdentity, PlanError, PlanTarget, PlanWarning,
     ReferenceChange, WarningCode,
 };
-use crate::domain::event_log::EventLogError;
 use crate::domain::identity::IssueId;
-use crate::domain::{Event, EventBody, Issue, State};
+use crate::domain::{EventBody, Issue, State};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Close a captured archive plan into one materialization plan, which
-/// publishes as one redo record.
+/// publishes as one redo record. `evidence` is the target record decoded by
+/// the planner from the same image.
 pub fn finalize_archive_execution(
     image: &RepositoryImage,
     context: &MutationContext,
     plan: &ArtifactPlan,
+    mut evidence: ArchiveEvidenceRecord,
 ) -> Result<(MaterializationPlan, ArchiveExecutionResult), RepositoryStateError> {
     let artifacts = plan
         .executable_artifacts()
         .map_err(ArchiveExecutionError::Plan)?;
     crate::domain::artifact_classifier::validate_proposed_layout(plan)
         .map_err(ArchiveExecutionError::Producer)?;
-    let prior = archive_executions(&captured_archive_events(image)?);
     let (covered_publications, covered_changes) =
-        archive_coverage(&prior, plan.target(), plan.destination_root());
+        archive_coverage(&evidence.executions, plan.target(), plan.destination_root());
     let mut actions = Vec::new();
     let mut publications = Vec::new();
     let mut created_directories = BTreeSet::new();
@@ -313,36 +312,6 @@ pub fn finalize_archive_execution(
         };
         let path = VirtualPath::archive_evidence_record(plan.target());
         let entry = captured_entry(image, &path)?;
-        let mut evidence = match image
-            .file_bytes(&path)
-            .map_err(ProducerError::from)
-            .map_err(ArchiveExecutionError::Producer)?
-        {
-            Some(bytes) => serde_json::from_slice::<ArchiveEvidenceRecord>(bytes)
-                .map_err(|error| MutationError::MalformedRecord {
-                    path: path.clone(),
-                    reason: error.to_string(),
-                })
-                .map_err(ArchiveExecutionError::Mutation)?,
-            None => ArchiveEvidenceRecord {
-                target: plan.target().clone(),
-                executions: Vec::new(),
-            },
-        };
-        if evidence.target != *plan.target()
-            || evidence
-                .executions
-                .iter()
-                .any(|prior| prior.target != evidence.target)
-        {
-            return Err(
-                ArchiveExecutionError::Mutation(MutationError::MalformedRecord {
-                    path,
-                    reason: "archive evidence contains another target".into(),
-                })
-                .into(),
-            );
-        }
         evidence.executions.push(execution.clone());
         create_ancestors(image, &path, &mut created_directories, &mut actions)?;
         actions.push(RepositoryAction::WriteFile {
@@ -494,17 +463,6 @@ fn captured_issue<'a>(
         .ok_or_else(|| ArchiveExecutionError::CapturedIssueCacheLost(id.clone()))
 }
 
-pub(crate) fn captured_archive_events(
-    image: &RepositoryImage,
-) -> Result<Vec<Event>, ArchiveExecutionError> {
-    let path = VirtualPath::EVENTS;
-    let bytes = image
-        .file_bytes(&path)
-        .map_err(ProducerError::from)?
-        .unwrap_or_default();
-    crate::domain::event_log::parse_known_events(bytes).map_err(ArchiveExecutionError::EventLog)
-}
-
 /// A typed failure raised while finalizing one archive execution.
 ///
 /// Composed into [`RepositoryStateError::ArchiveExecution`]. Fields hold paths
@@ -585,9 +543,6 @@ pub enum ArchiveExecutionError {
     /// The archive plan's artifacts were not eligible for execution.
     #[error(transparent)]
     Plan(#[from] PlanError),
-    /// The captured event log could not be parsed.
-    #[error(transparent)]
-    EventLog(#[from] EventLogError),
     /// A materialization producer failed reading captured evidence or
     /// canonicalizing a path, including the proposed-layout edge check.
     #[error(transparent)]
@@ -649,6 +604,7 @@ mod tests {
     }
 
     use super::*;
+    use crate::domain::artifact_execution::archive_executions;
     use crate::domain::artifact_plan::{
         ArtifactEdge, ArtifactPlanEntry, ArtifactVersion, EdgeKind, EdgeResolutionMode,
         PendingDeletion, PolicyStatus,
@@ -726,7 +682,17 @@ mod tests {
         image: &RepositoryImage,
         plan: &ArtifactPlan,
     ) -> ArchiveExecutionError {
-        match finalize_archive_execution(image, &context(), plan).unwrap_err() {
+        match finalize_archive_execution(
+            image,
+            &context(),
+            plan,
+            ArchiveEvidenceRecord {
+                target: plan.target().clone(),
+                executions: Vec::new(),
+            },
+        )
+        .unwrap_err()
+        {
             RepositoryStateError::ArchiveExecution(error) => error,
             other => panic!("expected a typed archive-execution error, got {other:?}"),
         }
@@ -748,6 +714,13 @@ mod tests {
             "archived.md",
             ContentIdentity::from_bytes(b"content"),
         );
+        let evidence = prior.clone().map_or_else(
+            || ArchiveEvidenceRecord {
+                target: plan.target().clone(),
+                executions: Vec::new(),
+            },
+            |value| serde_json::from_value(value).unwrap(),
+        );
         let entry = prior.map_or(RepositoryEntry::Absent, |value| {
             file_entry(&serde_json::to_vec(&value).unwrap())
         });
@@ -762,7 +735,8 @@ mod tests {
             .file("doc.md", b"content")
             .entry("archived.md", RepositoryEntry::Absent)
             .build();
-        let (materialization, _) = finalize_archive_execution(&image, &context(), &plan).unwrap();
+        let (materialization, _) =
+            finalize_archive_execution(&image, &context(), &plan, evidence).unwrap();
         let actions = materialization.delta().actions();
         let written = actions
             .iter()
