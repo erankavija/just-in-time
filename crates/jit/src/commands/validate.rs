@@ -3,6 +3,8 @@
 use super::*;
 use crate::domain::identity::GateKey;
 use crate::domain::type_taxonomy::{detect_validation_issues, generate_fixes, ValidationFix};
+use crate::domain::{EventBody, ReadinessCorrection};
+use crate::repository_state::{MutationIntent, RepositoryAction, RepositoryImage};
 use crate::validation::report::{group_messages, render_selector, BuiltInPass, RuleSelectionFault};
 use anyhow::Context;
 
@@ -47,11 +49,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         crate::validation::ValidationReport,
         crate::output::DivergenceResponse,
     )> {
-        use crate::domain::{EventBody, ReadinessCorrection};
-        use crate::repository_state::{
-            derive_materialization, finalize, MaterializationPlan, MaterializationRequest,
-            MutationIntent, RepositoryAction, RepositoryDelta,
-        };
+        use crate::repository_state::{finalize, MaterializationPlan, RepositoryDelta};
         let layout = self.exec.require_layout()?;
         let context = production_mutation_context();
         let (count, mut messages) = with_mutation_session(
@@ -65,128 +63,21 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 let (Ok(original), Ok(_)) = (&captured.issues, &captured.index) else {
                     return Ok(SessionStep::Done((0, Vec::new())));
                 };
-                let Ok(declarations) =
-                    crate::repository_state::validation_declarations_from_image(&captured.image)
-                else {
-                    return Ok(SessionStep::Done((0, Vec::new())));
-                };
-                let Ok(hierarchy) =
-                    crate::domain::type_taxonomy::HierarchyConfig::from_declarations(
-                        &crate::config_manager::namespaces_from_config(declarations.config()),
-                    )
-                else {
-                    return Ok(SessionStep::Done((0, Vec::new())));
-                };
-                if !declarations.rules_loaded() {
-                    return Ok(SessionStep::Done((0, Vec::new())));
-                }
-                let Ok(repair) = derive_materialization(
-                    &captured.image,
-                    MaterializationRequest::RepairDerivedState {
-                        declarations: declarations.borrowed(),
-                    },
-                ) else {
-                    return Ok(SessionStep::Done((0, Vec::new())));
-                };
-                let problems = original
-                    .iter()
-                    .flat_map(|issue| {
-                        detect_validation_issues(&hierarchy, &issue.id, &issue.labels)
-                    })
-                    .collect::<Vec<_>>();
                 let mut projected = original.to_vec();
-                let mut messages = Vec::new();
-                let mut count = 0;
-                let mut intents = Vec::new();
-                for fix in generate_fixes(&problems) {
-                    let ValidationFix::ReplaceType {
-                        issue_id,
-                        old_type,
-                        new_type,
-                    } = fix;
-                    if let Some(issue) = projected.iter_mut().find(|issue| issue.id == issue_id) {
-                        issue
-                            .labels
-                            .retain(|label| label != &label_utils::type_label(&old_type));
-                        issue.labels.push(label_utils::type_label(&new_type));
-                        if !dry_run {
-                            messages.extend(self.exec.refuse_foreign_lease(&issue_id)?);
-                        }
-                        messages.push(format!(
-                            "{} type '{}' with '{}' for issue {}",
-                            if dry_run { "Would replace" } else { "Replaced" },
-                            old_type,
-                            new_type,
-                            issue_id
-                        ));
-                        count += 1;
-                        intents.push(MutationIntent::RecordEvent {
-                            phase: 0,
-                            event: Box::new(EventBody::draft_issue_updated(
-                                issue_id,
-                                "issue-update".into(),
-                                vec!["labels".into()],
-                            )),
-                        });
-                    }
-                }
-                for intent in
-                    super::dependency::derive_reduced_graph_intents(&projected, &projected, None)?
-                {
-                    match intent {
-                        MutationIntent::UpdateIssue { issue } => {
-                            if let Some(target) =
-                                projected.iter_mut().find(|target| target.id == issue.id)
-                            {
-                                let removed = target.dependencies.len() - issue.dependencies.len();
-                                count += removed;
-                                messages.push(format!(
-                                    "Fixed {removed} redundant dependencies in issue {}",
-                                    issue.short_id()
-                                ));
-                                *target = *issue;
-                            }
-                        }
-                        event => intents.push(event),
-                    }
-                }
-                loop {
-                    let resolved = crate::domain::queries::build_issue_map(&projected);
-                    let corrections = projected
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(index, issue)| {
-                            issue
-                                .derive_readiness_correction(&resolved)
-                                .map(|correction| (index, correction))
-                        })
-                        .collect::<Vec<_>>();
-                    if corrections.is_empty() {
-                        break;
-                    }
-                    count += corrections.len();
-                    for (index, correction) in corrections {
-                        let issue = &mut projected[index];
-                        let from = issue.state;
-                        issue.state = match correction {
-                            ReadinessCorrection::Promote => State::Ready,
-                            ReadinessCorrection::Demote => State::Backlog,
-                        };
-                        messages.push(format!(
-                            "  → Transitioning {} to {}",
-                            issue.short_id(),
-                            issue.state.as_str()
-                        ));
-                        intents.push(MutationIntent::RecordEvent {
-                            phase: 4,
-                            event: Box::new(EventBody::draft_issue_state_changed(
-                                issue.id.clone(),
-                                from,
-                                issue.state,
-                            )),
-                        });
-                    }
-                }
+                let (count, mut messages, mut intents) = [
+                    self.plan_hierarchy_fixes(&captured.image, &mut projected, dry_run)?,
+                    plan_reduction_fixes(&mut projected)?,
+                    plan_readiness_fixes(&mut projected),
+                ]
+                .into_iter()
+                .fold(
+                    (0, Vec::new(), Vec::new()),
+                    |(count, mut messages, mut intents), fixes| {
+                        messages.extend(fixes.1);
+                        intents.extend(fixes.2);
+                        (count + fixes.0, messages, intents)
+                    },
+                );
                 intents.extend(
                     projected
                         .into_iter()
@@ -198,34 +89,27 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 );
                 let issues =
                     finalize(&layout, &captured.image, &context, &intents, Some(original))?;
-                let changed = repair
-                    .delta()
-                    .actions()
-                    .iter()
-                    .filter(|action| !matches!(action, RepositoryAction::CreateDirectory { .. }))
-                    .map(|action| action.path())
-                    .collect::<std::collections::BTreeSet<_>>();
-                count += changed.len();
-                messages.extend(
-                    changed
-                        .into_iter()
-                        .map(|path| format!("Repaired derived-state target {path:?}")),
-                );
-                let mut actions = issues.delta().actions().to_vec();
-                for action in repair.delta().actions() {
-                    if let RepositoryAction::AppendEvents { bytes, .. } = action {
-                        if let Some(RepositoryAction::AppendEvents {
-                            bytes: existing, ..
-                        }) = actions
-                            .iter_mut()
-                            .find(|action| matches!(action, RepositoryAction::AppendEvents { .. }))
-                        {
-                            existing.extend_from_slice(bytes);
-                            continue;
+                let (repaired, repair_messages, repairs) =
+                    plan_derived_state_fixes(&captured.image);
+                let count = count + repaired;
+                messages.extend(repair_messages);
+                let actions = repairs.into_iter().fold(
+                    issues.delta().actions().to_vec(),
+                    |mut actions, action| {
+                        if let RepositoryAction::AppendEvents { bytes, .. } = &action {
+                            if let Some(RepositoryAction::AppendEvents {
+                                bytes: existing, ..
+                            }) = actions.iter_mut().find(|action| {
+                                matches!(action, RepositoryAction::AppendEvents { .. })
+                            }) {
+                                existing.extend_from_slice(bytes);
+                                return actions;
+                            }
                         }
-                    }
-                    actions.push(action.clone());
-                }
+                        actions.push(action);
+                        actions
+                    },
+                );
                 let plan = MaterializationPlan::new(
                     &captured.image,
                     RepositoryDelta::new(&layout, actions)?,
@@ -246,6 +130,79 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         });
         let (report, divergences) = self.capture_validation_report()?;
         Ok((count, messages, report, divergences))
+    }
+
+    fn plan_hierarchy_fixes(
+        &self,
+        image: &RepositoryImage,
+        projected: &mut [Issue],
+        dry_run: bool,
+    ) -> Result<(usize, Vec<String>, Vec<MutationIntent>)> {
+        let hierarchy = (|| -> Result<_> {
+            let bytes = image
+                .file_bytes(&crate::repository_state::VirtualPath::CONFIG)?
+                .context("missing config.toml")?;
+            let config =
+                crate::declarations::parse_configuration(bytes)?.materialization_config(
+                    crate::declarations::invariants::InvariantRegistry::empty(),
+                );
+            Ok(
+                crate::domain::type_taxonomy::HierarchyConfig::from_declarations(
+                    &crate::config_manager::namespaces_from_config(&config),
+                )?,
+            )
+        })();
+        let hierarchy = match hierarchy {
+            Ok(hierarchy) => hierarchy,
+            Err(error) => {
+                return Ok((
+                    0,
+                    vec![format!("Skipped hierarchy fixes: {error:#}")],
+                    Vec::new(),
+                ))
+            }
+        };
+        let problems = projected
+            .iter()
+            .flat_map(|issue| detect_validation_issues(&hierarchy, &issue.id, &issue.labels))
+            .collect::<Vec<_>>();
+        generate_fixes(&problems).into_iter().try_fold(
+            (0, Vec::new(), Vec::new()),
+            |(count, mut messages, mut intents), fix| {
+                let ValidationFix::ReplaceType {
+                    issue_id,
+                    old_type,
+                    new_type,
+                } = fix;
+                if let Some(issue) = projected.iter_mut().find(|issue| issue.id == issue_id) {
+                    issue
+                        .labels
+                        .retain(|label| label != &label_utils::type_label(&old_type));
+                    issue.labels.push(label_utils::type_label(&new_type));
+                    if !dry_run {
+                        messages.extend(self.exec.refuse_foreign_lease(&issue_id)?);
+                    }
+                    messages.push(format!(
+                        "{} type '{}' with '{}' for issue {}",
+                        if dry_run { "Would replace" } else { "Replaced" },
+                        old_type,
+                        new_type,
+                        issue_id
+                    ));
+                    intents.push(MutationIntent::RecordEvent {
+                        phase: 0,
+                        event: Box::new(EventBody::draft_issue_updated(
+                            issue_id,
+                            "issue-update".into(),
+                            vec!["labels".into()],
+                        )),
+                    });
+                    Ok((count + 1, messages, intents))
+                } else {
+                    Ok((count, messages, intents))
+                }
+            },
+        )
     }
 
     /// Validate the exact repository through the closed-image pipeline.
@@ -275,6 +232,120 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
             ));
         }
         Ok(())
+    }
+}
+
+fn plan_reduction_fixes(
+    projected: &mut [Issue],
+) -> Result<(usize, Vec<String>, Vec<MutationIntent>)> {
+    Ok(
+        super::dependency::derive_reduced_graph_intents(projected, projected, None)?
+            .into_iter()
+            .fold(
+                (0, Vec::new(), Vec::new()),
+                |(count, mut messages, mut intents), intent| {
+                    match intent {
+                        MutationIntent::UpdateIssue { issue } => {
+                            if let Some(target) =
+                                projected.iter_mut().find(|target| target.id == issue.id)
+                            {
+                                let removed = target.dependencies.len() - issue.dependencies.len();
+                                messages.push(format!(
+                                    "Fixed {removed} redundant dependencies in issue {}",
+                                    issue.short_id()
+                                ));
+                                *target = *issue;
+                                return (count + removed, messages, intents);
+                            }
+                        }
+                        event => intents.push(event),
+                    }
+                    (count, messages, intents)
+                },
+            ),
+    )
+}
+
+fn plan_readiness_fixes(projected: &mut [Issue]) -> (usize, Vec<String>, Vec<MutationIntent>) {
+    let mut messages = Vec::new();
+    let mut intents = Vec::new();
+    loop {
+        let resolved = crate::domain::queries::build_issue_map(projected);
+        let corrections = projected
+            .iter()
+            .enumerate()
+            .filter_map(|(index, issue)| {
+                issue
+                    .derive_readiness_correction(&resolved)
+                    .map(|correction| (index, correction))
+            })
+            .collect::<Vec<_>>();
+        if corrections.is_empty() {
+            return (intents.len(), messages, intents);
+        }
+        for (index, correction) in corrections {
+            let issue = &mut projected[index];
+            let from = issue.state;
+            issue.state = match correction {
+                ReadinessCorrection::Promote => State::Ready,
+                ReadinessCorrection::Demote => State::Backlog,
+            };
+            messages.push(format!(
+                "  → Transitioning {} to {}",
+                issue.short_id(),
+                issue.state.as_str()
+            ));
+            intents.push(MutationIntent::RecordEvent {
+                phase: 4,
+                event: Box::new(EventBody::draft_issue_state_changed(
+                    issue.id.clone(),
+                    from,
+                    issue.state,
+                )),
+            });
+        }
+    }
+}
+
+fn plan_derived_state_fixes(
+    image: &RepositoryImage,
+) -> (usize, Vec<String>, Vec<RepositoryAction>) {
+    use crate::repository_state::{derive_materialization, MaterializationRequest};
+    let repair = (|| -> Result<_> {
+        let declarations = crate::repository_state::validation_declarations_from_image(image)?;
+        if let Some(error) = declarations.rules_load_error() {
+            return Err(anyhow!("rules.toml could not be loaded: {error:#}"));
+        }
+        Ok(derive_materialization(
+            image,
+            MaterializationRequest::RepairDerivedState {
+                declarations: declarations.borrowed(),
+            },
+        )?)
+    })();
+    match repair {
+        Ok(repair) => {
+            let changed = repair
+                .delta()
+                .actions()
+                .iter()
+                .filter(|action| !matches!(action, RepositoryAction::CreateDirectory { .. }))
+                .map(|action| action.path())
+                .collect::<std::collections::BTreeSet<_>>();
+            (
+                changed.len(),
+                changed
+                    .into_iter()
+                    .map(|path| format!("Repaired derived-state target {path:?}"))
+                    .collect(),
+                repair.delta().actions().to_vec(),
+            )
+        }
+        Err(error) => (
+            0,
+            vec![format!("Skipped derived-state repair: {error:#}")],
+            Vec::new(),
+        ),
     }
 }
 
@@ -2545,6 +2616,35 @@ mod tests {
         assert_eq!(count, 0);
         assert!(report.structural_failure.is_some());
         assert_eq!(storage.read_repo_file(&path).unwrap().as_deref(), Some("{"));
+    }
+
+    #[test]
+    fn test_validate_fix_repairs_readiness_with_unloadable_rules_and_reports_the_finding() {
+        use crate::commands::test_helpers::{memory_executor_declaring, seed_issue};
+        let storage = crate::storage::InMemoryStorage::new();
+        let executor = memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                rules: Some("not valid TOML"),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let mut issue = crate::test_utils::fixture_issue("unblocked".into(), String::new());
+        issue.state = State::Backlog;
+        seed_issue(&storage, issue.clone());
+
+        let (count, messages, report, _) = executor.validation().validate_with_fix(false).unwrap();
+
+        assert!(count > 0);
+        assert_eq!(storage.load_issue(&issue.id).unwrap().state, State::Ready);
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.reported.rule == "rules-file"));
+        assert!(messages.iter().any(|message| {
+            message.contains("Skipped derived-state repair") && message.contains("rules")
+        }));
     }
 
     #[test]
