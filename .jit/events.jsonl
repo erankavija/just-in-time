@@ -24852,3 +24852,5 @@
 {"fields":["dependencies"],"id":"3ca7853e-fc26-48d5-b76f-c607805f6b3d","issue_id":"4858de06-b973-443a-b6fd-6641d8694617","timestamp":"2026-11-04T23:46:41.091894074Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"b0ca810c-fc45-41e8-ad1e-a84258a23e92","issue_id":"3a61ff16-9afb-4c7c-9583-8ce588581350","timestamp":"2026-11-04T23:46:58.379282303Z","type":"issue_updated","updated_by":"dependency-add"}
 {"id":"bc57085d-a02e-4b28-8936-73d0f6a8cae4","issue_id":"bb03df0a-65c7-496a-bb09-2620eb253fd5","new_count":24,"old_count":25,"removed_deps":["6d93ab14-4c72-4ec5-9c50-471cf0d95746"],"timestamp":"2026-11-04T23:46:58.379282303Z","type":"dependency_reduced"}
+{"from":"ready","id":"2d88900f-dd5a-408f-baed-3196040edbef","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-04T23:52:29.474333037Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:f4d9502a-lead","id":"d11e15fa-807a-459b-8e3c-39c7d8b7f78c","issue_id":"09974ad1-7c28-4aba-8a7a-62b0020383f3","timestamp":"2026-11-04T23:52:29.474333037Z","type":"issue_claimed"}
