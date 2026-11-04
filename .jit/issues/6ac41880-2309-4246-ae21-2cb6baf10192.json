@@ -10,6 +10,7 @@
   ],
   "description": "Delete the executor's copies of the dangling-link, enforcement-drift and review-placeholder passes and the scoped graph entry point, together with their unit tests.\n\n## Background\n\n- `dangling_link_findings` (`crates/jit/src/commands/validate.rs:1326-1397`), `enforcement_drift_findings` (`:1430-1451`), `compute_drift_findings` (`:1470-1504`), `loadable_rule_names` (`:1515-1542`) and `review_placeholder_findings` (`:1766-1799`) have no production caller once the views, the invariant check and the gate checkers read the report. They are public, so the build does not flag them.\n- Their unit tests (`commands/validate.rs:2933-3219`) have counterparts against the report's passes in `crates/jit/src/validation/repository.rs`.\n- `validation::graph::evaluate_graph_scoped` (`crates/jit/src/validation/graph.rs:349-380`) is called only by the former scope view and label-target checker, so it too has no production caller; the rustdoc of `evaluate_graph_indexed` names it (`:502`). Its two tests are selection properties with other owners: `test_scoped_container_pointer_resolves_outside_slice_and_skips` (`:2399`) by the scope view's out-of-scope container test, and `test_scoped_container_pointer_unresolvable_in_full_index_is_config_error` (`:2439`) by the unresolvable-pointer graph test (`:2320`).\n- The rustdoc of `graph.rs:66-90` names `dangling_link_findings` as a resolution path.\n\n## Success Criteria\n\n- [hard] REQ-01: The five listed methods and their unit tests no longer exist, and no executor method computes dangling-link, drift or placeholder findings.\n- [hard] REQ-02: `evaluate_graph_scoped` and its two tests no longer exist; each removed case is owned by the test named in Background.\n- [hard] REQ-03: No rustdoc names a removed function, and the validation suites pass.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "first_ready_at": "2026-11-04T09:34:30.488554819Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -28,7 +29,7 @@
     "satisfies:9876a23a/REQ-05"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove the executor-side validation pass copies",
-  "updated_at": "2026-11-04T06:52:53.578305816Z"
+  "updated_at": "2026-11-04T09:34:30.488554819Z"
 }
