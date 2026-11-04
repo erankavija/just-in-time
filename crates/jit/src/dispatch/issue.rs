@@ -49,9 +49,7 @@ fn show<S: IssueStore>(
             .iter()
             .map(|id| show_response(ctx, id))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        return Ok(Outcome::from(IssueShowOutput::Many(
-            IssueShowListResponse::new(shown),
-        )));
+        return Ok(IssueShowOutput::Many(IssueShowListResponse::new(shown)).into());
     };
     // A `<issue>/<self-id>` argument addresses an item; issue ids never
     // contain '/'.
