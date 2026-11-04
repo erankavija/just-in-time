@@ -158,6 +158,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore> IssueOps<'_, S> {
+    /// Resolve a full issue ID or unique prefix in this repository.
+    pub fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<IssueId> {
+        self.exec.storage.resolve_issue_id(prefix)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn create_issue(
         &self,
@@ -191,25 +196,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
         issue.gates_required = gates;
         issue.labels = labels;
         issue.content_format = content_format;
-
-        // Auto-promote a brand-new issue to Ready if it has no dependencies
-        // (gates don't block Ready), BEFORE validating, so rules keyed on the
-        // final state (e.g. `when = { state = "ready" }`) see the shape that
-        // will be persisted.
-        //
-        // INTENTIONAL direct state write: this is the INITIAL state of an issue being
-        // constructed, not a transition of an existing persisted issue. There is
-        // no prior state to transition from, no dependency neighborhood yet (the
-        // issue has no dependencies by construction here), and the captured
-        // publisher below covers create-time validation.
-        if issue.dependencies.is_empty() {
-            issue.state = State::Ready;
-            // This direct write is the issue's INITIAL Ready state, so it does not
-            // pass through captured transition derivation that stamps
-            // `first_ready_at` for later transitions. Stamp it here so a
-            // dependency-free issue that is born Ready still records when it
-            // became workable (first-occurrence semantics via `mark_first_ready`).
-        }
 
         // REQ-02: when `--type` was explicitly provided, hard-reject an undeclared
         // kind through the SAME rule engine the write uses
@@ -567,11 +553,6 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 rejection: false,
             })?;
 
-        // A publication that entered a terminal state may unblock dependents.
-        if outcome.entered_terminal {
-            self.exec.check_auto_transitions()?;
-        }
-
         Ok(IssueMutation {
             issue: outcome.issue,
             warnings: outcome.warnings,
@@ -818,37 +799,16 @@ impl<S: IssueStore> IssueOps<'_, S> {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    pub(super) fn auto_transition_to_ready(&self, issue_id: &IssueId) -> Result<bool>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let full_id = issue_id.clone();
-        self.publish_captured_auto_transition(&full_id, State::Ready)
-    }
-
+    /// Move a `Gated` issue whose gates all passed to `Done`, with the readiness
+    /// corrections its dependents need, in one redo record.
     pub(super) fn auto_transition_to_done(&self, issue_id: &IssueId) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = issue_id.clone();
-        if self.publish_captured_auto_transition(&full_id, State::Done)? {
-            // Check if any dependent issues can now transition to ready
-            self.check_auto_transitions()?;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    /// Apply the promotions [`issues_becoming_ready`](crate::domain::queries::issues_becoming_ready) decides.
-    pub(super) fn check_auto_transitions(&self) -> Result<()>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let issues = self.storage.list_issues()?;
-        crate::domain::queries::issues_becoming_ready(&issues)
-            .iter()
-            .try_for_each(|issue_id| self.auto_transition_to_ready(issue_id).map(|_| ()))
+        self.publish_captured_lifecycle_mutation(super::CapturedLifecycleMutation::AutoDone {
+            issue_id: issue_id.clone(),
+        })
+        .map(|outcome| outcome.changed)
     }
 }
 
@@ -1125,60 +1085,6 @@ mod tests {
             .unwrap()
             .assignee
             .is_none());
-    }
-
-    #[test]
-    fn test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues() {
-        let counter = Arc::new(SessionOpenCounter(AtomicUsize::new(0)));
-        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
-        let executor = crate::commands::test_helpers::memory_executor(storage);
-
-        let eligible = crate::test_utils::fixture_issue("Eligible backlog".into(), String::new());
-        let eligible_id = eligible.id.clone();
-        crate::commands::test_helpers::seed_issue(&executor.storage, eligible);
-
-        let mut blocker = crate::test_utils::fixture_issue("Open dependency".into(), String::new());
-        blocker.state = State::InProgress;
-        let blocker_id = blocker.id.clone();
-        crate::commands::test_helpers::seed_issue(&executor.storage, blocker);
-
-        let blocked_ids = (0..64)
-            .map(|index| {
-                let mut blocked = crate::test_utils::fixture_issue(
-                    format!("Blocked dependent {index}"),
-                    String::new(),
-                );
-                blocked.dependencies.push(blocker_id.clone());
-                let id = blocked.id.clone();
-                crate::commands::test_helpers::seed_issue(&executor.storage, blocked);
-                id
-            })
-            .collect::<Vec<_>>();
-
-        executor.check_auto_transitions().unwrap();
-
-        assert_eq!(
-            counter.0.load(Ordering::SeqCst),
-            2,
-            "one eligible transition uses its existing preflight and publication sessions; blocked backlog must add none"
-        );
-        let transitioned = executor.storage.load_issue(&eligible_id).unwrap();
-        assert_eq!(transitioned.state, State::Ready);
-        assert!(transitioned.first_ready_at.is_some());
-        assert_eq!(
-            executor
-                .storage
-                .read_events()
-                .unwrap()
-                .into_iter()
-                .filter(|event| event.get_type() == "issue_state_changed")
-                .count(),
-            1
-        );
-        assert!(blocked_ids.into_iter().all(|id| executor
-            .storage
-            .load_issue(&id)
-            .is_ok_and(|issue| issue.state == State::Backlog)));
     }
 
     #[test]
@@ -3496,6 +3402,63 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap();
 
         assert_eq!(counter.0.load(Ordering::SeqCst) - opened, 1);
+    }
+
+    /// Move a `Done` blocker back to `InProgress`, optionally with a `Ready`
+    /// dependent; returns the session opens the update took and the
+    /// dependent's state.
+    fn reopen_done_blocker(with_dependent: bool) -> (usize, Option<State>) {
+        let counter = crate::commands::test_helpers::SessionOpenCounter::new();
+        let executor = crate::commands::test_helpers::memory_executor(
+            InMemoryStorage::new().with_mutation_interruption_view(counter.clone()),
+        );
+        let mut blocker = crate::test_utils::fixture_issue("Blocker".into(), String::new());
+        blocker.state = State::Done;
+        let blocker_id = blocker.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, blocker);
+        let dependent_id = with_dependent.then(|| {
+            let mut dependent = crate::test_utils::fixture_issue("Dependent".into(), String::new());
+            dependent.state = State::Ready;
+            dependent.dependencies.push(blocker_id.clone());
+            let id = dependent.id.clone();
+            crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
+            id
+        });
+        let opened = counter.count();
+
+        executor
+            .issues()
+            .update_issue(
+                &blocker_id,
+                None,
+                None,
+                None,
+                Some(State::InProgress),
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+
+        (
+            counter.count() - opened,
+            dependent_id.map(|id| executor.storage.load_issue(&id).unwrap().state),
+        )
+    }
+
+    #[test]
+    fn test_update_issue_reopening_a_done_blocker_demotes_its_ready_dependent_in_the_same_publication(
+    ) {
+        let (baseline, _) = reopen_done_blocker(false);
+        let (sessions, dependent) = reopen_done_blocker(true);
+
+        assert_eq!(dependent, Some(State::Backlog));
+        assert_eq!(
+            sessions, baseline,
+            "the dependent's demotion must add no session to the state change"
+        );
     }
 
     #[test]

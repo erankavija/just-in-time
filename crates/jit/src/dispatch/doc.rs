@@ -180,6 +180,7 @@ command_group! {
             => diff(&id, &path, &from, to.as_deref()) -> DocumentDiffResult,
         "doc_assets_list" => DocCommands::Assets { command: AssetCommands::List { id, path, rescan } }
             => assets_list(&id, &path, rescan) -> AssetListResult,
-        "doc_check-links" => DocCommands::CheckLinks { scope } => check_links(&scope) -> LinkCheckResult,
+        "doc_check-links" => DocCommands::CheckLinks { scope } => check_links(&scope)
+            findings ValidationFailed "One or more documents have broken links. Documents with only risky-link warnings exit `0`: warnings are reported, never fatal." -> LinkCheckResult,
     }
 }

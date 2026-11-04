@@ -23,7 +23,8 @@ command_group! {
     command: InvariantCommands,
     storage: [HandlerStore],
     leaves: {
-        "invariant_check" => InvariantCommands::Check => check() -> InvariantCheckResult,
+        "invariant_check" => InvariantCommands::Check => check()
+            findings ValidationFailed "Enforcement drift was found (declared enforcement not backed by an enforcing rule)." -> InvariantCheckResult,
     }
 }
 

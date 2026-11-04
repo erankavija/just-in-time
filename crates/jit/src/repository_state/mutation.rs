@@ -358,15 +358,12 @@ pub enum MutationIntent {
         /// finalizer; all other fields are authoritative.
         draft: Box<Issue>,
     },
-    /// Create a prevalidated issue batch and wire all intra-batch dependency
-    /// relationships in the same delta. Dependency pairs are
-    /// `(dependent_index, dependency_index)` into `drafts`; the finalizer
-    /// resolves them to the drafts' ids.
+    /// Create a prevalidated issue batch, with its intra-batch dependencies,
+    /// in the same delta.
     CreateIssueBatch {
-        /// Semantic issue drafts in caller request order.
+        /// Semantic issue drafts in caller request order; the finalizer stamps
+        /// their lifecycle timestamps.
         drafts: Vec<Issue>,
-        /// Prevalidated intra-batch dependency index pairs.
-        dependencies: Vec<(usize, usize)>,
     },
     /// Assign `issue_id` to `agent` and append `IssueClaimed`, or do nothing when
     /// the captured issue is already assigned to `agent`.
@@ -834,7 +831,7 @@ pub(super) fn finalize_delta(
             .iter()
             .map(|intent| match intent {
                 MutationIntent::CreateIssue { .. } => 1,
-                MutationIntent::CreateIssueBatch { drafts, .. } => drafts.len(),
+                MutationIntent::CreateIssueBatch { drafts } => drafts.len(),
                 _ => 0,
             })
             .sum(),
@@ -856,29 +853,9 @@ pub(super) fn finalize_delta(
     }
 
     for intent in intents {
-        if let MutationIntent::CreateIssueBatch {
-            drafts,
-            dependencies,
-        } = intent
-        {
-            for (index, draft) in drafts.iter().enumerate() {
-                let now = context.timestamp();
-                let mut issue = draft.clone();
-                issue.dependencies = dependencies
-                    .iter()
-                    .filter(|(dependent, _)| *dependent == index)
-                    .map(|(_, dependency)| drafts[*dependency].id.clone())
-                    .collect();
-                issue.dependencies.sort();
-                issue.dependencies.dedup();
-                issue.state = if issue.dependencies.is_empty() {
-                    State::Ready
-                } else {
-                    State::Backlog
-                };
-                issue.created_at = now;
-                issue.updated_at = now;
-                issue.first_ready_at = (issue.state == State::Ready).then_some(now);
+        if let MutationIntent::CreateIssueBatch { drafts } = intent {
+            for draft in drafts {
+                let issue = created_issue(draft, context.timestamp());
                 actions.push(write_issue_action(image, &issue)?);
                 pending_events.push(PendingEvent {
                     phase: 0,
@@ -2702,12 +2679,13 @@ mod tests {
 
     #[test]
     fn test_finalize_batch_creation_keeps_draft_ids_and_reserves_their_indices() {
-        let drafts = [
+        let mut drafts = [
             crate::test_utils::issue_id(61),
             crate::test_utils::issue_id(62),
         ]
         .map(|id| Issue::draft(id, "Batch".into(), "Body".into()))
         .to_vec();
+        drafts[1].dependencies = vec![drafts[0].id.clone()];
         let draft_ids = drafts
             .iter()
             .map(|draft| draft.id.clone())
@@ -2731,17 +2709,13 @@ mod tests {
             &synthetic_layout(),
             &image,
             &ctx(),
-            &[MutationIntent::CreateIssueBatch {
-                drafts,
-                dependencies: vec![(1, 0)],
-            }],
+            &[MutationIntent::CreateIssueBatch { drafts }],
             None,
         )
         .unwrap();
 
-        let written = draft_ids
-            .iter()
-            .map(|id| {
+        assert!(
+            draft_ids.iter().all(|id| {
                 plan.delta()
                     .actions()
                     .iter()
@@ -2753,10 +2727,10 @@ mod tests {
                         }
                         _ => None,
                     })
-                    .expect("each draft is written at its own id")
-            })
-            .collect::<Vec<_>>();
-        assert_eq!(written[1].dependencies, [draft_ids[0].clone()]);
+                    .is_some_and(|issue| &issue.id == id)
+            }),
+            "each draft is written at its own id"
+        );
         let events = appended_events(plan.delta());
         let created = events
             .iter()

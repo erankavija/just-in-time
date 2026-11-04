@@ -1322,6 +1322,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "similar",
+ "syn",
  "tar",
  "tempfile",
  "thiserror 1.0.69",

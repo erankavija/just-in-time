@@ -223,25 +223,28 @@ jit issue create \
   --label "type:task"
 ```
 
-New dependency-free issues are created in `ready`. An issue created carrying a
-dependency that is not yet effectively terminal — a `jit issue batch-create`
-entry with `depends_on`, or a graph-template node wired to a sibling — is created
-in `backlog` instead. Gates do not block `ready`; they are checked when work
-starts or completes.
+A new issue is created in `ready` when no dependency blocks it, and in `backlog`
+when it carries a dependency that is not yet effectively terminal, such as a
+`jit issue batch-create` entry with `depends_on` or a graph-template node wired
+to a sibling. Gates do not block `ready`; they are checked when work starts or
+completes.
 
 **2. Transition to Ready**
 
 An issue in `backlog` becomes `ready` when all dependencies are effectively
-terminal (`done`, `rejected`, or `archived` from one of those). This promotion is automatic: completing or rejecting a dependency
-re-scans its dependents and moves each newly-unblocked issue to `ready` in the
-same operation (`check_auto_transitions`, `crates/jit/src/commands/issue.rs`).
-Prechecks are not a readiness condition: they run when a ready issue is claimed or
-explicitly moved to `in_progress`.
+terminal (`done`, `rejected`, or `archived` from one of those). Readiness
+follows the graph in both directions, and every correction publishes in the same
+redo record as the change that causes it:
 
-The reverse holds too: a `ready` issue that gains a dependency on a non-terminal
-issue returns to `backlog` in the same operation. Stored state therefore always
-agrees with the dependency graph, and an issue reported as `ready` while listing
-unmet dependencies is a repository defect `jit validate` reports.
+- Completing or rejecting a dependency, removing an edge, or deleting a blocker
+  promotes each dependent it leaves unblocked from `backlog` to `ready`.
+- A dependency leaving `done` or `rejected`, or a new edge to a non-terminal
+  issue, demotes each `ready` dependent it blocks to `backlog`.
+
+Stored state therefore always agrees with the dependency graph; a disagreement
+is a repository defect `jit validate` reports. Prechecks are not a readiness
+condition: they run when a ready issue is claimed or explicitly moved to
+`in_progress`.
 
 **3. Work Begins**
 
@@ -812,9 +815,8 @@ do not rely on it to prohibit a later explicit state update.
 ### State Transitions
 
 **Auto-transitions:**
-- `Backlog → Ready`: Automatic. When a dependency reaches a terminal state (done or rejected), the completing/rejecting command re-scans dependents and promotes each newly-unblocked issue in the same operation (`check_auto_transitions`, `crates/jit/src/commands/issue.rs`)
-- `Ready → Backlog`: Automatic. The inverse: adding a dependency on a non-terminal issue — through `jit dep add` or through graph-template application — demotes the dependent in the same operation, so stored readiness never contradicts the graph
-- `Gated → Done`: Automatic. `jit gate evaluate` passing the last unpassed gate completes the issue and promotes its dependents in the same operation
+- `Backlog → Ready` and `Ready → Backlog`: Automatic. The change that unblocks or blocks a dependent corrects its readiness in the same redo record ([Transition to Ready](#issue-lifecycle))
+- `Gated → Done`: Automatic. `jit gate evaluate` passing the last unpassed gate completes the issue, with its dependents' readiness corrections in the same redo record
 
 **Guarded workflow operations:**
 - `ready → in_progress`: `jit issue claim` attempts this transition and runs prechecks

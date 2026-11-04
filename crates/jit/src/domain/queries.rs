@@ -107,18 +107,6 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
         .collect()
 }
 
-/// Take the whole issue graph after a mutation and return, in input order,
-/// every `Backlog` issue whose dependencies are all met.
-/// A promotion meets no dependency, so applying the result requires no further pass.
-pub fn issues_becoming_ready(issues: &[Issue]) -> Vec<crate::domain::identity::IssueId> {
-    let resolved = build_issue_map(issues);
-    issues
-        .iter()
-        .filter(|issue| issue.should_auto_transition_to_ready(&resolved))
-        .map(|issue| issue.id.clone())
-        .collect()
-}
-
 /// The issues [`derive_readiness_corrections`] re-derives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadinessScope {
@@ -1334,113 +1322,6 @@ mod tests {
         let mut issue = state_issue(index, State::Backlog);
         issue.dependencies = dependencies.iter().map(|issue| issue.id.clone()).collect();
         issue
-    }
-
-    #[test]
-    fn test_issues_becoming_ready_promotes_a_dependent_whose_dependency_is_done() {
-        let dependency = state_issue(0, State::Done);
-        let dependent = dependent_of(1, &[&dependency]);
-        let expected = dependent.id.clone();
-        assert_eq!(issues_becoming_ready(&[dependency, dependent]), [expected]);
-    }
-
-    #[test]
-    fn test_issues_becoming_ready_promotes_a_dependent_whose_dependency_is_rejected() {
-        let dependency = state_issue(0, State::Rejected);
-        let dependent = dependent_of(1, &[&dependency]);
-        let expected = dependent.id.clone();
-        assert_eq!(issues_becoming_ready(&[dependency, dependent]), [expected]);
-    }
-
-    #[test]
-    fn test_issues_becoming_ready_holds_a_dependent_with_another_unmet_dependency() {
-        let done = state_issue(0, State::Done);
-        let open = state_issue(1, State::InProgress);
-        let dependent = dependent_of(2, &[&done, &open]);
-        assert!(issues_becoming_ready(&[done, open, dependent]).is_empty());
-    }
-
-    #[test]
-    fn test_issues_becoming_ready_promotes_a_dependent_whose_dependencies_end_done_and_rejected() {
-        let done = state_issue(0, State::Done);
-        let rejected = state_issue(1, State::Rejected);
-        let dependent = dependent_of(2, &[&done, &rejected]);
-        let expected = dependent.id.clone();
-        assert_eq!(
-            issues_becoming_ready(&[done, rejected, dependent]),
-            [expected]
-        );
-    }
-
-    #[test]
-    fn test_issues_becoming_ready_holds_the_link_after_the_one_it_promotes() {
-        let done = state_issue(0, State::Done);
-        let next = dependent_of(1, &[&done]);
-        let after_next = dependent_of(2, &[&next]);
-        let expected = next.id.clone();
-        assert_eq!(issues_becoming_ready(&[done, next, after_next]), [expected]);
-    }
-
-    #[test]
-    fn test_issues_becoming_ready_leaves_dependents_outside_backlog() {
-        let dependency = state_issue(0, State::Done);
-        let issues = std::iter::once(dependency.clone())
-            .chain(
-                State::ALL
-                    .into_iter()
-                    .filter(|state| *state != State::Backlog)
-                    .enumerate()
-                    .map(|(index, state)| {
-                        let mut dependent = dependent_of(index + 1, &[&dependency]);
-                        dependent.state = state;
-                        dependent
-                    }),
-            )
-            .collect::<Vec<_>>();
-        assert!(issues_becoming_ready(&issues).is_empty());
-    }
-
-    #[test]
-    fn test_issues_becoming_ready_holds_a_dependent_of_an_unresolved_dependency() {
-        let mut dependent = state_issue(0, State::Backlog);
-        dependent.dependencies = vec![issue_id(137)];
-        assert!(issues_becoming_ready(&[dependent]).is_empty());
-    }
-
-    proptest! {
-        #[test]
-        fn test_issues_becoming_ready_is_the_backlog_issues_with_every_dependency_met(
-            nodes in proptest::collection::vec(
-                (
-                    0..State::ALL.len(),
-                    proptest::option::of(0..State::ALL.len()),
-                    proptest::collection::vec(0usize..16, 0..4),
-                ),
-                0..16,
-            ),
-        ) {
-            let issues: Vec<_> = nodes.iter().enumerate().map(|(index, (state, archived_from, dependencies))| {
-                let mut issue = state_issue(index, State::ALL[*state]);
-                issue.archived_from = archived_from.map(|from| State::ALL[from]);
-                issue.dependencies = dependencies.iter().map(|&index| issue_id(index as u128)).collect();
-                issue
-            }).collect();
-            let resolved = build_issue_map(&issues);
-            let expected: Vec<_> = issues.iter().filter(|issue| {
-                issue.state == State::Backlog
-                    && issue.dependencies.iter().all(|id| resolved.get(id)
-                        .is_some_and(|dependency| is_dependency_met(dependency.state, dependency.archived_from)))
-            }).map(|issue| issue.id.clone()).collect();
-
-            let promoted = issues_becoming_ready(&issues);
-            prop_assert_eq!(&promoted, &expected);
-
-            let applied: Vec<_> = issues.into_iter().map(|mut issue| {
-                if promoted.contains(&issue.id) { issue.state = State::Ready; }
-                issue
-            }).collect();
-            prop_assert!(issues_becoming_ready(&applied).is_empty());
-        }
     }
 
     fn affected_corrections(
