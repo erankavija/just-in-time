@@ -11,7 +11,14 @@
     "docs-mechanical",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "run_id": "9b6a4069-d5a5-45b1-aa94-7f06832d3898",
+      "status": "passed",
+      "updated_at": "2026-11-04T12:04:41.576153944Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2e2c8ee3-3112-439b-bd50-14919f98a468",
   "labels": [
     "milestone:v1.0",
@@ -21,5 +28,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Every review prompt binds user decisions",
-  "updated_at": "2026-11-04T12:01:19.480884506Z"
+  "updated_at": "2026-11-04T12:04:41.576153944Z"
 }

@@ -24148,3 +24148,4 @@
 {"fields":["dependencies"],"id":"0f01c308-5f9f-4789-a12a-7bfcb5603d1d","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-11-04T12:01:07.467902252Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"2e86c1aa-e83e-46f5-89e1-466256abe921","issue_id":"2e2c8ee3-3112-439b-bd50-14919f98a468","timestamp":"2026-11-04T12:01:19.480884506Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"551bf595-94dc-4d20-9cb7-bd5f694377c8","issue_id":"2e2c8ee3-3112-439b-bd50-14919f98a468","timestamp":"2026-11-04T12:01:19.480884506Z","type":"issue_claimed"}
+{"gate_key":"docs-mechanical","id":"fd32ecaf-4ed7-4860-81b6-f0525339214c","issue_id":"2e2c8ee3-3112-439b-bd50-14919f98a468","timestamp":"2026-11-04T12:04:41.576153944Z","type":"gate_passed","updated_by":"auto:executor"}
