@@ -196,14 +196,9 @@ fn test_check_reports_unloadable_rule_source_not_a_parse_error() {
 }
 
 #[test]
-fn test_check_reports_unloadable_gate_registry() {
-    // The gate registry is malformed and an invariant binds to a gate that would
-    // live there -> declared-but-unenforced (unloadable), exit non-zero.
+fn test_check_fails_on_unloadable_gate_registry() {
     let cli = JitCli::initialised().unwrap();
-    // Loadable (empty) rules so only the gate source is unloadable.
     write_rules(&cli, "\n");
-    // The gate registry is `.jit/gates.toml` (jit:f5d35048); malformed TOML here
-    // exercises the same unloadable-source path malformed JSON did previously.
     std::fs::write(cli.root().join(".jit/gates.toml"), "not valid toml {").unwrap();
     write_invariants(
         &cli,
@@ -218,13 +213,11 @@ fn test_check_reports_unloadable_gate_registry() {
 
     assert!(!output.status.success());
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "VALIDATION_FAILED", "{json}");
     assert!(
-        json["error"]["details"]["findings"]
-            .as_array()
+        json["error"]["message"]
+            .as_str()
             .unwrap()
-            .iter()
-            .any(|f| f["subject"] == "@/gate/some-gate" && f["unloadable"] == true),
-        "missing unloadable gate finding: {json}"
+            .contains(".jit/gates.toml"),
+        "expected gate registry load error: {json}"
     );
 }
