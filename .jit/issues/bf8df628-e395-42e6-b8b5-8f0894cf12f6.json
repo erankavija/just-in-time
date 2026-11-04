@@ -16,9 +16,6 @@
   "id": "bf8df628-e395-42e6-b8b5-8f0894cf12f6",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-gate-runs",
     "component:gates",
     "per:@/charter/D-19",
     "per:@/charter/D-20",
@@ -28,5 +25,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "An executor accessor loads an issue's latest run of each gate",
-  "updated_at": "2026-11-02T23:41:46.671920040Z"
+  "updated_at": "2026-11-04T22:42:45.139944883Z"
 }

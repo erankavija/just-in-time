@@ -16,9 +16,6 @@
   "id": "d0d73bef-4ef9-4777-bdc3-73c4e0e98ce1",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:history-boundary",
     "component:storage",
     "per:@/charter/D-18",
     "enforces:@/invariant/convention-convergence",
@@ -29,5 +26,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Archive event-log readers are gone",
-  "updated_at": "2026-11-02T23:41:53.512104900Z"
+  "updated_at": "2026-11-04T22:42:45.450484582Z"
 }

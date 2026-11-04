@@ -16,9 +16,6 @@
   "id": "cac57c93-1e32-4e1a-b4b1-c56bfb669cf8",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:history-boundary",
     "component:validation",
     "per:@/charter/D-19",
     "per:@/charter/D-18",
@@ -28,5 +25,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Repository validation stops parsing the event log",
-  "updated_at": "2026-11-02T23:41:52.260800416Z"
+  "updated_at": "2026-11-04T22:42:45.347584129Z"
 }

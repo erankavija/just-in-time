@@ -16,9 +16,6 @@
   "id": "c2930451-2555-4bed-ae3a-eaa6d72b7522",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:history-boundary",
     "component:core",
     "per:@/charter/D-17",
     "enforces:@/invariant/atomic-writes",
@@ -29,5 +26,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Event appends land at the log's committed length",
-  "updated_at": "2026-11-02T23:41:51.456279203Z"
+  "updated_at": "2026-11-04T22:42:45.242801966Z"
 }

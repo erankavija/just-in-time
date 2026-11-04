@@ -34,7 +34,6 @@
     "type:task",
     "epic:history-independent-reads",
     "milestone:v1.0",
-    "story:history-boundary",
     "component:docs",
     "per:@/charter/D-19",
     "satisfies:f8a6b298/REQ-11"
@@ -42,5 +41,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Gate provenance, gate-run lookup and search docs match per-key reads",
-  "updated_at": "2026-11-04T05:26:05.301983418Z"
+  "updated_at": "2026-11-04T22:42:44.937635186Z"
 }

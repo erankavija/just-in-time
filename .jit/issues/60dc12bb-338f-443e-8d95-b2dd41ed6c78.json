@@ -16,9 +16,6 @@
   "id": "60dc12bb-338f-443e-8d95-b2dd41ed6c78",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-gate-runs",
     "component:storage",
     "component:gates",
     "per:@/charter/D-19",
@@ -28,5 +25,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "The gate-run record path constructor takes the run's issue",
-  "updated_at": "2026-11-02T23:41:47.860467071Z"
+  "updated_at": "2026-11-04T22:42:43.599637265Z"
 }

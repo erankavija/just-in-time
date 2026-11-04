@@ -16,9 +16,6 @@
   "id": "6b1ed243-4081-4f0b-a7f3-346e11e2f2a7",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-leases",
     "component:core",
     "per:@/charter/D-19",
     "per:@/charter/D-20",
@@ -29,5 +26,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Issue claim emits its event exactly when the assignee changes",
-  "updated_at": "2026-11-02T23:41:51.048784855Z"
+  "updated_at": "2026-11-04T22:42:43.805576102Z"
 }
