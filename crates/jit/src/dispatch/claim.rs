@@ -1,44 +1,14 @@
 //! `jit claim` and `jit recover` handlers.
 
-use super::{CommandContext, Outcome};
+use super::{resolve_issue, resolve_issue_filter, CommandContext, Outcome};
 use crate::cli::ClaimCommands;
 use crate::commands::RecoveryFailedError;
-use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId};
+use crate::domain::identity::LeaseId;
 use crate::output::{
     ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
-    ClaimRenewResponse, LeaseListResponse, OutputContext, RecoverResponse,
+    ClaimRenewResponse, LeaseListResponse, RecoverResponse,
 };
-use crate::storage::{IssueStore, RepositoryStateStore, StorageWarning};
-
-/// Human-mode warnings go to stderr after the work succeeded.
-fn warn<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-    warnings: &[StorageWarning],
-) -> anyhow::Result<()> {
-    let output = OutputContext::new(ctx.mode.quiet, ctx.mode.json);
-    warnings
-        .iter()
-        .try_for_each(|warning| Ok(output.print_warning(warning)?))
-}
-
-fn resolve<S: IssueStore>(ctx: &CommandContext<'_, S>, requested: &str) -> anyhow::Result<IssueId> {
-    ctx.executor
-        .storage()
-        .resolve_issue_id(&requested.parse::<IssueIdPrefix>()?)
-}
-
-/// A status filter naming no existing issue still filters, by its prefix.
-fn resolve_filter<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-    requested: &str,
-) -> anyhow::Result<IssueIdPrefix> {
-    let prefix = requested.parse::<IssueIdPrefix>()?;
-    match ctx.executor.storage().resolve_issue_id(&prefix) {
-        Ok(id) => Ok(IssueIdPrefix::from(&id)),
-        Err(error) if error.is::<crate::storage::IssueNotFoundError>() => Ok(prefix),
-        Err(error) => Err(error),
-    }
-}
+use crate::storage::{IssueStore, RepositoryStateStore};
 
 fn acquire<S: IssueStore + RepositoryStateStore>(
     ctx: &CommandContext<'_, S>,
@@ -47,41 +17,37 @@ fn acquire<S: IssueStore + RepositoryStateStore>(
     agent_id: Option<String>,
     reason: Option<String>,
 ) -> anyhow::Result<Outcome<ClaimAcquireResponse>> {
-    let full_id = resolve(ctx, &issue_id)?;
+    let full_id = resolve_issue(ctx.executor.storage(), &issue_id)?;
     let (lease_id, warnings) =
         ctx.executor
             .claims()
             .acquire(&full_id, ttl, agent_id.as_deref(), reason.as_deref())?;
-    warn(ctx, &warnings)?;
     let message = format!("Acquired lease {lease_id} on issue {issue_id}");
-    Ok(Outcome::Success {
-        response: ClaimAcquireResponse {
-            lease_id,
-            issue_id,
-            ttl_secs: ttl,
-            warnings,
-        },
-        message: Some(message),
-    })
+    let shown = warnings.iter().map(ToString::to_string).collect::<Vec<_>>();
+    let response = ClaimAcquireResponse {
+        lease_id,
+        issue_id,
+        ttl_secs: ttl,
+        warnings,
+    };
+    Ok(Outcome::success_with(response, message).with_warnings(shown))
 }
 
 fn release<S: IssueStore + RepositoryStateStore>(
     ctx: &CommandContext<'_, S>,
     issue_id: String,
 ) -> anyhow::Result<Outcome<ClaimReleaseResponse>> {
-    let (released, warnings) = ctx
-        .executor
-        .claims()
-        .release_by_issue(&resolve(ctx, &issue_id)?)?;
-    warn(ctx, &warnings)?;
+    let id = resolve_issue(ctx.executor.storage(), &issue_id)?;
+    let (released, warnings) = ctx.executor.claims().release_by_issue(&id)?;
     let message = format!(
         "Released lease {} on issue {} (was held by {}) by {}",
         released.lease_id, released.issue_id, released.previous_owner, released.actor
     );
-    Ok(Outcome::Success {
-        response: ClaimReleaseResponse { released, warnings },
-        message: Some(message),
-    })
+    let shown = warnings.iter().map(ToString::to_string).collect::<Vec<_>>();
+    Ok(
+        Outcome::success_with(ClaimReleaseResponse { released, warnings }, message)
+            .with_warnings(shown),
+    )
 }
 
 fn renew<S: IssueStore + RepositoryStateStore>(
@@ -90,15 +56,17 @@ fn renew<S: IssueStore + RepositoryStateStore>(
     extension: u64,
 ) -> anyhow::Result<Outcome<ClaimRenewResponse>> {
     let (lease, warnings) = ctx.executor.claims().renew(&lease_id, extension)?;
-    warn(ctx, &warnings)?;
-    Ok(Outcome::Success {
-        response: ClaimRenewResponse {
-            lease,
-            warnings,
-            extension,
-        },
-        message: Some(format!("Renewed lease {lease_id} by {extension} seconds")),
-    })
+    let shown = warnings.iter().map(ToString::to_string).collect::<Vec<_>>();
+    let response = ClaimRenewResponse {
+        lease,
+        warnings,
+        extension,
+    };
+    Ok(Outcome::success_with(
+        response,
+        format!("Renewed lease {lease_id} by {extension} seconds"),
+    )
+    .with_warnings(shown))
 }
 
 fn heartbeat<S: IssueStore + RepositoryStateStore>(
@@ -106,11 +74,12 @@ fn heartbeat<S: IssueStore + RepositoryStateStore>(
     lease_id: LeaseId,
 ) -> anyhow::Result<Outcome<ClaimHeartbeatResponse>> {
     let warnings = ctx.executor.claims().heartbeat(&lease_id)?;
-    warn(ctx, &warnings)?;
-    Ok(Outcome::Success {
-        message: Some(format!("Heartbeat sent for lease {lease_id}")),
-        response: ClaimHeartbeatResponse { lease_id, warnings },
-    })
+    let shown = warnings.iter().map(ToString::to_string).collect::<Vec<_>>();
+    let message = format!("Heartbeat sent for lease {lease_id}");
+    Ok(
+        Outcome::success_with(ClaimHeartbeatResponse { lease_id, warnings }, message)
+            .with_warnings(shown),
+    )
 }
 
 fn status<S: IssueStore + RepositoryStateStore>(
@@ -118,25 +87,29 @@ fn status<S: IssueStore + RepositoryStateStore>(
     issue: Option<String>,
     agent: Option<String>,
 ) -> anyhow::Result<Outcome<LeaseListResponse>> {
-    let issue = issue.map(|id| resolve_filter(ctx, &id)).transpose()?;
+    let issue = issue
+        .map(|id| resolve_issue_filter(ctx.executor.storage(), &id))
+        .transpose()?;
     let leases = ctx
         .executor
         .claims()
         .status(issue.as_ref(), agent.as_deref())?;
-    Ok(Outcome::Success {
-        message: Some(format!("{} active lease(s)", leases.len())),
-        response: LeaseListResponse::listing(leases, false),
-    })
+    let message = format!("{} active lease(s)", leases.len());
+    Ok(Outcome::success_with(
+        LeaseListResponse::listing(leases, false),
+        message,
+    ))
 }
 
 fn list<S: IssueStore + RepositoryStateStore>(
     ctx: &CommandContext<'_, S>,
 ) -> anyhow::Result<Outcome<LeaseListResponse>> {
     let leases = ctx.executor.claims().list()?;
-    Ok(Outcome::Success {
-        message: Some(format!("{} lease(s) found", leases.len())),
-        response: LeaseListResponse::listing(leases, true),
-    })
+    let message = format!("{} lease(s) found", leases.len());
+    Ok(Outcome::success_with(
+        LeaseListResponse::listing(leases, true),
+        message,
+    ))
 }
 
 fn force_evict<S: IssueStore + RepositoryStateStore>(
@@ -145,15 +118,14 @@ fn force_evict<S: IssueStore + RepositoryStateStore>(
     reason: String,
 ) -> anyhow::Result<Outcome<ClaimForceEvictResponse>> {
     let warnings = ctx.executor.claims().force_evict(&lease_id, &reason)?;
-    warn(ctx, &warnings)?;
-    Ok(Outcome::Success {
-        message: Some(format!("Force-evicted lease {lease_id}")),
-        response: ClaimForceEvictResponse {
-            lease_id,
-            reason,
-            warnings,
-        },
-    })
+    let shown = warnings.iter().map(ToString::to_string).collect::<Vec<_>>();
+    let message = format!("Force-evicted lease {lease_id}");
+    let response = ClaimForceEvictResponse {
+        lease_id,
+        reason,
+        warnings,
+    };
+    Ok(Outcome::success_with(response, message).with_warnings(shown))
 }
 
 command_group! {
@@ -176,36 +148,50 @@ command_group! {
     }
 }
 
-/// `jit recover`; registers once the single-leaf handler form lands.
-///
-/// Recovery failures keep the `recovery_failed` classification.
-pub fn recover<S: IssueStore + RepositoryStateStore>(
-    ctx: &CommandContext<'_, S>,
-) -> anyhow::Result<Outcome<RecoverResponse>> {
-    let report = ctx
-        .executor
-        .claims()
-        .recover()
-        .map_err(RecoveryFailedError)?;
-    warn(ctx, &report.warnings)?;
-    Ok(Outcome::Success {
-        message: Some(format!(
+/// `jit recover`, whose unit variant is the single-leaf group's command.
+pub mod recover {
+    use super::*;
+
+    /// Recovery failures keep the `recovery_failed` classification.
+    fn recover<S: IssueStore + RepositoryStateStore>(
+        ctx: &CommandContext<'_, S>,
+    ) -> anyhow::Result<Outcome<RecoverResponse>> {
+        let report = ctx
+            .executor
+            .claims()
+            .recover()
+            .map_err(RecoveryFailedError)?;
+        let message = format!(
             "Recovery: {} locks cleaned, {} leases evicted, {} leases reclaimed",
             report.stale_locks_cleaned,
             report.expired_leases_evicted,
             report.stale_leases_reclaimed
-        )),
-        response: RecoverResponse {
+        );
+        let shown = report
+            .warnings
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        let response = RecoverResponse {
             success: true,
             report,
-        },
-    })
+        };
+        Ok(Outcome::success_with(response, message).with_warnings(shown))
+    }
+
+    command_group! {
+        command: (),
+        storage: [IssueStore + RepositoryStateStore],
+        leaves: {
+            "recover" => () => recover() -> RecoverResponse,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::output::HumanRender;
+    use crate::output::{HumanRender, OutputMode};
 
     #[test]
     fn test_registered_output_schema_every_claim_leaf_has_a_typed_response() {
@@ -217,6 +203,7 @@ mod tests {
             ("claim_status", "LeaseListResponse"),
             ("claim_list", "LeaseListResponse"),
             ("claim_force-evict", "ClaimForceEvictResponse"),
+            ("recover", "RecoverResponse"),
         ];
 
         for (path, name) in names {
@@ -227,7 +214,8 @@ mod tests {
 
     #[test]
     fn test_render_human_lease_listings_word_an_empty_result_per_command() {
-        let render = |all| LeaseListResponse::listing(Vec::new(), all).render_human();
+        let render =
+            |all| LeaseListResponse::listing(Vec::new(), all).render_human(OutputMode::default());
 
         assert_ne!(render(false), render(true));
     }

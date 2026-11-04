@@ -1311,7 +1311,6 @@ fn map_confined_read_error(
 mod tests {
     use super::*;
     use crate::domain::identity::IssueIdPrefix;
-    use crate::repository_state::GATE_RUN_RECORD_FILE;
     use crate::repository_state::SUPPORTED_INDEX_SCHEMA_VERSION;
     use crate::storage::IssueStore;
     use tempfile::TempDir;
@@ -1569,33 +1568,26 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn test_held_gate_run_directory_capability_cannot_escape_after_parent_symlink_swaps() {
+    fn test_held_gate_run_issue_directory_capability_cannot_escape_after_parent_symlink_swaps() {
         let temp = TempDir::new().unwrap();
         let data = temp.path().join(".jit");
         let data_layout = crate::test_utils::repository_layout_for_data_root(&data);
-        let run_id = crate::test_utils::gate_run_id(1);
+        let issue = crate::test_utils::issue_id(1);
+        let record_path = VirtualPath::gate_run_record(&issue, &crate::test_utils::gate_run_id(1));
+        let record_name = record_path.file_name().unwrap();
         let original_run = data_layout
-            .resolve(&VirtualPath::gate_run_directory(&run_id))
+            .resolve(&VirtualPath::gate_run_issue_directory(&issue))
             .unwrap();
-        let record = data_layout
-            .resolve(&VirtualPath::gate_run_record(&run_id))
-            .unwrap();
+        let record = data_layout.resolve(&record_path).unwrap();
         fs::create_dir_all(&original_run).unwrap();
         fs::write(&record, b"inside").unwrap();
 
         let outside_run = TempDir::new().unwrap();
-        fs::write(
-            outside_run.path().join(GATE_RUN_RECORD_FILE),
-            b"outside-run",
-        )
-        .unwrap();
+        fs::write(outside_run.path().join(record_name), b"outside-run").unwrap();
         let outside_root = TempDir::new().unwrap();
-        fs::create_dir(outside_root.path().join(run_id.as_str())).unwrap();
+        fs::create_dir(outside_root.path().join(issue.as_str())).unwrap();
         fs::write(
-            outside_root
-                .path()
-                .join(run_id.as_str())
-                .join(GATE_RUN_RECORD_FILE),
+            outside_root.path().join(issue.as_str()).join(record_name),
             b"outside-root",
         )
         .unwrap();
@@ -1609,7 +1601,7 @@ mod tests {
         .unwrap();
         let run_handle = super::super::repository_state_store::open_child_dir_nofollow(
             &gate_runs_handle,
-            run_id.as_str(),
+            issue.as_str(),
         )
         .unwrap();
 
@@ -1643,7 +1635,7 @@ mod tests {
         );
         let mut held_file = super::super::repository_state_store::open_regular_file_nofollow(
             &run_handle,
-            GATE_RUN_RECORD_FILE,
+            record_name,
         )
         .unwrap();
         let mut held_bytes = Vec::new();

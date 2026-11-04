@@ -1,6 +1,6 @@
 //! The `jit claim` and `jit recover` responses and their human renderings.
 
-use super::HumanRender;
+use super::{HumanRender, OutputMode};
 use crate::commands::claim::{ListedLease, RecoveryReport, ReleasedLeaseInfo};
 use crate::domain::identity::LeaseId;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
@@ -20,7 +20,7 @@ pub struct ClaimAcquireResponse {
 }
 
 impl HumanRender for ClaimAcquireResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!(
             "Acquired lease: {}\n  Issue: {}\n  TTL: {} seconds\n",
             self.lease_id, self.issue_id, self.ttl_secs
@@ -37,7 +37,7 @@ pub struct ClaimReleaseResponse {
 }
 
 impl HumanRender for ClaimReleaseResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let released = &self.released;
         format!(
             "Released lease: {}\n  Issue: {}\n  Previous owner: {}\n  Released by: {}\n",
@@ -57,7 +57,7 @@ pub struct ClaimRenewResponse {
 }
 
 impl HumanRender for ClaimRenewResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let lease = &self.lease;
         let mut text = format!(
             "Renewed lease: {}\n  Issue: {}\n  Extended by: {} seconds\n",
@@ -78,7 +78,7 @@ pub struct ClaimHeartbeatResponse {
 }
 
 impl HumanRender for ClaimHeartbeatResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!("Heartbeat sent: {}\n", self.lease_id)
     }
 }
@@ -92,7 +92,7 @@ pub struct ClaimForceEvictResponse {
 }
 
 impl HumanRender for ClaimForceEvictResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!(
             "Force-evicted lease: {}\n  Reason: {}\n",
             self.lease_id, self.reason
@@ -126,7 +126,7 @@ impl LeaseListResponse {
 }
 
 impl HumanRender for LeaseListResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let (none, heading) = if self.extras.all {
             ("No active leases.", "All active leases")
         } else {
@@ -198,7 +198,7 @@ pub struct RecoverResponse {
 }
 
 impl HumanRender for RecoverResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let report = &self.report;
         format!(
             "Recovery complete:\n  • Redo records applied: {}\n  • Stale locks cleaned: {}\n  \

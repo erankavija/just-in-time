@@ -172,27 +172,29 @@ fn issue_mutation_capture_budget() -> crate::repository_state::CaptureBudget {
     }
 }
 
-/// The `gate-runs` directory and the paths the first `count` gate-run records
-/// `context` derives ids for are published at: what a mutation publishing those
-/// records must capture.
+/// The `gate-runs` directory, `issue`'s directory in it, and the paths the first
+/// `count` gate-run records `context` derives ids for are published at: what a
+/// mutation publishing those records of `issue` must capture.
 ///
 /// Gate-run records take the first identifiers a mutation derives, so a
 /// mutation that also creates issues cannot use this.
 fn gate_run_record_paths(
     context: &crate::repository_state::MutationContext,
+    issue: &IssueId,
     count: usize,
 ) -> Vec<crate::repository_state::VirtualPath> {
     use crate::repository_state::VirtualPath;
 
-    std::iter::once(VirtualPath::GATE_RUNS)
-        .chain((0..count as u64).flat_map(|index| {
-            let run_id = context.gate_run_id_at(index);
-            [
-                VirtualPath::gate_run_directory(&run_id),
-                VirtualPath::gate_run_record(&run_id),
-            ]
-        }))
-        .collect()
+    [
+        VirtualPath::GATE_RUNS,
+        VirtualPath::gate_run_issue_directory(issue),
+    ]
+    .into_iter()
+    .chain(
+        (0..count as u64)
+            .map(|index| VirtualPath::gate_run_record(issue, &context.gate_run_id_at(index))),
+    )
+    .collect()
 }
 
 /// The verdict record a mutation recording `run` publishes, with the
@@ -2220,18 +2222,18 @@ fn named_gate_run_records(
         Some((
             key,
             run_id,
-            crate::repository_state::VirtualPath::gate_run_record(run_id),
+            crate::repository_state::VirtualPath::gate_run_record(&issue.id, run_id),
         ))
     })
 }
 
-/// Add the gate-run root and its complete listing to `spec`, then each run
-/// directory the image lists, then the result leaf of each the image holds as
-/// a directory. Direct occupants not named by a run id are evidence only through
-/// the listing, and direct non-directory occupants are captured as evidence but
-/// ignored as storage clutter, matching the typed readers. The verdict records
-/// are discovered the same way: the `verdicts` directory and its listing, each
-/// gate-key directory it names and its listing, then each record named there.
+/// Add the gate-run root and its complete listing to `spec`, then each issue
+/// directory it names with its listing, then each record those listings name.
+/// Names that are not issue ids, `verdicts` among them, and names not of the
+/// form `<run-id>.json` are evidence only through their listing, matching the
+/// typed reader. The verdict records are discovered the same way: the
+/// `verdicts` directory and its listing, each gate-key directory it names and
+/// its listing, then each record named there.
 fn discover_gate_records(
     image: &crate::repository_state::RepositoryImage,
     spec: &mut crate::repository_state::CaptureSpec,
@@ -2246,15 +2248,20 @@ fn discover_gate_records(
             listing
                 .names()
                 .iter()
-                .filter_map(|name| crate::domain::identity::GateRunId::try_from(name.as_str()).ok())
-                .map(|run_id| VirtualPath::gate_run_directory(&run_id)),
+                .filter_map(|name| IssueId::try_from(name.as_str()).ok())
+                .map(|issue| VirtualPath::gate_run_issue_directory(&issue)),
         )?;
     }
-    spec.discover_paths(
-        crate::repository_state::captured_gate_run_ids(image)
+    spec.discover_listings(
+        crate::repository_state::captured_gate_run_issue_ids(image)
             .unwrap_or_default()
             .iter()
-            .map(VirtualPath::gate_run_record),
+            .map(VirtualPath::gate_run_issue_directory),
+    )?;
+    spec.discover_paths(
+        crate::repository_state::captured_gate_run_ids(image)
+            .iter()
+            .map(|(issue, run)| VirtualPath::gate_run_record(issue, run)),
     )?;
     let verdicts = VirtualPath::GATE_VERDICTS;
     spec.discover_paths([verdicts.clone()])?;
@@ -2506,7 +2513,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             |session| {
                 let context = production_mutation_context();
                 let run_paths = if request.records_gate_run() {
-                    gate_run_record_paths(&context, 1)
+                    gate_run_record_paths(&context, request.issue_id(), 1)
                 } else {
                     Vec::new()
                 };
@@ -2693,8 +2700,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.rules
             .get_or_init(|| {
                 let config =
-                    self.config_manager
-                        .load()
+                    self.cached_config()
                         .map_err(|error| RuleConfigError::Configuration {
                             message: error.to_string(),
                         })?;
@@ -2703,7 +2709,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .map_err(|error| RuleConfigError::Configuration {
                             message: error.to_string(),
                         })?,
-                    &config,
+                    config,
                 )
             })
             .as_ref()
@@ -3029,7 +3035,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .as_ref()
                 .filter(|_| expected_precheck.is_some())
                 .is_some_and(|cached| cached.execution.error.is_some());
-            let precheck_run_paths = gate_run_record_paths(&context, precheck_runs.len());
+            let precheck_run_paths =
+                gate_run_record_paths(&context, &expected_target, precheck_runs.len());
 
             let claims_guard = coordinate_claims
                 .then(|| claims_mutation_guard(self.require_worktree_paths()?))
@@ -3886,7 +3893,7 @@ mod tests {
             VirtualPath::data("events.jsonl").unwrap(),
             VirtualPath::data("gates.toml").unwrap(),
         ]);
-        paths.extend(gate_run_record_paths(context, 1));
+        paths.extend(gate_run_record_paths(context, id, 1));
         CaptureSpec::new(
             paths,
             CaptureBudget {
@@ -4430,7 +4437,7 @@ assert = {}
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
         let before = capture_precheck_plan(&executor, &issue_id).evidence;
         storage.add_data_file(
-            crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
+            crate::repository_state::VirtualPath::gate_run_record(&run.issue_id, &run.run_id)
                 .relative()
                 .as_str(),
             &serde_json::to_string(&run).unwrap(),

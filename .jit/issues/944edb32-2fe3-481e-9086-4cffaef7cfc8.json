@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T03:29:01.499545940Z",
   "context": {},
   "created_at": "2026-11-02T23:39:44.698348087Z",
   "dependencies": [
@@ -29,7 +30,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "A rewrite script and window driver move a repository to format 4",
-  "updated_at": "2026-11-04T00:44:40.947118581Z"
+  "updated_at": "2026-11-04T03:29:01.499545940Z"
 }
