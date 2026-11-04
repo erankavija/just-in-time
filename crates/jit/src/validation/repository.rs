@@ -23,7 +23,7 @@ use crate::repository_state::{
     captured_issue_ids, parse_issue_records, IssueRecordsError, RepositoryImage, RepositoryIndex,
     VirtualPath,
 };
-use crate::validation::engine::Finding;
+use crate::validation::engine::{Finding, SchemaEngine};
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -536,9 +536,15 @@ fn collect_rule_findings(
     config: &JitConfig,
 ) -> Result<Vec<ReportedFinding>> {
     let repo_format = config.content_format();
+    let engine = SchemaEngine::new();
     let mut reported = Vec::new();
     for issue in issues {
-        let evaluation = crate::validation::evaluate_local(issue, rules, repo_format)?;
+        let evaluation = crate::validation::local::evaluate_local_with_engine(
+            issue,
+            rules,
+            repo_format,
+            &engine,
+        )?;
         reported.extend(
             evaluation
                 .findings()
