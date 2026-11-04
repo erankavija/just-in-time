@@ -936,7 +936,8 @@
     "cc4ea8a9": 2,
     "1a4f2ebd": 2,
     "4a01ccba": 1,
-    "10fdad38": 1
+    "10fdad38": 1,
+    "9be5b0de": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1272,10 +1273,11 @@
       "review": "lead R1 PASS; landed f0ed97f2e; worktree-cache-test passed; code-review R1 failed (run efb94dd6): F1 self-test leaks default-root temp dirs. Rework 1 to Claude Haiku. Rework 1 (64a2866c4) passed lead review; re-landing. Re-landed 2283280fa; worktree-cache-test passed; code-review R2 failed (run 19301ebb): new F1, protocol.md:176 hand-maintained config list omits LEAD_WORKTREE_TMP_ROOT (@/inv/single-source-prose); R1 F1 closed. Rework 2 of 2 to Codex gpt-6-astra. Re-landed dbbb1cb8b; code-review R3 passed; closed 35d88652d. Dispatch now makes per-worktree TMPDIRs: this host passes LEAD_WORKTREE_TMP_ROOT=/mnt/nvme/jit/tmp to dispatch and reclaim (steward worker-TMPDIR rule)."
     },
     "9be5b0de": {
-      "status": "dispatched",
+      "status": "rework",
       "vendor": "Codex gpt-6-luna (high)",
       "reason": "mechanical renderer dedup",
-      "note": "resumed after quiet window"
+      "note": "resumed after quiet window",
+      "review": "lead R1 FAIL: -4 vs >=25; dep.rs helper with two bool flags +26; rework to Option<String> heading helper. Rework 1 to Codex luna."
     },
     "f82a2e4a": {
       "status": "done",
