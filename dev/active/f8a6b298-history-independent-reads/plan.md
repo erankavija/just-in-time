@@ -125,9 +125,8 @@ Everything this epic changes on disk is repository format 4. There is one bump a
 | lease-mutation-guard-through-lock | The repository-mutation lease check reads through the held lease lock | task | The repository-mutation lease check reads its targets through one held lease lock. | lease-sequence | REQ-05, REQ-06, DEC-10 | touches 3 | — | lease-ops-through-lock |
 | lease-recover-through-lock | Recovery evicts and reclaims leases through the lease lock | task | Recovery's lease passes run through the held lease lock, with recover classified claims-first. | lease-sequence | REQ-06, DEC-03 | touches 4 | — | lease-ops-through-lock |
 | lease-store-fixtures | CLI tests reach lease storage through one test helper | task | CLI tests reach lease storage only through one test-support module. | — | REQ-05, DEC-09 | creates 1, touches 7 | — | — |
-| lease-per-issue-records | Each lease is one record under the lease lock | task | Leases are per-issue records read and changed only through the lease lock and the lock-free reads. | lease-record-layout, lease-read-api, lease-sequence, lease-store-test-helper, format-4-window | REQ-05, REQ-07, DEC-09, DEC-13 | touches 4 | lease-cutover | lease-recover-through-lock, lease-mutation-guard-through-lock, lease-store-fixtures, gate-latest-run-reads |
-| lease-index-machinery-removal | Claims-index rebuild machinery is gone | task | No index rebuild, verification, validation or recovery step over the claims log remains. | — | REQ-07, REQ-12, DEC-09 | touches 17 | lease-cutover | lease-per-issue-records, validation-skips-event-log |
-| lease-issue-addressed-ops | Renew, heartbeat and force-evict address a lease by issue | task | Renew, heartbeat and force-evict find the lease from the issue id directly, and force-evict reaches a lease on a deleted issue. | lease-sequence, lease-id-scan-bridge | REQ-05, DEC-11, DEC-03 | touches 9 | — | lease-index-machinery-removal |
+| lease-per-issue-records | Each lease is one record under the lease lock | task | Leases are per-issue records read and changed only through the lease lock and the lock-free reads. | lease-record-layout, lease-read-api, lease-sequence, lease-store-test-helper, format-4-window | REQ-05, REQ-07, DEC-09, DEC-13, REQ-12 | touches 4 | lease-cutover | lease-recover-through-lock, lease-mutation-guard-through-lock, lease-store-fixtures, gate-latest-run-reads |
+| lease-issue-addressed-ops | Renew, heartbeat and force-evict address a lease by issue | task | Renew, heartbeat and force-evict find the lease from the issue id directly, and force-evict reaches a lease on a deleted issue. | lease-sequence, lease-id-scan-bridge | REQ-05, DEC-11, DEC-03 | touches 9 | — | lease-per-issue-records |
 | lease-interruption-matrix | An interrupted lease operation leaves the prior or the next lease | task | One matrix test proves an interrupted lease operation leaves the prior or the next lease, and recover clears its residue. | lease-sequence, lease-record-layout | REQ-07, DEC-09 | touches 4 | — | lease-issue-addressed-ops |
 | claim-acquire-event-from-assignee | Claim acquire emits its event exactly when the assignee changes | task | Claim acquire and issue claim append their claim event exactly when the assignee changes. | event-append-probe | REQ-08, DEC-04, DEC-12, DEC-16, DEC-01 | touches 4 | — | — |
 | event-log-read-rule | Event-log readers ignore an unterminated final line that the next append overwrites | task | Appends land at the log's committed length, and the parser ignores only an unterminated final line. | — | REQ-10, DEC-15, DEC-21, REQ-12, DEC-01 | touches 5 | — | — |
@@ -146,7 +145,7 @@ Everything this epic changes on disk is repository format 4. There is one bump a
 | storage-format-history-docs | The storage-format reference describes per-key records and history files | task | The storage-format and concepts pages describe per-key records and name history files and their readers. | gate-run-record-layout, gate-verdict-record, lease-record-layout, archive-evidence-record, history-paths, history-log-read | REQ-12, REQ-13, REQ-15, DEC-19 | touches 4 | — | lease-issue-addressed-ops, capture-refuses-whole-event-log, gate-run-per-issue-layout, search-excludes-history, storage-records-per-key-reference |
 | lease-operator-docs | Lease command and recovery docs match per-issue lease records | task | Lease command, recovery and testing pages match issue-addressed lease commands and lease records. | lease-record-layout | REQ-12, REQ-15, DEC-11 | touches 11 | — | lease-interruption-matrix |
 | gate-and-search-command-docs | Gate provenance, gate-run lookup and search docs match per-key reads | task | Command docs show reused-verdict provenance with its source issue and the default history exclusion of search. | reused-verdict-provenance, history-paths | REQ-11, DEC-07, DEC-18 | touches 4 | gate-run-cutover | gate-run-per-issue-layout, search-excludes-history |
-| format-rewrite-tooling | A rewrite script and window driver move a repository to format 4 | task | An idempotent format 4 rewrite script and a window driver pass on copies of the five repositories. | format-4-window, gate-run-record-layout, gate-verdict-record, gate-state-run-id, reused-verdict-provenance, lease-record-layout, archive-evidence-record, event-log-rule | REQ-01, REQ-05, REQ-09, REQ-10, DEC-08, DEC-14, DEC-17, DEC-22 | creates 2 | — | gate-run-per-issue-layout, lease-index-machinery-removal, archive-preview-reads-evidence, torn-tail-marker-removal |
+| format-rewrite-tooling | A rewrite script and window driver move a repository to format 4 | task | An idempotent format 4 rewrite script and a window driver pass on copies of the five repositories. | format-4-window, gate-run-record-layout, gate-verdict-record, gate-state-run-id, reused-verdict-provenance, lease-record-layout, archive-evidence-record, event-log-rule | REQ-01, REQ-05, REQ-09, REQ-10, DEC-08, DEC-14, DEC-17, DEC-22 | creates 2 | — | gate-run-per-issue-layout, lease-per-issue-records, archive-preview-reads-evidence, torn-tail-marker-removal |
 | format-cutover | Five repositories move to repository format 4 in one window | task | This repository, gf2, mealie-fi, inflected-messages and research hold format 4 data, and the installed binary reads it. | format-4-window, gate-run-record-layout | REQ-01, REQ-05, REQ-09, REQ-10, DEC-08, DEC-14, DEC-17, DEC-22 | creates 3, touches 5 | — | format-rewrite-tooling |
 | per-key-gate-runs | Gate runs are addressed per issue, per gate and per inputs digest | story | Gate-run records are stored and read per issue, per gate and per inputs digest. | — | REQ-01, REQ-02, REQ-03, REQ-04 | — | — | gate-state-last-run, format-cutover, gate-and-search-command-docs |
 | per-key-leases | Leases are per-issue records under one lease sequence | story | Leases are per-issue records under one held lease lock, and claims decide their event from the assignee. | — | REQ-05, REQ-06, REQ-07, REQ-08 | — | — | format-cutover, lease-operator-docs, claim-acquire-event-from-assignee |
@@ -170,33 +169,32 @@ flowchart LR
     N13["lease-recover-through-lock: Recovery evicts and reclaims leases through the lease lock"]
     N14["lease-store-fixtures: CLI tests reach lease storage through one test helper"]
     N15["lease-per-issue-records: Each lease is one record under the lease lock"]
-    N16["lease-index-machinery-removal: Claims-index rebuild machinery is gone"]
-    N17["lease-issue-addressed-ops: Renew, heartbeat and force-evict address a lease by issue"]
-    N18["lease-interruption-matrix: An interrupted lease operation leaves the prior or the next lease"]
-    N19["claim-acquire-event-from-assignee: Claim acquire emits its event exactly when the assignee changes"]
-    N20["event-log-read-rule: Event-log readers ignore an unterminated final line that the next append overwrites"]
-    N21["torn-tail-marker-removal: The profile torn-tail marker is gone"]
-    N22["validation-skips-event-log: Validation captures read only the event log's end"]
-    N23["mutation-event-tail-captures: Mutations capture the event log's end, not the whole log"]
-    N24["archive-execution-record-type: Archive executions are one domain record type"]
-    N25["archive-evidence-writes: Archive executions write a per-target evidence record"]
-    N26["archive-execute-reads-evidence: Archive execute reads the per-target evidence record"]
-    N27["archive-preview-reads-evidence: Archive preview reads the per-target evidence record"]
-    N28["capture-refuses-whole-event-log: Captures refuse a whole read of the event log"]
-    N29["redo-record-refuses-log-rewrite: Redo records refuse a rewrite of the event log"]
-    N30["search-excludes-history: Default search reads no history file"]
-    N31["storage-records-per-key-reference: The storage-record reference describes verdict and archive-evidence records"]
-    N32["history-isolation-test: Ordinary commands succeed over unparseable history"]
-    N33["storage-format-history-docs: The storage-format reference describes per-key records and history files"]
-    N34["lease-operator-docs: Lease command and recovery docs match per-issue lease records"]
-    N35["gate-and-search-command-docs: Gate provenance, gate-run lookup and search docs match per-key reads"]
-    N36["format-rewrite-tooling: A rewrite script and window driver move a repository to format 4"]
-    N37["format-cutover: Five repositories move to repository format 4 in one window"]
-    N38["per-key-gate-runs: Gate runs are addressed per issue, per gate and per inputs digest"]
-    N39["per-key-leases: Leases are per-issue records under one lease sequence"]
-    N40["history-boundary: Only history-reporting commands read history files"]
+    N16["lease-issue-addressed-ops: Renew, heartbeat and force-evict address a lease by issue"]
+    N17["lease-interruption-matrix: An interrupted lease operation leaves the prior or the next lease"]
+    N18["claim-acquire-event-from-assignee: Claim acquire emits its event exactly when the assignee changes"]
+    N19["event-log-read-rule: Event-log readers ignore an unterminated final line that the next append overwrites"]
+    N20["torn-tail-marker-removal: The profile torn-tail marker is gone"]
+    N21["validation-skips-event-log: Validation captures read only the event log's end"]
+    N22["mutation-event-tail-captures: Mutations capture the event log's end, not the whole log"]
+    N23["archive-execution-record-type: Archive executions are one domain record type"]
+    N24["archive-evidence-writes: Archive executions write a per-target evidence record"]
+    N25["archive-execute-reads-evidence: Archive execute reads the per-target evidence record"]
+    N26["archive-preview-reads-evidence: Archive preview reads the per-target evidence record"]
+    N27["capture-refuses-whole-event-log: Captures refuse a whole read of the event log"]
+    N28["redo-record-refuses-log-rewrite: Redo records refuse a rewrite of the event log"]
+    N29["search-excludes-history: Default search reads no history file"]
+    N30["storage-records-per-key-reference: The storage-record reference describes verdict and archive-evidence records"]
+    N31["history-isolation-test: Ordinary commands succeed over unparseable history"]
+    N32["storage-format-history-docs: The storage-format reference describes per-key records and history files"]
+    N33["lease-operator-docs: Lease command and recovery docs match per-issue lease records"]
+    N34["gate-and-search-command-docs: Gate provenance, gate-run lookup and search docs match per-key reads"]
+    N35["format-rewrite-tooling: A rewrite script and window driver move a repository to format 4"]
+    N36["format-cutover: Five repositories move to repository format 4 in one window"]
+    N37["per-key-gate-runs: Gate runs are addressed per issue, per gate and per inputs digest"]
+    N38["per-key-leases: Leases are per-issue records under one lease sequence"]
+    N39["history-boundary: Only history-reporting commands read history files"]
     N3 --> N1
-    N23 --> N1
+    N22 --> N1
     N2 --> N3
     N3 --> N4
     N4 --> N5
@@ -213,49 +211,47 @@ flowchart LR
     N14 --> N15
     N3 --> N15
     N15 --> N16
-    N22 --> N16
     N16 --> N17
-    N17 --> N18
-    N20 --> N21
-    N3 --> N21
-    N20 --> N22
-    N22 --> N23
+    N19 --> N20
+    N3 --> N20
+    N19 --> N21
+    N21 --> N22
+    N23 --> N24
+    N3 --> N24
     N24 --> N25
-    N3 --> N25
     N25 --> N26
     N26 --> N27
-    N27 --> N28
+    N18 --> N27
+    N22 --> N27
     N19 --> N28
-    N23 --> N28
-    N20 --> N29
-    N25 --> N31
-    N5 --> N31
-    N17 --> N32
-    N28 --> N32
+    N24 --> N30
+    N5 --> N30
+    N16 --> N31
+    N27 --> N31
+    N8 --> N31
+    N16 --> N32
+    N27 --> N32
     N8 --> N32
+    N29 --> N32
+    N30 --> N32
     N17 --> N33
-    N28 --> N33
-    N8 --> N33
-    N30 --> N33
-    N31 --> N33
-    N18 --> N34
+    N8 --> N34
+    N29 --> N34
     N8 --> N35
-    N30 --> N35
-    N8 --> N36
-    N16 --> N36
-    N27 --> N36
-    N21 --> N36
+    N15 --> N35
+    N26 --> N35
+    N20 --> N35
+    N35 --> N36
+    N0 --> N37
     N36 --> N37
-    N0 --> N38
-    N37 --> N38
-    N35 --> N38
-    N37 --> N39
-    N34 --> N39
-    N19 --> N39
-    N32 --> N40
-    N33 --> N40
-    N37 --> N40
-    N29 --> N40
+    N34 --> N37
+    N36 --> N38
+    N33 --> N38
+    N18 --> N38
+    N31 --> N39
+    N32 --> N39
+    N36 --> N39
+    N28 --> N39
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -265,6 +261,7 @@ flowchart LR
 |---|---|
 | DEC-01 Upstream 2195c98f | Chosen: each root depends on the specific 2195c98f task it consumes. Those tasks are done (79aa3aa7, 417be079, 98404e0c, 855d027d, e98ae5a4, 3ee3a4d1, 945f65f3, 18dc6e3e, 8673dc5e, 72d89161). Edges from absorbed issues to them are not carried. |
 | DEC-02 Eviction and listings | Chosen (owner): `claim list` and `claim status` read per-file leases without the lock, keep every unexpired lease and mark a stale one `stale`; writers and `recover` do the evicting, and every eviction `lease-sequence` makes is persisted. d7d0d0db's persist-on-read is retired, which satisfies `@/charter/D-22` and closes the `renew_lease` leak. A stale lease is inactive, so it blocks nobody, but listings show it marked `stale` (owner ruling, replacing an `is_active` filter); heartbeat refreshes it and recover reclaims it. |
+| DEC-24 Index removal absorbed | Steward ruling (2026-11-04, for the user): `lease-index-machinery-removal` (53d19851) is absorbed into `lease-per-issue-records` (2f563673) after code-review found the claims-index replay still live through recovery and validation once leases became per-issue records. Its criteria are 2f563673 REQ-05 to REQ-09, and 53d19851 is rejected as merged-into-2f563673. |
 | DEC-03 Cross-epic seams | Chosen: external dependency 5b37a806 → `lease-recover-through-lock`; the reclaim pass lands first and appends to the claims log (5b37a806 REQ-04), and then moves onto the lease lock. External dependency 083c9a91 → `lease-issue-addressed-ops`: the claims facade lands first, and issue addressing changes the facade's methods. Rejected: the reverse order, which makes the facade wait on the end of the lease chain. b697a3f7 REQ-06 depends on `archive-preview-reads-evidence`. External dependency cf49da17 (9876a23a) → `capture-refuses-whole-event-log` (owner ruling): the shared test image builder lands first, so the tail change edits one builder instead of the private helpers it replaces. `recover` becomes claims-first in `lease-recover-through-lock`, which is what makes 083c9a91's "claim coordination before the operation session" true of it. Rejected: folding 5b37a806 in. |
 | DEC-04 19e7298a REQ-02 | Chosen: reverse it. A claim no longer repairs a missing claim event (steward-approved). Reachable states are in the drift audit, REQ-08. |
 | DEC-05 Latest run | Chosen: `gate-state-run-id` plus `gate-runs/<issue>/<run>.json`. Rejected: time-ordered run filenames, which read other runs' names, and a `latest.json` pointer, an extra file. Rejected: renaming the landed `run_id` to `last_run`, which rewrites stored states for no behaviour. |
