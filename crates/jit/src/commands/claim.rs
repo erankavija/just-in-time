@@ -671,9 +671,7 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
     }
 
     // 3. Evict expired leases and reclaim stale indefinite ones.
-    let mut index = coordinator.load_claims_index()?;
-    let lapsed = coordinator.evict_lapsed(&mut index)?;
-    coordinator.write_index_atomic(&index)?;
+    let lapsed = coordinator.evict_lapsed()?;
     report.expired_leases_evicted = lapsed.expired;
     report.stale_leases_reclaimed = lapsed.reclaimed;
 

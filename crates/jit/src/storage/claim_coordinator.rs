@@ -304,6 +304,9 @@ pub enum LeaseChange {
     Put(Lease),
     /// Remove the current lease, recording the reason in the claims log.
     Remove(String),
+    /// Remove the current lease as reclaimed for a stale heartbeat, recording
+    /// the reason in the claims log.
+    Reclaim(String),
 }
 
 /// The held claims lock: the one sequence through which every lease changes.
@@ -436,6 +439,14 @@ fn resolve_change(
             current.map(|lease| ClaimOp::ForceEvict {
                 lease_id: lease.lease_id.clone(),
                 evicted_at: now,
+                reason,
+            }),
+            None,
+        )),
+        LeaseChange::Reclaim(reason) => Ok((
+            current.map(|lease| ClaimOp::Reclaim {
+                lease_id: lease.lease_id.clone(),
+                reclaimed_at: now,
                 reason,
             }),
             None,
@@ -777,71 +788,30 @@ impl ClaimCoordinator {
         Ok(())
     }
 
-    /// Remove lapsed leases from `index`: evict expired leases and reclaim
-    /// stale indefinite ones ([`Lease::is_stale`], the rule lease listings
-    /// report), appending one claims-log record per lease.
-    pub fn evict_lapsed(&self, index: &mut ClaimsIndex) -> Result<LapsedLeases> {
-        let now = self.clock.now();
-        let lapsed: Vec<(LeaseId, ClaimOp)> = index
-            .leases
-            .iter()
-            .filter_map(|lease| {
-                let lease_id = lease.lease_id.clone();
-                if lease.is_expired(now) {
-                    Some(ClaimOp::AutoEvict {
-                        lease_id: lease_id.clone(),
-                        evicted_at: now,
-                        reason: format!(
-                            "Lease expired at {}",
-                            lease
-                                .expires_at
-                                .map_or_else(String::new, |at| at.to_string())
-                        ),
+    /// Under one [`LeaseLock`], evict expired leases and reclaim stale
+    /// indefinite ones ([`Lease::is_stale`], the rule lease listings report),
+    /// each through [`LeaseLock::apply`], which logs one record per lease.
+    pub fn evict_lapsed(&self) -> Result<LapsedLeases> {
+        let mut lock = self.lock()?;
+        lock.list()?
+            .into_iter()
+            .try_fold(LapsedLeases::default(), |mut lapsed, listed| {
+                lock.apply(&listed.issue_id, |current, now| {
+                    Ok(match current {
+                        // `apply` evicted the listed lease as expired.
+                        None => {
+                            lapsed.expired += 1;
+                            LeaseChange::Keep
+                        }
+                        Some(lease) if lease.is_stale(now) => {
+                            lapsed.reclaimed += 1;
+                            LeaseChange::Reclaim(format!("No heartbeat since {}", lease.last_beat))
+                        }
+                        Some(_) => LeaseChange::Keep,
                     })
-                } else if lease.is_stale(now) {
-                    Some(ClaimOp::Reclaim {
-                        lease_id: lease_id.clone(),
-                        reclaimed_at: now,
-                        reason: format!("No heartbeat since {}", lease.last_beat),
-                    })
-                } else {
-                    None
-                }
-                .map(|op| (lease_id, op))
+                })?;
+                Ok(lapsed)
             })
-            .collect();
-
-        lapsed.iter().try_fold(
-            LapsedLeases::default(),
-            |counts, (lease_id, op)| -> Result<LapsedLeases> {
-                self.append_claim_op(op)?;
-                index.remove_lease(lease_id);
-                Ok(match op {
-                    ClaimOp::Reclaim { .. } => LapsedLeases {
-                        reclaimed: counts.reclaimed + 1,
-                        ..counts
-                    },
-                    _ => LapsedLeases {
-                        expired: counts.expired + 1,
-                        ..counts
-                    },
-                })
-            },
-        )
-    }
-
-    /// Append a claim operation to the audit log
-    fn append_claim_op(&self, op: &ClaimOp) -> Result<()> {
-        let seq = self.next_claim_seq()?;
-
-        let entry = ClaimLogEntry {
-            schema_version: 1,
-            seq,
-            timestamp: self.clock.now(),
-            operation: op.clone(),
-        };
-
-        self.append_claim_log(format!("{}\n", serde_json::to_string(&entry)?).as_bytes())
     }
 
     /// The sequence number after the claims log's highest; unparseable lines
@@ -2059,9 +2029,8 @@ mod tests {
         clock.set(base + Duration::seconds(threshold + 1));
         let (current, ()) = acquire(&coordinator, &crate::test_utils::issue_id(43), 0, limits);
         let logged_before = logged_operations(&temp_dir).len();
-        let mut index = coordinator.load_claims_index().unwrap();
 
-        let lapsed = coordinator.evict_lapsed(&mut index).unwrap();
+        let lapsed = coordinator.evict_lapsed().unwrap();
 
         assert_eq!(
             lapsed,
@@ -2070,7 +2039,7 @@ mod tests {
                 reclaimed: 1
             }
         );
-        assert_eq!(index.leases, vec![current]);
+        assert_eq!(read_leases(&coordinator.paths).unwrap(), vec![current]);
         let appended = logged_operations(&temp_dir).split_off(logged_before);
         assert_eq!(appended.len(), 2, "one record per lapsed lease");
         assert!(appended.iter().any(
@@ -2097,8 +2066,7 @@ mod tests {
             ClaimAcquireLimits::new(10, 10),
         );
         clock.set(base + Duration::seconds(threshold + 1));
-        let mut index = coordinator.load_claims_index().unwrap();
-        coordinator.evict_lapsed(&mut index).unwrap();
+        coordinator.evict_lapsed().unwrap();
         clock.set(base);
 
         let rebuilt = coordinator.rebuild_index_from_log().unwrap();
