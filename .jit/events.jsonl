@@ -24251,3 +24251,4 @@
 {"from":"ready","id":"a966212c-b797-4df3-878f-8179db905d79","issue_id":"91edfa5c-2663-4fcb-a9d0-2817bc60664b","timestamp":"2026-11-04T13:06:33.232449557Z","to":"done","type":"issue_state_changed"}
 {"id":"7ec913bd-a9e2-42f6-bb1c-c906f527025e","issue_id":"91edfa5c-2663-4fcb-a9d0-2817bc60664b","timestamp":"2026-11-04T13:06:33.232449557Z","type":"issue_completed"}
 {"from":"backlog","id":"a1bfb7d2-667b-4f19-bada-0107e4176ab3","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-04T13:06:33.357047301Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"repo-validate","id":"e8c2315f-875c-4f93-ab54-388a58ab683d","issue_id":"9876a23a-8535-45ad-83f8-ca237f017e70","timestamp":"2026-11-04T13:06:45.216894105Z","type":"gate_passed","updated_by":"auto:executor"}

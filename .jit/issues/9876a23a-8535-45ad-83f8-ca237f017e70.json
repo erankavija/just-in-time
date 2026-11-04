@@ -85,7 +85,14 @@
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "run_id": "cb95f1a8-9510-4092-a96c-75c8b0c88664",
+      "status": "passed",
+      "updated_at": "2026-11-04T13:06:45.216894105Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9876a23a-8535-45ad-83f8-ca237f017e70",
   "labels": [
     "epic:one-validation-report",
@@ -100,5 +107,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Compute one validation report and derive every validation view from it",
-  "updated_at": "2026-11-04T13:06:33.357047301Z"
+  "updated_at": "2026-11-04T13:06:45.216894105Z"
 }
