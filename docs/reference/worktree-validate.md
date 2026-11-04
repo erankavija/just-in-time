@@ -401,7 +401,7 @@ for expiry and references to missing worktrees or issues.
 
 | Option | Description |
 |--------|-------------|
-| `[ID]` | Positional. Validate this one issue's rules; omit to validate the whole repository |
+| `[ID]` | Positional. Report this issue's [view](#views) of the whole-repository report; omit to validate the whole repository |
 | `--explain` | Report which rules matched the issue and whether each passed (requires an `[ID]`) |
 | `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`, and a rule or selection failure exits `1`. Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
 | `--scope <ID>` | Report the findings of a container's bracket scope as a deterministic gate checker. Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, `--explain`, and `--rule` |
@@ -420,7 +420,7 @@ with a positional `[ID]`.
 # Whole-repository validation
 jit validate
 
-# Validate a single issue's rules
+# The findings concerning one issue (its view of the whole-repository report)
 jit validate a1b2c3d4
 
 # Explain which rules apply to an issue
