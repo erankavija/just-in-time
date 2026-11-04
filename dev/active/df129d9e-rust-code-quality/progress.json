@@ -822,6 +822,10 @@
     {
       "id": "6acd7a05",
       "why": "steward ruling: validate success response declares no payload warnings; schema test covers enums; waits on 2c8c13b2, 1f24e3e9 (9876a23a) and 06ee9b67"
+    },
+    {
+      "id": "fb38bf1f",
+      "why": "steward ruling: every registered success response is output-owned; depends on all open handler issues"
     }
   ],
   "escalations": [
@@ -873,6 +877,20 @@
       "issue": "d952d057",
       "summary": "code-review F1 after 2 reworks; proposed one more rework moving the run dir before the probe and --cargo",
       "status": "ruled (a): one extra rework, no further allowance; d952d057 D-01; resolved: done"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "review-finding-attribution",
+      "issue": "06ee9b67",
+      "summary": "F1/F2 trace to 9876a23a wave 8 on main; F3 is the uniform findings-stderr rule",
+      "status": "ruled: D-01, D-02; rerun done"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "review-convention",
+      "issue": "1a4f2ebd,8e91126b,66790c84",
+      "summary": "output-owned response convention; conflicting verdicts on 8e91126b; 66790c84 F1 traces to 614a6f97",
+      "status": "ruled: fb38bf1f + D-01s; double runs were lead tooling (first runner did not stop)"
     }
   ],
   "rework_counts": {
@@ -891,14 +909,18 @@
     "153c9851": 1,
     "98cc2097": 2,
     "20fc3b92": 2,
-    "10751360": 1,
+    "10751360": 2,
     "8a14e8e9": 2,
     "9529b9ac": 1,
-    "06ee9b67": 1,
+    "06ee9b67": 2,
     "71f5296c": 1,
-    "66790c84": 1,
+    "66790c84": 2,
     "d952d057": 3,
-    "b51291e4": 2
+    "b51291e4": 2,
+    "1ac651c7": 1,
+    "cd8e04cc": 1,
+    "cc4ea8a9": 1,
+    "1a4f2ebd": 1
   },
   "surfaced_pitfalls": [
     {
@@ -935,7 +957,12 @@
       "id": "pool-runner-timeouts",
       "summary": "cargo-pool-run waits for a jobserver token inside nextest's per-test timer, so millisecond tests TIMEOUT at 20 s under parallel load. Not content failures; land-one retries TIMEOUT-only failures. f487aeef must not tighten limits until settled (D-43).",
       "status": "with the user via steward"
-    }
+    },
+    "Advisory whole-suite runs under the shared host lock starve behind a long chain of the lead's exclusive gate runs (cd8e04cc waited >1 h). Space gate chains or accept branch CI as the whole-tree evidence.",
+    "close-issue.sh globbed format-3 gate-run paths; fixed to .jit/gate-runs/<id>-*/ for format 4.",
+    "Some code-review evaluations recorded two runs a minute apart with different verdicts (8e91126b, 1a4f2ebd); cause unknown.",
+    "A for-loop over gate-one.sh continues past a failing issue; the lead assumed it stopped and started a second runner, doubling code-review runs. Break on failure or check ps before starting another runner.",
+    "Codex brief TMPDIR=$PWD/target/tmp puts temp dirs inside the git tree; claim/archive tests that need a non-git directory then fail (handoff-11 trap). Use /mnt/nvme/jit/tmp/df129d9e-workers."
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
@@ -971,7 +998,8 @@
       "d05b5639": -1,
       "abe555e9": 114,
       "2e0f276b": 1,
-      "22189592": 3
+      "22189592": 3,
+      "w7batch": 255
     },
     "epic_total": -239,
     "head_lines": 9111,
@@ -980,7 +1008,7 @@
     "note": "12c0f3fb added +233 (forms); handler moves must pay back"
   },
   "wave_notes": {
-    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line). Session 12 (lead 7c): one Claude Opus integrator on w7batch fixes the three cli_issue failures as per-issue fix commits (06ee9b67, 71f5296c, 20fc3b92) and merges main with the 614a6f97 claim port (66790c84); per-branch main merges conflict on registration lines, so fixes go on the batch. Each counts as one rework. Integrator (Opus) finished at 4ad4175c1: fix commits e21e28fe8 (06ee9b67), 287c3bbd9 (71f5296c, interim INVALID_ARGUMENT per steward; 487f45a9 ends it), 9160ec574 (20fc3b92), merge 1f50f71c5 (66790c84 claim port), dccad565d (06ee9b67), 4ad4175c1 (66790c84). Lead review PASS; batch merges cleanly with main. REQ-10: batch takes main+dispatch+output from 9248 to 9503 (+255)."
+    "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line). Session 12 (lead 7c): one Claude Opus integrator on w7batch fixes the three cli_issue failures as per-issue fix commits (06ee9b67, 71f5296c, 20fc3b92) and merges main with the 614a6f97 claim port (66790c84); per-branch main merges conflict on registration lines, so fixes go on the batch. Each counts as one rework. Integrator (Opus) finished at 4ad4175c1: fix commits e21e28fe8 (06ee9b67), 287c3bbd9 (71f5296c, interim INVALID_ARGUMENT per steward; 487f45a9 ends it), 9160ec574 (20fc3b92), merge 1f50f71c5 (66790c84 claim port), dccad565d (06ee9b67), 4ad4175c1 (66790c84). Lead review PASS; batch merges cleanly with main. REQ-10: batch takes main+dispatch+output from 9248 to 9503 (+255). Landing queue after batch gating: 182f4c03, 10751360, cd8e04cc, 1ac651c7, cc4ea8a9 (all lead-reviewed; Claude workers could not run whole-tree suites under the shared lock, branch CI is the evidence)."
   },
   "post_release_followups": [
     "Implement 8c67b21a after wave 7 settles, then delete the private dispatch.sh copy."
@@ -999,10 +1027,11 @@
       "reason": "steward-assigned standalone task; node/process-spawning tests rule out the Codex sandbox"
     },
     "10751360": {
-      "status": "dropped_from_batch",
+      "status": "reviewed",
       "vendor": "Claude Sonnet",
-      "reason": "cross-cutting or socket-bound migration",
-      "note": "E0119 duplicate HumanRender for ItemShowResult with 1a4f2ebd; rework 2 of 2 pending"
+      "reason": "rework 2 of 2: one HumanRender for ItemShowResult; merge main; Claude because every branch conflicts with main and Codex cannot merge",
+      "note": "E0119 duplicate HumanRender for ItemShowResult with 1a4f2ebd; rework 2 of 2 pending",
+      "review": "lead PASS (7c) at c8e1e7ed4; one HumanRender for ItemShowResult (main's); IssueRow duplicate removed; lines +60 vs main"
     },
     "c9103fcf": {
       "status": "landing",
@@ -1011,32 +1040,33 @@
       "note": "resumed: merge main after 9529b9ac"
     },
     "66790c84": {
-      "status": "in_batch",
+      "status": "rework",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "code-review cdebd1af: F1 heartbeat/force-evict issue_id = main 614a6f97 (escalated), F2 restating rustdoc (rework) D-01 (614a6f97). F2 rework to Codex gpt-6-astra. F2 rework at 3919dfb3c, lead PASS."
     },
     "8c46fc85": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "8f297e60": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
       "note": "ran one git checkout in its own worktree to discard its own uncommitted additions; tree clean, nothing committed touched",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "f930acf2": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "e5d618ee": {
       "status": "done",
@@ -1045,11 +1075,11 @@
       "note": "on main (4ec8f06cc, fix d735276b5); code-review F1: GateRunId path extractor rejects before classify (REQ-02); rework 2 of 2"
     },
     "20fc3b92": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "lead review: top-level rdeps left in legacy table (REQ-01/02); batch boundary-edge human text changed (REQ-06); +162 lines",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "153c9851": {
       "status": "done",
@@ -1058,95 +1088,99 @@
       "note": "lead review: non-UTF-8 config path no longer serializes under --json (REQ-06)"
     },
     "b25c2e54": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "reviewed; landing paused until e5d618ee's fix restores main",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "3cf69ecf": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "1a4f2ebd": {
-      "status": "in_batch",
+      "status": "rework",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "worker holding for 12c0f3fb; resume with its landing commit",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "code-review 9dc5bf99: F1 output-owned types (escalated, convention), F2 ITEM_COMMAND_FAILED doc claim stale (1a4f2ebd fixes docs; 0eca332a retires the code) D-01 (fb38bf1f). F2 docs rework to Codex gpt-6-astra; code retirement is 0eca332a. F2 docs rework at defce1739, lead PASS."
     },
     "98cc2097": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Claude Haiku",
       "reason": "small single-group migration",
       "note": "branch CI: two new search exit-code rows (1, 10) lack binding cases; rework 2 of 2",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "0fe46027": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Codex gpt-6.1-sol (high)",
       "reason": "self-contained migration without sockets",
       "note": "Codex resume committed by lead as a proper merge; lines -1",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "1ac651c7": {
-      "status": "codex_done_unreviewed",
-      "vendor": "Codex gpt-6.1-sol (high)",
-      "reason": "self-contained migration without sockets",
+      "status": "reviewed",
+      "vendor": "Claude Sonnet",
+      "reason": "rework 1: stale rustdoc link; merge main; Claude because every branch conflicts with main and Codex cannot merge",
       "note": "lead-preserve ac9220229",
-      "review": "lead R1 FAIL (7c), Tier 2.5 only: main.rs:536 rustdoc links [`resolve_gate_key`], which moved to jit::dispatch. Criteria otherwise met on reading. Rework with the main merge after the batch lands."
+      "review": "lead R1 FAIL (7c), Tier 2.5 only: main.rs:536 rustdoc links [`resolve_gate_key`], which moved to jit::dispatch. Criteria otherwise met on reading. Rework with the main merge after the batch lands. Rework 1 at c269f5554: lead PASS; stale link fixed; PresetsKey converged into collection_keys!; exit-codes.md regenerated by script."
     },
     "06ee9b67": {
-      "status": "in_batch",
+      "status": "rework",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
       "note": "Codex resume committed by lead as a proper merge; lines +20",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "landed c5a125d74; cargo-ci, mcp-ci passed; code-review R1 failed (run 8613707b): F1 --fix contract (9876a23a 1f24e3e9 on main), F2 container-pointer tests deleted by 9876a23a eae1c56a2, F3 uniform findings stderr (c9103fcf/1ac651c7 D-01 rule). Escalated to 6a. D-01/D-02 recorded; code-review R2 (run d4f538b0): R1 findings closed; new F1 cli-commands.md:3276 says --rule failures exit 1 (now 4). Rework 2 of 2 to Codex gpt-6-luna. Docs landing collided with b9's 62f836117 rewrite; Claude Haiku re-applying on merge."
     },
     "71f5296c": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
       "note": "Codex resume committed by lead as a proper merge; lines -2",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "cc4ea8a9": {
-      "status": "codex_partial",
-      "vendor": "Codex gpt-6.1-sol (high)",
-      "reason": "self-contained migration without sockets",
+      "status": "reviewed",
+      "vendor": "Claude Sonnet",
+      "reason": "resume after 8f297e60 on main; merge main; Claude because every branch conflicts with main and Codex cannot merge",
       "review_note": "8f297e60 (2a758ab62) made an unreadable --values-file an InvalidArgumentError: profile apply's plain form now exits 2 (was 3); its --json form still exits 1 via profile_json_error until this issue migrates the arm. On review: both forms should exit 2, with a profile apply row and dual-form binding.",
-      "note": "lead-preserve b7827c17a; waits for 8f297e60 on main"
+      "note": "lead-preserve b7827c17a; waits for 8f297e60 on main",
+      "review": "lead R1 FAIL (7c) at 093bd9e31: ProfileTargetConflicts lost PROFILE_CONFLICT when profile_json_error was deleted (one condition, two codes); classify gains the mapping, test assertion reverts. main.rs -417 lines. Rework 1 at 5a142bef9: lead PASS; classify owns ProfileTargetConflicts -> PROFILE_CONFLICT."
     },
     "52110fb4": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
       "note": "Codex resume committed by lead as a proper merge; lines +54",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "182f4c03": {
-      "status": "codex_partial",
-      "vendor": "Codex gpt-6-luna (xhigh)",
-      "reason": "self-contained migration without sockets",
+      "status": "reviewed",
+      "vendor": "Claude Sonnet",
+      "reason": "completion: snapshot export only; reconcile lines; merge main; Claude because every branch conflicts with main and Codex cannot merge",
       "note": "lead-preserve e1bff4aae; +68 lines to reconcile",
-      "review": "lead (7c): partial; migrate group no longer exists on main (842b0ac6 archived), so scope is snapshot export alone per its Notes. Completion dispatch after the batch lands; reconcile the +68 lines."
+      "review": "lead PASS (7c) at 8449ca2ac; REQ-03 via ListEnvelope; lines +11 vs main Landing branch CI failed on main's own red test (gate-presets.md hand-edited by 62f836117, b9); held."
     },
     "cd8e04cc": {
-      "status": "codex_done_unreviewed",
-      "vendor": "Codex gpt-6-astra (default)",
-      "reason": "self-contained migration without sockets",
+      "status": "reviewed",
+      "vendor": "Claude Sonnet",
+      "reason": "rework 1: exit-code row bindings, split render line; merge main; Claude because every branch conflicts with main and Codex cannot merge",
       "note": "lead-preserve 2cb30f0ac",
-      "review": "lead R1 FAIL (7c): three new worktree exit-code rows (3, 5, 10) have no row_bindings case in command_exit_code_projection_tests.rs, so test_command_exit_codes_every_row_is_verified fails; HumanRender for WorktreeInfo is one ~250-char format! line, split it. Rework after the batch lands (needs a main merge)."
+      "review": "lead R1 FAIL (7c): three new worktree exit-code rows (3, 5, 10) have no row_bindings case in command_exit_code_projection_tests.rs, so test_command_exit_codes_every_row_is_verified fails; HumanRender for WorktreeInfo is one ~250-char format! line, split it. Rework after the batch lands (needs a main merge). Rework 1 at e69f46779: lead PASS; rows narrowed to worktree info/list with one binding each; WorktreesKey moved into collection_keys!. Whole-tree run left to branch CI (worker's locked run starved behind gate runs)."
     },
     "8e91126b": {
-      "status": "in_batch",
+      "status": "done",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
       "note": "Codex resume committed by lead as a proper merge; lines -17",
-      "batch": "worktree-agent-w7batch @ 5376c344f (not landed; see handoff-11)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "two code-review runs: 1f2dbb8f failed (output-owned), 3f255520 passed; close held for steward ruling D-01 (fb38bf1f); closed f1f60977e."
     },
     "12c0f3fb": {
       "status": "done",

@@ -8,13 +8,33 @@
   ],
   "description": "`hooks install` builds its body inline and reports every failure with one fallback code. This moves it to a library handler.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `HooksCommands::Install` builds its success body with `json!` and, under `--json`, reports any failure as `HOOKS_INSTALL_ERROR`, while the human path uses the classifier. The leaf falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `hooks install` to a handler in `crates/jit/src/dispatch/hooks.rs`, and `main.rs` keeps no arm body for it.\n- [hard] REQ-02: The leaf returns its registered output-owned response type, and the schema names that type.\n- [hard] REQ-03: The handler returns failures as errors with no substituted code; a test asserts that an install failure reports the same classified code and exit status on both paths instead of `HOOKS_INSTALL_ERROR`.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: `hooks install` outside a Git repository reports `INVALID_ARGUMENT` (exit 2) as a named interim mapping, because the failure-probe contract rejects an untyped failure. Task 487f45a9 ends it by moving the condition onto one requires-Git error and code shared with claims (steward ruling, 2026-11-04).\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-11-04T09:38:20.903003125Z",
   "first_ready_at": "2026-11-03T23:08:01.673735468Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d4a7108e-158d-40a0-8d38-92727c5a37d4",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:59.342895250Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f05dc6ba-2abc-4d51-a030-097c94bdd64a",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:31:53.588050252Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "aae12fa6-2c49-4271-92fb-10edecdd3226",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:14:59.479089332Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "71f5296c-7de3-498b-b088-75a2f052014c",
   "labels": [
     "type:task",
@@ -30,7 +50,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Hooks command moves to a library handler",
-  "updated_at": "2026-11-04T07:36:39.006290771Z"
+  "updated_at": "2026-11-04T09:38:20.903003125Z"
 }

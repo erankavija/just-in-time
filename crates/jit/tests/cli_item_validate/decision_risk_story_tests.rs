@@ -1,30 +1,7 @@
-//! Acceptance tests for the decision + risk item kinds story (issue `205472c4`).
+//! Acceptance tests for decision and risk item kinds together.
 //!
-//! This is a STORY-LEVEL test file whose distinct contribution is exercising
-//! decision and risk kinds TOGETHER — both present in ONE issue description,
-//! sharing ONE generic code path — in a repo whose `[item_kinds]` table declares
-//! both (the package-supplied shape). The unit-kind files
-//! (`decision_kind_tests.rs`, `risk_kind_tests.rs`) test each kind in isolation;
-//! this file proves they coexist correctly and that the shared projection
-//! mechanism handles them both without interference.
-//!
-//! ## Coverage of the story's `[hard]` success criteria
-//!
-//! All tests run against a repo whose `[item_kinds]` table declares the shipped
-//! decision and risk kinds, derived from the default package.
-//!
-//! - REQ-01: [`test_story_item_list_decision_and_risk_coexist`] — `jit item list
-//!   --kind decision` returns only decisions; `jit item list --kind risk` returns
-//!   only risks, both parsed from the SAME issue carrying BOTH sections.
-//! - REQ-02: same test — `jit item list --kind risk` returns risk items.
-//! - REQ-03: [`test_story_per_label_resolves_decision`] — a `per:<issue>/D-01`
-//!   label resolves to the decision item via the generic `resolve_link_label`.
-//! - REQ-04: [`test_story_mitigates_and_resolves_labels_resolve_risk`] — BOTH a
-//!   `mitigates:<issue>/RISK-01` AND a `resolves:<issue>/RISK-01` label resolve to
-//!   the risk item via the same generic path.
-//! - REQ-05: [`test_story_markdown_sole_source_both_kinds`] — editing the
-//!   description (the only source) changes BOTH indexes, and no top-level `.jit/`
-//!   file duplicates either `D-01` or `RISK-01`.
+//! The suite checks that both kinds coexist in one issue description, stay
+//! independently queryable, and continue to derive from that description.
 use jit::test_cli::JitCli;
 use jit::test_utils::setup_test_repo_with_config;
 
@@ -99,102 +76,6 @@ fn test_story_item_list_decision_and_risk_coexist() {
             .iter()
             .all(|i| i["kind"].as_str().unwrap() == "risk"),
         "risk index must not contain non-risk items"
-    );
-}
-
-#[test]
-fn test_story_per_label_resolves_decision() {
-    // REQ-03: a `per:<issue>/D-01` label resolves to the addressed decision item
-    // through the generic `resolve_link_label`, even when the same issue also carries
-    // a `## Risks` section. The coexistence of both kinds must not disrupt label
-    // resolution for either kind.
-    let (_temp, exec) =
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision", "risk"]))
-            .unwrap();
-    let issue = crate::create_issue(&exec, "Architecture + risks", STORY_BODY);
-    let short = issue.short_id();
-
-    let label = format!("per:{short}/D-01");
-    let resolved = exec
-        .items()
-        .resolve_link_label(&label)
-        .unwrap()
-        .expect("a per:<issue>/D-01 label resolves to the addressed decision");
-    assert_eq!(resolved.item.self_id, "D-01");
-    assert_eq!(resolved.item.kind, "decision");
-    assert_eq!(
-        resolved.item.qualified_id,
-        format!("@/issue/{short}/decision/D-01")
-    );
-    assert!(
-        resolved.item.text.contains("markdown-first"),
-        "resolved decision text must match the authored entry"
-    );
-
-    // A registered `per:` namespace whose qualified id cannot be resolved is an
-    // error, never a silent drop.
-    let bad = format!("per:{short}/D-99");
-    assert!(
-        exec.items().resolve_link_label(&bad).is_err(),
-        "unresolvable per: qualified id must be an error"
-    );
-}
-
-#[test]
-fn test_story_mitigates_and_resolves_labels_resolve_risk() {
-    // REQ-04: BOTH a `mitigates:<issue>/RISK-01` AND a `resolves:<issue>/RISK-01`
-    // label resolve to the addressed risk item through the generic
-    // `resolve_link_label`, even when the same issue also carries a `## Decisions`
-    // section. Both namespaces are recognized because the configured `risk` kind
-    // declares them.
-    let (_temp, exec) =
-        setup_test_repo_with_config(&crate::config_with_shipped_kinds(&["decision", "risk"]))
-            .unwrap();
-    let issue = crate::create_issue(&exec, "Architecture + risks", STORY_BODY);
-    let short = issue.short_id();
-
-    // mitigates: namespace.
-    let mit_label = format!("mitigates:{short}/RISK-01");
-    let mit_resolved = exec
-        .items()
-        .resolve_link_label(&mit_label)
-        .unwrap()
-        .expect("a mitigates:<issue>/RISK-01 label resolves to the addressed risk");
-    assert_eq!(mit_resolved.item.self_id, "RISK-01");
-    assert_eq!(mit_resolved.item.kind, "risk");
-    assert_eq!(
-        mit_resolved.item.qualified_id,
-        format!("@/issue/{short}/risk/RISK-01")
-    );
-    assert!(
-        mit_resolved.item.text.contains("parsing ambiguity"),
-        "resolved risk text must match the authored entry"
-    );
-
-    // resolves: namespace.
-    let res_label = format!("resolves:{short}/RISK-01");
-    let res_resolved = exec
-        .items()
-        .resolve_link_label(&res_label)
-        .unwrap()
-        .expect("a resolves:<issue>/RISK-01 label resolves to the addressed risk");
-    assert_eq!(res_resolved.item.self_id, "RISK-01");
-    assert_eq!(res_resolved.item.kind, "risk");
-    assert_eq!(
-        res_resolved.item.qualified_id,
-        format!("@/issue/{short}/risk/RISK-01")
-    );
-
-    // Both namespaces ALSO return an error when the qualified id is unresolvable.
-    let bad_mit = format!("mitigates:{short}/RISK-99");
-    assert!(
-        exec.items().resolve_link_label(&bad_mit).is_err(),
-        "unresolvable mitigates: qualified id must be an error"
-    );
-    let bad_res = format!("resolves:{short}/RISK-99");
-    assert!(
-        exec.items().resolve_link_label(&bad_res).is_err(),
-        "unresolvable resolves: qualified id must be an error"
     );
 }
 

@@ -3,6 +3,7 @@
 //! Snapshots capture complete issue state with all linked documents and assets at a specific point
 //! in time. They are critical for handoffs, audits, compliance, and reproducibility.
 
+use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::errors::InvalidArgumentError;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -51,21 +52,36 @@ pub struct RepoInfo {
 /// Information about issues in the snapshot
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssuesInfo {
-    /// Total number of issues
-    pub count: usize,
-    /// Count of issues by state (keys are canonical snake_case state names)
-    pub states: std::collections::HashMap<crate::domain::State, usize>,
-    /// List of issue file paths relative to snapshot root
-    pub files: Vec<String>,
+    /// Issue file paths and their state counts.
+    #[serde(flatten)]
+    pub files: ListEnvelope<SnapshotIssueFiles, String, IssueStates>,
 }
 
 /// Information about documents in the snapshot
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentsInfo {
-    /// Total number of documents
-    pub count: usize,
-    /// List of document snapshots
-    pub items: Vec<DocumentSnapshot>,
+    /// Document snapshots, with a count derived from the collection.
+    #[serde(flatten)]
+    pub items: ListEnvelope<SnapshotDocumentItems, DocumentSnapshot>,
+}
+
+pub enum SnapshotIssueFiles {}
+
+impl CollectionKey for SnapshotIssueFiles {
+    const KEY: &'static str = "files";
+}
+
+pub enum SnapshotDocumentItems {}
+
+impl CollectionKey for SnapshotDocumentItems {
+    const KEY: &'static str = "items";
+}
+
+/// Counts of snapshot issues by canonical state name.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueStates {
+    /// Count of issues by state.
+    pub states: std::collections::HashMap<crate::domain::State, usize>,
 }
 
 /// Snapshot of a single document with verification data
@@ -370,9 +386,7 @@ mod tests {
         states.insert(State::InProgress, 2);
         states.insert(State::Done, 1);
         let info = IssuesInfo {
-            count: 3,
-            states,
-            files: vec![],
+            files: ListEnvelope::with_extras(vec![], IssueStates { states }),
         };
 
         let json = serde_json::to_string(&info).expect("IssuesInfo serializes");

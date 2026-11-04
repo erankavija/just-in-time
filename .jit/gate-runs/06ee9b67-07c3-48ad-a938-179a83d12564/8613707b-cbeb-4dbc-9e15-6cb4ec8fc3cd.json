@@ -1,0 +1,59 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "642a1e6b7a96812ee4cae3eb9375a48bcbe0dd5d",
+  "completed_at": "2026-11-04T09:05:55.038047082Z",
+  "duration_ms": 410915,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/validate.rs",
+        "id": "F1",
+        "line": 177,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The --fix response and possible exit status changed from its dedicated successful contract to a repository validation outcome."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs",
+        "id": "F2",
+        "line": 421,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The merge removed CLI tests that prove per-issue and --explain validation surface unresolved container-pointer failures."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/output/emit.rs",
+        "id": "F3",
+        "line": 101,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Human findings now write an additional stderr summary, changing established validate human output."
+      }
+    ],
+    "summary": "Three issue-impact regressions remain: changed --fix contract, removed CLI coverage, and changed human findings streams.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "06ee9b67-07c3-48ad-a938-179a83d12564",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8613707b-cbeb-4dbc-9e15-6cb4ec8fc3cd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T08:59:04.122198899Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 20408 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a5c8-897d-73d3-a09f-cb9939fca0c0\n--------\nuser\n--- 20395 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e5755970, b68e9eab, be080d3d, e21e28fe, dccad565, 30aec056\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 (issue Markdown); @/gate/jit-validate (.jit/gates.toml); @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T08:56:49Z); mcp-ci passed (exit 0, 2026-11-04T08:58:40Z)\nTruncation recovery: narrowed truncated merge output to validate handler/output/test patches; unrelated merge files were outside the validate impact cone\n\n1. **[blocking][issue-impact] `--fix` no longer preserves its success contract.** The pre-merge handler returned the dedicated successful `ValidationFixResponse`; the current handler folds it into a full repository report and can instead return a findings outcome/exit 4 when remaining findings exist. Its JSON `message`, fields, human output, and possible exit status therefore differ, violating REQ-06. [crates/jit/src/dispatch/validate.rs:177](crates/jit/src/dispatch/validate.rs:177)\n\n2. **[blocking][issue-impact] CLI coverage for malformed graph-rule configuration was deleted without a replacement.** The tagged merge removes the per-issue and `--explain` integration tests that ensure an unresolved container pointer is surfaced as a finding rather than silently passing; the current file retains the comment promising that behavior. Lower-level graph tests do not cover these CLI response paths. [crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs:421](crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs:421) (@/invariant/orthogonal-tests)\n\n3. **[blocking][issue-impact] Human-mode findings now add an unprefixed stderr summary.** The migrated validate modes return `Outcome::Findings`, whose shared renderer writes the report to stdout and additionally writes its message to stderr. The prior validate arms printed their human reports and exited without that extra diagnostic, violating REQ-06’s unchanged human-output requirement. [crates/jit/src/output/emit.rs:101](crates/jit/src/output/emit.rs:101)\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three issue-impact regressions remain: changed --fix contract, removed CLI coverage, and changed human findings streams.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The --fix response and possible exit status changed from its dedicated successful contract to a repository validation outcome.\",\"file\":\"crates/jit/src/dispatch/validate.rs\",\"line\":177,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The merge removed CLI tests that prove per-issue and --explain validation surface unresolved container-pointer failures.\",\"file\":\"crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs\",\"line\":421,\"references\":[\"@/invariant/orthogonal-tests\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Human findings now write an additional stderr summary, changing established validate human output.\",\"file\":\"crates/jit/src/output/emit.rs\",\"line\":101,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

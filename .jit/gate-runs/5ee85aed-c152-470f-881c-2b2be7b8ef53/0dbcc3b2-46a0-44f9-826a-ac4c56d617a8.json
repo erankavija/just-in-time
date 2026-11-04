@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3f047ea6b60b9fb05c9c2eeeb63a0421d7483c8",
+  "completed_at": "2026-11-04T09:35:24.487348170Z",
+  "duration_ms": 318643,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f8a6b298-history-independent-reads/progress.json",
+        "id": "F1",
+        "line": 799,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/655273d9/requirement/REQ-01",
+          "@/issue/655273d9/requirement/REQ-02",
+          "@/issue/655273d9/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "The five-repository format-4 cutover is only narratively evidenced for four external repositories."
+      }
+    ],
+    "summary": "The dependency closure contains an externally scoped hard criterion supported only by self-attested narrative.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "5ee85aed-c152-470f-881c-2b2be7b8ef53",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0dbcc3b2-46a0-44f9-826a-ac4c56d617a8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:30:05.843589577Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11515 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a5e4-ed21-7cf3-8116-06c68184e235\n--------\nuser\n--- 11502 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **[high, blocking]** Dependency `655273d9`’s hard cutover criteria are unsubstantiated for gf2, mealie-fi, inflected-messages, and research. The local recorded `repo-validate` run verifies only this repository; `progress.json` merely asserts the other rewrites, validations, lease counts, and server restart without reproducible artifacts or command output.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The dependency closure contains an externally scoped hard criterion supported only by self-attested narrative.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The five-repository format-4 cutover is only narratively evidenced for four external repositories.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/progress.json\",\"line\":799,\"references\":[\"@/issue/655273d9/requirement/REQ-01\",\"@/issue/655273d9/requirement/REQ-02\",\"@/issue/655273d9/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

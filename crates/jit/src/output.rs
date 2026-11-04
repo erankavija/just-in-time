@@ -31,6 +31,7 @@ mod item;
 mod project;
 mod search;
 mod serve;
+pub mod snapshot;
 mod validate;
 mod version;
 

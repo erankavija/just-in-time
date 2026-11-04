@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e3f047ea6b60b9fb05c9c2eeeb63a0421d7483c8",
+  "completed_at": "2026-11-04T09:36:29.979248125Z",
+  "duration_ms": 296904,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/project.rs",
+        "id": "F1",
+        "line": 52,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "ProjectRenderResult and its payload types remain in commands/project.rs, so the migrated handler does not return an output-owned response or output constructor."
+      }
+    ],
+    "summary": "Project render's registered success response remains command-owned instead of output-owned.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8e91126b-c17b-4274-bccb-13385e40c318",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1f2dbb8f-b917-458f-81da-b2ecd71deb3b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:31:33.074309767Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 13023 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a5e6-41e1-7291-8623-0af8bd19464a\n--------\nuser\n--- 13010 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 6e664ea897298cc08da257ac05048955d37f380f, b5fda64b56b63c3196f41770fddf20dac6e3025d, 0102810ac0efdb315afdd8deee23669df26ea476\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e91126b/requirement/REQ-01..REQ-05 and @/issue/df129d9e/requirement/REQ-01..REQ-02,REQ-12..REQ-13,REQ-17..REQ-18 (.jit/issues/*.json descriptions); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-11-04T09:14:59Z); mcp-ci passed (2026-11-04T09:14:59Z); code-review pending\nTruncation recovery: partitioned tagged patches by commit and project-render paths; inspected current handler, response, dispatch, classifier, schema, tests, and generated docs. Remaining b5fda64b merge changes concern the separate forms/server integration and are outside the project-render impact cone.\n\n1. **Blocking — issue-impact.** `ProjectRenderResult`, `ProjectionsKey`, and `ProjectionRenderReport` remain command-layer types in `crates/jit/src/commands/project.rs:24-52`; `output/project.rs` only adds a rendering trait implementation. The new handler therefore returns a command-owned machine response, rather than an output-owned response type or output constructor as required by the registered-handler contract. Move or construct this response in `output/` and have the handler return that output type. References: `@/issue/df129d9e/requirement/REQ-01`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Project render's registered success response remains command-owned instead of output-owned.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"ProjectRenderResult and its payload types remain in commands/project.rs, so the migrated handler does not return an output-owned response or output constructor.\",\"file\":\"crates/jit/src/commands/project.rs\",\"line\":52,\"references\":[\"@/issue/df129d9e/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
