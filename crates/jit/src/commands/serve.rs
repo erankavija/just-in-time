@@ -1498,8 +1498,8 @@ mod tests {
     /// Nothing here can be flipped by load: the child sleeps well past the
     /// bound, so it never serves and never exits, and a slower host delays the
     /// bounded failure instead of changing it. The first observation waits for
-    /// the child's PID announcement, so the bound can be short without racing
-    /// the child's one `echo`.
+    /// the child's PID announcement through a FIFO, so the bound can be short
+    /// without racing the child's one `echo`.
     #[test]
     #[cfg(unix)]
     fn test_start_server_bounds_a_child_that_neither_serves_nor_exits() {
@@ -1507,10 +1507,18 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let data_dir = tmp.path();
         let announced_pid = data_dir.join("child.pid");
+        nix::unistd::mkfifo(&announced_pid, nix::sys::stat::Mode::S_IRWXU).unwrap();
+        // The first observation blocks reading the announcement, so the bound
+        // starts counting down only after the child has named itself.
+        let child_pid = std::cell::OnceCell::<u32>::new();
         let never_serving_once_announced = |port: u16| {
-            while !std::fs::read_to_string(&announced_pid).is_ok_and(|pid| pid.ends_with('\n')) {
-                std::thread::sleep(STARTUP_POLL_INTERVAL);
-            }
+            child_pid.get_or_init(|| {
+                std::fs::read_to_string(&announced_pid)
+                    .expect("the fake server announces its PID before sleeping")
+                    .trim()
+                    .parse()
+                    .expect("the announced PID is a process id")
+            });
             never_serving(port)
         };
 
@@ -1539,11 +1547,7 @@ mod tests {
             !test_pid_path(data_dir).exists(),
             "PID file must not be written for a server that never answered"
         );
-        let child_pid: u32 = std::fs::read_to_string(&announced_pid)
-            .expect("the fake server announces its PID before sleeping")
-            .trim()
-            .parse()
-            .expect("the announced PID is a process id");
+        let child_pid = *child_pid.get().expect("the watch observed the child");
         assert!(
             !is_process_alive(child_pid),
             "a server the start gave up on must not outlive it"
