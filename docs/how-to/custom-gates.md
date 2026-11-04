@@ -1131,7 +1131,7 @@ a problem when that project configures a default or a rule requiring it.
 Warning: Issue is an orphaned task (no epic:* or milestone:* label)
 ```
 
-**Solution:** Add parent label: `jit issue update $ISSUE --label "epic:auth"` or use `--orphan` flag to explicitly allow orphaned issues.
+**Solution:** Add parent label: `jit issue update $ISSUE --label "epic:auth"`.
 
 ### Validation and Recovery
 

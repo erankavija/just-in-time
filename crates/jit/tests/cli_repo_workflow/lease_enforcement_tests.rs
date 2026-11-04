@@ -98,7 +98,7 @@ const NO_RECORD_WRITERS: &[(&str, &str, &str)] = &[
         OTHER,
         "issue batch-create --from-json batch.json",
     ),
-    ("issue create", OTHER, "issue create --title New --orphan"),
+    ("issue create", OTHER, "issue create --title New"),
 ];
 
 /// Leaves the production classifier opens no mutation session for, with arguments
@@ -334,10 +334,7 @@ impl Repo {
     }
 
     fn create(&self, title: &str) -> String {
-        let output = self.run(
-            OWNER,
-            &["issue", "create", "--title", title, "--orphan", "--json"],
-        );
+        let output = self.run(OWNER, &["issue", "create", "--title", title, "--json"]);
         assert!(output.status.success(), "{}", stderr(&output));
         jit::test_cli::created_issue_id(&serde_json::from_slice(&output.stdout).unwrap()).unwrap()
     }

@@ -148,7 +148,7 @@ fn test_issue_create_json_labels_is_array() {
 }
 
 #[test]
-fn test_issue_create_reports_returned_finding_in_json_and_human_output() {
+fn test_issue_create_forced_reports_same_findings_in_json_and_human_output() {
     let jit::test_taxonomy::TaxonomyRepo { temp, taxonomy } =
         jit::test_taxonomy::setup_test_repo_with_taxonomy();
     std::fs::write(
@@ -159,32 +159,30 @@ fn test_issue_create_reports_returned_finding_in_json_and_human_output() {
     .unwrap();
     let repo = JitCli::with_repository(temp);
     let leaf = jit::test_taxonomy::type_label(&taxonomy, 4);
+    let args = ["issue", "create", "-t", "Leaf", "--label", &leaf, "--force"];
 
-    let json = repo
-        .run_json(["issue", "create", "-t", "Leaf", "--label", &leaf])
-        .unwrap();
-    let human = repo
-        .command(["issue", "create", "-t", "Leaf", "--label", &leaf])
-        .output()
-        .unwrap();
+    let json = repo.run_json(args).unwrap();
+    let human = repo.command(args).output().unwrap();
 
-    let finding = json["findings"]
+    let findings = json["findings"]
         .as_array()
-        .and_then(|findings| findings.iter().find(|f| f["rule"] == "orphan-leaf"))
-        .unwrap_or_else(|| panic!("create --json must report orphan-leaf; got: {json}"));
+        .filter(|findings| !findings.is_empty())
+        .unwrap_or_else(|| panic!("create --json must report findings; got: {json}"));
     let human_stdout = String::from_utf8_lossy(&human.stdout);
     let human_id = human_stdout
         .trim()
         .strip_prefix("Created issue: ")
         .unwrap_or_else(|| panic!("human create prints the id; got: {human_stdout}"));
-    let expected = finding["message"]
-        .as_str()
-        .unwrap()
-        .replace(json["id"].as_str().unwrap(), human_id)
-        .replace(json["short_id"].as_str().unwrap(), &human_id[..8]);
-    assert!(
-        String::from_utf8_lossy(&human.stderr).contains(&expected),
-        "human create must print the finding {expected:?}; got: {}",
-        String::from_utf8_lossy(&human.stderr)
-    );
+    let human_stderr = String::from_utf8_lossy(&human.stderr);
+    for finding in findings {
+        let expected = finding["message"]
+            .as_str()
+            .unwrap()
+            .replace(json["id"].as_str().unwrap(), human_id)
+            .replace(json["short_id"].as_str().unwrap(), &human_id[..8]);
+        assert!(
+            human_stderr.contains(&expected),
+            "human create must print the finding {expected:?}; got: {human_stderr}"
+        );
+    }
 }
