@@ -1519,16 +1519,23 @@
       "note": "merged 56626345e; code-review F1 missing ReadSessionOpen race test (REQ-04)"
     },
     "5f12265a": {
-      "status": "in_progress",
+      "status": "done",
       "note": "critical; filed 2026-11-04 by user ruling; first next session",
       "model": "gpt-6.1-sol",
       "review": {
-        "verdict": "FAIL",
-        "gate": "code-review 89856a23",
-        "finding": "F1: hashed .wasm artifacts excluded from pruning; REQ-02 unmet",
-        "prior_findings": "first review, F1 open",
+        "verdict": "PASS",
+        "gates": "worktree-cache-test and code-review passed",
+        "criteria": {
+          "REQ-01": "incremental directories excluded and removed",
+          "REQ-02": "general suffix grouping retains newest coherent generation",
+          "REQ-03": "128 passing cache assertions over rsync/cp paths",
+          "REQ-04": "repeat fixture harvest does not grow pool",
+          "REQ-05": "script header and dispatch protocol updated"
+        },
+        "prior_findings": "R1 F1 closed at reclaim-worker-worktree.sh:72 and test-worktree-cache.sh:199/251",
+        "stale_narrative": "protocol current; obsolete growth claim replaced",
         "deferred_items": "no linked documents",
-        "action": "rework 1 dispatched; other criteria met"
+        "holistic": "retains fallback and artifact companions; zero Rust production delta"
       }
     },
     "f855d631": {
@@ -1813,10 +1820,11 @@
     ],
     "models": {
       "5f12265a": "gpt-6.1-sol high: cache generation selection and shell tests",
-      "f855d631": "gpt-6-luna high: bounded profile policy and documentation"
+      "f855d631": "gpt-6-luna high: bounded profile policy and documentation",
+      "75b46be9": "gpt-6.1-sol high: measured compiler/debug behavior and budget calibration"
     },
     "timing_hold": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
-    "status": "cache rework 1; test profile complete",
+    "status": "first wave complete; split debug information next",
     "measurements": {
       "f855d631": {
         "merge": "437c7ccfd",
@@ -1827,7 +1835,12 @@
       },
       "5f12265a": {
         "branch_commit": "27f5fa4c6",
-        "shell_assertions_passed": 116
+        "shell_assertions_passed": 128,
+        "production_delta": 0,
+        "merges": [
+          "acabe5453",
+          "61cdc4ec4"
+        ]
       }
     },
     "timing_diagnosis": "Private pipe probe reproduced queue wait before test start. Pinned nextest 0.9.133 times wrapper and lacks ready handshake; clean solution requires nextest-side acquisition before attempt clock. User keeps dynamic sharing; no host edits.",
