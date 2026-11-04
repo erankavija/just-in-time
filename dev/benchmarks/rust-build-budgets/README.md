@@ -65,7 +65,7 @@ flock -o /tmp/jit-ci-turnstile.lock flock -o -x /tmp/jit-full-ci.lock ./scripts/
 | unpacked | 14 | 1,177,006,296 |
 
 The reduction is `1 - 1,177,006,296 / 1,716,674,768 = 31.436850%`.
-This does **not** meet the issue's original 40% reduction criterion.
+This meets the user-approved 30% reduction floor (@/issue/75b46be9/decision/D-01).
 Unpacked debug information still leaves line and range tables in each linked
 executable on this compiler. The representative `cli_issue` executable shrank
 from 121,231,336 to 82,249,880 bytes. Section evidence comes from:
