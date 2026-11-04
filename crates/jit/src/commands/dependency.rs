@@ -371,7 +371,8 @@ fn derive_dependency_removal(
         .iter_mut()
         .find(|candidate| candidate.id == source_id)
         .ok_or_else(|| IssueNotFoundError::new(source_id.clone()))? = issue.clone();
-    let readiness = super::derive_readiness_intents(issues, &candidate, graph)?;
+    let readiness =
+        super::derive_readiness_intents(issues, &candidate, graph, ReadinessScope::Affected)?;
     let intents = (!readiness.corrects(&source_id))
         .then(|| MutationIntent::UpdateIssue {
             issue: Box::new(issue),
@@ -564,7 +565,8 @@ fn derive_batch_dependency_add(
                 .unwrap_or_else(|| issue.clone())
         })
         .collect::<Vec<_>>();
-    let readiness = super::derive_readiness_intents(issues, &projected, graph)?;
+    let readiness =
+        super::derive_readiness_intents(issues, &projected, graph, ReadinessScope::Affected)?;
     let mut intents = reduced
         .into_iter()
         .filter(|intent| {
