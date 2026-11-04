@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-8c67b21a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "12ad7f0af0b2f697168fca50027f75bd217cec22",
+  "completed_at": "2026-11-04T23:19:04.134112067Z",
+  "duration_ms": 283990,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied by the attributable current-tree implementation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8c67b21a-3672-46b2-ab71-db1d0a268da8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "60c42cae-b651-4e6b-a914-d1da30ea7a34",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:14:20.143652987Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 325e7a6ca, 5ee697559, acbaca41c, b0ad95a10, a7ebd206e, 12ad7f0af\nPolicy sources: AGENTS.md; .jit/reference/content-standards.md; .jit/config.toml\nResolved items: @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: worktree-cache-test passed (exit 0, 2026-11-04T23:12:21Z); cargo-ci pending (no exit code)\nTruncation recovery: narrowed reads of the changed script, protocol, command/output implementation, tests, repository-layout selection, gate definition, and content standard\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied by the attributable current-tree implementation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -23,6 +23,8 @@ pub struct WorktreeInfo {
     pub branch: String,
     /// Absolute path to worktree root
     pub root_path: String,
+    /// Absolute resolved data root selected for this invocation
+    pub data_root: String,
     /// Whether this is the main worktree
     pub is_main_worktree: bool,
     /// Shared .git directory path
@@ -86,6 +88,12 @@ impl<S: IssueStore> WorktreeOps<'_, S> {
                 worktree_id: identity.worktree_id,
                 branch: identity.branch,
                 root_path: paths.worktree_root.to_string_lossy().to_string(),
+                data_root: self
+                    .exec
+                    .repository_layout()?
+                    .data_root()
+                    .to_string_lossy()
+                    .into_owned(),
                 is_main_worktree: !paths.is_worktree(),
                 common_dir: paths.common_dir.to_string_lossy().to_string(),
             },
@@ -438,6 +446,7 @@ mod tests {
             worktree_id: "wt:12345678".parse().unwrap(),
             branch: "main".to_string(),
             root_path: "/path/to/worktree".to_string(),
+            data_root: "/path/to/worktree/.jit".to_string(),
             is_main_worktree: true,
             common_dir: "/path/to/.git".to_string(),
         };
