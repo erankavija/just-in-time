@@ -13,11 +13,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DISPATCH="$SCRIPT_DIR/dispatch-worker-worktree.sh"
 RECLAIM="$SCRIPT_DIR/reclaim-worker-worktree.sh"
 
-for tool in git rsync stat diff tar; do
+for tool in git jit jq rsync stat diff tar; do
     command -v "$tool" > /dev/null 2>&1 || { echo "ERROR: '$tool' not on PATH"; exit 2; }
 done
 
-unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE JIT_DATA_DIR
 
 FIX="$(mktemp -d)"
 export LEAD_WORKTREE_TMP_ROOT="$FIX/worker-tmp-root"
@@ -41,6 +41,7 @@ has_content() { [[ "$(cat "$1")" == "$2" ]]; }
 
 new_repo() { # dir
     git init -q -b main "$1"
+    (cd "$1" && jit init > /dev/null)
     echo 'target/' > "$1/.gitignore"
     git -C "$1" add .gitignore
     git -C "$1" -c user.email=test@example.com -c user.name=Test \
@@ -80,6 +81,60 @@ new_pool() { # dir
 }
 
 is_mutable_state() { [[ "/$1" == */.* || "/$1" == */build/* || "$1" == *.d ]]; }
+
+# --- Dispatch guard -------------------------------------------------------
+check_dispatch_guard() { # staged/unstaged, selected data root
+    local mode="$1" selection="$2" repo="$FIX/guard-$1-$2" out status
+    local snapshots="$FIX/guard-$1-$2-snapshots"
+    new_repo "$repo"
+    mkdir -p "$snapshots"
+    mv "$repo/.jit" "$repo/tracker space[1]"
+    put "$repo/tracker space[1]/tracked" baseline
+    put "$repo/source file" baseline
+    git -C "$repo" add .
+    git -C "$repo" -c user.email=test@example.com -c user.name=Test \
+        -c commit.gpgsign=false commit -qm baseline
+    put "$repo/tracker space[1]/tracked" changed
+    [[ "$mode" == staged ]] && git -C "$repo" add 'tracker space[1]/tracked'
+    local data_root="$repo/tracker space[1]"
+    [[ "$selection" == relative ]] && data_root='tracker space[1]'
+    out="$(cd "$repo" && JIT_DATA_DIR="$data_root" LEAD_CACHE_POOL="$FIX/absent-pool" \
+        LEAD_SNAPSHOT_DIR="$snapshots" "$DISPATCH" tracker 2>&1)"
+    status=$?
+    assert "$mode/$selection tracker changes dispatch" test "$status" -eq 0
+    assert "$mode/$selection snapshot keeps tracker dirt" \
+        grep -Fq 'tracker space[1]/tracked' "$snapshots/lead-pre-dispatch-latest.txt"
+    assert "$mode/$selection worker inherits committed tracker" \
+        has_content "$repo/.agents/worktrees/agent-tracker/tracker space[1]/tracked" baseline
+    put "$repo/source file" changed
+    [[ "$mode" == staged ]] && git -C "$repo" add 'source file'
+    out="$(cd "$repo" && JIT_DATA_DIR="$data_root" LEAD_CACHE_POOL="$FIX/absent-pool" \
+        LEAD_SNAPSHOT_DIR="$snapshots" "$DISPATCH" source 2>&1)"
+    status=$?
+    assert "$mode/$selection source changes refuse" test "$status" -eq 1
+    assert "$mode/$selection refusal names the source" grep -Fq 'source file' <<<"$out"
+    assert "$mode/$selection refusal creates no worktree" test ! -e "$repo/.agents/worktrees/agent-source"
+}
+check_dispatch_guard staged absolute
+check_dispatch_guard unstaged relative
+
+repo="$FIX/external-store"; new_repo "$repo"
+mv "$repo/.jit" "$FIX/external-data"
+put "$repo/source" baseline
+put "$repo/.jit/ordinary-source" baseline
+git -C "$repo" add .
+git -C "$repo" -c user.email=test@example.com -c user.name=Test \
+    -c commit.gpgsign=false commit -qm baseline
+put "$repo/.jit/ordinary-source" changed
+out="$(cd "$repo" && JIT_DATA_DIR="$FIX/external-data" "$DISPATCH" external 2>&1)"
+assert "external store exempts no checkout path" test "$?" -eq 1
+assert "external store refusal names ordinary .jit source" grep -Fq '.jit/ordinary-source' <<<"$out"
+
+shim="$FIX/broken-jit-bin"; mkdir -p "$shim"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$shim/jit"; chmod +x "$shim/jit"
+out="$(cd "$repo" && PATH="$shim:$PATH" "$DISPATCH" unresolved 2>&1)"
+assert "unresolved data root fails closed" test "$?" -eq 1
+assert "unresolved data root explains refusal" grep -Fq 'cannot resolve the data root' <<<"$out"
 
 # --- Hardlink seed --------------------------------------------------------
 repo="$FIX/seed"; pool="$FIX/seed-pool"; snapshots="$FIX/seed-snapshots"
