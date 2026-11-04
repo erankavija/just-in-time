@@ -1,9 +1,10 @@
 //! Whether stored records decode and reproduce through their writer's serializer.
 //!
 //! A record that decodes but does not reproduce loses data at its next rewrite.
-//! The event log is judged from its whole bytes: an unparseable log is one
-//! finding naming the line, and a parseable one reports each line that does not
-//! reproduce and each event id on more than one line.
+//! The event log is judged from its whole bytes: its parser ignores an
+//! unterminated final line, while each committed line must parse and reproduce.
+//! An unparseable log is one finding naming the line; a parseable one reports
+//! every line that does not reproduce and each event id on more than one line.
 
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::GateRunId;

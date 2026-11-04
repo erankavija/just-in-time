@@ -1403,9 +1403,6 @@ pub enum EventBody {
         operation: ProfileLifecycleOperation,
         /// Per-profile outcomes in stable aggregate order.
         profiles: Vec<ProfileLifecycleProfile>,
-        /// Whether this append isolated a pre-existing non-newline,
-        /// malformed event tail immediately before this record.
-        isolated_torn_tail: bool,
     },
     /// An explicit per-invocation override permitted a state-mutating command
     /// inside a linked non-primary checkout.
@@ -1487,23 +1484,6 @@ impl Event {
 }
 
 impl EventBody {
-    /// Record whether this profile lifecycle marker certifies the torn tail it
-    /// follows; any other body is returned unchanged.
-    pub fn with_isolated_torn_tail(self, torn_tail: bool) -> Self {
-        match self {
-            EventBody::ProfileLifecycle {
-                operation,
-                profiles,
-                ..
-            } => EventBody::ProfileLifecycle {
-                operation,
-                profiles,
-                isolated_torn_tail: torn_tail,
-            },
-            other => other,
-        }
-    }
-
     /// Create an issue created event
     pub fn draft_issue_created(issue: &Issue) -> Self {
         EventBody::IssueCreated {
@@ -1702,7 +1682,6 @@ impl EventBody {
         EventBody::ProfileLifecycle {
             operation,
             profiles,
-            isolated_torn_tail: false,
         }
     }
 

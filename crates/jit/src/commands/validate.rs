@@ -323,7 +323,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// part of it already.
     ///
     /// The round reads the registries, the event log (whole for an archive,
-    /// otherwise as its length and tail; a `mutation` also parses issues
+    /// otherwise its committed length and final-line tail, which determine the
+    /// append offset; a `mutation` also parses issues
     /// strictly) and the caller's paths; then the closure those registries
     /// plan. Validation and mutation passes also read linked plan documents; a
     /// mutation's precheck target adds prompt files and gate-run results.
@@ -374,8 +375,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 .chain(extra_paths.iter().cloned()),
             )?;
             spec.discover_listings([VirtualPath::ISSUES])?;
-            // Archive planning parses the log; every other base reads only its
-            // length and tail, which an append needs.
+            // Archive planning parses the log; every other base reads its
+            // committed length and final-line tail to determine the append offset.
             match purpose {
                 BaseCapturePurpose::Archive => spec.discover_paths([VirtualPath::EVENTS])?,
                 _ => spec.discover_tail(VirtualPath::EVENTS)?,

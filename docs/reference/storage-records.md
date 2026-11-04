@@ -38,7 +38,8 @@ so a short id printed by one command is always long enough to hand back to the n
 
 `.jit/events.jsonl` is the event log, in JSON Lines: one JSON object per line,
 each terminated by a newline. A record is serialized to a single line with its
-object keys sorted, and a mutation appends its lines at the log length it read;
+object keys sorted, and a mutation positions its append at the log's committed
+length, the end of its last newline-terminated line;
 records are never rewritten in place. The publication contract is
 [Publication and Recovery](storage-format.md#publication-and-recovery). Reading
 parses the file line by line, skipping blank lines. Every record carries a

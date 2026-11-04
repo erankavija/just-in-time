@@ -143,9 +143,11 @@ pub const EVENT_LOG_TAIL_WINDOW: u64 = 4096;
 /// A file's exact length with its last `min(length, window)` bytes, reaching
 /// back to the newline before the final line when that line starts earlier.
 ///
-/// The tail is bounded by the final line, never by the file's history: it
-/// holds that line whole, so [`final_line`](Self::final_line) determines the
-/// log's committed length, the end of its last newline-terminated line.
+/// `length` is the file's exact byte count and may include an uncommitted final
+/// line. The tail holds that line whole, so [`final_line`](Self::final_line)
+/// determines the log's committed length: the end of its last
+/// newline-terminated line, where event appends are positioned. The tail is
+/// bounded by the final line, never by the file's history.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct EventLogTail {
     length: u64,
@@ -538,8 +540,9 @@ pub struct CaptureBudget {
 pub enum ReadMode {
     /// Every byte.
     Whole,
-    /// The length and the last [`EVENT_LOG_TAIL_WINDOW`] bytes, reaching back
-    /// to the final line's start, as an [`EventLogTail`].
+    /// The exact length and the last [`EVENT_LOG_TAIL_WINDOW`] bytes, reaching
+    /// back to the final line's start, as an [`EventLogTail`] that determines
+    /// the committed length where an event append is positioned.
     Tail,
     /// The target's kind alone: a working-tree file captures as
     /// [`RepositoryEntry::FileKind`], and pinned file evidence carries no bytes.
