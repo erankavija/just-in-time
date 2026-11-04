@@ -23,9 +23,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "c543e28a-b11f-4a74-baa7-3142b7c9816e",
-      "status": "failed",
-      "updated_at": "2026-11-04T11:08:42.954693995Z",
+      "run_id": "9de97f49-519f-4679-9374-6275484e3e3d",
+      "status": "passed",
+      "updated_at": "2026-11-04T11:59:12.110060990Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -52,5 +52,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate definition and preset commands move to library handlers",
-  "updated_at": "2026-11-04T11:54:44.392826785Z"
+  "updated_at": "2026-11-04T11:59:12.110060990Z"
 }
