@@ -1056,7 +1056,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 .map(|action| action.path().clone())
                 .filter(|path| path != &VirtualPath::EVENTS),
         );
-        let overrides = super::validation_overlay(preview.image(), preview.delta())?;
+        let overrides = crate::repository_state::action_overrides(preview.delta().actions());
         let Some(probe) =
             self.exec
                 .capture_proposed_base(session, &overrides, &extra_paths, Some(base))?
@@ -1114,7 +1114,7 @@ fn final_validation_refusal(plan: &MaterializationPlan) -> Result<Option<Profile
     if plan.delta().actions().is_empty() {
         return Ok(None);
     }
-    let overrides = super::validation_overlay(plan.image(), plan.delta())?;
+    let overrides = crate::repository_state::action_overrides(plan.delta().actions());
     let proposed = apply_overlay(plan.image(), overrides)?;
     let validation = crate::validation::report(
         &crate::validation::CapturedValidation::from_image(&proposed),

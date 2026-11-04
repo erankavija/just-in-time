@@ -2857,8 +2857,9 @@ jit doc check-links [--scope all|issue:<ID>] [--json]
 
 `--scope` defaults to `all`. The exit code carries the verdict per the
 [exit-code reference](exit-codes.md#command-specific-mappings): `0` unless a link is
-broken, which exits `1`; warnings are reported in the output and the JSON
-result but never change the exit status. JSON reports `valid`, `errors`, `warnings`, and a `summary`.
+broken, which exits `4` (`VALIDATION_FAILED`); warnings are reported in the output and the JSON
+result but never change the exit status. JSON reports `valid`, `errors`, `link_warnings`, and a `summary`;
+with a broken link they arrive as the failure envelope's `error.details`.
 
 The documents in scope include each issue's derived documents, which are also
 tracked link targets. Each reference is checked at the version it names, the same version `jit
@@ -3347,9 +3348,10 @@ Like every mutating command, apply a leftover redo record when the session
 opens ([Publication and Recovery](storage-format.md#publication-and-recovery)),
 then run the repair routines in sequence: repair declaration-derived state
 through the `jit validate --fix` path; in a Git repository, clear claim locks
-left by dead processes (checked by PID), evict expired leases, and reclaim indefinite leases whose
-heartbeat is [stale](claim.md#staleness); and remove orphaned `*.tmp` files
-under `.jit/` older than the [cleanup threshold](runtime-defaults.md).
+left by dead processes (checked by PID), evict expired leases, reclaim indefinite leases whose
+heartbeat is [stale](claim.md#staleness), and remove interrupted lease
+operations' stage files; and remove orphaned `*.tmp` files under `.jit/` and
+under `.git/jit/leases/` older than the [cleanup threshold](runtime-defaults.md).
 
 ```bash
 jit recover [--json]
@@ -3533,8 +3535,10 @@ report as `error.details`, including its `count` and `findings` fields.
 
 ### `jit search`
 
-Grep the `.jit/` data directory: the stored issue records, the event log, and the
-other files jit keeps there. Matching is delegated to
+Grep the `.jit/` data directory: the stored issue records and the other files
+jit keeps there. A search without an explicit file selection excludes the history
+files: the event log, the gate-run records, and the record scratch directory. An
+explicit `--glob` can still select them. Matching is delegated to
 [ripgrep](https://github.com/BurntSushi/ripgrep), which must be on `PATH`.
 
 ```bash

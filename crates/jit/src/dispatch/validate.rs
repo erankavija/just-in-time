@@ -92,11 +92,11 @@ fn validate<S: IssueStore + RepositoryStateStore>(
     if let (true, Some(issue_id)) = (explain, id.as_ref()) {
         let response = ctx.executor.validation().explain_rules(issue_id)?;
         let outcome = if response.has_errors() {
-            Outcome::Findings {
-                code: ErrorCode::ValidationFailed,
-                message: "Validation found error-severity rule failures".to_owned(),
-                report: Box::new(response),
-            }
+            Outcome::findings(
+                ErrorCode::ValidationFailed,
+                "Validation found error-severity rule failures".to_owned(),
+                response,
+            )
         } else {
             Outcome::success_with(ValidateResponse::Explanation(response), "Validation passed")
         };
@@ -152,11 +152,11 @@ fn validate<S: IssueStore + RepositoryStateStore>(
         return Ok(if response.valid {
             Outcome::success_with(ValidateResponse::Checks(response), message)
         } else {
-            Outcome::Findings {
-                code: ErrorCode::ValidationFailed,
-                message: response.failure_message(),
-                report: Box::new(response),
-            }
+            Outcome::findings(
+                ErrorCode::ValidationFailed,
+                response.failure_message(),
+                response,
+            )
         });
     }
 
@@ -171,10 +171,8 @@ fn validate<S: IssueStore + RepositoryStateStore>(
         .executor
         .validation()
         .validate_repository_report_with_divergences()?;
-    let integrity_error = validation_report
-        .structural_failure
-        .map(|error| format!("Invalid repository: {error:#}"));
-    let rule_report = validation_report.rule_report;
+    let (structural_failure, rule_report) = validation_report.into_parts();
+    let integrity_error = structural_failure.map(|error| format!("Invalid repository: {error:#}"));
     let rules_failed = rule_report.has_errors();
     let validation_failed = rules_failed || integrity_error.is_some();
     let warning_findings: Vec<_> = rule_report
@@ -221,11 +219,7 @@ fn validate<S: IssueStore + RepositoryStateStore>(
     };
 
     Ok(if validation_failed {
-        Outcome::Findings {
-            code: ErrorCode::ValidationFailed,
-            message,
-            report: Box::new(response),
-        }
+        Outcome::findings(ErrorCode::ValidationFailed, message, response)
     } else {
         let mut warnings = Vec::new();
         if response.warning_count > 0 {
@@ -244,15 +238,15 @@ fn validate<S: IssueStore + RepositoryStateStore>(
 
 fn validation_findings(report: RuleReport, mode: ValidationMode) -> Outcome<ValidateResponse> {
     if report.has_errors() {
-        Outcome::Findings {
-            code: ErrorCode::ValidationFailed,
-            message: format!(
+        Outcome::findings(
+            ErrorCode::ValidationFailed,
+            format!(
                 "{} with {} error(s)",
                 mode.failure_message(),
                 report.error_count()
             ),
-            report: Box::new(report),
-        }
+            report,
+        )
     } else {
         let response = match mode {
             ValidationMode::Scope => ValidateResponse::Scope(report),

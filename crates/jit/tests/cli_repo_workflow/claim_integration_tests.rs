@@ -234,7 +234,7 @@ fn test_claim_renew_permission_denied_is_identical_in_plain_and_json_forms() {
             .unwrap(),
     );
     let agent = "agent:permission-probe";
-    let lease_id = acquire_lease(&cli, &issue_id, agent);
+    acquire_lease(&cli, &issue_id, agent);
     let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
     // Renew reads the lease under the lock from whichever path stores it.
     let stored = [
@@ -251,7 +251,7 @@ fn test_claim_renew_permission_denied_is_identical_in_plain_and_json_forms() {
 
     let invoke = |json: bool| {
         let mut command = cli.command_with_env(
-            ["claim", "renew", &lease_id, "--extension", "300"],
+            ["claim", "renew", issue_id.as_str(), "--extension", "300"],
             [("JIT_AGENT_ID", agent)],
         );
         if json {
@@ -805,12 +805,11 @@ fn test_claim_renew_success() {
         .output()
         .unwrap();
 
-    let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["lease_id"].as_str().unwrap();
+    assert!(acquire_output.status.success());
 
     // Renew claim
     cli.command_with_env(
-        ["claim", "renew", lease_id, "--extension", "300"],
+        ["claim", "renew", &issue_id, "--extension", "300"],
         [("JIT_AGENT_ID", "agent:test-1")],
     )
     .assert()
@@ -847,7 +846,7 @@ fn test_claim_renew_json_output() {
     // Renew with JSON output
     let renew_output = cli
         .command_with_env(
-            ["claim", "renew", lease_id, "--extension", "300", "--json"],
+            ["claim", "renew", &issue_id, "--extension", "300", "--json"],
             [("JIT_AGENT_ID", "agent:test-1")],
         )
         .output()
@@ -863,17 +862,17 @@ fn test_claim_renew_json_output() {
 }
 
 #[test]
-fn test_claim_renew_not_found_error() {
+fn test_claim_renew_of_an_issue_without_a_lease_fails_as_not_found() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap().commit("Initial commit").unwrap();
-    // A held lease brings up the claim control plane the missing lease is looked up in.
-    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Leased"]).unwrap());
-    acquire_lease(&cli, &issue_id, "agent:holder");
-    let missing_lease = "00000000-0000-0000-0000-000000000000";
+    // A held lease on another issue brings up the claim control plane.
+    let leased = parse_issue_id(&cli.create_issue(["--title", "Leased"]).unwrap());
+    acquire_lease(&cli, &leased, "agent:holder");
+    let unleased = cli.create_issue(["--title", "Unleased"]).unwrap();
 
     let invoke = |json: bool| {
         let mut command = cli.command_with_env(
-            ["claim", "renew", missing_lease, "--extension", "300"],
+            ["claim", "renew", &unleased, "--extension", "300"],
             [("JIT_AGENT_ID", "agent:test")],
         );
         if json {
@@ -908,14 +907,19 @@ fn test_claim_force_evict_success() {
         .output()
         .unwrap();
 
-    let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["lease_id"].as_str().unwrap();
+    assert!(acquire_output.status.success());
 
     // Force-evict (admin operation - doesn't need same agent)
-    cli.command(["claim", "force-evict", lease_id, "--reason", "test cleanup"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Force-evicted"));
+    cli.command([
+        "claim",
+        "force-evict",
+        &issue_id,
+        "--reason",
+        "test cleanup",
+    ])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("Force-evicted"));
 
     // Verify lease is gone
     let list_output = cli.command(["claim", "list", "--json"]).output().unwrap();
@@ -923,6 +927,37 @@ fn test_claim_force_evict_success() {
     let list_json: Value = serde_json::from_slice(&list_output.stdout).unwrap();
     let leases = list_json["leases"].as_array().unwrap();
     assert_eq!(leases.len(), 0, "Lease should be evicted");
+}
+
+#[test]
+fn test_claim_force_evict_removes_the_lease_of_a_deleted_issue() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    let issue_id = parse_issue_id(&cli.create_issue(["--title", "Deleted"]).unwrap());
+    let lease_id = acquire_lease(&cli, &issue_id, "agent:holder");
+    cli.command_with_env(
+        ["issue", "delete", issue_id.as_str()],
+        [
+            ("JIT_ALLOW_DELETION", "1"),
+            ("JIT_AGENT_ID", "agent:holder"),
+        ],
+    )
+    .assert()
+    .success();
+
+    let evicted = cli
+        .run_json([
+            "claim",
+            "force-evict",
+            issue_id.short_id(),
+            "--reason",
+            "issue deleted",
+        ])
+        .unwrap();
+
+    assert_eq!(evicted["lease_id"], lease_id.as_str());
+    let paths = WorktreePaths::detect_for_data_root(&cli.root().join(".jit"), cli.root()).unwrap();
+    assert!(!lease_path(&paths.shared_jit, &issue_id).exists());
 }
 
 #[test]
@@ -972,12 +1007,9 @@ fn test_claim_heartbeat_success() {
         String::from_utf8_lossy(&acquire_output.stderr)
     );
 
-    let acquire_json: Value = serde_json::from_slice(&acquire_output.stdout).unwrap();
-    let lease_id = acquire_json["lease_id"].as_str().unwrap();
-
     // Heartbeat to update last_beat
     cli.command_with_env(
-        ["claim", "heartbeat", lease_id],
+        ["claim", "heartbeat", &issue_id],
         [("JIT_AGENT_ID", "agent:test-1")],
     )
     .assert()
@@ -1016,7 +1048,7 @@ fn test_claim_heartbeat_json_output() {
     // Heartbeat with JSON output
     let heartbeat_output = cli
         .command_with_env(
-            ["claim", "heartbeat", lease_id, "--json"],
+            ["claim", "heartbeat", &issue_id, "--json"],
             [("JIT_AGENT_ID", "agent:test-1")],
         )
         .output()
@@ -1028,21 +1060,6 @@ fn test_claim_heartbeat_json_output() {
     // Envelope removed - success field no longer present
     assert_eq!(hb_json["lease_id"], lease_id);
     assert!(hb_json["message"].is_string());
-}
-
-#[test]
-fn test_claim_heartbeat_not_found_error() {
-    let cli = JitCli::initialised().unwrap();
-    cli.init_git().unwrap().commit("Initial commit").unwrap();
-
-    // Try to heartbeat non-existent lease
-    cli.command_with_env(
-        ["claim", "heartbeat", "00000000-0000-4000-8000-000000000001"],
-        [("JIT_AGENT_ID", "agent:test")],
-    )
-    .assert()
-    .failure()
-    .stderr(predicate::str::contains("not found"));
 }
 
 #[test]
@@ -1090,7 +1107,7 @@ fn test_claim_ttl0_workflow_acquire_heartbeat_release() {
 
     // Step 3: Heartbeat
     cli.command_with_env(
-        ["claim", "heartbeat", lease_id],
+        ["claim", "heartbeat", &issue_id],
         [("JIT_AGENT_ID", "agent:workflow-test")],
     )
     .assert()
@@ -1851,7 +1868,7 @@ fn test_claim_list_text_marks_a_stale_unexpired_lease_with_its_heartbeat_remedy(
     cli.command(["claim", "list"]).assert().success().stdout(
         predicate::str::contains("STALE").and(predicate::str::contains(format!(
             "jit claim heartbeat {}",
-            lease.lease_id
+            lease.issue_id.short_id()
         ))),
     );
 }

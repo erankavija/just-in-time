@@ -6,7 +6,7 @@
 //! 3. Validate internal doc links resolve
 //! 4. Detect broken relative vs root-relative links
 //! 5. Scope filtering (all vs issue:ID)
-//! 6. Exit codes (0=valid or warnings only, 1=errors)
+//! 6. Exit codes (0=valid or warnings only, 4=broken links)
 //! 7. JSON output support
 
 use jit::test_cli::JitCli;
@@ -128,6 +128,36 @@ fn test_broken_internal_doc_links_fails() {
 }
 
 #[test]
+fn test_check_links_broken_link_json_is_validation_failed_envelope_exit_4_with_report_details() {
+    let cli = JitCli::uninitialised().unwrap();
+    cli.init_git().unwrap().run(["init"]).unwrap();
+    let issue_id = cli
+        .create_issue(["--title", "Test issue", "--description", "Test description"])
+        .unwrap();
+    let doc_path = "docs/doc-with-broken-link.md";
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(
+        cli.root().join(doc_path),
+        "# Doc\n\nSee [missing doc](nonexistent.md) for details.\n",
+    )
+    .unwrap();
+    cli.run(["doc", "add", &issue_id, doc_path, "--label", "Test"])
+        .unwrap();
+
+    let output = cli
+        .command(["doc", "check-links", "--scope", "all", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["error"]["code"], "VALIDATION_FAILED");
+    let details = &envelope["error"]["details"];
+    assert_eq!(details["valid"], false);
+    assert!(!details["errors"].as_array().unwrap().is_empty());
+}
+
+#[test]
 fn test_risky_relative_links_warns() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap().run(["init"]).unwrap();
@@ -164,7 +194,7 @@ fn test_risky_relative_links_warns() {
     let json = cli
         .run_json(["doc", "check-links", "--scope", "all"])
         .unwrap();
-    assert!(!json["warnings"].as_array().unwrap().is_empty());
+    assert!(!json["link_warnings"].as_array().unwrap().is_empty());
     assert!(json["errors"].as_array().unwrap().is_empty());
 }
 
@@ -246,7 +276,7 @@ fn test_json_output_structure() {
     // success field removed
     assert!(json["valid"].is_boolean());
     assert!(json["errors"].is_array());
-    assert!(json["warnings"].is_array());
+    assert!(json["link_warnings"].is_array());
     assert!(json["summary"].is_object());
     assert!(json["summary"]["total_documents"].is_number());
 }
@@ -401,13 +431,7 @@ fn test_directory_link_target_is_navigation_not_a_missing_asset_or_scan_error() 
     cli.run(["doc", "add", &issue_id, "dev/notes/guide.md"])
         .unwrap();
 
-    let report: serde_json::Value = serde_json::from_slice(
-        &cli.command(["doc", "check-links", "--scope", "all", "--json"])
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap();
+    let report: serde_json::Value = check_links_report(&cli);
     assert!(
         errors_for_document(&report, "dev/notes/guide.md")
             .iter()
@@ -415,7 +439,7 @@ fn test_directory_link_target_is_navigation_not_a_missing_asset_or_scan_error() 
         "an existing directory is navigation, not a missing asset: {report}"
     );
     assert!(
-        report["warnings"]
+        report["link_warnings"]
             .as_array()
             .expect("warnings array")
             .iter()
@@ -479,19 +503,13 @@ fn test_pinned_directory_link_target_is_navigation_at_its_commit() {
     fs::write(cli.root().join("docs/studies"), "now a file\n").unwrap();
     cli.commit("replace navigation directory").unwrap();
 
-    let report: serde_json::Value = serde_json::from_slice(
-        &cli.command(["doc", "check-links", "--scope", "all", "--json"])
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap();
+    let report: serde_json::Value = check_links_report(&cli);
     assert!(
         errors_for_document(&report, "docs/report.md").is_empty(),
         "the pinned directory target must remain navigation: {report}"
     );
     assert!(
-        report["warnings"]
+        report["link_warnings"]
             .as_array()
             .expect("warnings array")
             .iter()
@@ -571,13 +589,7 @@ fn test_pinned_symlink_target_is_unsupported_at_its_commit() {
     .unwrap();
     cli.commit("replace symlink with regular file").unwrap();
 
-    let report: serde_json::Value = serde_json::from_slice(
-        &cli.command(["doc", "check-links", "--scope", "all", "--json"])
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, "docs/report.md");
     assert!(
         errors
@@ -632,6 +644,20 @@ fn test_git_versioned_asset_exists() {
     assert!(stdout.contains("valid"));
 }
 
+/// The link report of `doc check-links --json`: the failure envelope's
+/// `error.details` when a link is broken, the success payload otherwise.
+fn check_links_report(cli: &JitCli) -> serde_json::Value {
+    let output = cli
+        .command(["doc", "check-links", "--scope", "all", "--json"])
+        .output()
+        .unwrap();
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    envelope
+        .pointer("/error/details")
+        .cloned()
+        .unwrap_or(envelope)
+}
+
 /// Every error a report attributes to one document, whatever its type.
 fn errors_for_document<'a>(
     report: &'a serde_json::Value,
@@ -665,13 +691,7 @@ fn test_check_document_links_resolves_pinned_document_deleted_from_working_tree(
     fs::remove_file(cli.root().join(doc_path)).unwrap();
     cli.commit("delete pinned document").unwrap();
 
-    let report: serde_json::Value = serde_json::from_slice(
-        &cli.command(["doc", "check-links", "--scope", "all", "--json"])
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, doc_path);
     assert!(
         errors.is_empty(),
@@ -722,13 +742,7 @@ fn test_check_document_links_resolves_pinned_assets_and_links_at_the_pin() {
     fs::remove_file(cli.root().join(link_target)).unwrap();
     cli.commit("delete the report and its neighbours").unwrap();
 
-    let report: serde_json::Value = serde_json::from_slice(
-        &cli.command(["doc", "check-links", "--scope", "all", "--json"])
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, doc_path);
     assert!(
         errors.is_empty(),
@@ -768,13 +782,7 @@ fn test_check_document_links_rejects_pinned_document_absent_at_its_commit() {
     cli.run(["doc", "add", &issue_id, doc_path, "--commit", &pin])
         .unwrap();
 
-    let report: serde_json::Value = serde_json::from_slice(
-        &cli.command(["doc", "check-links", "--scope", "all", "--json"])
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, doc_path);
     assert!(
         !errors.is_empty(),
@@ -815,13 +823,7 @@ fn test_check_document_links_reports_pinned_document_without_git() {
     ])
     .unwrap();
 
-    let report: serde_json::Value = serde_json::from_slice(
-        &cli.command(["doc", "check-links", "--scope", "all", "--json"])
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, doc_path);
     assert!(
         !errors.is_empty(),
@@ -861,13 +863,7 @@ fn test_check_document_links_reports_pinned_link_target_outside_the_repository()
     cli.run(["doc", "add", &issue_id, doc_path, "--commit", &pin])
         .unwrap();
 
-    let report: serde_json::Value = serde_json::from_slice(
-        &cli.command(["doc", "check-links", "--scope", "all", "--json"])
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap();
+    let report: serde_json::Value = check_links_report(&cli);
     assert!(
         report["errors"].is_array(),
         "the check completes and reports, rather than failing"
@@ -900,13 +896,7 @@ fn test_check_document_links_resolves_unpinned_document_without_git() {
 
     cli.run(["doc", "add", &issue_id, doc_path]).unwrap();
 
-    let report: serde_json::Value = serde_json::from_slice(
-        &cli.command(["doc", "check-links", "--scope", "all", "--json"])
-            .output()
-            .unwrap()
-            .stdout,
-    )
-    .unwrap();
+    let report: serde_json::Value = check_links_report(&cli);
     let errors = errors_for_document(&report, doc_path);
     assert!(
         errors.is_empty(),

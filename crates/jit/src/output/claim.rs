@@ -2,9 +2,9 @@
 
 use super::{HumanRender, OutputMode};
 use crate::commands::claim::{ListedLease, RecoveryReport, ReleasedLeaseInfo};
-use crate::domain::identity::LeaseId;
+use crate::domain::identity::{IssueId, LeaseId};
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
-use crate::storage::{Lease, StorageWarning};
+use crate::storage::Lease;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::fmt::Write;
@@ -16,7 +16,6 @@ pub struct ClaimAcquireResponse {
     /// The issue as the caller named it.
     pub issue_id: String,
     pub ttl_secs: u64,
-    pub warnings: Vec<StorageWarning>,
 }
 
 impl HumanRender for ClaimAcquireResponse {
@@ -33,7 +32,6 @@ impl HumanRender for ClaimAcquireResponse {
 pub struct ClaimReleaseResponse {
     #[serde(flatten)]
     pub released: ReleasedLeaseInfo,
-    pub warnings: Vec<StorageWarning>,
 }
 
 impl HumanRender for ClaimReleaseResponse {
@@ -50,7 +48,6 @@ impl HumanRender for ClaimReleaseResponse {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ClaimRenewResponse {
     pub lease: Lease,
-    pub warnings: Vec<StorageWarning>,
     /// Seconds the lease was extended by; rendered in the human output only.
     #[serde(skip)]
     pub extension: u64,
@@ -74,12 +71,15 @@ impl HumanRender for ClaimRenewResponse {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ClaimHeartbeatResponse {
     pub lease_id: LeaseId,
-    pub warnings: Vec<StorageWarning>,
+    pub issue_id: IssueId,
 }
 
 impl HumanRender for ClaimHeartbeatResponse {
     fn render_human(&self, _: OutputMode) -> String {
-        format!("Heartbeat sent: {}\n", self.lease_id)
+        format!(
+            "Heartbeat sent: {}\n  Issue: {}\n",
+            self.lease_id, self.issue_id
+        )
     }
 }
 
@@ -87,15 +87,15 @@ impl HumanRender for ClaimHeartbeatResponse {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ClaimForceEvictResponse {
     pub lease_id: LeaseId,
+    pub issue_id: IssueId,
     pub reason: String,
-    pub warnings: Vec<StorageWarning>,
 }
 
 impl HumanRender for ClaimForceEvictResponse {
     fn render_human(&self, _: OutputMode) -> String {
         format!(
-            "Force-evicted lease: {}\n  Reason: {}\n",
-            self.lease_id, self.reason
+            "Force-evicted lease: {}\n  Issue: {}\n  Reason: {}\n",
+            self.lease_id, self.issue_id, self.reason
         )
     }
 }
@@ -182,7 +182,7 @@ fn render_lease(text: &mut String, listed: &ListedLease) {
             let _ = writeln!(
                 text,
                 "     Use 'jit claim heartbeat {}' to refresh",
-                lease.lease_id
+                lease.issue_id.short_id()
             );
         }
     }

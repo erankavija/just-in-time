@@ -4,7 +4,6 @@
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
     "208edf4c-ce57-4f8b-996f-9df2d53ca3a7",
-    "2c8c13b2-1079-4400-b0b9-deb107ea34b4",
     "3acaa5a3-ff38-43f6-a252-5984b3cad2d9",
     "a106d1be-918f-418d-9ee9-454ef0ed157c",
     "c1af05ac-cacb-46e5-895c-840276c0e9a6"
@@ -31,5 +30,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Remove the executor-side validation pass copies",
-  "updated_at": "2026-11-03T23:04:04.205193506Z"
+  "updated_at": "2026-11-04T06:52:53.578305816Z"
 }

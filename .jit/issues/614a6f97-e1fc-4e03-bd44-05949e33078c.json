@@ -9,12 +9,26 @@
   ],
   "description": "Address `jit claim renew`, `claim heartbeat` and `claim force-evict` by issue id, as `claim release` already is, so each finds its lease file directly, and keep force-evict able to remove a lease whose issue is gone.\n\n## Background\n\n`ClaimCommands::Renew`, `Heartbeat` and `ForceEvict` (`crates/jit/src/cli.rs`) take a lease id, dispatched to the claims family's renew, heartbeat and force-evict operations (the claims facade 083c9a91 lands before this) and the coordinator's `renew_lease`, `heartbeat` and `force_evict_lease`. These find a lease by id through an interim scan of the lease directory, `lease-id-scan-bridge`. `claim release` already takes an issue. The lease id remains an ownership token in command output.\n\nRemedies printing the lease-id form: `errors.rs` (lease conflict, `force-evict <lease-id>`) and `commands/validate.rs` (worktree gone). `commands/validate.rs` also tells an operator to run `jit claim release` on a lease whose issue no longer exists, and the claims family's release-by-issue operation fails on a deleted issue because it loads the issue first.\n\nResolving force-evict's argument through the issue store would remove the only working route for such a lease: `issue delete` by the holder leaves the lease behind.\n\nTests naming these commands: `tests/cli_repo_workflow/claim_integration_tests.rs`; `tests/cli_repo_workflow/lease_enforcement_tests.rs` (`{lease}` and `{w-lease}` arguments); `test_claim_lease_arguments_parse_to_lease_ids_before_dispatch` and the claim-first classification table in `cli.rs`; failure levers in `tests/cli_issue/failure_lever_registry.toml` (`ISSUE_NOT_FOUND: Lease ... not found`, exit 3); coordinator and command unit tests. The MCP bridge generates its tools from the CLI schema, and `mcp-server/curated-tools.json` names the tools only.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit claim renew <issue>` and `claim heartbeat <issue>` take an issue id prefix resolved at the CLI boundary. The coordinator methods take `&IssueId`, and `lease-id-scan-bridge` no longer exists: `find_by_lease_id` is deleted, and no lease operation lists the lease directory to find a lease by id.\n- [hard] REQ-02: `claim force-evict <issue>` resolves its id prefix against the names of stored lease records, never the issue store, and a test evicts a lease whose issue has been deleted.\n- [hard] REQ-03: A renew or heartbeat by another agent fails as not owned; a renew, heartbeat or force-evict of an issue with no active lease fails with `ISSUE_NOT_FOUND` and exit 3, naming the issue. The failure levers assert the new message.\n- [hard] REQ-04: Renewing an expired lease persists its eviction before reporting not found.\n- [hard] REQ-05: The lease-conflict remedy and both validation remedies for a gone worktree and a gone issue name `jit claim force-evict <issue>`.\n",
   "documents": [],
+  "done_at": "2026-11-04T06:21:53.434226438Z",
   "first_ready_at": "2026-11-04T00:43:59.679819457Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "65392041-1f3e-4169-8e3d-88227a68b694",
+      "status": "passed",
+      "updated_at": "2026-11-04T06:21:41.843734946Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9e98aef0-bb70-45c7-bc87-dd7512de9344",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:46:16.407330628Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "614a6f97-e1fc-4e03-bd44-05949e33078c",
   "labels": [
     "type:task",
@@ -27,7 +41,7 @@
     "satisfies:f8a6b298/REQ-05"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Renew, heartbeat and force-evict address a lease by issue",
-  "updated_at": "2026-11-04T05:16:50.179767725Z"
+  "updated_at": "2026-11-04T06:21:53.434226438Z"
 }

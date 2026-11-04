@@ -18,6 +18,7 @@ mod archive;
 mod claim;
 pub mod config;
 mod dep;
+mod doc;
 mod emit;
 mod events;
 pub mod failure;
@@ -744,11 +745,16 @@ pub fn is_broken_pipe_write_panic(message: &str) -> bool {
 // JSON Output Types
 // ============================================================================
 
+/// The top-level success-envelope property carrying a success outcome's
+/// warnings; the schema generator declares it for every success schema.
+pub const WARNINGS_FIELD: &str = "warnings";
+
 /// Wrapper for successful command output (now returns raw data without envelope)
 #[derive(Debug)]
 pub struct JsonOutput<T: Serialize> {
     pub data: T,
     pub message: Option<String>,
+    pub warnings: Vec<String>,
 }
 
 impl<T: Serialize> JsonOutput<T> {
@@ -757,6 +763,7 @@ impl<T: Serialize> JsonOutput<T> {
         Self {
             data,
             message: None,
+            warnings: Vec::new(),
         }
     }
 
@@ -770,13 +777,23 @@ impl<T: Serialize> JsonOutput<T> {
         self
     }
 
-    /// Serialize to JSON string with pretty formatting (returns raw data, no envelope)
-    /// If a message is set, it is injected into the top-level object.
+    /// Add the warnings listed as the top-level `warnings` array.
+    pub fn with_warnings(mut self, warnings: Vec<String>) -> Self {
+        self.warnings = warnings;
+        self
+    }
+
+    /// Serialize to JSON string with pretty formatting (returns raw data, no envelope).
+    /// A set message is injected as `message`, and non-empty warnings as the
+    /// `warnings` array, into the top-level object.
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         let mut value = serde_json::to_value(&self.data)?;
-        if let Some(ref msg) = self.message {
-            if let Value::Object(ref mut map) = value {
+        if let Value::Object(ref mut map) = value {
+            if let Some(ref msg) = self.message {
                 map.insert("message".to_string(), Value::String(msg.clone()));
+            }
+            if !self.warnings.is_empty() {
+                map.insert(WARNINGS_FIELD.to_string(), serde_json::json!(self.warnings));
             }
         }
         serde_json::to_string_pretty(&value)
@@ -787,6 +804,9 @@ impl<T: Serialize> JsonOutput<T> {
 #[derive(Debug, Serialize)]
 pub struct JsonError {
     pub error: ErrorDetail,
+    /// Serialized as the top-level `warnings` array only when non-empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 impl JsonError {
@@ -802,7 +822,14 @@ impl JsonError {
                 details: None,
                 suggestions: Vec::new(),
             },
+            warnings: Vec::new(),
         }
+    }
+
+    /// Add the warnings listed beside `error`.
+    pub fn with_warnings(mut self, warnings: Vec<String>) -> Self {
+        self.warnings = warnings;
+        self
     }
 
     /// Add details to the error
@@ -1407,23 +1434,14 @@ collection_keys! {
     ByStateKey = "by_state";
     GatesKey = "gates";
     ResultsKey = "results";
-    ArtifactsKey = "artifacts";
+    /// Collection key of [`ArtifactConformanceResponse`].
+    ArtifactsKey = "artifacts" as "ArtifactConformanceResponse";
+    /// Collection key of [`NamespacesResponse`].
+    NamespacesKey = "namespaces" as "NamespacesResponse";
+    /// Collection key of [`LabelValuesResponse`].
+    ValuesKey = "values" as "LabelValuesResponse";
     WorktreesKey = "worktrees";
     PresetsKey = "presets";
-}
-
-pub enum NamespacesKey {}
-
-impl CollectionKey for NamespacesKey {
-    const KEY: &'static str = "namespaces";
-    const SCHEMA_NAME: Option<&'static str> = Some("NamespacesResponse");
-}
-
-pub enum ValuesKey {}
-
-impl CollectionKey for ValuesKey {
-    const KEY: &'static str = "values";
-    const SCHEMA_NAME: Option<&'static str> = Some("LabelValuesResponse");
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)

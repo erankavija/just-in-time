@@ -884,7 +884,7 @@ row_bindings! {
     test_command_exit_codes_invariant_check_emits_4: ("invariant check", 4, true) => invoke_invariant_check;
     test_command_exit_codes_item_failures_emit_2: ("item list, item search, item show, item resolve", 2, false) => invoke_item_failures;
     test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", 4, false) => invoke_config_validate;
-    test_command_exit_codes_doc_check_links_emits_1: ("doc check-links", 1, true) => invoke_doc_check_links;
+    test_command_exit_codes_doc_check_links_emits_4: ("doc check-links", 4, true) => invoke_doc_check_links;
     test_command_exit_codes_init_missing_values_file_emits_2: ("init", 2, false) => invoke_init_missing_values_file;
     test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, false) => invoke_gate_preset_apply_missing_target;
     test_command_exit_codes_project_render_unknown_projection_emits_2: ("project render", 2, false) => invoke_project_render_unknown_name;

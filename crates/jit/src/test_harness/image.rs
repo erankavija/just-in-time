@@ -2,8 +2,9 @@
 //! backend or mutation session.
 
 use crate::repository_state::{
-    CaptureBudget, CaptureSpec, CapturedBytes, DirectoryListing, FileMode, PinnedDocumentEvidence,
-    RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryRootEvidence, VirtualPath,
+    CaptureBudget, CaptureSpec, CapturedBytes, DirectoryListing, EventLogTail, FileMode,
+    PinnedDocumentEvidence, RepositoryEntry, RepositoryImage, RepositoryLayout,
+    RepositoryRootEvidence, VirtualPath,
 };
 use std::collections::BTreeMap;
 
@@ -40,7 +41,7 @@ impl ImagePath for &str {
 ///
 /// Unless [`with_spec`](Self::with_spec) supplies one, the capture spec requests
 /// exactly what was declared, each in the read mode its answer implies, within
-/// an unbounded budget.
+/// an unbounded budget. Event-log files are reduced to their tail.
 #[derive(Debug)]
 pub struct ImageBuilder {
     layout: RepositoryLayout,
@@ -75,7 +76,17 @@ impl ImageBuilder {
 
     /// Capture `path` as `entry`.
     pub fn entry(mut self, path: impl ImagePath, entry: RepositoryEntry) -> Self {
-        self.entries.insert(path.resolve(&self.layout), entry);
+        let path = path.resolve(&self.layout);
+        let entry = match entry {
+            RepositoryEntry::File { content, mode } if path == VirtualPath::EVENTS => {
+                RepositoryEntry::FileTail {
+                    tail: EventLogTail::of_bytes(content.bytes()),
+                    mode,
+                }
+            }
+            entry => entry,
+        };
+        self.entries.insert(path, entry);
         self
     }
 
@@ -143,6 +154,10 @@ fn derived_spec(
     };
     let mut spec = CaptureSpec::new([], budget).unwrap();
     for (path, entry) in entries {
+        if *path == VirtualPath::EVENTS {
+            spec.discover_tail(path.clone()).unwrap();
+            continue;
+        }
         match entry {
             RepositoryEntry::FileTail { .. } => spec.discover_tail(path.clone()),
             RepositoryEntry::FileKind { .. } => spec.discover_kinds([path.clone()]),
@@ -180,6 +195,17 @@ mod tests {
             image.entry(&VirtualPath::CONFIG).unwrap(),
             RepositoryEntry::File { content, mode: FileMode::Regular }
                 if content.bytes() == b"config"
+        ));
+    }
+
+    #[test]
+    fn test_image_builder_captures_event_log_bytes_as_a_tail() {
+        let log = b"line\n".repeat(2000);
+        let image = ImageBuilder::new().file(VirtualPath::EVENTS, &log).build();
+
+        assert!(matches!(
+            image.entry(&VirtualPath::EVENTS).unwrap(),
+            RepositoryEntry::FileTail { tail, .. } if *tail == EventLogTail::of_bytes(&log)
         ));
     }
 

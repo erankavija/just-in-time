@@ -1950,7 +1950,7 @@ fn unpassed_gate_blockers(
 }
 
 /// Information about a git commit
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct CommitInfo {
     pub sha: String,
     pub author: String,
@@ -1976,6 +1976,7 @@ pub enum DocumentsKey {}
 
 impl CollectionKey for DocumentsKey {
     const KEY: &'static str = "documents";
+    const SCHEMA_NAME: Option<&'static str> = Some("DocumentListResult");
 }
 
 /// Result of listing document references for an issue
@@ -1989,7 +1990,7 @@ pub struct DocumentListScope {
 }
 
 /// Git history for a document
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentHistory {
     pub path: String,
     pub commits: Vec<CommitInfo>,
@@ -2000,6 +2001,7 @@ pub enum AssetsKey {}
 
 impl CollectionKey for AssetsKey {
     const KEY: &'static str = "assets";
+    const SCHEMA_NAME: Option<&'static str> = Some("AssetListResult");
 }
 
 /// Result of listing assets for a document
@@ -2008,14 +2010,16 @@ pub type AssetListResult = ListEnvelope<AssetsKey, crate::document::Asset, Asset
 /// Fields of an [`AssetListResult`] beside its `assets`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct AssetListScope {
+    /// Worktree root the human rendering checks asset paths against.
+    #[serde(skip)]
+    pub worktree_root: std::path::PathBuf,
     pub issue_id: IssueId,
     pub document_path: String,
     pub summary: AssetSummary,
-    pub warnings: Vec<String>,
 }
 
 /// Document content display result
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentContentResult {
     pub path: String,
     pub label: Option<String>,
@@ -2025,7 +2029,7 @@ pub struct DocumentContentResult {
 }
 
 /// Document diff result
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentDiffResult {
     pub path: String,
     pub from_commit: String,
@@ -2034,7 +2038,7 @@ pub struct DocumentDiffResult {
 }
 
 /// Result of adding a document reference
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentAddResult {
     pub issue_id: IssueId,
     pub document: crate::domain::DocumentReference,
@@ -2044,7 +2048,7 @@ pub struct DocumentAddResult {
 }
 
 /// Result of removing a document reference
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct DocumentRemoveResult {
     pub issue_id: IssueId,
     pub path: String,
@@ -2071,18 +2075,18 @@ pub struct SnapshotExportResult {
 }
 
 /// Result of checking document links
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct LinkCheckResult {
     pub valid: bool,
     pub errors: Vec<serde_json::Value>,
-    pub warnings: Vec<serde_json::Value>,
+    pub link_warnings: Vec<serde_json::Value>,
     #[serde(skip)]
     pub scope: String,
     pub summary: LinkCheckSummary,
 }
 
 /// Summary of link check results
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct LinkCheckSummary {
     pub total_documents: usize,
     pub valid: usize,
@@ -2178,20 +2182,6 @@ pub(crate) fn image_virtual_bytes(
     path: &crate::repository_state::VirtualPath,
 ) -> Result<Option<Vec<u8>>> {
     Ok(image.file_bytes(path)?.map(<[u8]>::to_vec))
-}
-
-/// Project a delta finalized over `image` to the file-overlay validation reads
-/// ([`crate::repository_state::action_overrides`]). This is the exact proposed
-/// repository state — only what the delta writes — used by init/profile to
-/// validate their proposed state under one coherent captured image.
-pub(crate) fn validation_overlay(
-    image: &crate::repository_state::RepositoryImage,
-    delta: &crate::repository_state::RepositoryDelta,
-) -> Result<std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>>> {
-    Ok(crate::repository_state::action_overrides(
-        image,
-        delta.actions(),
-    )?)
 }
 
 /// Parse the issues the captured listing names, in listing order, reporting a
@@ -3867,11 +3857,8 @@ mod tests {
 
     fn captured_issue_spec(id: &IssueId) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
-        let paths = std::collections::BTreeSet::from([
-            VirtualPath::issue_record(id),
-            VirtualPath::data("events.jsonl").unwrap(),
-        ]);
-        CaptureSpec::new(
+        let paths = std::collections::BTreeSet::from([VirtualPath::issue_record(id)]);
+        let mut spec = CaptureSpec::new(
             paths,
             CaptureBudget {
                 max_listings: 0,
@@ -3879,7 +3866,9 @@ mod tests {
                 max_depth: 4,
             },
         )
-        .unwrap()
+        .unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        spec
     }
 
     /// The capture of an issue mutation over `id` whose gate-run records
@@ -3891,11 +3880,10 @@ mod tests {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
         let mut paths = std::collections::BTreeSet::from([
             VirtualPath::issue_record(id),
-            VirtualPath::data("events.jsonl").unwrap(),
             VirtualPath::data("gates.toml").unwrap(),
         ]);
         paths.extend(gate_run_record_paths(context, id, 1));
-        CaptureSpec::new(
+        let mut spec = CaptureSpec::new(
             paths,
             CaptureBudget {
                 max_listings: 0,
@@ -3903,7 +3891,9 @@ mod tests {
                 max_depth: 4,
             },
         )
-        .unwrap()
+        .unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        spec
     }
 
     fn issue_from_image(image: &crate::repository_state::RepositoryImage, id: &IssueId) -> Issue {

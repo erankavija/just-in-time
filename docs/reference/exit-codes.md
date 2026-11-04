@@ -21,7 +21,7 @@
 
 ## Command-specific mappings
 
-Most commands draw only from the global taxonomy above. The rows below identify the codes a specific command family emits. An **exception** is a code a completed run emits to signal findings, or a code whose meaning departs from the global entry (for example, `doc check-links` exits `1` for broken links, not a generic error). `*` marks a code every command can reach: `0` on successful completion, and the failure codes through the shared classifier.
+Most commands draw only from the global taxonomy above. The rows below identify the codes a specific command family emits. An **exception** is a code a completed run emits to signal findings, or a code whose meaning departs from the global entry (for example, `doc check-links` exits `4` for broken links, not a generic error). `*` marks a code every command can reach: `0` on successful completion, and the failure codes through the shared classifier.
 
 | Command | Code | Condition | Exception |
 |---------|------|-----------|-----------|
@@ -57,7 +57,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `invariant check` | `4` | Enforcement drift was found (declared enforcement not backed by an enforcing rule). | yes |
 | `item list, item search, item show, item resolve` | `2` | The repository configuration failed to load, or an item address was not a qualified id. |  |
 | `config validate` | `4` | The repo or environment-variable configuration failed to load or carried an invalid value. |  |
-| `doc check-links` | `1` | One or more documents have broken links. Documents with only risky-link warnings exit `0`: warnings are reported, never fatal. | yes |
+| `doc check-links` | `4` | One or more documents have broken links. Documents with only risky-link warnings exit `0`: warnings are reported, never fatal. | yes |
 | `gate preset apply` | `3` | A preset target was not found, so the application failed. |  |
 | `project render` | `2` | The requested projection name is not declared in repository configuration. |  |
 | `serve, serve --stop, serve --status` | `1` | The daemon PID state could not be parsed (exits 0 on success). |  |
