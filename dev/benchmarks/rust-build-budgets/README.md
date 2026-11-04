@@ -1,6 +1,6 @@
 # Rust build budgets: what the enforced constants rest on (jit:75b46be9, jit:0708d692)
 
-`scripts/rust-build-budget.sh` fails the `cargo-ci` gate on four quantities: the
+`scripts/rust-build-budget.sh` checks `cargo-ci` budgets for the
 number of integration-test targets, the bytes of active test executables, the
 measured suite clock, and the production lines of `crates/jit/src/main.rs`. This
 document is where those limits come from —
@@ -25,7 +25,7 @@ host. 24 cores, 31 GiB RAM, `sccache` on PATH, `TMPDIR` on tmpfs; durations in m
 ## How each quantity is measured
 
 Every number below is produced by the code that enforces it rather than by a
-reconstruction of it. One `./scripts/cargo-ci.sh` run reports all four on its
+reconstruction of it. One `./scripts/cargo-ci.sh` run reports each budget on its
 `budget` line; the commands below isolate one quantity each.
 
 | quantity | command |
@@ -47,7 +47,7 @@ that same counter: blank lines, doc comments, and `#[cfg(test)]` items do not
 count; ordinary comments and `test-support`-gated code count.
 
 `MAX_MAIN_RS_CODE_LINES` follows **at most 10% headroom, rounded down to a whole
-line**: `floor(37 × 1.10) = 40`, or 8.108108% headroom. The checker applies this
+line**: $\lfloor 37 \times 1.10 \rfloor = 40$. The checker applies this
 limit to `crates/jit/src/main.rs` under `--root` and appends `main-rs-lines=N/MAX`
 to its success line. Its `--self-test` fixtures prove the default counting rules,
 the inclusive boundary, and rejection one line beyond it without compilation.
@@ -247,8 +247,8 @@ removed. The fresh-target figure is the `after, cold` run of the pre-cutover sui
 for what separates it from a warm one.
 
 The same tree's target directory measures 3,313,861,767 bytes (3.1 GiB) by
-`du -sb target` after these runs. That is an observation, not one of the four
-enforced budgets: the fresh-validation target-directory threshold is an
+`du -sb target` after these runs. That is an observation, not an enforced
+budget: the fresh-validation target-directory threshold is an
 acceptance criterion checked by `scripts/benchmark-rust-build.sh` once per
 build-topology change, and this figure comes from a gate-warm tree rather than
 that harness's clean-room protocol.
