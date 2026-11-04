@@ -14,21 +14,21 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "2dd3ef11-f82f-4cea-9ed9-ebc3c150bebe",
+      "run_id": "eee4a77e-d255-499f-b10a-19caf4335009",
       "status": "passed",
-      "updated_at": "2026-11-04T04:38:34.704066820Z",
+      "updated_at": "2026-11-04T04:48:17.814187590Z",
       "updated_by": "auto:executor"
     },
     "cargo-ci-selftest": {
-      "run_id": "d5dd67eb-6150-466f-afd4-d85c15e957fc",
+      "run_id": "33dc23de-6e97-4134-9205-3c5b89255401",
       "status": "passed",
-      "updated_at": "2026-11-04T04:38:41.148407405Z",
+      "updated_at": "2026-11-04T04:48:24.159585164Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "e154ca06-f97b-4743-aa86-5fbc9169fa63",
+      "run_id": "fc03c247-595e-4460-b089-8466ca565dd9",
       "status": "failed",
-      "updated_at": "2026-11-04T04:43:03.037900652Z",
+      "updated_at": "2026-11-04T04:51:42.982519761Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "cargo-ci classifies out-of-space failures as environment faults",
-  "updated_at": "2026-11-04T04:43:03.037900652Z"
+  "updated_at": "2026-11-04T04:51:42.982519761Z"
 }
