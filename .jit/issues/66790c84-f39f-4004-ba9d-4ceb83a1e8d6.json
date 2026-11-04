@@ -22,6 +22,12 @@
       "updated_at": "2026-11-04T09:13:32.658312181Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "run_id": "cdebd1af-5645-4418-a1e7-af6c51509962",
+      "status": "failed",
+      "updated_at": "2026-11-04T09:18:57.300244847Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
       "run_id": "52cdd51e-9211-416c-af99-88ed2dd0bb9d",
       "status": "passed",
@@ -47,5 +53,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Claim and recover commands move to library handlers",
-  "updated_at": "2026-11-04T09:13:32.788221287Z"
+  "updated_at": "2026-11-04T09:18:57.300244847Z"
 }

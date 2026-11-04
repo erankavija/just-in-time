@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "295d29e27922d2fd105372f3ee4abd5d8e6be9d1",
+  "completed_at": "2026-11-04T09:18:57.298175395Z",
+  "duration_ms": 324534,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/output/claim.rs",
+        "id": "F1",
+        "line": 72,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/66790c84/requirement/REQ-05",
+          "@/issue/df129d9e/requirement/REQ-09"
+        ],
+        "severity": "high",
+        "summary": "Heartbeat and force-evict add issue_id to successful JSON and an Issue line to human output, changing their output contracts."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/output/claim.rs",
+        "id": "F2",
+        "line": 12,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "Repeated response rustdoc restates type names rather than documenting a non-obvious contract."
+      }
+    ],
+    "summary": "Two issue-impact blocking findings: success-contract regression and repeated non-essential rustdoc.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "66790c84-f39f-4004-ba9d-4ceb83a1e8d6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cdebd1af-5645-4418-a1e7-af6c51509962",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T09:13:32.764016608Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 29257 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a5d5-c953-7f03-b886-5d3d9bd3fd00\n--------\nuser\n--- 29244 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b01b1fa00, d72551d25, 527badc1b, d08675a05, 756036fa4, 1f50f71c5, 4ad4175c1\nPolicy sources: AGENTS.md\nResolved items: @/issue/66790c84/requirement/REQ-01–REQ-05 and @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-09, REQ-12, REQ-13, REQ-17–REQ-19 (.jit issue sources); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-11-04T09:13:32Z; exit code not recorded); mcp-ci passed (2026-11-04T09:13:32Z; exit code not recorded)\nTruncation recovery: per-commit name/status and path-limited patches; bounded current-source, schema, test, and pre-change implementation reads\n\n1. F1 — blocking, issue-impact: `ClaimHeartbeatResponse` and `ClaimForceEvictResponse` add serialized `issue_id` fields and corresponding human “Issue” lines. Before this change, heartbeat emitted only its lease ID and force-evict only its lease ID and reason. This changes successful JSON and human output despite REQ-05 requiring those contracts remain unchanged. [crates/jit/src/output/claim.rs:72](@/issue/66790c84/requirement/REQ-05)\n\n2. F2 — blocking, issue-impact: The new output module repeats non-essential rustdoc such as “Response for `claim acquire`” across the response types. These comments merely restate the names and recur throughout the attributable file, contrary to the repository’s non-obvious-only prose policy. [crates/jit/src/output/claim.rs:12](@/invariant/essential-code-prose)\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact blocking findings: success-contract regression and repeated non-essential rustdoc.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Heartbeat and force-evict add issue_id to successful JSON and an Issue line to human output, changing their output contracts.\",\"file\":\"crates/jit/src/output/claim.rs\",\"line\":72,\"references\":[\"@/issue/66790c84/requirement/REQ-05\",\"@/issue/df129d9e/requirement/REQ-09\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repeated response rustdoc restates type names rather than documenting a non-obvious contract.\",\"file\":\"crates/jit/src/output/claim.rs\",\"line\":12,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
