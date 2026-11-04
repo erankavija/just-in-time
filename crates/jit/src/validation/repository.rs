@@ -898,7 +898,9 @@ mod tests {
             },
         )
         .unwrap();
-        overrides.extend(crate::commands::validation_overlay(plan.image(), plan.delta()).unwrap());
+        overrides.extend(crate::repository_state::action_overrides(
+            plan.delta().actions(),
+        ));
         let image = executor.capture_validation_image_with(&overrides).unwrap();
         split(overlay_report(&image))
     }
@@ -1375,14 +1377,8 @@ mod tests {
             vec!["type:task".to_string()],
         );
 
-        let report = validate_overlaid(
-            &executor,
-            [put(
-                VirtualPath::EVENTS.repository_relative(),
-                "not jsonl\n",
-            )],
-        )
-        .unwrap();
+        std::fs::write(data_path(&executor, &VirtualPath::EVENTS), "not jsonl\n").unwrap();
+        let report = validate_overlaid::<PathBuf>(&executor, []).unwrap();
 
         assert!(report.passes.contains(&RepositoryValidationPass::Records));
     }

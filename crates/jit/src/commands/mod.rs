@@ -2180,20 +2180,6 @@ pub(crate) fn image_virtual_bytes(
     Ok(image.file_bytes(path)?.map(<[u8]>::to_vec))
 }
 
-/// Project a delta finalized over `image` to the file-overlay validation reads
-/// ([`crate::repository_state::action_overrides`]). This is the exact proposed
-/// repository state — only what the delta writes — used by init/profile to
-/// validate their proposed state under one coherent captured image.
-pub(crate) fn validation_overlay(
-    image: &crate::repository_state::RepositoryImage,
-    delta: &crate::repository_state::RepositoryDelta,
-) -> Result<std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>>> {
-    Ok(crate::repository_state::action_overrides(
-        image,
-        delta.actions(),
-    )?)
-}
-
 /// Parse the issues the captured listing names, in listing order, reporting a
 /// missing record as issue-not-found.
 fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> Result<Vec<Issue>> {
@@ -3858,11 +3844,8 @@ mod tests {
 
     fn captured_issue_spec(id: &IssueId) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
-        let paths = std::collections::BTreeSet::from([
-            VirtualPath::issue_record(id),
-            VirtualPath::data("events.jsonl").unwrap(),
-        ]);
-        CaptureSpec::new(
+        let paths = std::collections::BTreeSet::from([VirtualPath::issue_record(id)]);
+        let mut spec = CaptureSpec::new(
             paths,
             CaptureBudget {
                 max_listings: 0,
@@ -3870,7 +3853,9 @@ mod tests {
                 max_depth: 4,
             },
         )
-        .unwrap()
+        .unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        spec
     }
 
     /// The capture of an issue mutation over `id` whose gate-run records
@@ -3882,11 +3867,10 @@ mod tests {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
         let mut paths = std::collections::BTreeSet::from([
             VirtualPath::issue_record(id),
-            VirtualPath::data("events.jsonl").unwrap(),
             VirtualPath::data("gates.toml").unwrap(),
         ]);
         paths.extend(gate_run_record_paths(context, id, 1));
-        CaptureSpec::new(
+        let mut spec = CaptureSpec::new(
             paths,
             CaptureBudget {
                 max_listings: 0,
@@ -3894,7 +3878,9 @@ mod tests {
                 max_depth: 4,
             },
         )
-        .unwrap()
+        .unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        spec
     }
 
     fn issue_from_image(image: &crate::repository_state::RepositoryImage, id: &IssueId) -> Issue {

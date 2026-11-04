@@ -982,7 +982,6 @@ fn ensure_write_set_unchanged_against(
     // An ordinary captured log is the only state carrying a tail to compare;
     // any other occupant is compared like any other write target.
     let tail = match captured.entry(&VirtualPath::EVENTS)? {
-        RepositoryEntry::File { content, .. } => EventLogTail::of_bytes(content.bytes()),
         RepositoryEntry::FileTail { tail, .. } => tail.clone(),
         _ => return ensure_target_unchanged(captured, &VirtualPath::EVENTS, live),
     };

@@ -657,25 +657,23 @@ fn compose_events(lines: &[Vec<u8>]) -> Vec<u8> {
 }
 
 /// The captured event log's committed length, the end of its last
-/// newline-terminated line, from a whole read or a tail that holds that line.
+/// newline-terminated line, from a tail that holds that line.
 ///
 /// # Errors
 ///
 /// [`CaptureError::TailOnlyCapture`] for a tail that holds only part of the
 /// final line, which cannot say where that line starts.
 fn captured_log_end(image: &RepositoryImage) -> Result<u64, MutationError> {
-    let (length, final_line) =
-        if let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS)? {
+    match image.entry(&VirtualPath::EVENTS)? {
+        RepositoryEntry::Absent => Ok(0),
+        RepositoryEntry::FileTail { tail, .. } => {
             let final_line = tail
                 .final_line()
                 .ok_or(CaptureError::TailOnlyCapture(VirtualPath::EVENTS))?;
-            (tail.length(), final_line)
-        } else {
-            let log = captured_file_bytes(image, &VirtualPath::EVENTS)?.unwrap_or_default();
-            let final_line = log.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
-            (log.len() as u64, final_line)
-        };
-    Ok(length - final_line.len() as u64)
+            Ok(tail.length() - final_line.len() as u64)
+        }
+        _ => Err(CaptureError::UnsafeCapturedOccupant(VirtualPath::EVENTS).into()),
+    }
 }
 
 /// Read the captured bytes of a `Data(...)` file entry, or `None` when absent.
@@ -2917,7 +2915,7 @@ mod tests {
             let image = tail_image(crate::repository_state::EventLogTail::of_bytes(&log));
             (log, image)
         };
-        let whole = |log: Vec<u8>| {
+        let captured = |log: Vec<u8>| {
             let image = ImageBuilder::new()
                 .entry(VirtualPath::EVENTS, file_entry(&log))
                 .build();
@@ -2930,7 +2928,7 @@ mod tests {
             )),
         };
         let cases = [Vec::new(), terminated.clone(), prior.clone(), unterminated]
-            .map(whole)
+            .map(captured)
             .into_iter()
             .chain([long_valid, long_unterminated].map(tail));
         for (log, image) in cases {
