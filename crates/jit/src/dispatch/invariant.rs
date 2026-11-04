@@ -4,10 +4,10 @@ use super::{CommandContext, Outcome};
 use crate::cli::InvariantCommands;
 use crate::commands::InvariantCheckResult;
 use crate::output::ErrorCode;
-use crate::storage::{IssueStore, RepositoryStateStore};
+use crate::storage::IssueStore;
 
 /// Enforcement drift is a findings outcome; a clean registry succeeds.
-fn check<S: IssueStore + RepositoryStateStore>(
+fn check<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
 ) -> anyhow::Result<Outcome<InvariantCheckResult>> {
     let result = ctx.executor.items().check_invariants()?;
@@ -18,16 +18,13 @@ fn check<S: IssueStore + RepositoryStateStore>(
             report: Box::new(result),
         }
     } else {
-        Outcome::Success {
-            response: result,
-            message: Some("No enforcement drift".to_owned()),
-        }
+        Outcome::success_with(result, "No enforcement drift")
     })
 }
 
 command_group! {
     command: InvariantCommands,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [IssueStore],
     leaves: {
         "invariant_check" => InvariantCommands::Check => check() -> InvariantCheckResult,
     }
