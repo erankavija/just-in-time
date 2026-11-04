@@ -364,6 +364,8 @@ preserve authored or unmanaged bytes. An ambiguous target is reported without
 writes. Coordination state — stale
 locks and expired leases — is repaired by
 [`jit recover`](#jit-recover), not by `jit validate`.
+Plain `jit validate` does not check leases; `--leases` checks lease records
+for expiry and references to missing worktrees or issues.
 
 ### Options
 
@@ -376,7 +378,7 @@ locks and expired leases — is repaired by
 | `--fix` | Auto-fix repairable rule/graph/state findings and derived-state drift |
 | `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
 | `--branch-drift` | Validate that git's `origin/main` is an ancestor of the current branch (requires git) |
-| `--leases` | Report active leases that are inconsistent or stale |
+| `--leases` | Report expired leases and leases referencing missing worktrees or issues |
 | `--json` | Output as JSON |
 
 `--fix`, `--branch-drift`, and `--leases` are repo-wide and cannot be combined
@@ -400,7 +402,7 @@ jit validate a1b2c3d4 --rule coverage-preview
 # Validate a container's bracket subtree as a gate check
 jit validate --scope <container-id>
 
-# Check git branch drift and lease health
+# Check git branch drift and expired or dangling leases
 jit validate --branch-drift --leases
 
 # Preview, then apply, the auto-fixes
