@@ -873,6 +873,13 @@
       "issue": "d952d057",
       "summary": "code-review F1 after 2 reworks; proposed one more rework moving the run dir before the probe and --cargo",
       "status": "ruled (a): one extra rework, no further allowance; d952d057 D-01; resolved: done"
+    },
+    {
+      "date": "2026-11-04",
+      "kind": "review-finding-attribution",
+      "issue": "06ee9b67",
+      "summary": "F1/F2 trace to 9876a23a wave 8 on main; F3 is the uniform findings-stderr rule",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -1002,10 +1009,11 @@
       "reason": "steward-assigned standalone task; node/process-spawning tests rule out the Codex sandbox"
     },
     "10751360": {
-      "status": "dispatched",
+      "status": "reviewed",
       "vendor": "Claude Sonnet",
       "reason": "rework 2 of 2: one HumanRender for ItemShowResult; merge main; Claude because every branch conflicts with main and Codex cannot merge",
-      "note": "E0119 duplicate HumanRender for ItemShowResult with 1a4f2ebd; rework 2 of 2 pending"
+      "note": "E0119 duplicate HumanRender for ItemShowResult with 1a4f2ebd; rework 2 of 2 pending",
+      "review": "lead PASS (7c) at c8e1e7ed4; one HumanRender for ItemShowResult (main's); IssueRow duplicate removed; lines +60 vs main"
     },
     "c9103fcf": {
       "status": "landing",
@@ -1103,11 +1111,12 @@
       "review": "lead R1 FAIL (7c), Tier 2.5 only: main.rs:536 rustdoc links [`resolve_gate_key`], which moved to jit::dispatch. Criteria otherwise met on reading. Rework with the main merge after the batch lands."
     },
     "06ee9b67": {
-      "status": "landed_gating",
+      "status": "escalated",
       "vendor": "Codex gpt-6-luna (xhigh)",
       "reason": "self-contained migration without sockets",
       "note": "Codex resume committed by lead as a proper merge; lines +20",
-      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
+      "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)",
+      "review": "landed c5a125d74; cargo-ci, mcp-ci passed; code-review R1 failed (run 8613707b): F1 --fix contract (9876a23a 1f24e3e9 on main), F2 container-pointer tests deleted by 9876a23a eae1c56a2, F3 uniform findings stderr (c9103fcf/1ac651c7 D-01 rule). Escalated to 6a."
     },
     "71f5296c": {
       "status": "landed_gating",
@@ -1131,11 +1140,11 @@
       "batch": "landed c5a125d74 (second main merge 30aec0565 carried 9876a23a wave 8 validate)"
     },
     "182f4c03": {
-      "status": "dispatched",
+      "status": "reviewed",
       "vendor": "Claude Sonnet",
       "reason": "completion: snapshot export only; reconcile lines; merge main; Claude because every branch conflicts with main and Codex cannot merge",
       "note": "lead-preserve e1bff4aae; +68 lines to reconcile",
-      "review": "lead (7c): partial; migrate group no longer exists on main (842b0ac6 archived), so scope is snapshot export alone per its Notes. Completion dispatch after the batch lands; reconcile the +68 lines."
+      "review": "lead PASS (7c) at 8449ca2ac; REQ-03 via ListEnvelope; lines +11 vs main"
     },
     "cd8e04cc": {
       "status": "dispatched",
