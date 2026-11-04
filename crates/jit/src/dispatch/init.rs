@@ -53,8 +53,7 @@ fn init(args: &InitArgs) -> anyhow::Result<Outcome<InitResponse>> {
         profile: init_result.profile,
     };
     let message = response.message();
-    Ok(Outcome::success_with(response, message)
-        .with_warnings(warnings.iter().map(ToString::to_string)))
+    Ok(Outcome::success_with(response, message).with_warnings(&warnings))
 }
 
 command_group! {
