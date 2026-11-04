@@ -979,6 +979,8 @@ mod file_setup_tests {
             .validation()
             .validate_repository_report()
             .unwrap()
+            .structural_failure
+            .map_or(Ok(()), Err)
             .unwrap();
     }
 

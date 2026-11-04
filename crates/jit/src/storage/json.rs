@@ -12,7 +12,7 @@ use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use crate::domain::{Event, Issue};
 use crate::repository_state::{
     RepositoryIndex, RepositoryIndexError, RepositoryLayout, VirtualPath, BOOTSTRAP_LOCK_FILE,
-    EVENTS_LOCK_FILE, GATES_LOCK_FILE, GATE_RUN_RECORD_FILE, INDEX_LOCK_FILE,
+    EVENTS_LOCK_FILE, GATE_RUN_RECORD_FILE, INDEX_LOCK_FILE,
 };
 use crate::storage::{
     FileLocker, GateRunNotFoundError, IssueNotFoundError, IssueStore, RecoveryDispatchReport,
@@ -1155,8 +1155,7 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
-        let gates_lock_path = self.root.join(GATES_LOCK_FILE);
-        let _lock = self.locker.lock_shared(&gates_lock_path)?;
+        // Lock-free (`@/charter/D-22`): the registry is replaced by atomic rename.
         crate::storage::gate_store::load_gate_registry(&self.path_layout()?)
     }
 
@@ -1306,16 +1305,6 @@ impl IssueStore for JsonFileStorage {
         issue_id: &IssueId,
     ) -> Result<Vec<crate::domain::GateRunResult>> {
         self.read_gate_runs(|result| &result.issue_id == issue_id)
-    }
-
-    fn find_reusable_gate_run(
-        &self,
-        gate_key: &crate::domain::identity::GateKey,
-        digest: &crate::domain::repository_inputs::InputsDigest,
-    ) -> Result<Option<crate::domain::GateRunResult>> {
-        Ok(crate::domain::latest_gate_run(self.read_gate_runs(
-            |result| result.is_reusable_for(gate_key, digest),
-        )?))
     }
 
     fn root(&self) -> &Path {

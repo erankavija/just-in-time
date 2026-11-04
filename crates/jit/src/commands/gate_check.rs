@@ -64,7 +64,10 @@ fn reused_gate_run(
         message: None,
         findings: source.findings.clone(),
         inputs_digest: source.inputs_digest.clone(),
-        origin: crate::domain::GateVerdictOrigin::Reused(source.run_id.clone()),
+        origin: crate::domain::GateVerdictOrigin::Reused {
+            source_issue: source.issue_id.clone(),
+            source_run: source.run_id.clone(),
+        },
         evaluation_stability: GateEvaluationStability::Stable,
     }
 }
@@ -222,8 +225,8 @@ pub(super) fn gate_state_from_run(result: &GateRunResult) -> GateState {
     }
 }
 
-/// Select and sanitize the run `state` was projected from, the gate's latest
-/// published run, before it enters checker context.
+/// Select and sanitize `gate_key`'s run among `runs`, which hold at most one
+/// latest run per gate, before it enters checker context.
 ///
 /// Stored results are never mutated. Structured findings replace verbose stdout;
 /// legacy unstructured runs retain stdout as their compatibility signal. Stderr is
@@ -231,10 +234,9 @@ pub(super) fn gate_state_from_run(result: &GateRunResult) -> GateState {
 fn compact_run_history_for_context(
     runs: &[GateRunResult],
     gate_key: &GateKey,
-    state: Option<&GateState>,
 ) -> Vec<GateRunResult> {
-    state
-        .and_then(|state| state.projected_run(gate_key, runs))
+    runs.iter()
+        .find(|run| &run.gate_key == gate_key)
         .cloned()
         .map(|mut run| {
             run.stderr.clear();
@@ -247,52 +249,97 @@ fn compact_run_history_for_context(
         .collect()
 }
 
+/// Make `fresh` its gate's run in `history`, keeping one run per gate.
+fn replace_named_run(history: &mut Vec<GateRunResult>, fresh: GateRunResult) {
+    history.retain(|run| run.gate_key != fresh.gate_key);
+    history.push(fresh);
+}
+
+/// The run the verdict record of `(gate_key, digest)` names, captured with that
+/// record and nothing else. `Ok(None)` is a retryable conflict; the inner
+/// `None` means no record names a run reusable for that key.
+fn captured_reusable_gate_run(
+    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    gate_key: &GateKey,
+    digest: &crate::domain::repository_inputs::InputsDigest,
+) -> Result<Option<Option<GateRunResult>>> {
+    use crate::repository_state::{CaptureSpec, RepositoryImage, VirtualPath};
+
+    let record_path = VirtualPath::gate_verdict_record(gate_key, digest);
+    let record = |image: &RepositoryImage| -> Result<Option<crate::domain::GateVerdictRecord>> {
+        image
+            .file_bytes(&record_path)?
+            .map(|bytes| {
+                serde_json::from_slice(bytes)
+                    .with_context(|| format!("failed to parse verdict record at {record_path:?}"))
+            })
+            .transpose()
+    };
+    let spec = CaptureSpec::new(
+        [record_path.clone()],
+        super::validate::MUTATION_CAPTURE_BUDGET,
+    )?;
+    let Some(image) = super::capture_discovering(session, spec, |image, spec| {
+        if let Some(record) = record(image)? {
+            spec.discover_paths([VirtualPath::gate_run_record(&record.run_id)])?;
+        }
+        Ok(())
+    })?
+    else {
+        return Ok(None);
+    };
+    let Some(record) = record(&image)? else {
+        return Ok(Some(None));
+    };
+    let run_path = VirtualPath::gate_run_record(&record.run_id);
+    let run = image
+        .file_bytes(&run_path)?
+        .map(|bytes| {
+            serde_json::from_slice::<GateRunResult>(bytes)
+                .with_context(|| format!("failed to parse captured gate run at {run_path:?}"))
+        })
+        .transpose()?;
+    Ok(Some(run.filter(|run| {
+        run.issue_id == record.issue_id
+            && run.run_id == record.run_id
+            && run.is_reusable_for(gate_key, digest)
+    })))
+}
+
+/// Read the run each required gate's state on `issue` names from `image`.
+///
+/// A named record that is absent, or that does not record that gate's run on
+/// `issue`, contributes no result; its path is still an input.
 fn captured_gate_runs(
     image: &crate::repository_state::RepositoryImage,
-    issue_id: &IssueId,
+    issue: &Issue,
 ) -> Result<CapturedGateRuns> {
-    use crate::repository_state::{RepositoryEntry, VirtualPath};
+    use crate::repository_state::RepositoryEntry;
 
-    let run_ids = crate::repository_state::captured_gate_run_ids(image)
-        .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?;
-    let mut captured = run_ids
+    let named = super::named_gate_run_records(issue).collect::<Vec<_>>();
+    let results = named
         .iter()
-        .map(VirtualPath::gate_run_record)
-        .map(|path| {
-            let entry = image.entry(&path)?;
-            let identity = entry.identity().cloned();
-            let result = match entry {
-                RepositoryEntry::File { content, .. } => Some(
-                    serde_json::from_slice::<GateRunResult>(content.bytes()).with_context(
-                        || format!("failed to parse captured gate run at {path:?}"),
-                    )?,
-                ),
-                RepositoryEntry::Absent => None,
+        .map(|(key, run_id, path)| {
+            let run = match image.entry(path)? {
+                RepositoryEntry::File { content, .. } => {
+                    serde_json::from_slice::<GateRunResult>(content.bytes())
+                        .with_context(|| format!("failed to parse captured gate run at {path:?}"))?
+                }
+                RepositoryEntry::Absent => return Ok(None),
                 _ => {
                     return Err(anyhow!(
                         "captured gate run at {path:?} is not a regular file"
                     ))
                 }
             };
-            Ok((path, identity, result))
+            Ok(
+                (run.issue_id == issue.id && &run.gate_key == *key && &run.run_id == *run_id)
+                    .then_some(run),
+            )
         })
+        .filter_map(Result::transpose)
         .collect::<Result<Vec<_>>>()?;
-    captured.sort_by(|left, right| left.0.cmp(&right.0));
-    let mut results = captured
-        .iter()
-        .filter_map(|(_, _, result)| result.clone())
-        .filter(|run| &run.issue_id == issue_id)
-        .collect::<Vec<_>>();
-    results.sort_by(|left, right| {
-        left.started_at
-            .cmp(&right.started_at)
-            .then_with(|| left.run_id.cmp(&right.run_id))
-    });
-    let inputs = captured
-        .into_iter()
-        .filter(|(_, _, result)| result.as_ref().is_some_and(|run| &run.issue_id == issue_id))
-        .map(|(path, _, _)| path)
-        .collect();
+    let inputs = named.into_iter().map(|(_, _, path)| path).collect();
     Ok(CapturedGateRuns { results, inputs })
 }
 
@@ -413,11 +460,14 @@ fn omit_current_gate_projection(issue: &mut IssueShowResponse, gate_key: &GateKe
 fn repository_rule_report(
     image: &crate::repository_state::RepositoryImage,
 ) -> crate::validation::report::RuleReport {
-    let report = match crate::validation::repository::validate_repository(image) {
-        Ok(report) => report,
-        Err(error) => error.into_parts().1,
-    };
-    report.rule_report
+    crate::validation::report(
+        &crate::validation::CapturedValidation::from_image(image),
+        &crate::validation::ReportInputs {
+            now: chrono::Utc::now(),
+            history: None,
+        },
+    )
+    .rule_report
 }
 
 fn captured_issue_rule_report(
@@ -455,7 +505,7 @@ fn captured_issue_rule_report(
         .collect::<Vec<_>>();
     let namespaces = crate::config_manager::namespaces_from_config(&config);
     let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-    let plan_content = super::validate::plan_content_from_image(image, &issues)?;
+    let plan_content = super::validate::plan_content_with_issues(image, &issues, &issues)?;
     findings.extend(
         crate::validation::graph::evaluate_graph(
             &graph_rules,
@@ -477,7 +527,7 @@ fn captured_issue_rule_report(
             .findings
             .into_iter()
             .filter(|finding| {
-                finding.rule == super::DANGLING_LINK_RULE
+                finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
                     && finding.issue_id.as_ref() == Some(issue_id)
             }),
     );
@@ -531,7 +581,7 @@ fn captured_scope_rule_report(
         let namespaces = crate::config_manager::namespaces_from_config(&config);
         let hierarchy =
             crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-        let plan_content = super::validate::plan_content_from_image(image, &slice)?;
+        let plan_content = super::validate::plan_content_with_issues(image, &all, &slice)?;
         findings.extend(
             crate::validation::graph::evaluate_graph_scoped(
                 &graph_rules,
@@ -551,12 +601,13 @@ fn captured_scope_rule_report(
             .findings
             .into_iter()
             .filter(|finding| {
-                (finding.rule == super::DANGLING_LINK_RULE
+                (finding.rule == crate::validation::report::BuiltInPass::DanglingItemLink.as_str()
                     && finding
                         .issue_id
                         .as_ref()
                         .is_some_and(|id| scope_ids.contains(id)))
-                    || finding.rule == super::ENFORCEMENT_DRIFT_RULE
+                    || finding.rule
+                        == crate::validation::report::BuiltInPass::EnforcementDrift.as_str()
             }),
     );
     Ok(RuleReport { findings })
@@ -596,33 +647,29 @@ fn gate_findings_from_rule_report(
 /// findings. Failing to load or read what it needed, an unloadable rules declaration
 /// included, is a fault the checker cannot judge through, so it returns `Err`.
 fn gate_findings_from_report(
-    result: std::result::Result<
-        crate::validation::repository::RepositoryValidationReport,
-        crate::validation::repository::RepositoryValidationFailure,
-    >,
+    report: crate::validation::ValidationReport,
 ) -> Result<(Vec<GateFinding>, bool)> {
-    let report = match result {
-        Ok(report) => report,
-        Err(failure) if failure.is_judged_invalid() => {
-            let (error, report) = failure.into_parts();
-            let mut findings = gate_findings_from_rule_report(&report.rule_report);
-            findings.push(GateFinding::builtin(
-                "repository-invalid",
-                FindingSeverity::High,
-                FindingDisposition::Blocking,
-                FindingOrigin::PreExisting,
-                format!("{error:#}"),
-            ));
-            return Ok((findings, true));
-        }
-        Err(failure) => return Err(failure.into_error()),
-    };
-    if !report
+    let judged_invalid = report.is_judged_invalid();
+    let rules_loaded = report
         .passes
-        .contains(&crate::validation::repository::RepositoryValidationPass::RulesAndSchemas)
-    {
-        let causes = report
-            .rule_report
+        .contains(&crate::validation::repository::RepositoryValidationPass::RulesAndSchemas);
+    let (failure, rule_report) = report.into_parts();
+    if let Some(error) = failure {
+        if !judged_invalid {
+            return Err(error);
+        }
+        let mut findings = gate_findings_from_rule_report(&rule_report);
+        findings.push(GateFinding::builtin(
+            "repository-invalid",
+            FindingSeverity::High,
+            FindingDisposition::Blocking,
+            FindingOrigin::PreExisting,
+            format!("{error:#}"),
+        ));
+        return Ok((findings, true));
+    }
+    if !rules_loaded {
+        let causes = rule_report
             .findings
             .iter()
             .filter(|finding| finding.is_error())
@@ -631,8 +678,10 @@ fn gate_findings_from_report(
             .join("; ");
         anyhow::bail!("rules declaration did not load: {causes}");
     }
-    let failed = report.rule_report.has_errors();
-    Ok((gate_findings_from_rule_report(&report.rule_report), failed))
+    Ok((
+        gate_findings_from_rule_report(&rule_report),
+        rule_report.has_errors(),
+    ))
 }
 
 /// Validate the scope named by the issue's single `<namespace>:<target-id>` label.
@@ -796,7 +845,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .map(|image| (image, target_id)));
         }
         let layout = initial.layout().clone();
-        let image = super::grow_discovering(session, initial, |image, spec| {
+        let image = super::grow_discovering(session, initial, |_, spec| {
             spec.discover_paths(
                 issue
                     .dependencies
@@ -819,7 +868,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 spec.discover_paths([prompt])?;
             }
             if super::checker_consumes_run_history(checker) {
-                super::discover_gate_run_results(image, spec)?;
+                spec.discover_paths(
+                    super::named_gate_run_records(&issue)
+                        .map(|(_, _, path)| path)
+                        .collect::<Vec<_>>(),
+                )?;
             }
             Ok(())
         })?;
@@ -904,7 +957,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                         .collect()
                 };
                 let runs = if super::checker_consumes_run_history(checker) {
-                    captured_gate_runs(&image, &target_id)?
+                    captured_gate_runs(&image, &issue)?
                 } else {
                     CapturedGateRuns::default()
                 };
@@ -922,10 +975,17 @@ impl<S: IssueStore> GateOps<'_, S> {
         // the verdict was derived over, not what the checker left behind.
         let digest = self.exec.declared_inputs_digest(gate)?;
         let reused = match (source, digest.as_ref()) {
-            (VerdictSource::ReuseUnchangedInputs, Some(digest)) => self
-                .exec
-                .storage
-                .find_reusable_gate_run(&gate.key, digest)?,
+            (VerdictSource::ReuseUnchangedInputs, Some(digest)) => {
+                with_mutation_attempts("gate verdict reuse", || {
+                    let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
+                    Ok(
+                        match captured_reusable_gate_run(session.as_mut(), &gate.key, digest)? {
+                            Some(run) => AttemptOutcome::Done(run),
+                            None => AttemptOutcome::Retry,
+                        },
+                    )
+                })?
+            }
             _ => None,
         };
         let mut result = match reused {
@@ -941,6 +1001,11 @@ impl<S: IssueStore> GateOps<'_, S> {
             })?,
         };
         result.inputs_digest = digest;
+        let record_paths = run_paths
+            .iter()
+            .cloned()
+            .chain(super::gate_verdict_record_paths(&result)?)
+            .collect::<Vec<_>>();
 
         with_mutation_attempts("gate evaluation record", || {
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
@@ -948,7 +1013,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 session.as_mut(),
                 &target_id.clone(),
                 gate_key,
-                &run_paths,
+                &record_paths,
             )?
             else {
                 return Ok(AttemptOutcome::Retry);
@@ -961,7 +1026,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 .as_ref()
                 .is_some_and(super::checker_consumes_run_history)
             {
-                captured_gate_runs(&final_image, &target_id)?
+                captured_gate_runs(&final_image, &final_issue)?
             } else {
                 CapturedGateRuns::default()
             };
@@ -1097,7 +1162,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
             GateChecker::ReviewPlaceholder => Ok((
                 vec![GateFinding::builtin(
-                    "review-placeholder",
+                    crate::validation::report::BuiltInPass::ReviewPlaceholder.as_str(),
                     FindingSeverity::High,
                     FindingDisposition::Advisory,
                     FindingOrigin::PreExisting,
@@ -1228,6 +1293,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .and_then(|state| state.run_id.as_ref())
             .map(|run_id| self.storage.load_gate_run_result(&issue.id, run_id))
             .transpose()
+            .map(|run| run.filter(|run| &run.gate_key == gate_key))
     }
 
     fn build_captured_gate_context(
@@ -1287,11 +1353,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 "description": input.gate.description,
                 "stage": input.gate.stage,
             }),
-            run_history: compact_run_history_for_context(
-                input.runs,
-                &input.gate.key,
-                input.issue.gates_status.get(&input.gate.key),
-            ),
+            run_history: compact_run_history_for_context(input.runs, &input.gate.key),
         }))
     }
 
@@ -1338,12 +1400,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore> GateOps<'_, S> {
-    /// Return the latest published run for each registered required gate on an
-    /// issue, an automated gate's checker run or a manual gate's attestation, as
-    /// [`Self::get_last_gate_run`] selects it.
+    /// Load the run named by every gate state, without listing run history.
     ///
-    /// Results are ordered by gate priority, preserving insertion order for ties.
-    /// The second vector contains the gate keys that have no recorded run.
+    /// Registered required gates come first on priority ties; unregistered
+    /// states sort last. The second vector includes states and registered
+    /// required gates with no run id, or whose named run belongs to another
+    /// gate.
     pub fn get_last_gate_runs_for_issue(
         &self,
         issue_id: &IssueId,
@@ -1352,17 +1414,25 @@ impl<S: IssueStore> GateOps<'_, S> {
         let issue = self.exec.storage.load_issue(&full_id)?;
         let registry = self.exec.storage.load_gate_registry()?;
 
-        // Sort by priority (stable sort preserves insertion order for ties)
         let mut gates: Vec<_> = issue
             .gates_required
             .iter()
-            .filter_map(|key| registry.gates.get(key).map(|g| (key, g)))
+            .filter(|key| registry.gates.contains_key(*key))
             .collect();
-        gates.sort_by_key(|(_, gate)| gate.priority);
+        let remaining: Vec<_> = issue
+            .gates_status
+            .keys()
+            .filter(|key| !gates.contains(key))
+            .collect();
+        gates.extend(remaining);
+        gates.sort_by_key(|key| {
+            let priority = registry.gates.get(*key).map(|gate| gate.priority);
+            (priority.is_none(), priority)
+        });
 
         gates.into_iter().try_fold(
             (Vec::new(), Vec::new()),
-            |(mut results, mut not_run), (gate_key, _)| {
+            |(mut results, mut not_run), gate_key| {
                 match self.exec.projected_gate_run(&issue, gate_key)? {
                     Some(result) => results.push(result),
                     None => not_run.push(gate_key.clone()),
@@ -1447,7 +1517,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .as_ref()
                     .is_some_and(super::checker_consumes_run_history)
         }) {
-            captured_gate_runs(image, &issue.id)?.results
+            captured_gate_runs(image, issue)?.results
         } else {
             Vec::new()
         };
@@ -1484,7 +1554,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     projected_issue
                         .gates_status
                         .insert(gate_key.clone(), gate_state_from_run(&result));
-                    history.push(result.clone());
+                    replace_named_run(&mut history, result.clone());
                     runs.push(result);
                 }
                 GateMode::Manual => {
@@ -1535,7 +1605,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::{compact_run_history_for_context, omit_current_gate_projection, IssueIdPrefix};
+    use super::{
+        compact_run_history_for_context, omit_current_gate_projection, replace_named_run,
+        IssueIdPrefix,
+    };
     use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file, setup};
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
@@ -1721,7 +1794,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
     }
 
     #[test]
-    fn test_compact_run_history_selects_the_run_the_gate_status_names() {
+    fn test_compact_run_history_selects_the_gates_run_among_other_gates_runs() {
         let named = prior_run(
             &crate::test_utils::gate_run_id(1),
             &"review".parse().unwrap(),
@@ -1729,38 +1802,50 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             None,
         );
         let runs = vec![
-            named.clone(),
             prior_run(
                 &crate::test_utils::gate_run_id(2),
                 &"cargo-ci".parse().unwrap(),
                 40,
                 None,
             ),
-            prior_run(
-                &crate::test_utils::gate_run_id(3),
-                &"review".parse().unwrap(),
-                30,
-                None,
-            ),
-            prior_run(
-                &crate::test_utils::gate_run_id(4),
-                &"review".parse().unwrap(),
-                10,
-                None,
-            ),
+            named.clone(),
         ];
 
-        let compact = compact_run_history_for_context(
-            &runs,
-            &"review".parse().unwrap(),
-            Some(&super::gate_state_from_run(&named)),
-        );
+        let compact = compact_run_history_for_context(&runs, &"review".parse().unwrap());
 
         assert_eq!(compact.len(), 1);
         assert_eq!(compact[0].run_id, named.run_id);
         assert_eq!(compact[0].stdout, named.stdout);
         assert!(compact[0].stderr.is_empty());
-        assert_eq!(runs[0], named, "source run must remain unchanged");
+        assert_eq!(runs[1], named, "source run must remain unchanged");
+    }
+
+    #[test]
+    fn test_replace_named_run_makes_the_fresh_result_its_gates_history() {
+        let review: GateKey = "review".parse().unwrap();
+        let other = prior_run(
+            &crate::test_utils::gate_run_id(2),
+            &"cargo-ci".parse().unwrap(),
+            10,
+            None,
+        );
+        let mut history = vec![
+            prior_run(&crate::test_utils::gate_run_id(1), &review, 10, None),
+            other.clone(),
+        ];
+        let fresh = prior_run(&crate::test_utils::gate_run_id(3), &review, 20, None);
+
+        replace_named_run(&mut history, fresh.clone());
+
+        assert_eq!(
+            compact_run_history_for_context(&history, &review)
+                .into_iter()
+                .map(|run| run.run_id)
+                .collect::<Vec<_>>(),
+            vec![fresh.run_id]
+        );
+        assert_eq!(history.len(), 2);
+        assert!(history.contains(&other));
     }
 
     #[test]
@@ -1780,7 +1865,6 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         let compact = compact_run_history_for_context(
             std::slice::from_ref(&source),
             &"review".parse().unwrap(),
-            Some(&super::gate_state_from_run(&source)),
         );
 
         assert_eq!(compact.len(), 1);
@@ -1792,19 +1876,15 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
     }
 
     #[test]
-    fn test_compact_run_history_is_empty_without_matching_runs() {
+    fn test_compact_run_history_is_empty_for_a_gate_without_a_named_run() {
         let run = prior_run(
             &crate::test_utils::gate_run_id(6),
             &"cargo-ci".parse().unwrap(),
             10,
             None,
         );
-        let state = super::gate_state_from_run(&run);
 
-        assert!(
-            compact_run_history_for_context(&[run], &"review".parse().unwrap(), Some(&state))
-                .is_empty()
-        );
+        assert!(compact_run_history_for_context(&[run], &"review".parse().unwrap()).is_empty());
     }
 
     #[test]
@@ -1822,40 +1902,6 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             serde_json::to_value(&view.gates).unwrap(),
             serde_json::json!([expected])
         );
-    }
-
-    #[test]
-    fn test_projected_precheck_run_matches_next_checker_issue_view() {
-        let mut issue = crate::test_utils::fixture_issue("Test".into(), String::new());
-        issue.id = crate::test_utils::issue_id(0xc4e9_59a0_b8a4_228d_7550_22a2_872f_f725);
-        issue.gates_required = vec!["first".parse().unwrap(), "second".parse().unwrap()];
-        let mut run = prior_run(
-            &crate::test_utils::gate_run_id(7),
-            &"first".parse().unwrap(),
-            10,
-            None,
-        );
-        run.status = GateRunStatus::Passed;
-        issue
-            .gates_status
-            .insert("first".parse().unwrap(), super::gate_state_from_run(&run));
-
-        let second = issue.gates_status.get(&"second".parse().unwrap()).cloned();
-        let mut view = crate::output::IssueShowResponse::from_issue(
-            issue,
-            Vec::new(),
-            std::slice::from_ref(&run),
-        );
-        omit_current_gate_projection(&mut view, &"second".parse().unwrap());
-
-        assert_eq!(view.gates[0].status, GateStatus::Passed);
-        assert!(view.gates[0].last_run_at.is_some());
-        assert!(compact_run_history_for_context(
-            &[run],
-            &"second".parse().unwrap(),
-            second.as_ref()
-        )
-        .is_empty());
     }
 
     #[test]
@@ -2351,7 +2397,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
         assert_eq!(fixture.executions(), 1, "the checker must run exactly once");
         assert!(executed.origin.is_executed());
-        assert_eq!(reused.origin.source_run(), Some(&executed.run_id));
+        assert_eq!(
+            reused.origin,
+            crate::domain::GateVerdictOrigin::Reused {
+                source_issue: executed.issue_id.clone(),
+                source_run: executed.run_id.clone(),
+            }
+        );
         assert_eq!(reused.status, executed.status);
         assert_eq!(reused.inputs_digest, executed.inputs_digest);
         assert!(
@@ -2456,6 +2508,63 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(fixture.executions(), 2, "the restored content was verified");
         assert_eq!(restored.inputs_digest, original.inputs_digest);
         assert_eq!(restored.origin.source_run(), Some(&original.run_id));
+    }
+
+    /// Reuse reads only the verdict record for its key and the run it names.
+    #[test]
+    fn test_check_gate_reuses_while_every_other_run_and_verdict_record_is_unparseable() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".parse().unwrap(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let source = fixture.evaluate(&fixture.issue("Test", "Test"));
+        fixture.write("workspace/src/lib.rs", "fn main() { /* edited */ }\n");
+        fixture.evaluate(&fixture.issue("Test", "Test"));
+        fixture.write("workspace/src/lib.rs", "fn main() {}\n");
+        let reusing = fixture.issue("Test", "Test");
+        let layout = fixture.executor.require_layout().unwrap();
+        let kept = [
+            crate::repository_state::VirtualPath::gate_verdict_record(
+                &fixture.gate_key,
+                source.inputs_digest.as_ref().unwrap(),
+            ),
+            crate::repository_state::VirtualPath::gate_run_record(&source.run_id),
+        ]
+        .map(|path| layout.resolve(&path).unwrap());
+        fn corrupt_files_except(dir: &std::path::Path, kept: &[std::path::PathBuf]) -> usize {
+            std::fs::read_dir(dir)
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .map(|path| match path.is_dir() {
+                    true => corrupt_files_except(&path, kept),
+                    false if kept.contains(&path) => 0,
+                    false => {
+                        std::fs::write(&path, "{ not json").unwrap();
+                        1
+                    }
+                })
+                .sum()
+        }
+        let corrupted = corrupt_files_except(
+            &layout
+                .resolve(&crate::repository_state::VirtualPath::GATE_RUNS)
+                .unwrap(),
+            &kept,
+        );
+        assert_eq!(corrupted, 2, "the other run and its verdict record");
+
+        let reused = fixture.evaluate(&reusing);
+
+        assert_eq!(fixture.executions(), 2);
+        assert_eq!(reused.origin.source_run(), Some(&source.run_id));
     }
 
     /// REQ-07: a change to a file no declared root covers leaves the digest
@@ -2568,6 +2677,91 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(
             forced.inputs_digest, executed.inputs_digest,
             "a forced run still records the digest it was derived over"
+        );
+    }
+
+    /// Replaces a verdict record at the first commit check, as an evaluation
+    /// racing to record the same key would.
+    struct RacingVerdictWriter {
+        path: std::path::PathBuf,
+        bytes: Vec<u8>,
+        commit_checks: std::sync::atomic::AtomicUsize,
+    }
+
+    impl crate::storage::MutationInterruptionInjector for RacingVerdictWriter {
+        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+            use std::sync::atomic::Ordering;
+            if point == &MutationPoint::BeforeCommitCheck
+                && self.commit_checks.fetch_add(1, Ordering::SeqCst) == 0
+            {
+                std::fs::write(&self.path, &self.bytes)?;
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_check_gate_with_retries_a_verdict_record_replaced_by_a_racing_evaluation() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let fixture = ReuseFixture {
+            repo,
+            executor,
+            gate_key: "workspace-check".parse().unwrap(),
+        };
+        fixture.seed(Some((&["workspace"], &[])), 0);
+        let first = fixture.evaluate(&fixture.issue("Test", "Test"));
+        let layout = fixture.executor.require_layout().unwrap();
+        let record = layout
+            .resolve(&crate::repository_state::VirtualPath::gate_verdict_record(
+                &fixture.gate_key,
+                first.inputs_digest.as_ref().unwrap(),
+            ))
+            .unwrap();
+        let racer = Arc::new(RacingVerdictWriter {
+            path: record.clone(),
+            bytes: crate::repository_state::serialize_gate_verdict(
+                &crate::domain::GateVerdictRecord {
+                    issue_id: first.issue_id.clone(),
+                    run_id: crate::test_utils::gate_run_id(9),
+                },
+            )
+            .unwrap(),
+            commit_checks: Default::default(),
+        });
+        let racing = CommandExecutor::new(JsonFileStorage::with_mutation_interruptions(
+            fixture.executor.storage.root(),
+            racer.clone(),
+        ))
+        .with_layout(layout);
+
+        let forced = racing
+            .gates()
+            .check_gate_with(
+                &fixture.issue("Test", "Test"),
+                &fixture.gate_key,
+                super::VerdictSource::Execute,
+            )
+            .expect("the evaluation retries its record");
+
+        let stored: crate::domain::GateVerdictRecord =
+            serde_json::from_slice(&std::fs::read(record).unwrap()).unwrap();
+        assert_eq!(stored.run_id, forced.run_id);
+        assert_eq!(
+            fixture.executions(),
+            2,
+            "the retry reuses the checker's verdict"
+        );
+        assert!(
+            racer
+                .commit_checks
+                .load(std::sync::atomic::Ordering::SeqCst)
+                > 1,
+            "the replaced record must fail the first commit check"
         );
     }
 
@@ -2742,6 +2936,36 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         executor.gates().add_gate(issue_id, gate_key).unwrap();
     }
 
+    /// Make `issue_id`'s state of `gate_key` name `run_id`, written past the
+    /// executor so no record of that run need exist.
+    fn name_gate_run(
+        executor: &CommandExecutor<JsonFileStorage>,
+        issue_id: &IssueId,
+        gate_key: &GateKey,
+        run_id: &GateRunId,
+    ) {
+        let mut issue = executor.storage.load_issue(issue_id).unwrap();
+        issue.gates_status.insert(
+            gate_key.clone(),
+            crate::domain::GateState {
+                status: crate::domain::GateStatus::Failed,
+                updated_by: None,
+                updated_at: Utc::now(),
+                run_id: Some(run_id.clone()),
+            },
+        );
+        let issue_path = executor
+            .require_layout()
+            .unwrap()
+            .resolve(&VirtualPath::issue_record(issue_id))
+            .unwrap();
+        std::fs::write(
+            issue_path,
+            crate::repository_state::serialize_issue(&issue).unwrap(),
+        )
+        .unwrap();
+    }
+
     fn corrupt_gate_run_record() -> crate::repository_state::VirtualPath {
         crate::repository_state::VirtualPath::gate_run_record(&crate::test_utils::gate_run_id(0xc0))
     }
@@ -2792,7 +3016,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .as_ref()
             .is_some_and(crate::commands::checker_consumes_run_history)
         {
-            super::captured_gate_runs(&image, issue_id).unwrap()
+            super::captured_gate_runs(&image, &issue).unwrap()
         } else {
             super::CapturedGateRuns::default()
         };
@@ -2843,6 +3067,70 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
+    fn test_capture_gate_evaluation_image_holds_only_the_evaluated_issues_named_runs() {
+        use crate::storage::RepositoryStateStore;
+
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Evaluated", "Evaluated");
+        let other_id = seed_gate_issue(
+            &executor,
+            &taxonomy,
+            &"not-a-reserved-repository-key".parse().unwrap(),
+            "Other",
+            "Other",
+        );
+        let gate_key: GateKey = "review".parse().unwrap();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            &gate_key,
+            "Review",
+            "cat \"$JIT_CONTEXT_FILE\"".to_string(),
+            None,
+        );
+        executor.gates().add_gate(&other_id, &gate_key).unwrap();
+        executor.gates().check_gate(&other_id, &gate_key).unwrap();
+        executor.gates().check_gate(&issue_id, &gate_key).unwrap();
+        let latest = executor.gates().check_gate(&issue_id, &gate_key).unwrap();
+        executor.gates().check_gate(&other_id, &gate_key).unwrap();
+
+        let layout = executor.require_layout().unwrap();
+        let mut session = executor.storage.open_mutation_session(layout).unwrap();
+        let (image, _) = executor
+            .capture_gate_evaluation_image(session.as_mut(), &issue_id, &gate_key, &[])
+            .unwrap()
+            .unwrap();
+        drop(session);
+        let captured_runs = image
+            .entries()
+            .keys()
+            .filter(|path| {
+                *path != &VirtualPath::GATE_RUNS
+                    && path
+                        .relative()
+                        .as_path()
+                        .starts_with(VirtualPath::GATE_RUNS.relative().as_path())
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(
+            captured_runs,
+            vec![VirtualPath::gate_run_record(&latest.run_id)]
+        );
+
+        let result = executor.gates().check_gate(&issue_id, &gate_key).unwrap();
+        let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+        let history = context["run_history"].as_array().unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0]["run_id"], latest.run_id.as_str());
+    }
+
+    #[test]
     fn test_exec_without_context_ignores_unrelated_corrupt_gate_run() {
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let config = format!(
@@ -2880,7 +3168,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
-    fn test_exec_with_context_rejects_corrupt_gate_run_with_path() {
+    fn test_exec_with_context_rejects_corrupt_named_gate_run_with_path() {
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let config = format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
@@ -2897,6 +3185,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             None,
         );
         write_corrupt_gate_run(repo.path());
+        name_gate_run(
+            &executor,
+            &issue_id,
+            &"with-context".parse().unwrap(),
+            &crate::test_utils::gate_run_id(0xc0),
+        );
 
         let error = executor
             .gates()
@@ -3064,8 +3358,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let validate = executor
             .validation()
             .validate_repository_report()
-            .unwrap()
-            .is_ok_and(|report| !report.rule_report.has_errors());
+            .map(|report| report.structural_failure.is_none() && !report.rule_report.has_errors())
+            .unwrap();
         let run = executor
             .execute_builtin_checker_with_repository_view(
                 GateRunSubject {
@@ -3201,7 +3495,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let findings = executor.validation().review_placeholder_findings().unwrap();
 
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule, crate::commands::REVIEW_PLACEHOLDER_RULE);
+        assert_eq!(
+            findings[0].rule,
+            crate::validation::report::BuiltInPass::ReviewPlaceholder.as_str()
+        );
         assert_eq!(
             findings[0].severity,
             crate::declarations::rules::Severity::Warn
@@ -3418,7 +3715,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "unrelated-local-failure",
             "unrelated-graph-failure",
             "unrelated-label-reference",
-            crate::commands::DANGLING_LINK_RULE,
+            crate::validation::report::BuiltInPass::DanglingItemLink.as_str(),
         ] {
             assert!(
                 broad_report
@@ -4097,6 +4394,115 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     }
 
     #[test]
+    fn test_get_last_gate_runs_for_issue_loads_named_runs_for_every_gate_state() {
+        let executor = setup();
+        let mut issue = crate::test_utils::fixture_issue("T".into(), String::new());
+        let mut expected = Vec::new();
+        for (index, key) in ["required", "optional"].into_iter().enumerate() {
+            let key: GateKey = key.parse().unwrap();
+            let older = GateRunResult::attestation(
+                &crate::test_utils::gate_run_id(index as u128 * 2 + 1),
+                &issue.id,
+                &key,
+                GateStage::Postcheck,
+                GateStatus::Failed,
+                None,
+            );
+            let mut named = older.clone();
+            named.run_id = crate::test_utils::gate_run_id(index as u128 * 2 + 2);
+            named.status = GateRunStatus::Passed;
+            for run in [&older, &named] {
+                executor.storage.add_data_file(
+                    crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
+                        .relative()
+                        .as_path(),
+                    &serde_json::to_string(run).unwrap(),
+                );
+            }
+            issue
+                .gates_status
+                .insert(key, super::gate_state_from_run(&named));
+            expected.push(named.run_id);
+        }
+        issue.gates_required.push("required".parse().unwrap());
+        seed_issue(executor.storage(), issue.clone());
+
+        let (runs, not_run) = executor
+            .gates()
+            .get_last_gate_runs_for_issue(&issue.id)
+            .unwrap();
+        let actual: std::collections::BTreeSet<_> =
+            runs.iter().map(|run| run.run_id.clone()).collect();
+        assert_eq!(actual, expected.into_iter().collect());
+        assert!(not_run.is_empty());
+    }
+
+    #[test]
+    fn test_get_last_gate_runs_for_issue_omits_a_run_named_by_another_gates_state() {
+        let executor = setup();
+        let mut issue = crate::test_utils::fixture_issue("T".into(), String::new());
+        let own: GateKey = "review".parse().unwrap();
+        let other: GateKey = "lint".parse().unwrap();
+        let run = GateRunResult::attestation(
+            &crate::test_utils::gate_run_id(1),
+            &issue.id,
+            &other,
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        executor.storage.add_data_file(
+            crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
+                .relative()
+                .as_path(),
+            &serde_json::to_string(&run).unwrap(),
+        );
+        issue
+            .gates_status
+            .insert(own.clone(), super::gate_state_from_run(&run));
+        seed_issue(executor.storage(), issue.clone());
+
+        let (runs, not_run) = executor
+            .gates()
+            .get_last_gate_runs_for_issue(&issue.id)
+            .unwrap();
+        assert!(runs.is_empty());
+        assert_eq!(not_run, vec![own]);
+    }
+
+    #[test]
+    fn test_get_last_gate_runs_for_issue_ignores_history_without_state_run_id() {
+        let executor = setup();
+        let mut issue = crate::test_utils::fixture_issue("T".into(), String::new());
+        let key: GateKey = "review".parse().unwrap();
+        let run = GateRunResult::attestation(
+            &crate::test_utils::gate_run_id(1),
+            &issue.id,
+            &key,
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            None,
+        );
+        executor.storage.add_data_file(
+            crate::repository_state::VirtualPath::gate_run_record(&run.run_id)
+                .relative()
+                .as_path(),
+            &serde_json::to_string(&run).unwrap(),
+        );
+        let mut state = super::gate_state_from_run(&run);
+        state.run_id = None;
+        issue.gates_status.insert(key.clone(), state);
+        seed_issue(executor.storage(), issue.clone());
+
+        let (runs, not_run) = executor
+            .gates()
+            .get_last_gate_runs_for_issue(&issue.id)
+            .unwrap();
+        assert!(runs.is_empty());
+        assert_eq!(not_run, vec![key]);
+    }
+
+    #[test]
     fn test_get_last_gate_runs_for_issue() {
         let executor = setup();
 
@@ -4288,75 +4694,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .get(&"precheck".parse().unwrap())
             .unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter() {
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        let config = format!(
-            "[worktree]\nenforce_leases = \"off\"\n\n{}",
-            taxonomy.config_fragment()
-        );
-        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
-        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        add_exec_gate(
-            &executor,
-            &issue_id,
-            &"precheck".parse().unwrap(),
-            "Precheck",
-            "true".to_string(),
-            None,
-        );
-        executor
-            .gates()
-            .update_gate(
-                &"precheck".parse().unwrap(),
-                GateUpdate {
-                    stage: Some(GateStage::Precheck),
-                    ..Default::default()
-                },
-            )
-            .unwrap();
-        crate::test_utils::transition_issue(&executor, &issue_id, State::Ready).unwrap();
-
-        let root = repo.path().join(".jit/gate-runs");
-        for index in 0..257 {
-            let run_id = crate::test_utils::gate_run_id(index as u128 + 1);
-            let record = repo.path().join(".jit").join(
-                crate::repository_state::VirtualPath::gate_run_record(&run_id)
-                    .relative()
-                    .as_path(),
-            );
-            std::fs::create_dir_all(record.parent().unwrap()).unwrap();
-            let mut run = prior_run(&run_id, &"history".parse().unwrap(), index, None);
-            run.issue_id = issue_id.clone();
-            std::fs::write(record, serde_json::to_vec_pretty(&run).unwrap()).unwrap();
-        }
-        std::fs::write(root.join("clutter-file"), "ignored").unwrap();
-        std::fs::create_dir(root.join("clutter-directory")).unwrap();
-        std::fs::write(root.join("clutter-directory/result.json"), "{ corrupt").unwrap();
-        std::os::unix::fs::symlink("clutter-file", root.join("clutter-link")).unwrap();
-        assert!(std::process::Command::new("mkfifo")
-            .arg(root.join("clutter-fifo"))
-            .status()
-            .unwrap()
-            .success());
-
-        executor
-            .issues()
-            .claim_issue(
-                &IssueIdPrefix::from(&issue_id),
-                "agent:worker".parse().unwrap(),
-            )
-            .unwrap();
-
-        let issue = executor.storage.load_issue(&issue_id).unwrap();
-        assert_eq!(issue.state, State::InProgress);
-        assert_eq!(
-            issue.gates_status[&"precheck".parse().unwrap()].status,
-            crate::domain::GateStatus::Passed
-        );
     }
 
     #[test]
@@ -5250,7 +5587,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[cfg(unix)]
     #[test]
-    fn test_check_gate_classifies_same_issue_run_drift_but_not_unrelated_run() {
+    fn test_check_gate_classifies_named_run_drift_but_not_unrelated_run() {
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let config = format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
@@ -5280,6 +5617,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 publish_concurrent_run_script(&concurrent.run_id)
             ),
             None,
+        );
+        name_gate_run(
+            &executor,
+            &issue_id,
+            &"run-race".parse().unwrap(),
+            &concurrent.run_id,
         );
 
         let result = executor

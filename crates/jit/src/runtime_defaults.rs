@@ -103,7 +103,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Claim stale threshold",
             format!("{CLAIM_STALE_THRESHOLD_SECS} seconds"),
-            "Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer refuses other agents' writes and is not evicted automatically.",
+            "Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer refuses other agents' writes, and `jit recover` reclaims it.",
         ),
         (
             "Indefinite leases per agent",

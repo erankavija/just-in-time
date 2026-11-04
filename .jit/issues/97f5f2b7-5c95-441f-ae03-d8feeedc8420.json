@@ -1,13 +1,16 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T00:02:41.399934998Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
     "2117739f-f6b9-4b39-9dbd-f3deb7a0885e",
     "84e1e27a-8272-4885-84af-8e667cbad57e"
   ],
-  "description": "Delete the profile-lifecycle torn-tail marker and the finalizer code that wrote and ordered it, which no reader consults any more, and correct every statement of where an event append lands.\n\n## Background\n\nThe profile-lifecycle event carries `isolated_torn_tail` (`crates/jit/src/domain/types.rs`, catalog sample in `domain/event_catalog.rs`). The finalizer stamps it and moves the marker to the first appended line over a torn tail (`repository_state/mutation.rs`), detects the tail with `prefix_has_torn_tail` (re-exported from `repository_state/mod.rs`) and declares `MutationError::UncertifiedTornTail`. Tests naming the marker live in `mutation.rs`, `commands/profile.rs` and `storage/repository_state_store_tests.rs`.\n\nRemoving the field changes how stored lines reproduce: gf2's log holds 13 lines carrying `\"isolated_torn_tail\":false`, and whole-repository validation fails a line that does not reproduce. The format cutover rewrites those lines. The marker on main is already at format 4, so the format 3 data is never read by this code.\n\nEvent appends land at the log's committed length, the end of its last newline-terminated line. Restatements still say \"the log's length\" or \"the captured length\", or describe a torn-tail refusal: `repository_state/image.rs` (`EventLogTail` and its capture docs), `repository_state/initialize.rs` (module doc and capture comments), `commands/validate.rs` (the mutation capture comment), `validation/record_fidelity.rs` (\"certified torn tail\"), `dev/architecture/repository-state-materialization.md` and `docs/reference/storage-format.md`.\n\n## Success Criteria\n\n- [hard] REQ-01: `ProfileLifecycle.isolated_torn_tail`, the finalizer's marker stamping and reordering, `prefix_has_torn_tail` and `UncertifiedTornTail` no longer exist, and no test names them.\n- [hard] REQ-02: The generated event reference is regenerated, and this repository's event log, which holds no such line, decodes and re-serializes unchanged.\n- [hard] REQ-03: Each listed rustdoc, comment and document says that an event append is positioned at the log's committed length, and none describes a torn-tail certification or refusal.\n",
+  "description": "Delete the profile-lifecycle torn-tail marker and the finalizer code that wrote and ordered it, which no reader consults any more, and correct every statement of where an event append lands.\n\n## Background\n\nThe profile-lifecycle event carries `isolated_torn_tail` (`crates/jit/src/domain/types.rs`, catalog sample in `domain/event_catalog.rs`). The finalizer stamps it and moves the marker to the first appended line over a torn tail (`repository_state/mutation.rs`), detects the tail with `prefix_has_torn_tail` (re-exported from `repository_state/mod.rs`) and declares `MutationError::UncertifiedTornTail`. Tests naming the marker live in `mutation.rs`, `commands/profile.rs` and `storage/repository_state_store_tests.rs`.\n\nRemoving the field changes how stored lines reproduce: gf2's log holds 13 lines carrying `\"isolated_torn_tail\":false`, and whole-repository validation fails a line that does not reproduce. The format cutover rewrites those lines. The marker on main is already at format 4, so the format 3 data is never read by this code.\n\nEvent appends land at the log's committed length, the end of its last newline-terminated line. Restatements still say \"the log's length\" or \"the captured length\", or describe a torn-tail refusal: `repository_state/image.rs` (`EventLogTail` and its capture docs), `repository_state/initialize.rs` (module doc and capture comments), `commands/validate.rs` (the mutation capture comment), `validation/record_fidelity.rs` (\"certified torn tail\"), `dev/architecture/repository-state-materialization.md` and `docs/reference/storage-format.md`.\n\n## Success Criteria\n\n- [hard] REQ-01: `ProfileLifecycle.isolated_torn_tail`, the finalizer's marker stamping and reordering, `prefix_has_torn_tail` and `UncertifiedTornTail` no longer exist, and no test names them.\n- [hard] REQ-02: The generated event reference is regenerated, and this repository's event log, which holds no such line, decodes and re-serializes unchanged.\n- [hard] REQ-03: Each listed rustdoc, comment and document says that an event append is positioned at the log's committed length, and none describes a torn-tail certification or refusal.\n\n## Decisions\n\n- D-1: Steward ruling (just-in-time-6a, 2026-11-04, for the user): @/inv/atomic-writes now says the event log grows by a positioned append at the committed length the mutation read. The wording clarifies the invariant and does not change its meaning: with the torn-tail marker gone, the committed length is what the code implements.\n",
   "documents": [],
+  "done_at": "2026-11-04T01:23:09.806269075Z",
+  "first_ready_at": "2026-11-04T00:02:18.558781278Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -15,15 +18,29 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "run_id": "a13574e0-a497-41fe-98ec-87ebabdc9442",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:54:11.698154128Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6d04c438-8040-4afc-bbb9-90b2ee0377c6",
+      "status": "passed",
+      "updated_at": "2026-11-04T01:22:49.769078397Z",
+      "updated_by": "auto:executor"
+    },
     "doc-review": {
-      "status": "pending",
-      "updated_at": "2026-11-02T23:39:49.585143444Z",
-      "updated_by": null
+      "run_id": "e1a3b095-5e12-41a1-8c4f-ece62edceccf",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:56:05.437692647Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-11-02T23:39:49.585143444Z",
-      "updated_by": null
+      "run_id": "08825b97-9bdb-4c6f-98b9-0f8fb4a52d5b",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:56:08.713780638Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "97f5f2b7-5c95-441f-ae03-d8feeedc8420",
@@ -41,7 +58,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "The profile torn-tail marker is gone",
-  "updated_at": "2026-11-02T23:40:47.656302166Z"
+  "updated_at": "2026-11-04T01:23:09.806269075Z"
 }

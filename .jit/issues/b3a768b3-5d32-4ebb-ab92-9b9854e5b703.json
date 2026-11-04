@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-01T14:26:00.271663203Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -10,12 +10,26 @@
   ],
   "description": "Parse every listed issue record through one loader, and make repository validation, validation capture and mutation bases call it.\n\n## Background\n\nSince c47d78c8, issue membership comes from the captured `.jit/issues` listing (`captured_issue_ids`, `crates/jit/src/repository_state/index.rs:118-126`) and `.jit/index.json` holds tombstones only. Three loaders parse the listed records:\n\n- `load_records` (`crates/jit/src/validation/repository.rs:378-401`) checks that the index parses (`:380-384`), then parses every listed record with `serde_json` and checks its embedded id, reporting each defect as `RepositoryJudgedInvalid`.\n- `effective_issues` (`crates/jit/src/commands/validate.rs:785-799`) decodes the overlay-effective bytes of every listed record through `decode_issue_record` (`crates/jit/src/repository_state/issue_record.rs:18`) during capture.\n- `captured_active_issues` (`crates/jit/src/commands/mod.rs:2161-2185`) decodes the same records through `decode_issue_record`, reports a missing record as issue-not-found and a mismatched embedded id as an error; mutation bases, gate checking, archive and gate commands call it.\n\nKept as one change for a build reason: the three private loaders are replaced together, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: One function in `repository_state` parses every listed issue record from a byte source into parsed records, in listing order, checking embedded ids; its errors are typed.\n- [hard] REQ-02: `effective_issues` and the record parsing in `load_records` and `captured_active_issues` no longer exist; each former caller calls the loader.\n- [hard] REQ-03: Each caller keeps its contract: mutation captures still return the listed issues in listing order and report a missing record as issue-not-found, and repository validation reports a missing, unparseable or mismatched record, and an unparseable index, with today's messages.\n- [hard] REQ-04: Unit tests own the loader's cases: a well-formed set, a missing record, a mismatched embedded id, and an unparseable record.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-03T23:45:51.329762444Z",
   "first_ready_at": "2026-10-21T20:31:28.613451335Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c9d3c90e-2fb6-4b95-8df2-ffdf2c23c92c",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:42:47.570386581Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7b379907-c52a-483b-96e2-2dbc3f39457f",
+      "status": "passed",
+      "updated_at": "2026-11-03T23:45:28.560667913Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b3a768b3-5d32-4ebb-ab92-9b9854e5b703",
   "labels": [
     "type:task",
@@ -29,7 +43,7 @@
     "satisfies:9876a23a/REQ-10"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "One loader parses the issue records",
-  "updated_at": "2026-11-03T23:04:04.738755873Z"
+  "updated_at": "2026-11-03T23:45:51.329762444Z"
 }

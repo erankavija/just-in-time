@@ -13,7 +13,7 @@ these values.
 | Lock poll interval | 10 milliseconds | Wait between successive attempts while blocking on a contended file lock. |
 | Temp-file cleanup threshold | 3600 seconds | Minimum age at which `jit recover` removes an orphaned `*.tmp` file under `.jit/`. A pending redo record is not swept: the next mutation session applies it (see [Publication and Recovery](storage-format.md#publication-and-recovery)). |
 | Claim lease TTL | 3600 seconds | Default time-to-live for a lease from `jit claim acquire`, and the default extension for `jit claim renew`. |
-| Claim stale threshold | 3600 seconds | Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer refuses other agents' writes and is not evicted automatically. |
+| Claim stale threshold | 3600 seconds | Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer refuses other agents' writes, and `jit recover` reclaims it. |
 | Indefinite leases per agent | 2 | Default maximum concurrent indefinite (`--ttl 0`) leases one agent holds; `jit claim acquire` refuses beyond it. Overridden by `[coordination] max_indefinite_leases_per_agent`. |
 | Indefinite leases per repository | 10 | Default maximum concurrent indefinite leases across the repository. Overridden by `[coordination] max_indefinite_leases_per_repo`. |
 | Lease enforcement mode | strict | Mode applied when the repository's `[worktree]` section omits `enforce_leases`. In `strict` a write is refused only when another agent holds an active lease on the issue. A repository with no `[worktree]` section enforces no leases. |

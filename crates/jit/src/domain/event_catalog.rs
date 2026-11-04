@@ -470,6 +470,23 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_profile_lifecycle_sample_uses_canonical_event_fields() {
+        let record = serde_json::to_value(EventTag::ProfileLifecycle.sample())
+            .expect("sample event serializes");
+        let fields = record
+            .as_object()
+            .expect("an event is a JSON object")
+            .keys()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(
+            fields,
+            BTreeSet::from(["id", "operation", "profiles", "timestamp", "type"]),
+        );
+    }
+
     /// REQ-01: every tag has a catalog row carrying its scope and `issue_id`
     /// presence, and the two agree — a record carries an `issue_id` exactly when
     /// it is issue-scoped.

@@ -389,7 +389,15 @@
   ],
   "created_during_execution": [
     "944edb32",
-    "655273d9"
+    "655273d9",
+    {
+      "id": "5b37a806",
+      "note": "external issue driven by this lead per user ruling (via 6a)"
+    },
+    {
+      "id": "53d19851",
+      "note": "rejected merged-into-2f563673"
+    }
   ],
   "escalations": [
     {
@@ -424,7 +432,9 @@
   "rework_counts": {
     "becea20a": 1,
     "f9bf70a5": 1,
-    "dd53527f": 2
+    "dd53527f": 2,
+    "2117739f": 1,
+    "2f563673": 1
   },
   "surfaced_pitfalls": [
     {
@@ -552,15 +562,118 @@
       "vendor": "claude",
       "model": "opus",
       "reason": "concurrency-critical mutation lease guard"
+    },
+    {
+      "id": "2117739f",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "latest-run accessor and format-4 bump; warned 6a, 88, a4"
+    },
+    {
+      "id": "5b37a806",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "external v1-release bug assigned to this lead by user ruling; unblocks a7314585"
+    },
+    {
+      "id": "2117739f-r1",
+      "vendor": "lead",
+      "reason": "code-review F1: accessor must check the loaded run gate_key; one-line filter + test"
+    },
+    {
+      "id": "a7314585",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "recovery onto LeaseLock; concurrency-critical; on 944edb32 path"
+    },
+    {
+      "id": "0bd2c797",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path gate captures"
+    },
+    {
+      "id": "93b7f1dd",
+      "vendor": "codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "critical path verdict provenance contract"
+    },
+    {
+      "id": "97f5f2b7",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "well-specified removal"
+    },
+    {
+      "id": "db9bcf12",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "archive evidence record writes"
+    },
+    {
+      "id": "2f563673",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "per-issue lease records + claims.seq; concurrency-critical, format-4 layout"
+    },
+    {
+      "id": "b33ed7eb",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path verdict record writes; Claude pauses cleanly on the host hold"
+    },
+    {
+      "id": "2f563673-r1",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "absorbs 53d19851 (steward ruling): index machinery removal"
+    },
+    {
+      "id": "7fc08dff",
+      "vendor": "codex",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "archive execute reads evidence record"
+    },
+    {
+      "id": "6c0f8739",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path verdict reuse lookup; dispatched 03:19 before quiet window"
+    },
+    {
+      "id": "0851fae4",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "critical path: one gate-run reader for both backends"
+    },
+    {
+      "id": "5e1ba005",
+      "vendor": "codex",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "archive preview reads evidence record; well-specified"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
-  "freeze": "format-4-window: installed jit stays at last format 3 build from the 2117739f landing to the window",
+  "freeze": {
+    "format4_bump": "2117739f dispatched; installed jit stays last format-3 build until cutover window"
+  },
   "notes": [
     "Dispatch runs ready issues ahead of a held wave 1 remainder, per the user's maximum-parallelism instruction relayed by just-in-time-6a; dependencies still order all work. 2117739f is held to shorten the format freeze.",
     "just-in-time-a4 may lead 9876a23a (one validation report): coordinate R1 (validate as history reader, 5b0e3d63 landed read_history_log + record_drift bytes) and merge order with it; warn it, 88 and 6a before 2117739f.",
     "a4 agreed: keeps DEC-09 bridge, sends field name when 6ba4f623 lands (for 53d19851 brief); warn a4 before 2117739f, its benchmark 5d774061 needs a format-4 copy and a main build after the bump.",
     "88 2e0f276b: IssueOps assign/claim/unassign/release/reject/update_issue_resolved take &IssueIdPrefix and return IssueMutation{issue,warnings}; create_issue returns IssueCreation{issue,warnings}. Put in briefs.",
-    "User principle (via 6a): refactors and spec changes must make things more consistent and simpler on their own merit, never to pre-empt a reviewer; a wrong review finding goes to 6a."
+    "User principle (via 6a): refactors and spec changes must make things more consistent and simpler on their own merit, never to pre-empt a reviewer; a wrong review finding goes to 6a.",
+    "Host schedule: from 03:30 EET dispatch nothing new; let running work finish; hold until 6a says gf2 benchmark is done. Warn 6a the moment 2117739f lands.",
+    "User approved format-4 cutover for all five repos (just-in-time, gf2, mealie-fi, inflected-messages, research) without per-repo runtime confirmation. Conditions: inspect research first; stop and report via 6a if any repo is not a format-3 jit tracker; before each rewrite, .jit/ has no uncommitted changes and git tree is clean enough to revert; coordinate with live sessions (gf2-4e in gf2; benchmark 04:00-04:15); reinstall jit only after all five are rewritten, then tell 6a.",
+    "User allows Codex gpt-6-luna and gpt-6.1-sol liberally alongside astra and Claude.",
+    "User ruling: reorder toward 944edb32 (format rewrite tooling); defer tasks off its path.",
+    "a7314585 added LeaseChange::Reclaim and edited the lease-sequence contract in plan.md; batch a plan-review rerun after the wave.",
+    "gf2 quiet window 03:52-04:09 held the full-CI lock; released by 6a."
   ]
 }

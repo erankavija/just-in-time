@@ -99,25 +99,27 @@ pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedReposit
     // Session opening is the one recovery boundary. Claim-coordinating commands
     // open their operation session only after coordination, so their startup
     // open repairs residue without inverting coordinator -> repository.
+    let recovery_failure = |error: anyhow::Error| {
+        if invocation.is_recover && is_leftover_record_failure(&error) {
+            RecoveryFailedError(error).into()
+        } else {
+            error
+        }
+    };
     let (retained_session, recovered_records) = match (
         invocation.opens_mutation_session,
         invocation.coordinates_claims_first,
     ) {
         (false, _) => (None, 0),
         (true, true) => {
-            let session = RepositoryStateStore::open_mutation_session(&storage, layout.clone())?;
+            let session = RepositoryStateStore::open_mutation_session(&storage, layout.clone())
+                .map_err(|error| recovery_failure(error.into()))?;
             (None, session.recovery_report().recovered_count())
         }
         (true, false) => {
             let guard = storage
                 .open_and_retain_mutation_session(layout.clone())
-                .map_err(|error| {
-                    if invocation.is_recover && is_leftover_record_failure(&error) {
-                        RecoveryFailedError(error).into()
-                    } else {
-                        error
-                    }
-                })?;
+                .map_err(recovery_failure)?;
             let recovered = guard.recovery_report().recovered_count();
             (Some(guard), recovered)
         }
@@ -318,22 +320,25 @@ mod tests {
         std::fs::create_dir_all(&scratch).expect("create the record scratch directory");
         std::fs::write(scratch.join(crate::storage::RECORD_FILE_NAME), b"no header")
             .expect("write an unreadable leftover record");
-        let mutating = RepositoryInvocation {
+        let mutating = |coordinates_claims_first| RepositoryInvocation {
             opens_mutation_session: true,
+            coordinates_claims_first,
             ..invocation(repo.path())
         };
 
-        let other = open_repository(mutating.clone())
-            .err()
-            .expect("an unreadable leftover record fails the session open");
-        assert!(
-            is_leftover_record_failure(&other)
-                && other.downcast_ref::<RecoveryFailedError>().is_none(),
-            "another command reports the session-open failure itself: {other:#}"
-        );
+        for coordinates_claims_first in [false, true] {
+            let other = open_repository(mutating(coordinates_claims_first))
+                .err()
+                .expect("an unreadable leftover record fails the session open");
+            assert!(
+                is_leftover_record_failure(&other)
+                    && other.downcast_ref::<RecoveryFailedError>().is_none(),
+                "another command reports the session-open failure itself: {other:#}"
+            );
+        }
         let recover = open_repository(RepositoryInvocation {
             is_recover: true,
-            ..mutating
+            ..mutating(true)
         })
         .err()
         .expect("an unreadable leftover record fails jit recover");

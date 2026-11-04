@@ -100,7 +100,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 **Solutions:**
 
-1. **Wait for expiration** — A finite lease expires at its TTL and is evicted on the next claim acquisition (an indefinite lease never expires; force-evict it)
+1. **Wait for expiration** — A finite lease expires at its TTL and is evicted on the next claim acquisition (an indefinite lease never expires; once its heartbeat is stale, `jit recover` reclaims it)
 2. **Check who has it:**
    ```bash
    jit claim status --issue abc123
@@ -151,9 +151,9 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
    ```bash
    jit claim release <issue-id>
    ```
-3. **Force evict** if agent is gone:
+3. **Reclaim** if the agent is gone:
    ```bash
-   jit claim force-evict <lease-id> --reason "Agent abandoned"
+   jit recover
    ```
 
 ### Exceeded Indefinite Lease Limit
@@ -212,27 +212,23 @@ jit recover
 
 This cleans up stale locks by checking if owning PIDs are still running.
 
-### Corrupted Claims Index
+### Malformed Lease Record
 
 **Symptom:**
 ```
-Error: Failed to parse claims index
+Error: Failed to parse lease record at .git/jit/leases/<issue-id>.json
 ```
 
-Or inconsistent claim status.
-
-**Solution:** Rebuild from audit log:
+**Solution:** The record is that issue's lease alone. Removing it releases the
+lease and leaves every other lease intact:
 ```bash
-jit recover
+rm .git/jit/leases/<issue-id>.json
 ```
-
-The claims index can always be rebuilt from the append-only `claims.jsonl` log.
 
 ### Coordination-State Repair
 
-`jit validate` reports repository validation findings. Stale locks, expired
-leases, and a corrupted claims index are coordination state for `jit recover` to
-repair; it also removes orphaned `*.tmp` files. It never removes `redo.record`
+`jit validate` reports repository validation findings. Stale locks and expired
+leases are coordination state for `jit recover` to repair; it also removes orphaned `*.tmp` files. It never removes `redo.record`
 from the scratch directory `.jit/tmp/`: that record is a pending mutation's
 commit point. [Stale Temporary Files](../concepts/guarantees.md#stale-temporary-files)
 names what is safe to remove by hand.
@@ -479,32 +475,16 @@ jit validate
 jit claim list
 ```
 
-### Manual Index Rebuild
-
-If automatic recovery fails:
-
-```bash
-# The claims index is derived from claims.jsonl
-# Remove the index and let recovery rebuild it from the log:
-rm .git/jit/claims.index.json
-jit recover  # Rebuilds the claims index from claims.jsonl
-```
-
 ### Emergency: Clear All Leases
 
 **Warning:** Only do this if coordination is completely broken.
 
 ```bash
 # Backup first
-cp .git/jit/claims.jsonl .git/jit/claims.jsonl.bak
-cp .git/jit/claims.index.json .git/jit/claims.index.json.bak
+cp -r .git/jit/leases .git/jit/leases.bak
 
-# Clear (loses all lease history)
-rm .git/jit/claims.jsonl
-rm .git/jit/claims.index.json
-
-# Reinitialize
-jit recover  # Rebuilds an empty index from the cleared log
+# Clear every lease; claims.jsonl keeps the history
+rm -r .git/jit/leases
 ```
 
 ---

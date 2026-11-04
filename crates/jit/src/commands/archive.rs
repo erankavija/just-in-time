@@ -15,7 +15,7 @@ use crate::domain::artifact_discovery::{
     ArtifactEvidenceMap, ArtifactListingScope,
 };
 use crate::domain::artifact_execution::{
-    archive_executions, ArchiveExecution, ArchiveExecutionResult,
+    archive_executions, ArchiveEvidenceRecord, ArchiveExecution, ArchiveExecutionResult,
 };
 use crate::domain::artifact_inventory::{
     inventory_explicit_roots, member_derived_documents, member_document_directories,
@@ -552,7 +552,15 @@ impl ArchiveOps<'_, JsonFileStorage> {
         &self,
         session: &mut dyn RepositoryMutationSession,
         target: ArchiveTarget<'_>,
-    ) -> Result<Option<(crate::repository_state::RepositoryImage, ArtifactPlan)>> {
+    ) -> Result<
+        Option<(
+            crate::repository_state::RepositoryImage,
+            ArtifactPlan,
+            ArchiveEvidenceRecord,
+        )>,
+    > {
+        use crate::repository_state::{ArchiveExecutionError, MutationError, ProducerError};
+
         let Some(mut image) = self.exec.capture_archive_base(session)? else {
             return Ok(None);
         };
@@ -578,6 +586,44 @@ impl ArchiveOps<'_, JsonFileStorage> {
                     .clone(),
             },
         };
+        let evidence_path =
+            crate::repository_state::VirtualPath::archive_evidence_record(&plan_target);
+        if !capture_more(session, &mut image, |spec| {
+            spec.discover_paths(evidence_path.ancestor_directories()?)?;
+            Ok(spec.discover_paths([evidence_path.clone()])?)
+        })? {
+            return Ok(None);
+        }
+        let archive_evidence = match image
+            .file_bytes(&evidence_path)
+            .map_err(ProducerError::from)
+            .map_err(ArchiveExecutionError::Producer)?
+        {
+            Some(bytes) => serde_json::from_slice::<ArchiveEvidenceRecord>(bytes)
+                .map_err(|error| MutationError::MalformedRecord {
+                    path: evidence_path.clone(),
+                    reason: error.to_string(),
+                })
+                .map_err(ArchiveExecutionError::Mutation)?,
+            None => ArchiveEvidenceRecord {
+                target: plan_target.clone(),
+                executions: Vec::new(),
+            },
+        };
+        if archive_evidence.target != plan_target
+            || archive_evidence
+                .executions
+                .iter()
+                .any(|prior| prior.target != archive_evidence.target)
+        {
+            return Err(
+                ArchiveExecutionError::Mutation(MutationError::MalformedRecord {
+                    path: evidence_path,
+                    reason: "archive evidence contains another target".into(),
+                })
+                .into(),
+            );
+        }
         let legacy = artifact_destination_root(&plan_target, &policy.archive_root);
         let mut conflicts = Vec::new();
         let destination = if let Some(id) = root_id.as_ref() {
@@ -782,10 +828,9 @@ impl ArchiveOps<'_, JsonFileStorage> {
             )
             .collect::<BTreeSet<_>>();
         let mut evidence = ArtifactEvidenceMap::new();
-        let archive_executions =
-            archive_executions(&crate::repository_state::captured_archive_events(&image)?);
+        let archive_executions = &archive_evidence.executions;
         let mut state = ArtifactClosureState::new(roots)
-            .with_archived_copies(recorded_archived_copies(&archive_executions, &plan_target));
+            .with_archived_copies(recorded_archived_copies(archive_executions, &plan_target));
         let parsed = loop {
             match expand_artifact_closure(state, &evidence) {
                 ArtifactClosure::Complete(parsed) => break parsed,
@@ -888,7 +933,7 @@ impl ArchiveOps<'_, JsonFileStorage> {
             &mut facts.locations,
             &plan_target,
             &destination,
-            &archive_executions,
+            archive_executions,
         );
         let plan = classify_artifacts(
             ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
@@ -896,7 +941,7 @@ impl ArchiveOps<'_, JsonFileStorage> {
             policy,
             facts,
         )?;
-        Ok(Some((image, plan)))
+        Ok(Some((image, plan, archive_evidence)))
     }
 
     /// Execute a freshly recomputed document archive plan under one write guard.
@@ -917,7 +962,8 @@ impl ArchiveOps<'_, JsonFileStorage> {
             &layout,
             "archive execution",
             |session| {
-                let Some((image, plan)) = self.capture_archive_plan(session, target)? else {
+                let Some((image, plan, evidence)) = self.capture_archive_plan(session, target)?
+                else {
                     return Ok(SessionStep::Retry);
                 };
                 if let Some((code, guidance)) = plan
@@ -938,7 +984,9 @@ impl ArchiveOps<'_, JsonFileStorage> {
                     bail!("cannot archive target: {} — {guidance}", code.as_str());
                 }
                 let (materialization, result) =
-                    crate::repository_state::finalize_archive_execution(&image, &context, &plan)?;
+                    crate::repository_state::finalize_archive_execution(
+                        &image, &context, &plan, evidence,
+                    )?;
                 if materialization.delta().actions().is_empty() {
                     return Ok(SessionStep::Done(result));
                 }
@@ -1229,6 +1277,47 @@ mod tests {
     }
 
     #[test]
+    fn test_execute_archive_document_rearchive_preserves_evidence_with_unparseable_event_log() {
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let source = "fixtures/root.md";
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::write(repo.path().join(source), b"# Original\n").unwrap();
+        let mut owner = crate::test_utils::fixture_issue("Owner".into(), String::new());
+        owner.state = State::Done;
+        owner.documents = vec![document_reference(source)];
+        seed_archive_issue_precondition(&executor.storage, owner);
+        let first = executor.archive().execute_archive_document(source).unwrap();
+        fs::write(repo.path().join(source), b"# Edited residue\n").unwrap();
+
+        let before = executor.archive().execute_archive_document(source).unwrap();
+        assert!(before.publications.is_empty());
+        assert!(before.reference_changes.is_empty());
+        assert_eq!(before.planned_deletions, first.planned_deletions);
+        assert!(before.deleted_sources.is_empty());
+        assert!(before
+            .warnings
+            .iter()
+            .any(|warning| warning.code == WarningCode::DeletionFailed));
+
+        fs::write(
+            repo.path().join(".jit/events.jsonl"),
+            b"unparseable event\n",
+        )
+        .unwrap();
+        let after = executor.archive().execute_archive_document(source).unwrap();
+
+        assert_eq!(after, before);
+        assert_eq!(
+            fs::read(repo.path().join(source)).unwrap(),
+            b"# Edited residue\n"
+        );
+    }
+
+    #[test]
     fn test_execute_reports_preview_citations_without_capturing_the_scanned_files() {
         use crate::storage::RepositoryStateStore as _;
         let config = format!(
@@ -1265,7 +1354,7 @@ mod tests {
             .storage
             .open_mutation_session(executor.require_layout().unwrap())
             .unwrap();
-        let (image, _) = executor
+        let (image, _, _) = executor
             .archive()
             .capture_archive_plan(
                 session.as_mut(),
@@ -2588,6 +2677,23 @@ mod tests {
             chrono::DateTime::UNIX_EPOCH,
         );
         let events_path = repo.path().join(".jit/events.jsonl");
+        let execution = archive_executions(std::slice::from_ref(&historical_event)).remove(0);
+        let evidence_path =
+            crate::repository_state::VirtualPath::archive_evidence_record(&execution.target);
+        let evidence_file = repo
+            .path()
+            .join(".jit")
+            .join(evidence_path.relative().as_str());
+        fs::create_dir_all(evidence_file.parent().unwrap()).unwrap();
+        fs::write(
+            evidence_file,
+            serde_json::to_vec(&ArchiveEvidenceRecord {
+                target: execution.target.clone(),
+                executions: vec![execution],
+            })
+            .unwrap(),
+        )
+        .unwrap();
         let mut event_bytes = fs::read(&events_path).unwrap_or_default();
         event_bytes.extend(serde_json::to_vec(&historical_event).unwrap());
         event_bytes.push(b'\n');

@@ -395,7 +395,7 @@ impl FailureFixture {
                 fs::write(self.root().join(".jit/server.pid.json"), "{")
                     .expect("write malformed server PID file");
             }
-            SetupStep::MalformedClaimIndex => {
+            SetupStep::MalformedLeaseRecord => {
                 let paths =
                     WorktreePaths::detect_for_data_root(&self.root().join(".jit"), self.root())
                         .unwrap();
@@ -404,7 +404,7 @@ impl FailureFixture {
                     self.claimed_issue.as_ref().expect("claim fixture issue"),
                     LeaseCorruption::MalformedJson,
                 )
-                .expect("write malformed lease storage");
+                .expect("write malformed lease record");
             }
             SetupStep::MalformedWorktreeIdentity => {
                 self.require_setup_jit(&["worktree", "info", "--json"]);
@@ -467,7 +467,7 @@ impl FailureFixture {
                 )
                 .unwrap();
             }
-            SetupStep::ActiveClaimIndex => {
+            SetupStep::ActiveLease => {
                 let created = self.require_setup_jit(&[
                     "issue",
                     "create",
@@ -565,7 +565,7 @@ enum SetupStep {
     MalformedEventsLog,
     MalformedGateRegistry,
     MalformedServerPid,
-    MalformedClaimIndex,
+    MalformedLeaseRecord,
     MalformedWorktreeIdentity,
     MalformedIssueRecord(String),
     MalformedPreset(String),
@@ -575,7 +575,7 @@ enum SetupStep {
     GitAbsent,
     SetEnvironment(String, String),
     UnsetEnvironment(String),
-    ActiveClaimIndex,
+    ActiveLease,
     /// Seed the issue whose id the canonical-id fixture derives from this
     /// hexadecimal seed.
     SeedIssue(u128),
@@ -604,12 +604,12 @@ impl SetupStep {
             "malformed-events-log" => Ok(Self::MalformedEventsLog),
             "malformed-gate-registry" => Ok(Self::MalformedGateRegistry),
             "malformed-server-pid-file" => Ok(Self::MalformedServerPid),
-            "malformed-claim-index" => Ok(Self::MalformedClaimIndex),
+            "malformed-lease-record" => Ok(Self::MalformedLeaseRecord),
             "malformed-worktree-identity" => Ok(Self::MalformedWorktreeIdentity),
             "git:repository-with-head" => Ok(Self::GitRepositoryWithHead),
             "git:repository-without-head" => Ok(Self::GitRepositoryWithoutHead),
             "git:absent" => Ok(Self::GitAbsent),
-            "claim:index-with-active-lease" => Ok(Self::ActiveClaimIndex),
+            "claim:active-lease" => Ok(Self::ActiveLease),
             "no-ready-issue" => Ok(Self::MissingReadyIssue),
             "worktree:primary" => Ok(Self::PrimaryWorktree),
             "worktree:linked-selected" => Ok(Self::SelectedLinkedWorktree),
@@ -654,7 +654,7 @@ impl SetupStep {
             | Self::MalformedEventsLog
             | Self::MalformedGateRegistry
             | Self::MalformedServerPid
-            | Self::MalformedClaimIndex
+            | Self::MalformedLeaseRecord
             | Self::MalformedWorktreeIdentity
             | Self::MalformedIssueRecord(_)
             | Self::MalformedPreset(_) => SetupClass::CorruptRepositoryFile,
@@ -662,7 +662,7 @@ impl SetupStep {
                 SetupClass::GitTopology
             }
             Self::SetEnvironment(_, _) | Self::UnsetEnvironment(_) => SetupClass::Environment,
-            Self::ActiveClaimIndex
+            Self::ActiveLease
             | Self::SeedIssue(_)
             | Self::DuplicateGate(_)
             | Self::DanglingInvariant(_)

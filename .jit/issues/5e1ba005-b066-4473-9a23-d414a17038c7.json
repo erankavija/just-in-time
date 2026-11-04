@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T02:11:18.833120692Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "Make archive preview and `archive candidates` read each target's prior executions from its evidence record through storage, once per target, and delete the archive readers of the event log, including the file backend's second parser.\n\n## Background\n\nPreview and `archive candidates` read the whole event log once per target through `IssueStore::read_artifact_archive_events` (`crates/jit/src/commands/archive.rs`; trait default in `storage/mod.rs`; file-backend override in `storage/json.rs`). The override is a second event-log parser with its own torn-prefix rule (`is_torn_event_prefix`) and a raw `\"artifact_archive_executed\"` literal. Each target's executions are in `archive-evidence/<target-key>.json`. Command tests plant prior executions as events and call the reader directly in `commands/archive.rs`, including `test_archive_event_reader_accepts_final_and_multiple_nested_brace_torn_prefixes`; a conformance case in `storage/issue_store_conformance.rs` covers it too. Both integration-test `IssueStore` wrappers implement the trait.\n\n## Success Criteria\n\n- [hard] REQ-01: Preview and `archive candidates` read each target's evidence record once through a new `IssueStore` method implemented by both backends and both test wrappers, and read no event-log content.\n- [hard] REQ-02: Preview tests plant prior executions as evidence records, and a test shows that preview of a re-archived target succeeds with an unparseable event log and reports the same coverage as before.\n- [hard] REQ-03: `read_artifact_archive_events`, `is_torn_event_prefix` and their conformance case no longer exist, and no test calls them.\n- [hard] REQ-04: Outside tests of the parser, no code parses the event log except through `domain::parse_known_events`.\n",
   "documents": [],
+  "first_ready_at": "2026-11-04T01:32:26.125932117Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -27,7 +29,7 @@
     "satisfies:f8a6b298/REQ-10"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Archive preview reads the per-target evidence record",
-  "updated_at": "2026-11-02T23:39:50.347952383Z"
+  "updated_at": "2026-11-04T02:11:18.833120692Z"
 }

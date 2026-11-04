@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-03T23:56:59.247366196Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Declare the rule names of the built-in validation passes as one closed vocabulary in the validation layer, so `crates/jit/src/validation/` no longer imports them from `commands`.\n\n## Background\n\n- `DANGLING_LINK_RULE`, `ENFORCEMENT_DRIFT_RULE` and `REVIEW_PLACEHOLDER_RULE` are `&str` constants in `crates/jit/src/commands/validate.rs:12,19,23`, re-exported at `commands/mod.rs:97`. Repository validation reads them from `commands` (`crates/jit/src/validation/repository.rs:622,646,769,832`), and spells the fourth built-in name, `rules-file`, as a literal (`:215`). `commands/validate.rs:1605` spells it again.\n- Other readers: `commands/validate.rs` (dangling, drift and placeholder passes), `commands/gate_check.rs:513,592,597` and tests (`validation/repository.rs:1006,1236,1263`, `commands/gate_check.rs:2908,3048`, `crates/jit/tests/cli_item_validate/item_cli_tests.rs`, `cli_item_validate/validate_cli_rule_tests.rs`, `cli_repo_workflow/profile_acceptance_tests.rs`).\n- Closed vocabularies are declared through the crate's wire-vocabulary macro (`domain/vocabulary.rs`), which emits `as_str`, `ALL`, `FromStr` and serde from one list.\n\n## Success Criteria\n\n- [hard] REQ-01: A `BuiltInPass` vocabulary in the validation layer, declared through the wire-vocabulary macro, names `rules-file`, `dangling-item-link`, `enforcement-drift` and `review-placeholder`, and every built-in finding takes its rule name from it.\n- [hard] REQ-02: The three `commands` constants and their re-export no longer exist, and no code spells a built-in pass name as a string literal outside the vocabulary declaration and tests that assert wire output.\n- [hard] REQ-03: Findings keep their wire rule names: the existing validation and gate suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T00:23:22.976591824Z",
+  "first_ready_at": "2026-11-03T23:46:17.289557048Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c2e5fca1-d820-466b-9cb4-66289c61aac9",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:19:59.408729866Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cde7eecc-0908-44f6-a9be-eb0ff77d14f0",
+      "status": "passed",
+      "updated_at": "2026-11-04T00:23:10.737792445Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8b56c215-4a4f-4b43-b940-b6687356b3aa",
   "labels": [
     "type:task",
@@ -23,7 +39,7 @@
     "satisfies:9876a23a/REQ-06"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Built-in validation pass names are one validation-layer vocabulary",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "updated_at": "2026-11-04T00:23:22.976591824Z"
 }

@@ -360,8 +360,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
-            let config = crate::repository_state::assemble_config(&image)?;
+            let graph = super::CapturedGraphEvidence::capture(&image, &issues, &context)?;
             let resolved_request: CapturedDependencyMutation = match &request {
                 CapturedDependencyMutation::RemoveSingle {
                     issue_id,
@@ -379,7 +378,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 },
                 _ => unreachable!("removal coordinator receives only removals"),
             };
-            let plan_content = super::validate::plan_content_with_issues(&image, &issues, &issues)?;
             let warning = if enforce_lease {
                 let (CapturedDependencyMutation::RemoveSingle {
                     issue_id: resolved_id,
@@ -393,7 +391,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     unreachable!("removal coordinator receives only removals");
                 };
                 refuse_foreign_leases_held(
-                    config.enforcement_mode(),
+                    graph.declarations.config().enforcement_mode(),
                     std::slice::from_ref(resolved_id),
                     claims_guard.as_ref(),
                 )?
@@ -408,10 +406,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 warning,
                 super::CapturedTransitionEvidence {
                     issues: &issues,
-                    declarations: &declarations,
-                    config: &config,
-                    plan_content: &plan_content,
-                    context: &context,
+                    graph: &graph,
                 },
             )?;
             if derived.intents.is_empty() {

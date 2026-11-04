@@ -24,10 +24,9 @@ struct FileState {
 }
 
 fn file_snapshot(root: &Path) -> BTreeMap<PathBuf, FileState> {
-    const MACHINE_LOCAL_LOCKS: [&str; 5] = [
+    const MACHINE_LOCAL_LOCKS: [&str; 4] = [
         ".jit-bootstrap.lock",
         ".jit/.events.lock",
-        ".jit/.gates.lock",
         ".jit/.index.lock",
         ".jit/.repo-write.lock",
     ];

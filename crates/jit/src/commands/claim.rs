@@ -471,7 +471,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
         &self,
         issue: Option<&IssueIdPrefix>,
         agent_id: Option<&str>,
-    ) -> Result<Vec<Lease>> {
+    ) -> Result<Vec<ListedLease>> {
         let paths = self.exec.require_worktree_paths()?;
         use crate::agent_config::resolve_agent_id;
 
@@ -488,25 +488,34 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     }
 }
 
+/// A lease as `claim list` and `claim status` report it.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct ListedLease {
+    #[serde(flatten)]
+    pub lease: Lease,
+    /// Whether the lease was stale ([`Lease::is_stale`]) when it was read.
+    pub stale: bool,
+}
+
 /// Unexpired leases matching the filters, most recently acquired first, read
 /// without the claims lock. A stale lease is kept and marked stale as of now.
 fn unexpired_leases(
     paths: &WorktreePaths,
     issue: Option<&IssueIdPrefix>,
     agent_id: Option<&str>,
-) -> Result<Vec<Lease>> {
+) -> Result<Vec<ListedLease>> {
     let now = chrono::Utc::now();
     let mut leases = read_leases(paths)?
         .into_iter()
         .filter(|lease| !lease.is_expired(now))
-        .map(|lease| Lease {
-            stale: lease.is_stale(now),
-            ..lease
-        })
         .filter(|lease| issue.is_none_or(|issue| issue.matches(&lease.issue_id)))
         .filter(|lease| agent_id.is_none_or(|agent| lease.agent_id.to_string() == agent))
+        .map(|lease| ListedLease {
+            stale: lease.is_stale(now),
+            lease,
+        })
         .collect::<Vec<_>>();
-    leases.sort_by_key(|lease| std::cmp::Reverse(lease.acquired_at));
+    leases.sort_by_key(|listed| std::cmp::Reverse(listed.lease.acquired_at));
     Ok(leases)
 }
 
@@ -518,7 +527,7 @@ impl<S: IssueStore> ClaimOps<'_, S> {
     ///
     /// The selected worktree is not a git checkout with a commit, or the leases
     /// cannot be read.
-    pub fn list(&self) -> Result<Vec<Lease>> {
+    pub fn list(&self) -> Result<Vec<ListedLease>> {
         let paths = self.exec.require_worktree_paths()?;
         // Claims require git (`@/charter/D-4`).
         get_current_branch(&paths.worktree_root)?;
@@ -571,10 +580,10 @@ impl<S: IssueStore> ClaimOps<'_, S> {
 pub struct RecoveryReport {
     /// Number of stale locks cleaned up
     pub stale_locks_cleaned: usize,
-    /// Whether the claims index was rebuilt
-    pub index_rebuilt: bool,
     /// Number of expired leases evicted
     pub expired_leases_evicted: usize,
+    /// Number of indefinite leases reclaimed for a stale heartbeat
+    pub stale_leases_reclaimed: usize,
     /// Number of orphaned temp files removed
     pub temp_files_removed: usize,
     /// Number of derived-state targets repaired during recovery.
@@ -657,23 +666,10 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
         report.stale_locks_cleaned = locks_before.saturating_sub(locks_after);
     }
 
-    // 2. Rebuild index if corrupted.
-    let (consistent, verify_warnings) = coordinator.verify_index_consistency()?;
-    report.warnings.extend(verify_warnings);
-    if !consistent {
-        report.warnings.push(StorageWarning::IndexRebuilt);
-        let index = coordinator.rebuild_index_from_log()?;
-        report.warnings.extend(index.warnings());
-        coordinator.write_index_atomic(&index)?;
-        report.index_rebuilt = true;
-    }
-
-    // 3. Evict expired leases.
-    let mut index = coordinator.load_claims_index()?;
-    let leases_before = index.leases.len();
-    coordinator.evict_expired(&mut index)?;
-    coordinator.write_index_atomic(&index)?;
-    report.expired_leases_evicted = leases_before.saturating_sub(index.leases.len());
+    // 2. Evict expired leases and reclaim stale indefinite ones.
+    let lapsed = coordinator.evict_lapsed()?;
+    report.expired_leases_evicted = lapsed.expired;
+    report.stale_leases_reclaimed = lapsed.reclaimed;
 
     Ok(())
 }
@@ -685,8 +681,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
     /// when its session opens, before this runs. The routines, in sequence:
     /// - Repairs declaration-derived state through the `jit validate --fix` path
     /// - With claims coordination: cleans up stale claim locks from crashed processes
-    ///   (PID check), rebuilds a corrupted claims index from its append-only log,
-    ///   and evicts expired leases; without Git, skips these with a warning
+    ///   (PID check), evicts expired leases, and reclaims indefinite leases whose
+    ///   heartbeat is stale; without Git, skips these with a warning
     /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
     ///
     /// Safe to run at any time: it removes only provably stale data and never
@@ -968,11 +964,14 @@ mod tests {
         issue_id: Option<&crate::domain::identity::IssueId>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
-        unexpired_leases(
+        Ok(unexpired_leases(
             &create_test_paths(temp),
             issue_id.map(IssueIdPrefix::from).as_ref(),
             agent_id,
-        )
+        )?
+        .into_iter()
+        .map(|listed| listed.lease)
+        .collect())
     }
 
     /// Seed an exact identifier precondition for short-id collision tests.
@@ -1638,7 +1637,10 @@ mod tests {
 
     /// The leases `jit claim list` reports.
     fn execute_claim_list_test(temp: &TempDir) -> Result<Vec<Lease>> {
-        unexpired_leases(&create_test_paths(temp), None, None)
+        Ok(unexpired_leases(&create_test_paths(temp), None, None)?
+            .into_iter()
+            .map(|listed| listed.lease)
+            .collect())
     }
 
     #[test]
@@ -1692,9 +1694,9 @@ mod tests {
                 .claims()
                 .status(Some(&IssueIdPrefix::from(issue_id)), None)
         };
-        let marked = Lease {
+        let marked = ListedLease {
+            lease: stale,
             stale: true,
-            ..stale
         };
 
         let listed = executor.claims().list()?;

@@ -20,7 +20,6 @@ use crate::repository_state::{
     RepositoryStateError, RootRelativePath, VirtualPath,
 };
 use crate::storage::{IssueStore, RepositoryMutationSession, RepositoryStateStore, WorktreePaths};
-use crate::validation::repository::RepositoryValidationFailure;
 use anyhow::Result;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -159,8 +158,8 @@ pub enum ProfileApplyError {
         paths: Vec<String>,
     },
     /// Final package and event overlay failed validation.
-    #[error("final profile application validation failed: {0}")]
-    FinalValidation(#[from] RepositoryValidationFailure),
+    #[error("final profile application validation failed: {0:#}")]
+    FinalValidation(anyhow::Error),
     /// Final overlay produced error-severity rule findings.
     #[error("final profile application validation produced {error_count} error finding(s)")]
     FinalValidationFindings {
@@ -1080,17 +1079,22 @@ fn final_validation_refusal(plan: &MaterializationPlan) -> Result<Option<Profile
     }
     let overrides = super::validation_overlay(plan.image(), plan.delta())?;
     let proposed = apply_overlay(plan.image(), overrides)?;
-    Ok(
-        match crate::validation::repository::validate_repository(&proposed) {
-            Err(failure) => Some(failure.into()),
-            Ok(validation) if validation.rule_report.has_errors() => {
-                Some(ProfileApplyError::FinalValidationFindings {
-                    error_count: validation.rule_report.error_count(),
-                })
-            }
-            Ok(_) => None,
+    let validation = crate::validation::report(
+        &crate::validation::CapturedValidation::from_image(&proposed),
+        &crate::validation::ReportInputs {
+            now: chrono::Utc::now(),
+            history: None,
         },
-    )
+    );
+    Ok(match validation.into_parts() {
+        (Some(error), _) => Some(ProfileApplyError::FinalValidation(error)),
+        (None, rule_report) if rule_report.has_errors() => {
+            Some(ProfileApplyError::FinalValidationFindings {
+                error_count: rule_report.error_count(),
+            })
+        }
+        (None, _) => None,
+    })
 }
 
 /// Refuse `plan` when a path its delta writes differs from `HEAD`.
@@ -2959,7 +2963,7 @@ template = true
             chrono::DateTime::UNIX_EPOCH,
         ))
         .unwrap();
-        for tail in [b"{\"torn\":".as_slice(), &complete_record] {
+        for tail in [b"{\"partial\":".as_slice(), &complete_record] {
             let (temp, _) = setup_test_repo().unwrap();
             let executor = file_executor(temp.path()).unwrap();
             let package = package_read_from(&temp, FIXTURE_LOCATION);

@@ -123,6 +123,7 @@ fn test_check_exits_zero_when_consistent() {
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert!(json["findings"].as_array().unwrap().is_empty());
+    assert_eq!(json["message"], "No enforcement drift", "{json}");
 }
 
 #[test]

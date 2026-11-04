@@ -152,9 +152,9 @@ jit claim status
 
 Indefinite leases are marked **stale** after the built-in claim stale
 threshold ([Runtime Defaults](../reference/runtime-defaults.md))
-without a heartbeat. Staleness is only a marker: a stale indefinite lease is not
-evicted automatically — it remains until a heartbeat, a `jit claim release`, or
-a `jit claim force-evict`. The threshold is not configurable.
+without a heartbeat. A stale indefinite lease remains until a heartbeat, a
+`jit claim release`, a `jit claim force-evict`, or the next `jit recover`, which
+reclaims it. The threshold is not configurable.
 
 ## Handling Conflicts
 
@@ -325,7 +325,7 @@ jit validate --fix
 ### Corrupted Control Plane
 
 ```bash
-# Rebuild claims index from log
+# Clear dead locks, evict expired leases, reclaim stale indefinite ones
 jit recover
 
 # Validate everything

@@ -243,22 +243,22 @@ echo "[session-bench] generating pristine fixture of $ISSUE_COUNT issues ($BULK_
 (
   cd "$PRISTINE"
   "$BIN" init --quiet >/dev/null
-  TARGET_ID=$("$BIN" issue create "Fixture issue 1" --type task --priority normal --orphan --quiet)
+  TARGET_ID=$("$BIN" issue create "Fixture issue 1" --type task --priority normal --quiet)
   change_end=$((1 + BULK_CHANGE_COUNT))
   match_end=$((1 + BULK_MATCH_COUNT))
   # Bulk-labeled issues that need an actual priority change (normal -> high).
   for i in $(seq 2 "$change_end"); do
     "$BIN" issue create "Fixture issue $i" --type task --priority normal \
-      --label "$BULK_LABEL" --orphan --quiet >/dev/null
+      --label "$BULK_LABEL" --quiet >/dev/null
   done
   # Bulk-labeled issues already at the target priority (confirmed no-ops).
   for i in $(seq "$((change_end + 1))" "$match_end"); do
     "$BIN" issue create "Fixture issue $i" --type task --priority high \
-      --label "$BULK_LABEL" --orphan --quiet >/dev/null
+      --label "$BULK_LABEL" --quiet >/dev/null
   done
   # Unlabeled issues, outside the bulk filter's match set.
   for i in $(seq "$((match_end + 1))" "$ISSUE_COUNT"); do
-    "$BIN" issue create "Fixture issue $i" --type task --priority normal --orphan --quiet >/dev/null
+    "$BIN" issue create "Fixture issue $i" --type task --priority normal --quiet >/dev/null
   done
   printf '%s\n' "$TARGET_ID" >"$WORK_BASE/target-id"
 )

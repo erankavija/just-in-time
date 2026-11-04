@@ -18,12 +18,12 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
-    GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, ProfileCommands,
-    ProjectCommands,
+    GateCommands, GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
 };
 use jit::commands::{
     parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
 };
+use jit::dispatch::{invariant, CommandContext};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -37,6 +37,7 @@ use jit::profile::{ProfileVariableAssignment, ProfileVariableName};
 use jit::repository_state::VirtualPath;
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
+use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -736,8 +737,14 @@ fn print_gate_run_details(result: &GateRunResult) {
     if let Some(commit) = &result.commit {
         println!("  Commit: {}", commit);
     }
-    if let Some(source_run) = result.origin.source_run() {
-        println!("  Verdict: taken from run {source_run} over the same declared inputs");
+    if let jit::domain::GateVerdictOrigin::Reused {
+        source_issue,
+        source_run,
+    } = &result.origin
+    {
+        println!(
+            "  Verdict: taken from issue {source_issue}, run {source_run} over the same declared inputs"
+        );
     }
     if result.origin == jit::domain::GateVerdictOrigin::Attested {
         println!(
@@ -1011,79 +1018,6 @@ fn run_item_inner<S: IssueStore>(
         ItemCommands::Show { qualified_id } | ItemCommands::Resolve { qualified_id } => {
             let result = executor.items().show_item(&qualified_id)?;
             print_item_show(&result, json, quiet)?;
-        }
-    }
-    Ok(())
-}
-
-/// Run `jit invariant <subcommand>`.
-///
-/// A thin delegation over the [`CommandExecutor`] invariant methods: `render`
-/// projects the registry into its configured documentation target and reports the
-/// written target; `check` runs the enforcement-drift check (the sole
-/// declared-but-unenforced direction) and exits non-zero (via
-/// [`run_invariant_inner`]) when any drift is present. On
-/// `--json` a failure is rendered as a JSON error object (honoring the
-/// machine-readable contract) rather than the top-level plain `Error: ...`.
-fn run_invariant<S: IssueStore>(
-    executor: &CommandExecutor<S>,
-    command: InvariantCommands,
-    mode: OutputMode,
-) -> Result<()> {
-    let result = run_invariant_inner(executor, command, mode);
-    if let Err(e) = result {
-        handle_json_error!(
-            mode.json,
-            e,
-            command_json_error(&e, jit::output::ErrorCode::InvariantCommandFailed)
-        );
-    }
-    Ok(())
-}
-
-/// Inner dispatch for `jit invariant`; errors are converted to JSON by
-/// [`run_invariant`] when `--json` is set.
-fn run_invariant_inner<S: IssueStore>(
-    executor: &CommandExecutor<S>,
-    command: InvariantCommands,
-    mode: OutputMode,
-) -> Result<()> {
-    let OutputMode { json, quiet } = mode;
-    match command {
-        InvariantCommands::Check => {
-            let result = executor.items().check_invariants()?;
-            let exit_nonzero = result.has_drift();
-            let output_ctx = OutputContext::new(quiet, json);
-            if json {
-                let msg = if exit_nonzero {
-                    format!("Enforcement drift: {} finding(s)", result.count())
-                } else {
-                    "No enforcement drift".to_string()
-                };
-                if exit_nonzero {
-                    let error = JsonError::new(ErrorCode::ValidationFailed, msg)
-                        .with_details(serde_json::to_value(&result)?);
-                    println!("{}", error.to_json_string()?);
-                    std::process::exit(error.exit_code().code());
-                }
-                let output = JsonOutput::success(&result).with_message(msg);
-                println!("{}", output.to_json_string()?);
-            } else if result.items.is_empty() {
-                output_ctx.print_data("No enforcement drift".to_string())?;
-            } else {
-                for finding in &result.items {
-                    // Every finding is declared-but-unenforced (the sole drift
-                    // direction); the message names that direction inline.
-                    println!("error: {}", finding.message());
-                }
-                eprintln!("Enforcement drift: {} finding(s)", result.count());
-            }
-            // Exit non-zero (4) when any drift is present, matching the project's
-            // validation-failed convention. Done AFTER emitting output so `--json`
-            // still prints a valid payload.
-            if exit_nonzero {
-                std::process::exit(jit::ExitCode::ValidationFailed.code());
-            }
         }
     }
     Ok(())
@@ -1367,7 +1301,7 @@ fn main() {
     }));
 
     let outcome = std::panic::catch_unwind(|| match run() {
-        (_, Ok(())) => ExitCode::Success,
+        (_, Ok(code)) => code,
         (mode, Err(e)) => {
             if mode.json {
                 emit_top_level_json_error(&e)
@@ -1417,7 +1351,7 @@ fn emit_top_level_json_error(error: &anyhow::Error) -> ExitCode {
 
 /// Parse the command line and dispatch it, handing back the parsed output mode
 /// with the result so failure rendering reads the same mode the arms did.
-fn run() -> (OutputMode, Result<()>) {
+fn run() -> (OutputMode, Result<ExitCode>) {
     let args: Vec<String> = env::args().collect();
     let cli = match Cli::try_parse_from(args.clone()) {
         Ok(cli) => cli,
@@ -1435,7 +1369,7 @@ fn run() -> (OutputMode, Result<()>) {
     (mode, dispatch(cli, mode))
 }
 
-fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
+fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
     let OutputMode { json, quiet } = mode;
 
     // Handle --schema flag first
@@ -1444,7 +1378,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         let schema = CommandSchema::generate();
         let json = serde_json::to_string_pretty(&schema)?;
         println!("{}", json);
-        return Ok(());
+        return Ok(ExitCode::Success);
     }
 
     // Ensure command is provided
@@ -1462,7 +1396,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
             println!("Profile: {}", info.build_profile);
             println!("Target: {}", info.target);
         }
-        return Ok(());
+        return Ok(ExitCode::Success);
     }
 
     let current_dir = env::current_dir()?;
@@ -1501,6 +1435,10 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         },
     )?;
     let storage = executor.storage().clone();
+    let ctx = CommandContext {
+        executor: &executor,
+        mode,
+    };
 
     if let Commands::Init {
         profile,
@@ -1798,7 +1736,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     label,
                     content_format,
                     force,
-                    orphan,
                 } => {
                     let gate = parse_gate_keys(gate, json)?;
 
@@ -1823,66 +1760,34 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
 
                     // The command layer owns `--type` validation and `type:<kind>`
                     // label derivation; the CLI just forwards the typed value.
-                    let jit::commands::IssueCreation { issue, warnings } =
-                        executor.issues().create_issue(
-                            title,
-                            description,
-                            prio,
-                            gate,
-                            label,
-                            content_format,
-                            issue_type,
-                            force,
-                        )?;
-
-                    // Print warnings to stderr
-                    for warning in &warnings {
-                        eprintln!("Warning: {}", warning);
-                    }
-
-                    let output_ctx = OutputContext::new(quiet, json);
-
+                    let creation = executor.issues().create_issue(
+                        title,
+                        description,
+                        prio,
+                        gate,
+                        label,
+                        content_format,
+                        issue_type,
+                        force,
+                    )?;
                     if json {
+                        let issue = creation.issue;
                         let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
-                        let enriched_deps = executor.issues().get_dependencies_enriched(&issue);
-                        let gate_runs = executor
-                            .gates()
-                            .list_gate_runs(&issue.id, None)
-                            .with_context(|| {
-                                format!("Failed to load gate runs for issue {}", issue.id)
-                            })?;
-                        let response = jit::output::IssueShowResponse::from_issue(
-                            issue,
-                            enriched_deps,
-                            &gate_runs,
-                        );
+                        // A new issue has no dependencies and no gate runs.
+                        let response = jit::output::IssueCreateResponse {
+                            issue: jit::output::IssueShowResponse::from_issue(issue, vec![], &[]),
+                            findings: creation.findings,
+                        };
                         let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         // In quiet mode, output just the ID for scripting
                         if quiet {
-                            println!("{}", issue.id);
+                            println!("{}", creation.issue.id);
                         } else {
-                            println!("Created issue: {}", issue.id);
-                        }
-
-                        // Surface workflow type-hierarchy warnings
-                        // (`TypeHierarchyKind` checks) for the new issue
-                        // unless --force or --quiet. These are GRAPH rule
-                        // findings produced by the rule engine, not a hard-coded
-                        // check. `--orphan` suppresses the orphan-leaf hint
-                        // (acknowledged intentional orphan).
-                        if !force && !quiet {
-                            let issues = storage.list_issues()?;
-                            let graph_findings =
-                                executor.validation().evaluate_graph_rules(&issues)?;
-                            for gf in graph_findings.iter().filter(|gf| {
-                                gf.issue_id.as_ref() == Some(&issue.id)
-                                    && !(orphan && gf.finding.rule == "orphan-leaf")
-                            }) {
-                                let _ =
-                                    output_ctx.print_warning(format!("\n{}", gf.finding.message));
-                            }
+                            println!("Created issue: {}", creation.issue.id);
+                            jit::output::render_validation_findings(&creation.findings, None)
+                                .print();
                         }
                     }
                 }
@@ -1911,7 +1816,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 outcome.issue_count, outcome.dependency_count
                             );
                         }
-                        return Ok(());
+                        return Ok(ExitCode::Success);
                     }
 
                     let outcome = executor.issues().batch_create_from_json(defs)?;
@@ -2049,7 +1954,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             jit::output::IssueShowListResponse::new(responses),
                         )?);
                         println!("{}", output.to_json_string()?);
-                        return Ok(());
+                        return Ok(ExitCode::Success);
                     }
 
                     if ids.len() > 1 {
@@ -2061,7 +1966,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                             )?;
                             print_issue_show_human(&response);
                         }
-                        return Ok(());
+                        return Ok(ExitCode::Success);
                     }
 
                     // Single id (guaranteed by clap `required = true`).
@@ -2075,7 +1980,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         match executor.items().show_item(requested) {
                             Ok(result) => {
                                 print_item_show(&result, json, quiet)?;
-                                return Ok(());
+                                return Ok(ExitCode::Success);
                             }
                             Err(e) => {
                                 // `handle_json_error!` either prints the JSON error
@@ -2119,7 +2024,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                         })?;
                                     println!("{}", rendered);
                                 }
-                                return Ok(());
+                                return Ok(ExitCode::Success);
                             }
 
                             if summary && json {
@@ -2134,7 +2039,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 let output = jit::output::JsonOutput::success(summary_response)
                                     .with_message(msg);
                                 println!("{}", output.to_json_string()?);
-                                return Ok(());
+                                return Ok(ExitCode::Success);
                             }
                             let response = executor.issues().show_response(issue)?;
 
@@ -2644,7 +2549,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                                 issue.id
                             ));
                         }
-                        return Ok(());
+                        return Ok(ExitCode::Success);
                     }
 
                     let jit::commands::IssueMutation { issue, warnings } =
@@ -5658,8 +5563,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         Commands::Item(item_cmd) => {
             run_item(&executor, item_cmd, mode)?;
         }
-        Commands::Invariant(invariant_cmd) => {
-            run_invariant(&executor, invariant_cmd, mode)?;
+        Commands::Invariant(command) => {
+            return invariant::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
         }
         Commands::Project(project_cmd) => {
             run_project(&executor, project_cmd, mode)?;
@@ -5875,7 +5780,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 if exit_nonzero {
                     std::process::exit(jit::ExitCode::ValidationFailed.code());
                 }
-                return Ok(());
+                return Ok(ExitCode::Success);
             }
 
             // --rule path: evaluate exactly one configured graph rule with the
@@ -5912,7 +5817,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 if exit_nonzero {
                     std::process::exit(1);
                 }
-                return Ok(());
+                return Ok(ExitCode::Success);
             }
 
             // --explain requires an issue id (it is a per-issue debugging view).
@@ -5981,7 +5886,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 if exit_nonzero {
                     std::process::exit(1);
                 }
-                return Ok(());
+                return Ok(ExitCode::Success);
             }
 
             // Per-issue rule run: `jit validate <id>`. Incompatible flag combos
@@ -6015,7 +5920,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 if exit_nonzero {
                     std::process::exit(1);
                 }
-                return Ok(());
+                return Ok(ExitCode::Success);
             }
 
             // Handle specific validations if requested
@@ -6104,7 +6009,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                     )?;
                 }
 
-                return Ok(());
+                return Ok(ExitCode::Success);
             }
 
             // Standard repository validation (existing code)
@@ -6164,18 +6069,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 let (validation_report, divergence_report) = executor
                     .validation()
                     .validate_repository_report_with_divergences()?;
-                let (integrity_error, rule_report) = match validation_report {
-                    Ok(report) => (None, report.rule_report),
-                    Err(failure) => {
-                        let (error, report) = failure.into_parts();
-                        (
-                            Some(anyhow::Error::new(jit::errors::ValidationFailedError::new(
-                                format!("Invalid repository: {error:#}"),
-                            ))),
-                            report.rule_report,
-                        )
-                    }
-                };
+                let integrity_error = validation_report.structural_failure.map(|error| {
+                    anyhow::Error::new(jit::errors::ValidationFailedError::new(format!(
+                        "Invalid repository: {error:#}"
+                    )))
+                });
+                let rule_report = validation_report.rule_report;
                 let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
 
                 // The view-derived report contains the declarative local/graph
@@ -6307,15 +6206,17 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                 Ok(report) => {
                     if json {
                         let msg = format!(
-                            "Recovery: {} locks cleaned, {} leases evicted",
-                            report.stale_locks_cleaned, report.expired_leases_evicted
+                            "Recovery: {} locks cleaned, {} leases evicted, {} leases reclaimed",
+                            report.stale_locks_cleaned,
+                            report.expired_leases_evicted,
+                            report.stale_leases_reclaimed
                         );
                         let output = JsonOutput::success(json!({
                             "success": true,
                             "redo_records_applied": redo_records_applied,
                             "stale_locks_cleaned": report.stale_locks_cleaned,
-                            "index_rebuilt": report.index_rebuilt,
                             "expired_leases_evicted": report.expired_leases_evicted,
+                            "stale_leases_reclaimed": report.stale_leases_reclaimed,
                             "temp_files_removed": report.temp_files_removed,
                             "derived_state_repaired": report.derived_state_repaired,
                             "claims_lease_recovery": report.claims_lease_recovery,
@@ -6327,10 +6228,13 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
                         println!("Recovery complete:");
                         println!("  • Redo records applied: {redo_records_applied}");
                         println!("  • Stale locks cleaned: {}", report.stale_locks_cleaned);
-                        println!("  • Index rebuilt: {}", report.index_rebuilt);
                         println!(
                             "  • Expired leases evicted: {}",
                             report.expired_leases_evicted
+                        );
+                        println!(
+                            "  • Stale leases reclaimed: {}",
+                            report.stale_leases_reclaimed
                         );
                         println!("  • Temp files removed: {}", report.temp_files_removed);
                         println!(
@@ -7094,11 +6998,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<()> {
         },
     }
 
-    Ok(())
+    Ok(ExitCode::Success)
 }
 
 /// Render one lease for plain-text `claim status` and `claim list`.
-fn print_lease(lease: &jit::storage::Lease) {
+fn print_lease(listed: &jit::commands::claim::ListedLease) {
+    let lease = &listed.lease;
     let now = chrono::Utc::now();
     println!("Lease: {}", lease.lease_id);
     println!("  Issue:    {}", lease.issue_id);
@@ -7126,7 +7031,7 @@ fn print_lease(lease: &jit::storage::Lease) {
             lease.last_beat,
             since_beat.num_seconds()
         );
-        if lease.stale {
+        if listed.stale {
             println!(
                 "  STALE: Lease marked stale (no heartbeat for {} minutes)",
                 since_beat.num_minutes()

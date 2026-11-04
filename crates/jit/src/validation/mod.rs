@@ -28,7 +28,8 @@
 //!   declared-but-unenforced direction;
 //! - [`record_fidelity`] — whether stored records decode and reproduce what the
 //!   writer would publish, a verdict of whole-repository validation only;
-//! - [`report`] — structured rule reports for `jit validate [--explain]`.
+//! - [`mod@report`] — structured rule reports for `jit validate [--explain]`;
+//! - [`repository`] — the one whole-repository [`fn@report`].
 //!
 //! Rendering a [`RuleSet`](crate::declarations::rules::RuleSet) to `rules.toml` +
 //! schema file CONTENT (no I/O) is `serialize_ruleset` in
@@ -48,4 +49,5 @@ pub mod strictness;
 pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
 pub use local::{evaluate_local, LocalEvalError, LocalEvaluation};
 pub use report::{ExplainReport, ReportedFinding, RuleOutcome, RuleReport};
+pub use repository::{report, CapturedValidation, HistoryVerdicts, ReportInputs, ValidationReport};
 pub use strictness::Strictness;

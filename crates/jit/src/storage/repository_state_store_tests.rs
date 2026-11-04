@@ -1972,7 +1972,7 @@ fn put_file(path: VirtualPath, bytes: &[u8]) -> PutFile {
     }
 }
 
-/// An append at `offset`, the log length the mutation read.
+/// An append at `offset`, the log's committed length when the mutation read it.
 fn event_append(offset: u64) -> Option<EventAppend> {
     Some(EventAppend {
         offset,
@@ -2516,7 +2516,7 @@ impl crate::storage::MutationInterruptionInjector for InterruptAtMoment {
     }
 }
 
-/// One data file published and one event appended at the log length the
+/// One data file published and one event appended at the committed length the
 /// interrupted mutation captured.
 fn leftover_record() -> RedoRecord {
     RedoRecord::new(
@@ -2942,4 +2942,62 @@ fn test_absent_root_publication_carries_its_worktree_targets_in_the_redo_record(
 
     assert_eq!(session.recovery_report().applied_records, 1);
     assert_eq!(std::fs::read(&note).unwrap(), b"note");
+}
+
+/// The delta's path order puts the run record first.
+#[test]
+fn test_redo_record_for_finalized_gate_run_precedes_issue_naming_it() {
+    use crate::repository_state::{finalize, serialize_issue, MutationContext, MutationIntent};
+    use crate::test_harness::image::{synthetic_layout, ImageBuilder};
+
+    let context = MutationContext::deterministic([7; 32], chrono::Utc::now());
+    let mut issue = crate::test_utils::fixture_issue("T".into(), String::new());
+    let issue_path = VirtualPath::issue_record(&issue.id);
+    let image = ImageBuilder::new()
+        .file(issue_path.clone(), serialize_issue(&issue).unwrap())
+        .entry(VirtualPath::GATE_RUNS, RepositoryEntry::Absent)
+        .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
+        .build();
+    let key = "review".parse().unwrap();
+    let run = crate::domain::GateRunResult::attestation(
+        &context.gate_run_id_at(0),
+        &issue.id,
+        &key,
+        crate::declarations::GateStage::Postcheck,
+        crate::domain::GateStatus::Passed,
+        None,
+    );
+    issue.gates_status.insert(
+        key,
+        crate::domain::GateState {
+            status: crate::domain::GateStatus::Passed,
+            updated_by: None,
+            updated_at: run.started_at,
+            run_id: Some(run.run_id.clone()),
+        },
+    );
+    let run_path = VirtualPath::gate_run_record(&run.run_id);
+    let plan = finalize(
+        &synthetic_layout(),
+        &image,
+        &context,
+        &[
+            MutationIntent::UpdateIssue {
+                issue: Box::new(issue),
+            },
+            MutationIntent::RecordGateRun {
+                draft: Box::new(run),
+            },
+        ],
+    )
+    .unwrap();
+    let record = redo_record_for(&image, plan.delta().actions().iter()).unwrap();
+    let position = |path: &VirtualPath| {
+        record
+            .puts()
+            .iter()
+            .position(|put| &put.path == path)
+            .unwrap()
+    };
+    assert!(position(&run_path) < position(&issue_path));
 }

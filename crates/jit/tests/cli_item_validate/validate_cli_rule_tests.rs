@@ -70,6 +70,48 @@ assert = { require-label = { label = "component:*", min = 1 } }
 "#;
 
 #[test]
+fn test_validate_custom_only_rules_reject_malformed_labels() {
+    let cli = JitCli::initialised().unwrap();
+    let rules_path = cli.root().join(".jit/rules.toml");
+    fs::write(&rules_path, EPIC_NEEDS_COMPONENT).unwrap();
+    cli.command(["issue", "create", "--title", "Malformed", "--label", "BAD"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("label-format"));
+
+    cli.create_issue(["--title", "Forced malformed", "--label", "BAD", "--force"])
+        .unwrap();
+    fs::write(rules_path, EPIC_NEEDS_COMPONENT).unwrap();
+    cli.command(["validate"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("label-format"));
+}
+
+#[test]
+fn test_config_writes_and_validate_fix_restore_defaults_in_custom_only_file() {
+    for args in [
+        &["config", "set", "validation.strictness", "loose"][..],
+        &["validate", "--fix"][..],
+        &["init"][..],
+    ] {
+        let cli = JitCli::initialised().unwrap();
+        let rules_path = cli.root().join(".jit/rules.toml");
+        fs::write(&rules_path, EPIC_NEEDS_COMPONENT).unwrap();
+        cli.command(args).assert().success();
+        let restored = fs::read_to_string(&rules_path).unwrap();
+        assert!(restored.starts_with(EPIC_NEEDS_COMPONENT));
+        let executor = jit::test_utils::file_executor(cli.root()).unwrap();
+        assert!(executor
+            .rules()
+            .unwrap()
+            .rules
+            .iter()
+            .any(|r| r.name == "label-format" && r.origin.as_deref() == Some("default")));
+    }
+}
+
+#[test]
 fn test_validate_id_passes_for_compliant_issue() {
     let cli = JitCli::with_repository(
         profiled_repository_fixture(crate::DEFAULT_PACKAGE, "packages").unwrap(),
