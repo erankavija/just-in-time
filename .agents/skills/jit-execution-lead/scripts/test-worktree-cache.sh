@@ -20,6 +20,7 @@ done
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 
 FIX="$(mktemp -d)"
+export LEAD_WORKTREE_TMP_ROOT="$FIX/worker-tmp-root"
 # shellcheck disable=SC2329  # invoked via trap
 cleanup() { rm -rf "$FIX"; }
 trap cleanup EXIT
@@ -172,12 +173,12 @@ check_harvest cp "$no_rsync"
 check_worker_tmp_reclaim() { # label, force
     local label="$1" force="$2"
     local repo="$FIX/worker-tmp-$label" pool="$FIX/worker-tmp-$label-pool"
-    local tmp_root="$FIX/worker-tmp-root-$label" tmp_dir wt dispatch_out
+    local tmp_dir wt dispatch_out
     new_repo "$repo"
-    dispatch_out="$(cd "$repo" && LEAD_CACHE_POOL="$pool" LEAD_WORKTREE_TMP_ROOT="$tmp_root" \
+    dispatch_out="$(cd "$repo" && LEAD_CACHE_POOL="$pool" \
         LEAD_SNAPSHOT_DIR="$snapshots" "$DISPATCH" a 2>&1)"
     wt="$repo/.agents/worktrees/agent-a"
-    tmp_dir="$tmp_root/${repo#/}/agent-a"
+    tmp_dir="$LEAD_WORKTREE_TMP_ROOT/${repo#/}/agent-a"
     assert "$label: dispatch creates a per-worktree temporary directory" test -d "$tmp_dir"
     assert "$label: prompt exports the temporary directory as TMPDIR" \
         grep -Fq "export TMPDIR=\"$tmp_dir\"" <<<"$dispatch_out"
@@ -191,8 +192,7 @@ check_worker_tmp_reclaim() { # label, force
             -c commit.gpgsign=false commit -qm 'unmerged worker commit'
     fi
 
-    (cd "$repo" && LEAD_CACHE_POOL="$pool" LEAD_WORKTREE_TMP_ROOT="$tmp_root" \
-        LEAD_RECLAIM_FORCE="$force" "$RECLAIM" a > /dev/null 2>&1)
+    (cd "$repo" && LEAD_CACHE_POOL="$pool" LEAD_RECLAIM_FORCE="$force" "$RECLAIM" a > /dev/null 2>&1)
     assert "$label: reclaim succeeds" test "$?" -eq 0
     assert "$label: the temporary directory is removed" test ! -e "$tmp_dir"
     assert "$label: the leftover is absent from the cache pool" \

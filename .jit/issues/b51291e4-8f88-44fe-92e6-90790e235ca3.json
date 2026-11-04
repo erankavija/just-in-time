@@ -11,7 +11,20 @@
     "worktree-cache-test",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "efb94dd6-698d-4fa7-84d9-b64065186c8e",
+      "status": "failed",
+      "updated_at": "2026-11-04T07:24:06.968481665Z",
+      "updated_by": "auto:executor"
+    },
+    "worktree-cache-test": {
+      "run_id": "c0ae71a2-63aa-4b40-a522-e74c755679c7",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:20:29.959589627Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b51291e4-8f88-44fe-92e6-90790e235ca3",
   "labels": [
     "epic:rust-code-quality",
@@ -23,5 +36,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Worker worktrees own and remove their temporary directory",
-  "updated_at": "2026-11-04T07:03:40.075506346Z"
+  "updated_at": "2026-11-04T07:24:06.968481665Z"
 }
