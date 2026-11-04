@@ -9,7 +9,10 @@ fn install<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
 ) -> anyhow::Result<Outcome<HooksInstallResponse>> {
     let paths = ctx.executor.require_worktree_paths()?;
-    anyhow::ensure!(paths.is_git_repository(), NOT_GIT_REPOSITORY);
+    anyhow::ensure!(
+        paths.is_git_repository(),
+        crate::errors::InvalidArgumentError::new(NOT_GIT_REPOSITORY)
+    );
 
     let result = crate::commands::hooks::install_hooks(&paths.common_dir)?;
     let (hooks_dir, installed, skipped) = (result.hooks_dir, result.installed, result.skipped);
@@ -144,9 +147,8 @@ mod tests {
             .unwrap_err();
             let classified = classify(&error);
 
-            assert_eq!(classified.error.code, ErrorCode::GenericError);
-            assert_eq!(classified.exit_code(), ExitCode::GenericError);
-            assert_eq!(classified.exit_code().code(), 1);
+            assert_eq!(classified.error.code, ErrorCode::InvalidArgument);
+            assert_eq!(classified.exit_code(), ExitCode::InvalidArgument);
         });
     }
 

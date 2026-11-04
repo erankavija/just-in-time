@@ -969,8 +969,8 @@ impl CommandSchema {
             ),
             row(
                 "hooks install",
-                1,
-                "The invocation is outside a git repository, or hook installation failed without a more specific classification.",
+                2,
+                "The invocation is outside a git repository.",
                 false,
             ),
             row(

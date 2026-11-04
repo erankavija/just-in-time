@@ -811,7 +811,7 @@ fn invoke_search_unspawnable_ripgrep(json: bool) -> Vec<Output> {
     vec![command.output().unwrap()]
 }
 
-/// `jit hooks install` outside a Git checkout is an untyped generic failure.
+/// `jit hooks install` outside a Git checkout is an invalid invocation.
 fn invoke_hooks_without_git(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
     vec![output_hooks_in_form(&cli, json)]
@@ -901,7 +901,7 @@ row_bindings! {
     test_command_exit_codes_search_missing_ripgrep_emits_1: ("search", 1, false) => invoke_search_missing_ripgrep;
     #[cfg(unix)]
     test_command_exit_codes_search_unspawnable_ripgrep_emits_10: ("search", 10, false) => invoke_search_unspawnable_ripgrep;
-    test_command_exit_codes_hooks_install_without_git_emits_1: ("hooks install", 1, false) => invoke_hooks_without_git;
+    test_command_exit_codes_hooks_install_without_git_emits_2: ("hooks install", 2, false) => invoke_hooks_without_git;
     #[cfg(unix)]
     test_command_exit_codes_hooks_install_target_not_found_emits_3: ("hooks install", 3, false) => invoke_hooks_target_not_found;
     #[cfg(unix)]

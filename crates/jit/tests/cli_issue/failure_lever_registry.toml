@@ -824,7 +824,7 @@ path = "hooks install"
 argv = ["hooks", "install", "--json"]
 setup = ["init", "git:absent"]
 expected_failure = "Not in a git repository (no .git directory found)"
-expected_code = "GENERIC_ERROR"
+expected_code = "INVALID_ARGUMENT"
 confirmation = "invoked"
 
 [[arms]]
