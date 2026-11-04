@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e7469377-32f5-42b0-9411-8568b6bddf89",
+      "status": "passed",
+      "updated_at": "2026-11-04T12:09:23.715107913Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4a01ccba-b6b9-46db-ae4a-cf92a98c9279",
   "labels": [
     "epic:rust-code-quality",
@@ -25,5 +32,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Refactor every test over the per-test limit",
-  "updated_at": "2026-11-04T11:55:48.113000476Z"
+  "updated_at": "2026-11-04T12:09:23.715107913Z"
 }
