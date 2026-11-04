@@ -26,6 +26,7 @@ use crate::validation::engine::{Finding, SchemaEngine};
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
+use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
@@ -50,23 +51,35 @@ pub enum RepositoryValidationPass {
     Projections,
 }
 
-/// A captured image paired with the issue records the loader parsed from it.
+/// A captured image paired with the index and issue records parsed from it.
+/// Each loader failure is shared with each report that fails on it; the
+/// index's failure precedes the records'.
 #[derive(Debug)]
 pub struct CapturedValidation<'a> {
-    image: &'a RepositoryImage,
-    /// The loader's outcome, shared with each report that fails on it.
-    records: std::result::Result<Vec<Issue>, Arc<anyhow::Error>>,
+    pub(crate) image: Cow<'a, RepositoryImage>,
+    pub(crate) index: std::result::Result<RepositoryIndex, Arc<anyhow::Error>>,
+    pub(crate) issues: std::result::Result<Vec<Issue>, Arc<anyhow::Error>>,
 }
 
 impl<'a> CapturedValidation<'a> {
-    /// Parse `image`'s issue records through the records loader.
+    /// Parse `image`'s index and issue records.
     pub fn from_image(image: &'a RepositoryImage) -> Self {
+        Self::new(Cow::Borrowed(image), load_issues(image))
+    }
+
+    fn new(image: Cow<'a, RepositoryImage>, issues: Result<Vec<Issue>>) -> Self {
         Self {
+            index: records_pass(load_index(&image)),
+            issues: records_pass(issues),
             image,
-            records: load_records(image)
-                .context("records validation pass")
-                .map_err(Arc::new),
         }
+    }
+}
+
+impl CapturedValidation<'static> {
+    /// Parse `image`'s index beside the issue records its capture parsed.
+    pub(crate) fn with_issues(image: RepositoryImage, issues: Vec<Issue>) -> Self {
+        Self::new(Cow::Owned(image), Ok(issues))
     }
 }
 
@@ -150,7 +163,7 @@ fn image_read(image: &RepositoryImage, repo_rel: &str) -> Result<Option<Vec<u8>>
 /// ([`apply_overlay`](crate::repository_state::apply_overlay)) a proposed final
 /// state.
 pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> ValidationReport {
-    let image = captured.image;
+    let image = &*captured.image;
     let mut report = ValidationReport {
         passes: Vec::new(),
         structural_failure: None,
@@ -225,7 +238,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
     let gates = declarations.gates();
     passes.push(RepositoryValidationPass::Gates);
 
-    let issues = match &captured.records {
+    let issues = match captured.index.as_ref().and(captured.issues.as_ref()) {
         Ok(issues) => {
             passes.push(RepositoryValidationPass::Records);
             Some(issues.as_slice())
@@ -342,13 +355,20 @@ fn read_text(read: &ReadBytes<'_>, path: &str) -> Result<Option<String>> {
         .transpose()
 }
 
-fn load_records(image: &RepositoryImage) -> Result<Vec<Issue>> {
+fn records_pass<T>(loaded: Result<T>) -> std::result::Result<T, Arc<anyhow::Error>> {
+    loaded.context("records validation pass").map_err(Arc::new)
+}
+
+fn load_index(image: &RepositoryImage) -> Result<RepositoryIndex> {
     let index_path = VirtualPath::INDEX.repository_relative();
     RepositoryIndex::parse(
         &image_read(image, &index_path)?
             .ok_or_else(|| anyhow!("required repository file '{index_path}' is missing"))?,
     )
-    .context(RepositoryJudgedInvalid(format!("invalid {index_path}")))?;
+    .context(RepositoryJudgedInvalid(format!("invalid {index_path}")))
+}
+
+fn load_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
     let ids = captured_issue_ids(image)?;
     parse_issue_records(&ids, |path| image.file_bytes(path)).map_err(|error| match error {
         IssueRecordsError::Malformed { id, error } => {
