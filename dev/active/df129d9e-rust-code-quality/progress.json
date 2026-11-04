@@ -1367,9 +1367,10 @@
       "reason": "gate status handler move; first of the four remaining moves"
     },
     "24a982b7": {
-      "status": "dispatched",
+      "status": "landing",
       "vendor": "Claude Sonnet",
-      "reason": "query/status handler move; parallel with f87f9b00 (disjoint arms)"
+      "reason": "query/status handler move; parallel with f87f9b00 (disjoint arms)",
+      "review": "lead PASS at fca7ff50c: dispatch/query.rs (7 leaves + bare query + status), parent-filter check typed, legacy schema rows removed, emit_list/print_issue_list/StatusSummary deleted; whole-crate -8 (main -306, dispatch +184, output +167, schema -44)"
     },
     "ceaaf0ab": {
       "status": "landing",
