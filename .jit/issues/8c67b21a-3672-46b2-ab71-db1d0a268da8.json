@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "50d72533-c978-49c3-aa51-6939955616c0",
+      "run_id": "e727cc14-819b-4d22-969e-39ac6760b486",
       "status": "passed",
-      "updated_at": "2026-11-04T23:14:36.701305303Z",
+      "updated_at": "2026-11-04T23:40:42.196424203Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -27,9 +27,9 @@
       "updated_by": "auto:executor"
     },
     "worktree-cache-test": {
-      "run_id": "cb86cbf2-a358-4811-954f-959756d723fe",
+      "run_id": "e6ece3dc-20a4-41de-8a6d-e4082c7e9b34",
       "status": "passed",
-      "updated_at": "2026-11-04T23:12:24.451089215Z",
+      "updated_at": "2026-11-04T23:41:31.162294499Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Dispatch over an uncommitted tracker on main",
-  "updated_at": "2026-11-04T23:24:15.487796278Z"
+  "updated_at": "2026-11-04T23:41:31.162294499Z"
 }

@@ -1,0 +1,26 @@
+{
+  "branch": null,
+  "by": "auto:executor",
+  "command": "./.agents/skills/jit-execution-lead/scripts/test-worktree-cache.sh",
+  "commit": null,
+  "completed_at": "2026-11-04T23:41:12.824913107Z",
+  "duration_ms": 0,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "worktree-cache-test",
+  "inputs_digest": "e281c798bc08d328c717fae8066ee7da9c6ef9520c55c24ef0af70d33357f996",
+  "issue_id": "8c67b21a-3672-46b2-ab71-db1d0a268da8",
+  "message": null,
+  "origin": {
+    "derivation": "reused",
+    "source_issue": "8c67b21a-3672-46b2-ab71-db1d0a268da8",
+    "source_run": "cb86cbf2-a358-4811-954f-959756d723fe"
+  },
+  "run_id": "a1e998ef-59f0-4812-be18-a7789c78b0fc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T23:41:12.824913107Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}
