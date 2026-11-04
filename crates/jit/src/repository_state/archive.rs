@@ -4,7 +4,7 @@ use super::mutation::finalize_delta;
 use super::{
     ExpectedPreimage, FileMode, MaterializationPlan, MutationContext, MutationError,
     MutationIntent, ProducerError, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
-    RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
+    RepositoryEntry, RepositoryImage, RepositoryLayoutError, RepositoryStateError, VirtualPath,
 };
 use crate::domain::artifact_execution::{
     ArchiveEvidenceRecord, ArchiveExecution, ArchiveExecutionResult, ArchivePublication,
@@ -14,6 +14,7 @@ use crate::domain::artifact_plan::{
     ReferenceChange, WarningCode,
 };
 use crate::domain::identity::IssueId;
+use crate::domain::relative_path::RootRelativePath;
 use crate::domain::{EventBody, Issue, State};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -394,7 +395,9 @@ fn create_ancestors(
         if parent.as_os_str().is_empty() {
             break;
         }
-        let relative_path = super::RootRelativePath::parse(parent).map_err(ProducerError::from)?;
+        let relative_path = RootRelativePath::parse(parent)
+            .map_err(RepositoryLayoutError::from)
+            .map_err(ProducerError::from)?;
         ancestors.push(
             VirtualPath::from_root(path.root_class(), relative_path)
                 .map_err(ProducerError::from)?,

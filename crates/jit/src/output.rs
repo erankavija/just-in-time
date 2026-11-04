@@ -49,9 +49,9 @@ pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 pub use graph::{GraphExportOutput, GraphExportText, GraphExportWritten};
 pub use issue::{
-    BatchCreateResponse, IssueBatchCreateOutput, IssueDeleteResponse, IssueLifecycleResponse,
-    IssueListing, IssueProjection, IssueSearchResults, IssueShowOutput, IssueStatusOutput,
-    IssueUpdateOutput,
+    BatchCreateResponse, BlockedListing, IssueBatchCreateOutput, IssueDeleteResponse,
+    IssueLifecycleResponse, IssueListing, IssueProjection, IssueSearchResults, IssueShowOutput,
+    IssueStatusOutput, IssueUpdateOutput, QuerySubset, SubsetListing,
 };
 pub use search::{SearchHit, SearchKey, SearchQuery, SearchResponse};
 pub use serve::{ServeResponse, WebUiSource};
@@ -342,21 +342,6 @@ pub fn render_issue_list<'a, I: ListedIssue + 'a>(
     } else {
         format!("{header}\n{lines}\nTotal: {total}\n")
     }
-}
-
-/// Print [`render_issue_list`]; quiet mode prints the rows alone and an empty
-/// quiet list prints nothing.
-pub fn print_issue_list<'a, I: ListedIssue + 'a>(
-    ctx: &OutputContext,
-    header: &str,
-    rows: impl IntoIterator<Item = IssueListRow<'a, I>>,
-    columns: &[IssueColumn],
-) -> io::Result<()> {
-    let rendered = render_issue_list(header, rows, columns, ctx.quiet);
-    if ctx.json || (ctx.quiet && rendered.is_empty()) {
-        return Ok(());
-    }
-    writeln_safe(rendered.trim_end_matches('\n'))
 }
 
 /// Which run-status line [`render_gate_run_status`] renders.
@@ -1398,6 +1383,15 @@ pub struct StatusResponse {
     pub total: usize,
 }
 
+impl HumanRender for StatusResponse {
+    fn render_human(&self, _: OutputMode) -> String {
+        format!(
+            "Status:\n  backlog: {}\n  ready: {}\n  in_progress: {}\n  done: {}\n  rejected: {}\n  blocked: {}\n",
+            self.backlog, self.ready, self.in_progress, self.done, self.rejected, self.blocked
+        )
+    }
+}
+
 /// The query an issue search echoes beside its matches.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueSearchQuery {
@@ -1429,13 +1423,20 @@ collection_keys! {
     IssuesKey = "issues";
     /// Collection key of [`IssueListResponse`].
     ListedIssuesKey = "issues" as "IssueListResponse";
+    /// Collection key of [`BlockedListResponse`].
+    BlockedIssuesKey = "issues" as "BlockedListResponse";
     /// Collection key of [`IssueSearchResponse`].
     SearchedIssuesKey = "issues" as "IssueSearchResponse";
     /// Collection key of [`IssueChildrenResponse`].
     ChildrenKey = "issues" as "IssueChildrenResponse";
     DivergencesKey = "divergences";
-    ByStateKey = "by_state";
+    /// Collection key of [`DivergenceResponse`].
+    MembershipDivergencesKey = "divergences" as "DivergenceResponse";
+    /// Collection key of [`StateRollup`].
+    ByStateKey = "by_state" as "StateRollup";
     GatesKey = "gates";
+    /// Collection key of [`GateCheckAllResponse`].
+    GateReadinessKey = "gates" as "GateCheckAllResponse";
     ResultsKey = "results";
     /// Collection key of [`ArtifactConformanceResponse`].
     ArtifactsKey = "artifacts" as "ArtifactConformanceResponse";
@@ -1503,7 +1504,7 @@ impl TemplateApplyResponse {
 }
 
 /// Response for blocked query with reasons (minimal issue + reasons)
-pub type BlockedListResponse = ListEnvelope<IssuesKey, MinimalBlockedIssue>;
+pub type BlockedListResponse = ListEnvelope<BlockedIssuesKey, MinimalBlockedIssue>;
 
 /// One [`BlockedListResponse`] reason string. A gate reason keeps the status
 /// variant name (`gate:<key> (Pending)`) the JSON contract carries; human output
@@ -1543,6 +1544,21 @@ pub struct BlockedReason {
     #[serde(rename = "type")]
     pub reason_type: BlockedReasonType,
     pub detail: String,
+}
+
+impl From<&BlockingReason> for BlockedReason {
+    fn from(reason: &BlockingReason) -> Self {
+        match reason {
+            BlockingReason::Dependency { id, title, state } => Self {
+                reason_type: BlockedReasonType::Dependency,
+                detail: format!("{id} ({title}:{state})"),
+            },
+            BlockingReason::Gate { key, status } => Self {
+                reason_type: BlockedReasonType::Gate,
+                detail: format!("{key} ({status})"),
+            },
+        }
+    }
 }
 
 /// Type of blocking reason
@@ -1758,7 +1774,29 @@ pub struct DivergenceView {
 /// Each entry in `divergences` is a membership label whose claim the dependency
 /// DAG does not back (the issue carries the label but is not in the closure of
 /// the container that owns it), ordered by `(issue_id, label)`.
-pub type DivergenceResponse = ListEnvelope<DivergencesKey, DivergenceView>;
+pub type DivergenceResponse = ListEnvelope<MembershipDivergencesKey, DivergenceView>;
+
+impl HumanRender for DivergenceResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        let rows = self
+            .items
+            .iter()
+            .map(|d| format!("  {} | {} | {}\n", d.short_id, d.label, d.title))
+            .collect::<String>();
+        let header = match self.items.is_empty() {
+            true => "No membership/DAG divergences".to_owned(),
+            false => format!(
+                "{} membership label(s) not backed by the DAG:",
+                self.count()
+            ),
+        };
+        if mode.quiet {
+            rows
+        } else {
+            format!("{header}\n{rows}")
+        }
+    }
+}
 
 // ============================================================================
 // Issue Show Response
@@ -2116,6 +2154,15 @@ pub struct StateCount {
 /// (`total − done − rejected`). The `done`/`total` ratio and `percent` (rounded,
 /// `0` when `total` is `0`) measure delivery, i.e. `done` against `total`.
 pub type StateRollup = ListEnvelope<ByStateKey, StateCount, RollupTotals>;
+
+impl HumanRender for StateRollup {
+    fn render_human(&self, _: OutputMode) -> String {
+        self.to_lines()
+            .into_iter()
+            .map(|line| format!("{line}\n"))
+            .collect()
+    }
+}
 
 /// Delivery tallies of a [`StateRollup`] beside its `by_state` buckets.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -2631,7 +2678,7 @@ impl GateStatusEntry {
 /// `count` is the length of the `gates` collection (one entry per required
 /// gate). It equals `total` whenever every required gate has a status entry;
 /// `total`/`passed` remain the readiness tallies.
-pub type GateCheckAllResponse = ListEnvelope<GatesKey, GateStatusEntry, GateCheckSummary>;
+pub type GateCheckAllResponse = ListEnvelope<GateReadinessKey, GateStatusEntry, GateCheckSummary>;
 
 /// Fields of [`GateCheckAllResponse`] beside its `gates`.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -2734,6 +2781,23 @@ pub struct GateFindingsResponse {
     pub summary: Option<String>,
     /// Individual findings; empty when no block was emitted.
     pub findings: Vec<crate::domain::gate_findings::GateFinding>,
+}
+
+impl GateFindingsResponse {
+    /// The findings view of `run`.
+    pub fn of_run(run: &GateRunResult) -> Self {
+        Self {
+            key: run.gate_key.clone(),
+            run_id: run.run_id.clone(),
+            has_findings: run.findings.is_some(),
+            verdict: run.findings.as_ref().map(|f| f.verdict.clone()),
+            summary: run.findings.as_ref().map(|f| f.summary.clone()),
+            findings: run
+                .findings
+                .as_ref()
+                .map_or_else(Vec::new, |f| f.findings.clone()),
+        }
+    }
 }
 
 // ============================================================================
@@ -2986,6 +3050,66 @@ mod tests {
     use schemars::schema_for;
     use serde_json::json;
     use std::collections::BTreeSet;
+
+    fn divergence_view(label: &str) -> DivergenceView {
+        let id = crate::test_utils::issue_id(7);
+        DivergenceView {
+            short_id: id.short_id().to_string(),
+            id,
+            title: "Orphan".to_owned(),
+            label: label.to_owned(),
+            namespace: "epic".to_owned(),
+            value: "x".to_owned(),
+        }
+    }
+
+    #[test]
+    fn test_divergence_response_human_header_names_the_count_and_quiet_keeps_rows_only() {
+        let report = DivergenceResponse::new(vec![divergence_view("epic:x")]);
+
+        let loud = report.render_human(OutputMode::default());
+        let quiet = report.render_human(OutputMode {
+            json: false,
+            quiet: true,
+        });
+
+        assert!(loud.starts_with("1 membership label(s)"));
+        assert!(loud.ends_with(&quiet));
+        assert!(quiet.contains("epic:x") && quiet.lines().count() == 1);
+    }
+
+    #[test]
+    fn test_divergence_response_human_empty_reports_none_unless_quiet() {
+        let report = DivergenceResponse::new(Vec::new());
+
+        assert_eq!(
+            report.render_human(OutputMode::default()),
+            "No membership/DAG divergences\n"
+        );
+        assert_eq!(
+            report.render_human(OutputMode {
+                json: false,
+                quiet: true
+            }),
+            ""
+        );
+    }
+
+    #[test]
+    fn test_state_rollup_human_renders_its_greppable_lines() {
+        let rollup = StateRollup::from_issues(&[]);
+
+        let human = rollup.render_human(OutputMode::default());
+
+        assert_eq!(
+            human.lines().collect::<Vec<_>>(),
+            rollup
+                .to_lines()
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        );
+    }
 
     #[test]
     fn test_batch_target_serializes_resolved_and_unresolved_as_plain_strings() {

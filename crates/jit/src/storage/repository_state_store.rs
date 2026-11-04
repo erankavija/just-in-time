@@ -5,12 +5,13 @@
 //! absent data root is the exception, published by [`init_publish`] because the
 //! record's home is inside the root that does not exist yet.
 
+use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::{
     CaptureError, CaptureSpec, CapturedAnswers, CapturedBytes, DirectoryListing, EntryIdentity,
     EventLogTail, ExpectedPreimage, FileMode, ImageToken, MaterializationPlan,
     PinnedDocumentEvidence, PinnedSourceClass, ReadMode, RepositoryAction, RepositoryDelta,
     RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryRootEvidence, RootRelativePath, VirtualPath,
+    RepositoryRootEvidence, VirtualPath,
 };
 use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::init_publish;
@@ -1359,7 +1360,10 @@ fn ensure_memory_parent_exists(
     if parent.as_os_str().is_empty() {
         return Ok(());
     }
-    let parent_path = VirtualPath::from_root(path.root_class(), RootRelativePath::parse(parent)?)?;
+    let parent_path = VirtualPath::from_root(
+        path.root_class(),
+        RootRelativePath::parse(parent).map_err(RepositoryLayoutError::from)?,
+    )?;
     if matches!(
         state.entries.get(&parent_path),
         Some(RepositoryEntry::Directory { .. })

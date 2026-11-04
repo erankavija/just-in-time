@@ -59,8 +59,9 @@ fn test_status_all_includes_stdout_for_failing_runs_even_without_full() {
         .clone();
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let result = &json["results"][0];
+    let result = &json["error"]["details"]["results"][0];
     assert_ne!(result["status"].as_str(), Some("passed"));
+    assert_eq!(result["status"].as_str(), Some("failed"));
     let serialized = serde_json::to_string(&json).unwrap();
     assert!(
         serialized.contains("FAILURE_DETAIL"),

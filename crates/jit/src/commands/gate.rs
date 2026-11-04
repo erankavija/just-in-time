@@ -46,12 +46,9 @@ pub struct GateNotRequiredError {
 /// Error returned by `jit gate status` when its two positionals look swapped:
 /// the first names a registered gate and the second resolves to an issue.
 ///
-/// Raised before any lookup, so it is an invalid-argument condition (exit code
-/// `2`) that names the canonical argument order.
-#[derive(Debug, thiserror::Error)]
-#[error(
-    "'{gate_key}' is a gate key and '{issue}' is an issue; the issue id and gate key look transposed."
-)]
+/// An invalid-argument condition (exit code `2`) whose message names the
+/// canonical argument order.
+#[derive(Debug)]
 pub struct GateStatusArgumentsTransposedError {
     /// The issue, as written in the gate position.
     pub issue: String,
@@ -65,6 +62,20 @@ impl GateStatusArgumentsTransposedError {
         format!("jit gate status {} {}", self.issue, self.gate_key)
     }
 }
+
+impl std::fmt::Display for GateStatusArgumentsTransposedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "'{}' is a gate key and '{}' is an issue; the issue id and gate key look transposed.\n  Did you mean: {}",
+            self.gate_key,
+            self.issue,
+            self.canonical_command()
+        )
+    }
+}
+
+impl std::error::Error for GateStatusArgumentsTransposedError {}
 
 /// Error returned when `jit gate evaluate`/`pass` targets a MANUAL gate with no
 /// `--by` attestor.
@@ -1030,6 +1041,16 @@ impl<S: IssueStore> GateOps<'_, S> {
         Ok(registry.gates.into_values().collect())
     }
 
+    /// Whether `jit gate status <issue> <gate_key>` has its positionals swapped:
+    /// `issue` names a registered gate and `gate_key` resolves to an issue.
+    pub fn are_gate_status_arguments_transposed(&self, issue: &str, gate_key: &str) -> bool {
+        self.list_gates()
+            .is_ok_and(|gates| gates.iter().any(|gate| gate.key.as_str() == issue))
+            && gate_key
+                .parse::<crate::domain::identity::IssueIdPrefix>()
+                .is_ok_and(|prefix| self.exec.storage.resolve_issue_id(&prefix).is_ok())
+    }
+
     fn publish_gate_registry_mutation(
         &self,
         request: CapturedGateRegistryMutation,
@@ -1569,6 +1590,21 @@ mod tests {
                 .status,
             crate::domain::GateStatus::Passed
         );
+    }
+
+    #[test]
+    fn test_are_gate_status_arguments_transposed_requires_a_gate_then_an_issue() {
+        let executor = setup();
+        define_manual_gate(&executor, &"tests".parse().unwrap());
+        let issue = crate::test_utils::fixture_issue("Test".to_string(), "Test".to_string());
+        let id = issue.id.to_string();
+        seed_issue(executor.storage(), issue);
+        let gates = executor.gates();
+
+        assert!(gates.are_gate_status_arguments_transposed("tests", &id));
+        assert!(!gates.are_gate_status_arguments_transposed(&id, "tests"));
+        assert!(!gates.are_gate_status_arguments_transposed("tests", "other"));
+        assert!(!gates.are_gate_status_arguments_transposed("unknown", &id));
     }
 
     /// Register a simple manual gate so it can be added to issues in tests.

@@ -12,12 +12,26 @@
   ],
   "description": "Give the proposed-layout check a domain error type, make the artifact classifier's missing-evidence lookup one generic helper, and give every fallible domain parser and constructor a `thiserror` error type, so domain code names nothing in `repository_state`, uses no `anyhow` and returns no bare `String` errors.\n\n## Background\n\n- `validate_proposed_layout` (`crates/jit/src/domain/artifact_classifier.rs:835`) and `validate_proposed_artifact_layout` (`:842`) return `crate::repository_state::ProducerError` and construct `ProposedLayoutTargetAbsent` (`:865`) and `ProposedLayoutEdgeUnavailable` (`:897`). Those variants are declared in `crates/jit/src/repository_state/mod.rs:250` and `:256`, inside `ProducerError` (`:184`) beside unrelated producer errors.\n- `classify_artifacts` (`artifact_classifier.rs:662`) imports `ProducerError` locally (`:783`) and maps a violation to a blocker subject with a wildcard arm `_ => None` (`:789`), which would silently absorb a new variant.\n- Archive execution consumes the check in `finalize_archive_execution` (`crates/jit/src/repository_state/archive.rs:30-31`, mapped into `ArchiveExecutionError::Producer`, declared `:555`); the test at `repository_state/archive.rs:1020` matches `ProducerError::ProposedLayoutTargetAbsent`. Classifier tests match the edge variant at `artifact_classifier.rs:2785` and `:3021`.\n- This is one of the `domain` imports of `repository_state` (`@/inv/architecture-dependency-direction`).\n- `required_resolution_evidence` (`artifact_classifier.rs:487-496`) takes `&ArtifactEvidenceMap` and maps an absent path to `ArtifactEvidenceError::IncompleteEvidence` (declared `:402`). Destination resolution calls it at `:425`, `:448`, `:453`, `:475`, `:555`, `:577` and `:593`.\n- `classify_entry` (`:930`) reads a different map, `&BTreeMap<String, ArtifactLocationFacts>` (`:934`), and builds the same error inline with `locations.get(&source).cloned().ok_or_else(..)` (`:950-954`), so the \"missing evidence is `IncompleteEvidence` naming the path\" rule is written twice. Tests that assert `IncompleteEvidence` for classification: `artifact_classifier.rs:2512`, `:2536`, `:2715`, `:2740`.\n- `crates/jit/src/domain/types.rs:14` imports `anyhow::Result`, and the `FromStr` impls of `State` (`:148-157`), `Priority` (`:173-185`) and `ContentFormat` (`:234-248`) return `anyhow::Error`. The closed-vocabulary macro in `domain/vocabulary.rs` re-declares these three with an exact-match `FromStr`; its error type is not fixed by that change, so this task types whatever error remains.\n- `TryFrom<IssueWire> for Issue` (`domain/types.rs:549-550`) returns `String`; serde reports it through `Display`.\n- `crates/jit/src/domain/repository_inputs.rs` returns `String` from `DeclaredRoot::try_from` (`:98-109`), the second `TryFrom` at `:112-113`, `ExclusionPattern` conversions (`:196-215`), `RepositoryInputs::parse`/`new` (`:266`, `:283`) and the digest conversions (`:375-399`). Callers outside the file are test `expect`s (`crates/jit/src/gate_execution.rs:762,988`, `crates/jit/src/commands/gate_check.rs:2210`, `crates/jit/src/profile/manifest.rs:554,557`, `crates/jit/src/profile/repository_package.rs:488`), which compile unchanged, and the serde `Deserialize` impls in the same file.\n- `resolve_key_reference` (`crates/jit/src/domain/key_reference.rs:26-30`) returns `Result<String, String>`, the error being the unknown key; its caller `crates/jit/src/commands/batch_create.rs:616` maps it.\n\n## Success Criteria\n\n- [hard] REQ-01: A `domain::artifact_classifier::ProposedLayoutViolation` enum with `TargetAbsent` and `EdgeUnavailable` variants is the error type of both layout-check functions, and `classify_artifacts` matches it with no wildcard arm.\n- [hard] REQ-02: `artifact_classifier.rs` names nothing from `crate::repository_state`; `ProducerError` replaces its two layout variants with one `#[from] ProposedLayoutViolation` variant, and archive execution reports a violation through it with the same message text.\n- [hard] REQ-03: `required_resolution_evidence` is generic over the map's value type and is the only constructor of `ArtifactEvidenceError::IncompleteEvidence` outside tests; `classify_entry` obtains its source location through it.\n- [hard] REQ-04: No production code under `crates/jit/src/domain/` names `anyhow` or returns a `Result` whose error type is `String`.\n- [hard] REQ-05: Each listed parser returns a `thiserror` type whose message names the offending input as today's message does, and its callers compile against it without changing their output.\n- [hard] REQ-06: The classifier tests (`:2785`, `:3021`) and the archive-execution test (`repository_state/archive.rs:1020`) assert the domain variants, the existing `IncompleteEvidence` tests and domain parser tests pass, and one test per new error type asserts its variant for one rejected input.\n\n## Notes\n\n- Behaviour is unchanged: messages, blocker subjects and user-visible parser messages keep their wording.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T14:53:32.791141916Z",
   "first_ready_at": "2026-10-24T21:22:37.717854234Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d6073b00-859f-4001-9aba-5060c8794a6d",
+      "status": "passed",
+      "updated_at": "2026-11-04T14:47:05.944868870Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "90231880-37c1-447a-b441-30a95156d2e0",
+      "status": "passed",
+      "updated_at": "2026-11-04T14:52:27.231959438Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ceaaf0ab-119d-4f76-863c-75457e94c7a5",
   "labels": [
     "type:task",
@@ -29,7 +43,7 @@
     "satisfies:b697a3f7/REQ-18"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Domain code reports typed errors and imports nothing from repository_state",
-  "updated_at": "2026-11-04T14:30:31.445480707Z"
+  "updated_at": "2026-11-04T14:53:32.791141916Z"
 }

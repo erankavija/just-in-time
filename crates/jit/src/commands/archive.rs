@@ -470,7 +470,7 @@ fn capture_artifact_evidence(
     let paths = paths.into_iter().collect::<BTreeSet<_>>();
     for path in &paths {
         if validate_repo_relative_path(path).is_err()
-            || crate::repository_state::RootRelativePath::parse(path).is_err()
+            || crate::domain::relative_path::RootRelativePath::parse(path).is_err()
         {
             evidence.insert(path.clone(), ArtifactEvidence::InvalidPath);
         }
