@@ -1218,6 +1218,137 @@ mod tests {
         );
     }
 
+    /// A repository whose only gate run result is unreadable.
+    fn unreadable_gate_run() -> (
+        tempfile::TempDir,
+        TestServer,
+        IssueId,
+        GateRunId,
+        anyhow::Error,
+    ) {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let gate_key: jit::domain::identity::GateKey = "review".parse().unwrap();
+        executor
+            .gates()
+            .define_gate(
+                &gate_key,
+                "Review".to_string(),
+                "Manual review".to_string(),
+                jit::declarations::GateStage::Postcheck,
+                jit::declarations::GateMode::Manual,
+                None,
+                100,
+            )
+            .unwrap();
+        let id = executor
+            .issues()
+            .create_issue(
+                "Gated".to_string(),
+                String::new(),
+                Priority::Normal,
+                vec![gate_key.clone()],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+            .issue
+            .id;
+        executor
+            .gates()
+            .pass_gate(&id, &gate_key, Some("human:reviewer".to_string()), false)
+            .unwrap();
+        let run = executor
+            .gates()
+            .get_last_gate_run(&id, &gate_key)
+            .unwrap()
+            .unwrap();
+        let result = std::fs::read_dir(temp.path().join(".jit/gate-runs"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path().join("result.json"))
+            .find(|path| path.is_file())
+            .unwrap();
+        std::fs::write(result, "{").unwrap();
+        let failure = executor
+            .gates()
+            .get_gate_run_result(&id, &run.run_id)
+            .unwrap_err();
+        (temp, test_app(executor), id, run.run_id, failure)
+    }
+
+    #[tokio::test]
+    async fn test_get_gate_run_reports_an_unreadable_result_as_a_server_error() {
+        let (_temp, server, id, run_id, failure) = unreadable_gate_run();
+        let expected = status_of_error(failure);
+
+        let response = server
+            .get(&format!("/issues/{id}/gate-runs/{run_id}"))
+            .await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_list_gate_runs_reports_an_unreadable_result_as_a_server_error() {
+        let (_temp, server, id, _run_id, failure) = unreadable_gate_run();
+        let expected = status_of_error(failure);
+
+        let response = server.get(&format!("/issues/{id}/gate-runs")).await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_get_gate_definition_reports_an_unreadable_registry_as_a_server_error() {
+        let executor = memory_executor_declaring(
+            InMemoryStorage::new(),
+            MemoryDeclarations {
+                gates: Some("= [ not toml"),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let key = "review".parse().unwrap();
+        let expected = status_of_error(executor.gates().show_gate_definition(&key).unwrap_err());
+
+        let response = test_app(executor).get("/gates/review").await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn test_get_issue_reports_an_ambiguous_prefix_as_a_bad_request() {
+        let harness = jit::test_harness::TestHarness::new();
+        for seed in [1, 2] {
+            jit::test_harness::seed_memory_issue(
+                &harness.storage,
+                &jit::domain::Issue::draft(
+                    jit::test_utils::issue_id(seed),
+                    "Twin".into(),
+                    "".into(),
+                ),
+            )
+        }
+        let prefix = "0000".parse().unwrap();
+        let expected = status_of_error(
+            harness
+                .executor
+                .storage()
+                .resolve_issue_id(&prefix)
+                .unwrap_err(),
+        );
+
+        let response = test_app(harness.executor).get("/issues/0000").await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::BAD_REQUEST);
+    }
+
     #[tokio::test]
     async fn test_health_check() {
         let server = test_app(memory_executor_declaring(
