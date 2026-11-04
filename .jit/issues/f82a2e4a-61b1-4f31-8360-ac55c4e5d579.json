@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "The dependency batch failure envelope takes each edge's code from the shared classifier, and the gate checker renderer reads its lines from a table, so neither keeps a parallel copy of a decision made elsewhere.\n\n## Background\n\n`dependency_batch_json_error` in `crates/jit/src/output/failure.rs` builds the envelope for a rejected `jit dep add` batch. Its per-edge closure re-derives error codes that `classify_code` already assigns, so the batch path and the single-edge path can drift. `render_checker` in `crates/jit/src/output/gate.rs` doubles every arm on a `preset` flag. Handlers in `dispatch/claim.rs`, `recover` and `dispatch/doc.rs` repeat the same conversion of displayable warnings into outcome warnings.\n\n## Success Criteria\n\n- [hard] REQ-01: Each rejected edge in the `jit dep add` batch envelope carries the code the shared classifier assigns its error, plus the dependency-specific fallback for an error the classifier leaves generic. No second code-derivation closure remains.\n- [hard] REQ-02: The batch envelope's shape, codes, exit status and suggestions are unchanged for every case the existing failure and CLI contract tests cover, and those tests pass unweakened.\n- [hard] REQ-03: `render_checker` produces each line from one table of (kind, preset and plain text), with byte-identical output.\n- [hard] REQ-04: Outcome warnings built from displayable values go through one shared conversion instead of a per-handler `map(ToString::to_string)`.\n- [hard] REQ-05: The change removes at least 50 production lines from `crates/jit/src` (default mode of `scripts/production-lines.py`).\n\n## Notes\n\nPart of the epic's net-reduction work (plan D-51).\n",
   "documents": [],
+  "done_at": "2026-11-04T12:53:23.384208625Z",
   "first_ready_at": "2026-11-04T12:28:15.914965560Z",
   "gates_required": [
     "cargo-ci",
@@ -16,6 +17,12 @@
       "run_id": "d3fe3b50-3ecf-45dc-b2be-102cecb6c50d",
       "status": "passed",
       "updated_at": "2026-11-04T12:47:52.640561638Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0777244f-669a-47cc-904c-cb1366c84aef",
+      "status": "passed",
+      "updated_at": "2026-11-04T12:52:58.557934234Z",
       "updated_by": "auto:executor"
     }
   },
@@ -28,7 +35,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Dependency batch codes and checker text come from one source",
-  "updated_at": "2026-11-04T12:47:52.640561638Z"
+  "updated_at": "2026-11-04T12:53:23.384208625Z"
 }
