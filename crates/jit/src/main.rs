@@ -5323,190 +5323,159 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 return Ok(ExitCode::Success);
             }
 
-            // Standard repository validation (existing code)
-            if fix {
-                // Use auto-fix mode
-                let (fixes_applied, messages) = match executor
-                    .validation()
-                    .validate_with_fix(true, dry_run)
-                {
+            let (fixes_applied, messages, validation_report, divergence_report) = if fix {
+                match executor.validation().validate_with_fix(dry_run) {
                     Ok(result) => result,
                     Err(error) if json => {
                         let json_error = validate_fix_json_error(&error);
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
                     }
-                    Err(error) if classify(&error).exit_code() == ExitCode::ValidationFailed => {
-                        return Err(anyhow::Error::new(jit::errors::ValidationFailedError::new(
-                            format!("{error:#}"),
-                        )));
-                    }
                     Err(error) => return Err(error),
-                };
-
-                // Print messages unless in JSON mode
-                if !json {
-                    for message in &messages {
-                        println!("{}", message);
-                    }
-                }
-
-                if json {
-                    use serde_json::json;
-
-                    let output = JsonOutput::success(json!({
-                        "valid": true,
-                        "fixes_applied": fixes_applied,
-                        "dry_run": dry_run,
-                        "message": if dry_run {
-                            format!("{} fixes would be applied", fixes_applied)
-                        } else if fixes_applied > 0 {
-                            format!("Applied {} fixes, repository is now valid", fixes_applied)
-                        } else {
-                            "Repository is valid".to_string()
-                        }
-                    }));
-                    println!("{}", output.to_json_string()?);
                 }
             } else {
-                // Standard whole-repo validation. Capture the bounded whole-repository
-                // image through a mutation session and validate it, so every pass
-                // reads image-projected content with no live `.jit` reopen. Capture (do
-                // NOT `?`-propagate) any integrity error so it can be rendered before
-                // the exit status is decided below.
-                // Wrap any integrity violation in the typed ValidationFailedError
-                // (message preserved verbatim) so the top-level handler classifies
-                // it as a validation failure by downcast rather than by message text.
-                let (validation_report, divergence_report) = executor
+                let (report, divergences) = executor
                     .validation()
                     .validate_repository_report_with_divergences()?;
-                let (structural_failure, rule_report) = validation_report.into_parts();
-                let integrity_error = structural_failure.map(|error| {
-                    anyhow::Error::new(jit::errors::ValidationFailedError::new(format!(
-                        "Invalid repository: {error:#}"
-                    )))
-                });
-                let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
+                (0, Vec::new(), report, divergences)
+            };
+            if !json {
+                for message in &messages {
+                    println!("{message}");
+                }
+            }
+            let (structural_failure, rule_report) = validation_report.into_parts();
+            let integrity_error = structural_failure.map(|error| {
+                anyhow::Error::new(jit::errors::ValidationFailedError::new(format!(
+                    "Invalid repository: {error:#}"
+                )))
+            });
+            let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
 
-                // The view-derived report contains the declarative local/graph
-                // findings and built-in semantic findings. Do not reopen the
-                // storage root through `CommandExecutor` after judging the view.
-                let rules_failed = rule_report.has_errors();
-                let validation_failed = rules_failed || integrity_error.is_some();
+            // The view-derived report contains the declarative local/graph
+            // findings and built-in semantic findings. Do not reopen the
+            // storage root through `CommandExecutor` after judging the view.
+            let rules_failed = rule_report.has_errors();
+            let validation_failed = rules_failed || integrity_error.is_some();
 
-                // Warn-severity findings are reported separately as "warnings" for
-                // output-shape stability (the prior orphan/strategic warning list).
-                let warning_findings: Vec<&jit::validation::report::ReportedFinding> = rule_report
-                    .findings
+            // Warn-severity findings are reported separately as "warnings" for
+            // output-shape stability (the prior orphan/strategic warning list).
+            let warning_findings: Vec<&jit::validation::report::ReportedFinding> = rule_report
+                .findings
+                .iter()
+                .filter(|f| !f.is_error())
+                .collect();
+
+            if json {
+                use serde_json::json;
+
+                let warnings_json: Vec<_> = warning_findings
                     .iter()
-                    .filter(|f| !f.is_error())
+                    .map(|f| {
+                        json!({
+                            "type": "rule_warning",
+                            "issue_id": f.issue_id,
+                            "rule": f.rule,
+                            "message": f.message,
+                        })
+                    })
                     .collect();
 
-                if json {
-                    use serde_json::json;
-
-                    let warnings_json: Vec<_> = warning_findings
-                        .iter()
-                        .map(|f| {
-                            json!({
-                                "type": "rule_warning",
-                                "issue_id": f.issue_id,
-                                "rule": f.rule,
-                                "message": f.message,
-                            })
-                        })
-                        .collect();
-
-                    let findings_json = serde_json::to_value(&rule_report.findings)?;
-                    let message = if let Some(err) = &integrity_message {
-                        if rules_failed {
-                            format!(
-                                "Repository validation failed: {} rule error(s) and a \
-                                 repository-integrity error: {}",
-                                rule_report.error_count(),
-                                err
-                            )
-                        } else {
-                            format!("Repository integrity validation failed: {}", err)
-                        }
-                    } else if rules_failed {
+                let findings_json = serde_json::to_value(&rule_report.findings)?;
+                let message = if let Some(err) = &integrity_message {
+                    if rules_failed {
                         format!(
-                            "Repository validation failed with {} rule error(s)",
-                            rule_report.error_count()
+                            "Repository validation failed: {} rule error(s) and a \
+                                 repository-integrity error: {}",
+                            rule_report.error_count(),
+                            err
                         )
                     } else {
-                        "Repository validation passed".to_string()
-                    };
-                    let divergences_json = serde_json::to_value(&divergence_report.items)?;
-                    let details = json!({
-                        "valid": !validation_failed,
-                        "integrity_error": integrity_message,
-                        "warnings": warnings_json,
-                        "warning_count": warnings_json.len(),
-                        "membership_divergences": divergences_json,
-                        "divergence_count": divergence_report.count(),
-                        "rule_findings": findings_json,
-                        "error_count": rule_report.error_count(),
-                        "message": message
-                    });
-
-                    let failure_code = validation_failed.then(|| {
-                        if integrity_error.is_some() {
-                            ErrorCode::ValidationFailed
-                        } else {
-                            ErrorCode::GenericError
-                        }
-                    });
-                    render_validation_json(details, message, failure_code)?;
+                        format!("Repository integrity validation failed: {}", err)
+                    }
+                } else if rules_failed {
+                    format!(
+                        "Repository validation failed with {} rule error(s)",
+                        rule_report.error_count()
+                    )
                 } else {
-                    if validation_failed {
-                        if rules_failed {
-                            println!(
-                                "error: Repository validation failed with {} rule error(s)",
-                                rule_report.error_count()
-                            );
-                        }
-                        if let Some(err) = &integrity_message {
-                            println!("error: Repository integrity error: {}", err);
-                        }
+                    "Repository validation passed".to_string()
+                };
+                let divergences_json = serde_json::to_value(&divergence_report.items)?;
+                let mut details = json!({
+                    "valid": !validation_failed,
+                    "integrity_error": integrity_message,
+                    "warnings": warnings_json,
+                    "warning_count": warnings_json.len(),
+                    "membership_divergences": divergences_json,
+                    "divergence_count": divergence_report.count(),
+                    "rule_findings": findings_json,
+                    "error_count": rule_report.error_count(),
+                    "message": message
+                });
+
+                if fix {
+                    details["fixes_applied"] = json!(fixes_applied);
+                    details["fix_messages"] = json!(messages);
+                    details["dry_run"] = json!(dry_run);
+                }
+
+                let failure_code = validation_failed.then(|| {
+                    if integrity_error.is_some() {
+                        ErrorCode::ValidationFailed
                     } else {
-                        println!("Repository validation passed");
+                        ErrorCode::GenericError
                     }
-
-                    // Every finding (errors AND warnings — including the built-in
-                    // type-hierarchy warnings) is rendered through the rule report.
-                    jit::output::render_validation_findings(&rule_report.findings, None).print();
-
-                    if !warning_findings.is_empty() {
-                        println!("\nWarnings: {}", warning_findings.len());
-                    }
-
-                    // Advisory only — does not affect the exit status.
-                    if divergence_report.count() > 0 {
+                });
+                render_validation_json(details, message, failure_code)?;
+            } else {
+                if validation_failed {
+                    if rules_failed {
                         println!(
-                            "warning: {} membership label(s) not backed by the DAG \
-                             (run `jit query divergence` for details)",
-                            divergence_report.count()
+                            "error: Repository validation failed with {} rule error(s)",
+                            rule_report.error_count()
                         );
                     }
+                    if let Some(err) = &integrity_message {
+                        println!("error: Repository integrity error: {}", err);
+                    }
+                } else {
+                    println!("Repository validation passed");
                 }
 
-                // Decide the exit status AFTER rendering. The structured rule
-                // report (including graph-rule findings) has already been printed
-                // above, so finding #1 is fixed regardless of how we exit.
-                //
-                // A repository-integrity error keeps its specific exit code
-                // (e.g. a broken dependency maps to `ExitCode::ValidationFailed`).
-                // Machine-readable failures have already terminated after their
-                // single canonical envelope; plain failures continue through the
-                // established human diagnostic path below. Otherwise, an
-                // error-severity rule finding (local OR graph) exits non-zero.
-                if let Some(err) = integrity_error {
-                    return Err(err);
+                // Every finding (errors AND warnings — including the built-in
+                // type-hierarchy warnings) is rendered through the rule report.
+                jit::output::render_validation_findings(&rule_report.findings, None).print();
+
+                if !warning_findings.is_empty() {
+                    println!("\nWarnings: {}", warning_findings.len());
                 }
-                if rules_failed {
-                    std::process::exit(1);
+
+                // Advisory only — does not affect the exit status.
+                if divergence_report.count() > 0 {
+                    println!(
+                        "warning: {} membership label(s) not backed by the DAG \
+                             (run `jit query divergence` for details)",
+                        divergence_report.count()
+                    );
                 }
+            }
+
+            // Decide the exit status AFTER rendering. The structured rule
+            // report (including graph-rule findings) has already been printed
+            // above, so finding #1 is fixed regardless of how we exit.
+            //
+            // A repository-integrity error keeps its specific exit code
+            // (e.g. a broken dependency maps to `ExitCode::ValidationFailed`).
+            // Machine-readable failures have already terminated after their
+            // single canonical envelope; plain failures continue through the
+            // established human diagnostic path below. Otherwise, an
+            // error-severity rule finding (local OR graph) exits non-zero.
+            if let Some(err) = integrity_error {
+                return Err(err);
+            }
+            if rules_failed {
+                std::process::exit(1);
             }
         }
         Commands::Recover => {

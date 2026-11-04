@@ -47,6 +47,9 @@ pub mod report;
 pub mod repository;
 pub mod strictness;
 
+#[cfg(test)]
+mod selection_proptests;
+
 pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
 pub use local::{evaluate_local, LocalEvalError, LocalEvaluation};
 pub use report::{ExplainReport, ReportedFinding, RuleOutcome, RuleReport};

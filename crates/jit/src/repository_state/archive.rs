@@ -334,7 +334,7 @@ pub fn finalize_archive_execution(
             event: Box::new(event),
         });
     }
-    let record_actions = finalize_delta(image.layout(), image, context, &intents)
+    let record_actions = finalize_delta(image.layout(), image, context, &intents, None)
         .map_err(ArchiveExecutionError::Mutation)?
         .actions()
         .to_vec();

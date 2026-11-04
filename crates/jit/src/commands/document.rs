@@ -518,7 +518,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             if derived.intents.is_empty() {
                 return Ok(SessionStep::Done((derived.outcome, warnings)));
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             Ok(SessionStep::Apply(plan, (derived.outcome, warnings)))
         })
     }
@@ -546,7 +546,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             };
             let issue = captured_issue(&image, &issue_path, issue_id)?;
             let derived = derive_document_remove(issue, path)?;
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             Ok(SessionStep::Apply(plan, derived.outcome))
         })
     }
@@ -1091,7 +1091,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
                     )),
                 },
             ];
-            let plan = finalize(&layout, &image, &context, &intents)?;
+            let plan = finalize(&layout, &image, &context, &intents, None)?;
             Ok(SessionStep::Apply(plan, scanned))
         })
     }
@@ -2160,7 +2160,7 @@ mod tests {
             first_scan.format,
             first_scan.assets,
         );
-        let first_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
+        let first_plan = finalize(&layout, &first_image, &context, &first.intents, None).unwrap();
 
         let mut concurrent = storage.load_issue(&id).unwrap();
         concurrent.labels.push("owner:concurrent".into());
@@ -2197,7 +2197,7 @@ mod tests {
             retry_scan.format,
             retry_scan.assets,
         );
-        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents).unwrap();
+        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents, None).unwrap();
         assert_eq!(event_bytes(&first_plan), event_bytes(&retry_plan));
         retry_session.apply(&retry_plan).unwrap();
 
