@@ -1,3 +1,4 @@
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::domain::artifact_classifier::ArtifactClassificationPolicy;
 use jit::domain::artifact_discovery::{
     expand_artifact_closure, ArtifactClosure, ArtifactClosureState, ArtifactEvidence,

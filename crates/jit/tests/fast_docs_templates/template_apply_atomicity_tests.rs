@@ -5,6 +5,7 @@
 //! call. These tests inject a failure at that boundary and compare complete
 //! captured preimages, rather than observing superseded per-record writes.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::test_utils::add_reducing_edge;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -230,13 +231,9 @@ impl Drop for PublicationProbeSession {
     }
 }
 
-impl jit::storage::RepositoryMutationSession for PublicationProbeSession {
+impl jit::storage::RepositoryReadSession for PublicationProbeSession {
     fn layout(&self) -> &jit::repository_state::RepositoryLayout {
         self.inner.layout()
-    }
-
-    fn recovery_report(&self) -> &jit::storage::RecoveryDispatchReport {
-        self.inner.recovery_report()
     }
 
     fn capture(
@@ -266,6 +263,12 @@ impl jit::storage::RepositoryMutationSession for PublicationProbeSession {
         let image = self.inner.extend(image, spec)?;
         self.captures.lock().unwrap().push(image.clone());
         Ok(image)
+    }
+}
+
+impl jit::storage::RepositoryMutationSession for PublicationProbeSession {
+    fn recovery_report(&self) -> &jit::storage::RecoveryDispatchReport {
+        self.inner.recovery_report()
     }
 
     fn apply(
@@ -346,6 +349,14 @@ impl<S: IssueStore + RepositoryStateStore> RepositoryStateStore for PublicationP
             closure_rewrite: self.closure_rewrite.clone(),
             closure_rewritten: Arc::clone(&self.closure_rewritten),
         }))
+    }
+
+    fn open_read_session(
+        &self,
+        layout: jit::repository_state::RepositoryLayout,
+    ) -> Result<Box<dyn jit::storage::OptimisticReadSession>, jit::storage::RepositoryStateStoreError>
+    {
+        self.inner.open_read_session(layout)
     }
 }
 

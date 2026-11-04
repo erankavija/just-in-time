@@ -10,6 +10,7 @@
 //! - an `enforce` error graph rule's violation blocks under `loose` but is
 //!   downgraded to advisory under `permissive`.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
 use jit::domain::identity::IssueId;

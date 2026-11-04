@@ -102,6 +102,7 @@ test-support = []
 sha2 = "0.10"
 
 [dev-dependencies]
+syn = { version = "2", features = ["full", "visit"] }
 # Enables `test-support` for this crate's own test builds (inline `#[cfg(test)]`
 # modules and the `tests/` integration binaries) without making the feature
 # part of the default build. Cargo unifies this self-edge's requested features

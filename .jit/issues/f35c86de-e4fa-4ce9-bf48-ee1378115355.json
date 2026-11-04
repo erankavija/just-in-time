@@ -8,6 +8,7 @@
   ],
   "description": "Splits the monolithic `CommandExecutor` public surface into per-family facades and moves every storage call, repository bootstrap, search, claim and foreground-serve step the CLI makes on its own behind the executor or `commands/`.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) exposes about 195 methods in 28 `impl` blocks across 25 files, so any consumer that needs one family (the HTTP server needs issues, documents, gates and validation) accepts the whole surface, including session and cache internals and a `pub config_manager` field. Separately, `crates/jit/src/main.rs` bypasses the executor: `run()` constructs `JsonFileStorage`, opens mutation sessions and calls `storage.validate()`; issue arms call `storage.resolve_issue_id` and `storage.load_issue` after each mutation; `Commands::Search` calls `jit::search::search`; claim and recover arms call `commands::claim` free functions with `&storage`; and foreground `jit serve` spawns and waits on the server inline and calls `std::process::exit`.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each command family is reachable through a facade returned by a `CommandExecutor` accessor (for example `issues()` returning `IssueOps<'_, S>`), and the executor's public surface is limited to its constructors and those accessors.\n- [hard] REQ-02: The CLI command path makes no direct `IssueStore` or `JsonFileStorage` call: repository opening, issue mutations, template application, search, claims and foreground serve go through library functions that return what the CLI reports.\n- [hard] REQ-03: The CLI's human output, JSON output and exit codes are unchanged by this restructuring, and the existing Rust suites pass with no assertion weakened.\n\n## Notes\n\n- 0f8efc37 later adopts the repository bootstrap for the server and replaces what the executor search entry point computes.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "documents": [],
+  "first_ready_at": "2026-11-04T18:21:04.534321938Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "story:executor-surface"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Narrow executor surface and storage-free CLI entry",
-  "updated_at": "2026-11-03T23:12:35.325107147Z"
+  "updated_at": "2026-11-04T18:21:04.534321938Z"
 }

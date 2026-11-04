@@ -12,6 +12,7 @@
 //!   most permissive, which downgrades it to advisory;
 //! - an unrecognized strictness value is rejected rather than silently ignored.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;

@@ -5,8 +5,8 @@ use super::{
     HandlerStore, Outcome,
 };
 use crate::cli::ClaimCommands;
-use crate::commands::RecoveryFailedError;
 use crate::domain::identity::IssueIdPrefix;
+use crate::errors::RecoveryFailedError;
 use crate::output::{
     ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
     ClaimRenewResponse, LeaseListResponse, RecoverResponse,
@@ -123,18 +123,25 @@ command_group! {
     storage: [HandlerStore],
     leaves: {
         "claim_acquire" => ClaimCommands::Acquire { issue_id, ttl, agent_id, reason }
-            => acquire(issue_id, ttl, agent_id, reason) -> ClaimAcquireResponse,
+            => acquire(issue_id, ttl, agent_id, reason)
+            raises [ClaimRequiresGit] -> ClaimAcquireResponse,
         "claim_release" => ClaimCommands::Release { issue_id }
-            => release(issue_id) -> ClaimReleaseResponse,
+            => release(issue_id)
+            raises [ClaimRequiresGit] -> ClaimReleaseResponse,
         "claim_renew" => ClaimCommands::Renew { issue_id, extension }
-            => renew(issue_id, extension) -> ClaimRenewResponse,
+            => renew(issue_id, extension)
+            raises [ClaimRequiresGit] -> ClaimRenewResponse,
         "claim_heartbeat" => ClaimCommands::Heartbeat { issue_id }
-            => heartbeat(issue_id) -> ClaimHeartbeatResponse,
+            => heartbeat(issue_id)
+            raises [ClaimRequiresGit] -> ClaimHeartbeatResponse,
         "claim_status" => ClaimCommands::Status { issue, agent }
-            => status(issue, agent) -> LeaseListResponse,
-        "claim_list" => ClaimCommands::List => list() -> LeaseListResponse,
+            => status(issue, agent)
+            raises [ClaimRequiresGit] -> LeaseListResponse,
+        "claim_list" => ClaimCommands::List => list()
+            raises [ClaimRequiresGit] -> LeaseListResponse,
         "claim_force-evict" => ClaimCommands::ForceEvict { issue_id, reason }
-            => force_evict(issue_id, reason) -> ClaimForceEvictResponse,
+            => force_evict(issue_id, reason)
+            raises [ClaimRequiresGit] -> ClaimForceEvictResponse,
     }
 }
 

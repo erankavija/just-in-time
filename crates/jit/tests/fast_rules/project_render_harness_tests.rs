@@ -7,6 +7,7 @@
 //! the two migrated projections (`invariants` id-anchor, `rules-and-gates` full),
 //! each bound to the live renderer code rather than a committed mirror.
 
+use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::declarations::invariants::InvariantRegistry;
 use jit::declarations::rules::RuleSet;

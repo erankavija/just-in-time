@@ -132,9 +132,13 @@ command_group! {
     storage: [HandlerStore],
     leaves: {
         "profile_show" => ProfileCommands::Show { profile } => show(profile) -> ProfileShowResult,
-        "profile_diff" => ProfileCommands::Diff { profile, values_file, set } => diff(profile, values_file, set) -> ProfileComposedApplyResult,
-        "profile_apply" => ProfileCommands::Apply { profile, values_file, set, dry_run } => apply(profile, values_file, set, dry_run) -> ProfileComposedApplyResult,
-        "profile_pack" => ProfileCommands::Pack { source, output, dry_run } => pack(source, output, dry_run) -> ProfilePackResult,
-        "profile_add" => ProfileCommands::Add { archive, destination, dry_run } => add(archive, destination, dry_run) -> ProfileAddResult,
+        "profile_diff" => ProfileCommands::Diff { profile, values_file, set } => diff(profile, values_file, set)
+            findings ValidationFailed "The difference report found targets or final validation that prevent publication." -> ProfileComposedApplyResult,
+        "profile_apply" => ProfileCommands::Apply { profile, values_file, set, dry_run } => apply(profile, values_file, set, dry_run)
+            raises [ProfileConflict, ProfileUncommittedTargets] -> ProfileComposedApplyResult,
+        "profile_pack" => ProfileCommands::Pack { source, output, dry_run } => pack(source, output, dry_run)
+            raises [AlreadyExists] -> ProfilePackResult,
+        "profile_add" => ProfileCommands::Add { archive, destination, dry_run } => add(archive, destination, dry_run)
+            raises [ProfileConflict] -> ProfileAddResult,
     }
 }

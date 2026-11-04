@@ -65,7 +65,8 @@ command_group! {
         "config_show" => ConfigCommands::Show => show() -> ConfigShowResponse,
         "config_get" => ConfigCommands::Get { key } => get(key) -> ConfigGetResponse,
         "config_set" => ConfigCommands::Set { key, value } => set(key, value) -> ConfigSetResponse,
-        "config_validate" => ConfigCommands::Validate => validate() -> ConfigValidateResponse,
+        "config_validate" => ConfigCommands::Validate => validate()
+            findings ValidationFailed "The repo or environment-variable configuration failed to load or carried an invalid value." -> ConfigValidateResponse,
         "config_show-hierarchy" => ConfigCommands::ShowHierarchy => show_hierarchy() -> TypeHierarchyResponse,
     }
 }
