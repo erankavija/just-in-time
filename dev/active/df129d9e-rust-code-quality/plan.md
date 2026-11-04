@@ -10,20 +10,20 @@
 | Criterion | Approach | Evidence / open gap |
 |---|---|---|
 | REQ-01 | Handlers return typed command or domain results; output owns rendering and envelopes (`handler-response-ownership`). | Inline bodies: investigation area 2 §1 |
-| REQ-02 | `run()` shrinks to group dispatch as groups migrate; a final consolidation leaves `main()` as parse, bootstrap, dispatch, render, exit. | `run()` spans 6,428 lines: area 1 claim 1d |
+| REQ-02 | `run()` parses, opens the repository, dispatches and renders propagated failures; `main()` performs the sole process exit. | `run()` spans 6,428 lines: area 1 claim 1d |
 | REQ-03 | Per-family facades borrowed from the executor (D-1); the shared kernel becomes crate-private. | 195 methods, 28 blocks, 25 files: area 3 §1 |
 | REQ-04 | The eight per-query structs are dead and are deleted; every live list response becomes a `list-envelope` instantiation. | area 2 §2 |
-| REQ-05 | `generate()` stays the authority; `get_output_schema_for_command` survives as a lookup into the handler registry; `hidden_commands()` and `builtin_global_flags()` stay where they are (D-12). | area 2 §4 |
+| REQ-05 | `generate()` stays the authority; `get_output_schema_for_command` survives as a lookup into the handler registry; `builtin_global_flags()` remains; MCP-only `hidden_commands()` is removed under charter D-23. | area 2 §4 |
 | REQ-06 | `[workspace.lints]` denies `warnings` and `unsafe_code`; members inherit it (D-14). | area 3 Lints |
 | REQ-07 | The harness moves into `jit`'s `test-support` surface (D-15); the completion report re-measures the budgets. | Included in 4 of 10 targets: area 3 Harness |
 | REQ-08 | A fourth budget in `rust-build-budget.sh`, calibrated after consolidation (D-20), reported as a field of the existing success line. | area 3 Budget script |
 | REQ-09 | Each deliberate change is decided in a decision row below or in the task that makes it, and gets a test that states the new contract; changed exit codes also update the schema's exit-code projection; `cli-contract-docs` states the contract once. | Suites: area 1 Prior art, area 2 Consumer sweep |
-| REQ-10 | `production-line-count` counts before and after with one committed counter, in the Background's described method; `completion-report` holds `main.rs` + `dispatch/` + `output` below 8,700 (D-26). | area 3 REQ-10 counting method |
+| REQ-10 | `production-line-count` counts before and after with one committed counter, in the Background's described method; `completion-report` verifies the epic-attributed whole-crate net increase is at most 375 production lines (D-54). | area 3 REQ-10 counting method |
 | REQ-11 | `failure-classification` moves the classifier into output, then absorbs the details and suggestions call sites build today. | 15 emitters: area 1 §A |
 | REQ-12 | Handlers return `Outcome` values (`handler-contract`); findings render through `findings-envelope`; `main()` holds the one `std::process::exit`. | 75 exits, 14 findings sites: area 1 claim 3, §D |
 | REQ-13 | `type-only-error-codes`: a call site that needs a distinct code gets a typed error; codes nothing produces any more retire. | 50+ fallback sites: area 1 §B, §C |
 | REQ-14 | Document path-read failures first get correct codes; the server then derives its status from `failure-classification` through one exhaustive code-to-status projection (D-10). | area 1 §E |
-| REQ-15 | `output-mode`: one global `--json`; both argv scans disappear with the stubs and with threading the parsed mode out of `run()`. | area 2 §5 |
+| REQ-15 | `output-mode`: one global `--json`; `run()` passes its parsed mode to dispatch and failure rendering, and returns `RunStatus`; no raw-argv mode inference remains. | area 2 §5 |
 | REQ-16 | `issue-filter-args`: one flattened group with one conversion at the CLI boundary (D-8). | about 14 parse sites: area 2 §6 |
 | REQ-17 | `handler-contract` registers each leaf's response type, including the pre-bootstrap `version` leaf; the hand table is deleted once every group has migrated. | 74 of 120 leaves untyped: area 2 §4 |
 | REQ-18 | `list-envelope` replaces the 33 `count` structs and the inline count bodies; bare prints go through the one success emitter. | area 2 §2, §3 |
