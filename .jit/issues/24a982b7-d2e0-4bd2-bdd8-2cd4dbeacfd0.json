@@ -3,7 +3,8 @@
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
-    "10751360-4148-410a-bcae-dfe9c1ee1282"
+    "10751360-4148-410a-bcae-dfe9c1ee1282",
+    "8fbf8c43-88a7-4671-8402-865a872075ff"
   ],
   "description": "The query arms build list responses and blocked-reason mappings inline. This moves them, bare `jit query` and `jit status` to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `QueryCommands::{Available, Blocked, Strategic, Closed}` construct `IssueListResponse`, `BlockedListResponse` and their `--full` variants inline, `Blocked` maps blocking reasons inline, and each renders its own issue-list copy; `QueryCommands::{Count, Divergence}` fall back to `CommandResponse`; `query all` and bare `jit query` call `run_query_all`, and `reject_parent_query_filters` rejects filters placed before a subcommand. `Commands::Status` (`jit status`) renders the state rollup. Filters arrive through the flattened `IssueFilterArgs` group.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `query all|available|blocked|strategic|closed|count|divergence`, bare `jit query` and `jit status` to handlers in `crates/jit/src/dispatch/query.rs`, and `main.rs` keeps no arm body or `reject_parent_query_filters` copy for them.\n- [hard] REQ-02: `query all` and bare `jit query` call the one library-side filtered-list function rather than a copy.\n- [hard] REQ-03: Each leaf returns its registered response type, list payloads (including divergences) are `ListEnvelope` instantiations, the blocked-reason mapping is an output constructor, human lists go through the shared issue-list renderer, and the schema names a typed response for every leaf.\n- [hard] REQ-04: The handlers return failures as errors with no substituted code or `std::process::exit`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
@@ -29,7 +30,7 @@
     "satisfies:df129d9e/REQ-18"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Query and status commands move to library handlers",
-  "updated_at": "2026-11-04T10:16:57.705402255Z"
+  "updated_at": "2026-11-04T12:28:19.515867437Z"
 }

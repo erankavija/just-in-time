@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T12:28:16.328621432Z",
+  "dependencies": [
+    "5687e281-d504-4b85-ab4f-c84e603c37e2"
+  ],
+  "description": "`command_group!` has one entry form per storage shape folded into a single entry rule, and groups share one count-message helper, so the macro has fewer near-identical arms.\n\n## Background\n\n`command_group!` in `crates/jit/src/dispatch/mod.rs` has grown separate entry arms for its storage shapes (concrete store, generic bound and executor-free), which differ only in how the handler context is built. Several groups (item, events, label, doc) each keep a helper that formats a \"N item(s)\" message for a list outcome.\n\n## Success Criteria\n\n- [hard] REQ-01: `command_group!` has one entry arm for the storage shapes, with the context construction selected by an internal rule, and every group compiles against it unchanged apart from its declaration.\n- [hard] REQ-02: List outcomes take their count message from one shared helper, and no group keeps its own.\n- [hard] REQ-03: No command's JSON payload, human output, schema or exit code changes, and the handler-form tests pass unweakened.\n- [hard] REQ-04: The change removes at least 10 production lines from `crates/jit/src` (default mode of `scripts/production-lines.py`).\n\n## Notes\n\nLands with or after the main.rs reduction that removes the transitional pass-through form, so the macro is edited once. Part of the epic's net-reduction work (plan D-51).\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T12:28:16.328621432Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ae3f4f8b-4f95-402f-8b05-3be296bff3e9",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:command-dispatch",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "One entry rule for every command_group! storage shape",
+  "updated_at": "2026-11-04T12:28:20.020435282Z"
+}
