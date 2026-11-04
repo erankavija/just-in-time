@@ -15,7 +15,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "88363cf0-c609-44e0-909d-8bbbddaffab0",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:54:51.512027026Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4466395d-342d-46c0-b6c8-27d7fd4ab879",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Ordinary commands succeed over unparseable history",
-  "updated_at": "2026-11-04T07:11:27.968965419Z"
+  "updated_at": "2026-11-04T07:54:51.512027026Z"
 }
