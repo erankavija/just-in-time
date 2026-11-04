@@ -9,6 +9,7 @@
   ],
   "description": "Add the verdict record and the archive-evidence record to the generated storage-record reference, so the reference describes every per-key record a reader addresses.\n\n## Background\n\n`docs/reference/storage-records.md` is generated from `crates/jit/src/storage/reference.rs` by `scripts/generate-storage-records-reference.sh` and checked by a golden test. It describes issue records, gate-run records and event records. It does not describe `gate-runs/verdicts/<gate-key>/<inputs-digest>.json`, which names the run holding a reusable verdict, or `archive-evidence/<target-key>.json`, which holds one archive target's executions. Both are written in the same redo record as the run or execution they describe. Other changes also regenerate this page; rebase by regenerating it.\n\n## Success Criteria\n\n- [hard] REQ-01: The reference source documents both records: their paths, their fields, which mutation writes them and which reader addresses them, with field rows derived from their types.\n- [hard] REQ-02: `docs/reference/storage-records.md` is regenerated from the source and its golden test passes.\n",
   "documents": [],
+  "done_at": "2026-11-04T08:26:57.872146380Z",
   "first_ready_at": "2026-11-04T01:18:45.868809302Z",
   "gates_required": [
     "cargo-ci",
@@ -18,9 +19,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "acf12c3d-58e4-49c5-9fc6-3c1ae5659918",
-      "status": "failed",
-      "updated_at": "2026-11-04T08:13:43.931366310Z",
+      "run_id": "84d35de4-b698-4a25-9a73-c59374d1d9c1",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:26:57.433651674Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -55,7 +56,7 @@
     "satisfies:f8a6b298/REQ-15"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "The storage-record reference describes verdict and archive-evidence records",
-  "updated_at": "2026-11-04T08:20:07.228696372Z"
+  "updated_at": "2026-11-04T08:26:57.872146380Z"
 }

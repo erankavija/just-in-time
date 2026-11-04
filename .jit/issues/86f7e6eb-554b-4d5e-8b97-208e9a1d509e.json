@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "daa75ff7-748e-483e-adaa-c6bfdac6cd39",
+      "status": "passed",
+      "updated_at": "2026-11-04T08:25:20.972241600Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "86f7e6eb-554b-4d5e-8b97-208e9a1d509e",
   "labels": [
     "type:task",
@@ -28,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Single-rule validation selects from the report",
-  "updated_at": "2026-11-04T08:21:00.277034970Z"
+  "updated_at": "2026-11-04T08:25:20.972241600Z"
 }
