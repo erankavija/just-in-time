@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9ea35b0338d3b63ddcd5097beb7b65b17c1d5cdc",
+  "completed_at": "2026-11-04T15:38:02.724424304Z",
+  "duration_ms": 239333,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed gate-status handler migration meets its scoped criteria; the prior timestamp finding is fixed and the findings-stderr behavior is accepted by D-01.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f87f9b00-c255-45b3-b66c-655b394c13bc",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a2f28bc6-216a-4fc9-869f-c1988d5f617b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T15:34:03.390546152Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a5c2fb794, 1f76f1deb, 8e9b1242e, 33459be46\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-01, REQ-02, REQ-09, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19; @/issue/f87f9b00/decision/D-01; @/issue/df129d9e/decision/D-03; @/inv/architecture-dependency-direction, @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/semantic-test-assertions, @/inv/shared-test-contracts, @/inv/canonical-cutover\nGate evidence: cargo-ci passed (exit 0); mcp-ci passed (exit 0)\nTruncation recovery: recovered broad diff output with per-file patches, merge-parent diffs, and bounded current-source reads\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed gate-status handler migration meets its scoped criteria; the prior timestamp finding is fixed and the findings-stderr behavior is accepted by D-01.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

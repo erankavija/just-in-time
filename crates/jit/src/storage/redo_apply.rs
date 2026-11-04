@@ -11,12 +11,12 @@ use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
 use crate::storage::atomic_write::sync_capability_directory;
+use crate::storage::capability_fs::{
+    open_capability_parent, open_child_dir_nofollow, open_or_create_capability_parent,
+    CapabilityFsError, CapabilityRoots,
+};
 use crate::storage::redo_record::{
     EventAppend, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
-};
-use crate::storage::repository_state_store::{
-    open_capability_parent, open_child_dir_nofollow, open_or_create_capability_parent,
-    CapabilityRoots, RepositoryStateStoreError,
 };
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, File, OpenOptions};
@@ -79,7 +79,7 @@ pub enum RedoApplyError {
     #[error("redo record makes directory {path}, which something other than a directory occupies")]
     OccupiedDirectory { path: String },
     #[error(transparent)]
-    Roots(#[from] RepositoryStateStoreError),
+    Roots(#[from] CapabilityFsError),
     #[error(transparent)]
     Path(#[from] RepositoryLayoutError),
     #[error(transparent)]

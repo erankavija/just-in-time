@@ -56,7 +56,7 @@ pub(crate) fn write_external_export_atomic(
     let leaf = target
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("external export target has no file name"))?;
-    let parent = super::repository_state_store::open_absolute_dir_nofollow(parent_path)
+    let parent = super::capability_fs::open_absolute_dir_nofollow(parent_path)
         .with_context(|| format!("opening external export parent {}", parent_path.display()))?;
     match parent.symlink_metadata(leaf) {
         Ok(metadata) if metadata.is_file() && !metadata.is_symlink() => {}
@@ -90,11 +90,11 @@ pub(crate) fn write_external_export_atomic(
 }
 
 fn revalidate_external_parent(path: &Path, held: &Dir) -> Result<()> {
-    let fresh = super::repository_state_store::open_absolute_dir_nofollow(path)
+    let fresh = super::capability_fs::open_absolute_dir_nofollow(path)
         .with_context(|| format!("revalidating external export parent {}", path.display()))?;
-    let held_identity = super::repository_state_store::capability_dir_identity(held)
+    let held_identity = super::capability_fs::capability_dir_identity(held)
         .ok_or_else(|| anyhow::anyhow!("external parent identity is unavailable"))?;
-    let fresh_identity = super::repository_state_store::capability_dir_identity(&fresh)
+    let fresh_identity = super::capability_fs::capability_dir_identity(&fresh)
         .ok_or_else(|| anyhow::anyhow!("external parent identity is unavailable"))?;
     if held_identity != fresh_identity {
         anyhow::bail!("external export parent changed before publication");
@@ -185,7 +185,7 @@ pub(crate) fn publish_external_directory_noreplace(
     let (parent_path, leaf, parent) = external_parent(target)?;
     let stage_name = external_temp_name(leaf);
     parent.create_dir(&stage_name)?;
-    let stage = super::repository_state_store::open_child_dir_nofollow(&parent, &stage_name)?;
+    let stage = super::capability_fs::open_child_dir_nofollow(&parent, &stage_name)?;
     let prepare = (|| -> Result<()> {
         for relative in directories {
             create_external_stage_directory(&stage, relative)?;
@@ -249,7 +249,7 @@ fn external_parent(target: &Path) -> Result<(&Path, &OsStr, Dir)> {
     let leaf = target
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("external export target has no file name"))?;
-    let parent = super::repository_state_store::open_absolute_dir_nofollow(parent_path)
+    let parent = super::capability_fs::open_absolute_dir_nofollow(parent_path)
         .with_context(|| format!("opening external export parent {}", parent_path.display()))?;
     Ok((parent_path, leaf, parent))
 }
@@ -297,7 +297,7 @@ fn create_external_stage_directory(root: &Dir, relative: &Path) -> Result<()> {
             }
             Err(error) => return Err(error.into()),
         }
-        current = super::repository_state_store::open_child_dir_nofollow(&current, name)?;
+        current = super::capability_fs::open_child_dir_nofollow(&current, name)?;
     }
     Ok(())
 }
@@ -305,7 +305,7 @@ fn create_external_stage_directory(root: &Dir, relative: &Path) -> Result<()> {
 fn open_external_stage_directory(root: &Dir, relative: &Path) -> Result<Dir> {
     let mut current = root.try_clone()?;
     for component in relative.components() {
-        current = super::repository_state_store::open_child_dir_nofollow(
+        current = super::capability_fs::open_child_dir_nofollow(
             &current,
             Path::new(component.as_os_str()),
         )?;
