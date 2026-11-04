@@ -3,40 +3,36 @@
 //! Execution is implemented only for the JSON-file store, so the group is bound
 //! to it rather than generic over [`IssueStore`](crate::storage::IssueStore).
 
-use super::{resolve_issue, CommandContext, Outcome};
+use super::{resolve_issue, CommandContext, HandlerResult};
 use crate::cli::ArchiveCommands;
 use crate::domain::artifact_execution::ArchiveExecutionResult;
 use crate::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan};
 use crate::output::ArchiveTargetResponse;
 use crate::storage::JsonFileStorage;
 
-fn candidates(
-    ctx: &CommandContext<'_, JsonFileStorage>,
-) -> anyhow::Result<Outcome<ArchiveCandidates>> {
-    Ok(Outcome::success(
-        ctx.executor.archive().archive_candidates()?,
-    ))
+fn candidates(ctx: &CommandContext<'_, JsonFileStorage>) -> HandlerResult<ArchiveCandidates> {
+    Ok(ctx.executor.archive().archive_candidates()?.into())
 }
 
 fn document(
     ctx: &CommandContext<'_, JsonFileStorage>,
     path: String,
     execute: bool,
-) -> anyhow::Result<Outcome<ArchiveTargetResponse>> {
+) -> HandlerResult<ArchiveTargetResponse> {
     let archive = ctx.executor.archive();
     let response = if execute {
         ArchiveTargetResponse::Executed(archive.execute_archive_document(&path)?)
     } else {
         ArchiveTargetResponse::Preview(archive.preview_archive_document(&path)?)
     };
-    Ok(Outcome::success(response))
+    Ok(response.into())
 }
 
 fn container(
     ctx: &CommandContext<'_, JsonFileStorage>,
     requested: String,
     execute: bool,
-) -> anyhow::Result<Outcome<ArchiveTargetResponse>> {
+) -> HandlerResult<ArchiveTargetResponse> {
     let id = resolve_issue(ctx.executor.storage(), &requested)?;
     let archive = ctx.executor.archive();
     let response = if execute {
@@ -44,7 +40,7 @@ fn container(
     } else {
         ArchiveTargetResponse::Preview(archive.preview_archive_container(&id)?)
     };
-    Ok(Outcome::success(response))
+    Ok(response.into())
 }
 
 command_group! {

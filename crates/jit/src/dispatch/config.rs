@@ -1,15 +1,15 @@
 //! `jit config` handlers.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::ConfigCommands;
 use crate::output::config::{
     ConfigGetResponse, ConfigSetResponse, ConfigShowResponse, ConfigValidateResponse,
     TypeHierarchyResponse,
 };
 use crate::output::ErrorCode;
-use crate::storage::{IssueStore, RepositoryStateStore};
+use crate::storage::IssueStore;
 
-fn show<S: IssueStore>(ctx: &CommandContext<'_, S>) -> anyhow::Result<Outcome<ConfigShowResponse>> {
+fn show<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<ConfigShowResponse> {
     Ok(Outcome::success_with(
         ConfigShowResponse(ctx.executor.config().effective_config_snapshot()?),
         "Effective configuration",
@@ -19,27 +19,21 @@ fn show<S: IssueStore>(ctx: &CommandContext<'_, S>) -> anyhow::Result<Outcome<Co
 fn get<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     key: String,
-) -> anyhow::Result<Outcome<ConfigGetResponse>> {
-    Ok(Outcome::success(ConfigGetResponse(
-        ctx.executor.config().get_config(&key)?,
-    )))
+) -> HandlerResult<ConfigGetResponse> {
+    Ok(ConfigGetResponse(ctx.executor.config().get_config(&key)?).into())
 }
 
-fn set<S: IssueStore + RepositoryStateStore>(
+fn set<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     key: String,
     value: String,
-) -> anyhow::Result<Outcome<ConfigSetResponse>> {
-    Ok(Outcome::success(ConfigSetResponse(
-        ctx.executor.config().set_config(&key, &value)?,
-    )))
+) -> HandlerResult<ConfigSetResponse> {
+    Ok(ConfigSetResponse(ctx.executor.config().set_config(&key, &value)?).into())
 }
 
 /// An invalid configuration source is a registered validation failure; its
 /// report carries the errors under `--json` and the summary is the message.
-fn validate<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-) -> anyhow::Result<Outcome<ConfigValidateResponse>> {
+fn validate<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<ConfigValidateResponse> {
     let response = ConfigValidateResponse(ctx.executor.config().validate()?);
     Ok(if response.0.valid {
         Outcome::success_with(response, "Configuration is valid")
@@ -57,7 +51,7 @@ fn validate<S: IssueStore>(
 
 fn show_hierarchy<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
-) -> anyhow::Result<Outcome<TypeHierarchyResponse>> {
+) -> HandlerResult<TypeHierarchyResponse> {
     Ok(Outcome::success_with(
         TypeHierarchyResponse(ctx.executor.config().declared_type_hierarchy()?),
         "Type hierarchy",
@@ -66,7 +60,7 @@ fn show_hierarchy<S: IssueStore>(
 
 command_group! {
     command: ConfigCommands,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [HandlerStore],
     leaves: {
         "config_show" => ConfigCommands::Show => show() -> ConfigShowResponse,
         "config_get" => ConfigCommands::Get { key } => get(key) -> ConfigGetResponse,

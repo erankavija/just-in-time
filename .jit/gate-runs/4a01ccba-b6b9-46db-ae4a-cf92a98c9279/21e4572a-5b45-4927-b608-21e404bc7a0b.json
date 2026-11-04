@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b64962ffa9c0d77e0a9f3a0f4c8b104f019d99d9",
+  "completed_at": "2026-11-04T14:05:47.057864314Z",
+  "duration_ms": 287029,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three benchmarked tests have current evidence below their limits; their properties remain covered without wall-clock observation, and prior finding F1 is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4a01ccba-b6b9-46db-ae4a-cf92a98c9279",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "21e4572a-5b45-4927-b608-21e404bc7a0b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T14:01:00.028368915Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:4a01ccba` commits 32843b6ab, b1ed23165, 46301855b, 3fedb755a, 7360cf535, 5e3f82d8, 65033128f, d76de4e9b, ff8a8d1a, 82745633d, 03ef3b4d, 11571b007\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/4a01ccba/requirement/REQ-01, REQ-02, REQ-03 and decision/D-01 (issue markdown); @/invariant/orthogonal-tests, essential-code-prose, no-ignored-tests, architecture-dependency-direction, shared-test-contracts, semantic-test-assertions, bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-04T14:00:42Z\nTruncation recovery: narrowed the initially truncated combined policy read to relevant config, gate, invariant, benchmark, and artifact reads\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three benchmarked tests have current evidence below their limits; their properties remain covered without wall-clock observation, and prior finding F1 is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

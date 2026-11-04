@@ -1,6 +1,6 @@
 //! `jit item` handlers.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult, Outcome};
 use crate::cli::ItemCommands;
 use crate::commands::{ItemListResult, ItemShowResult};
 use crate::storage::IssueStore;
@@ -8,7 +8,7 @@ use crate::storage::IssueStore;
 fn list<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     kind: Option<String>,
-) -> anyhow::Result<Outcome<ItemListResult>> {
+) -> HandlerResult<ItemListResult> {
     let response = ctx.executor.items().list_items(kind.as_deref())?;
     Ok(list_outcome(response))
 }
@@ -17,7 +17,7 @@ fn search<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     query: String,
     kind: Option<String>,
-) -> anyhow::Result<Outcome<ItemListResult>> {
+) -> HandlerResult<ItemListResult> {
     let response = ctx.executor.items().search_items(&query, kind.as_deref())?;
     Ok(list_outcome(response))
 }
@@ -31,10 +31,8 @@ fn list_outcome(response: ItemListResult) -> Outcome<ItemListResult> {
 fn show<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     qualified_id: String,
-) -> anyhow::Result<Outcome<ItemShowResult>> {
-    Ok(Outcome::success(
-        ctx.executor.items().show_item(&qualified_id)?,
-    ))
+) -> HandlerResult<ItemShowResult> {
+    Ok(ctx.executor.items().show_item(&qualified_id)?.into())
 }
 
 command_group! {

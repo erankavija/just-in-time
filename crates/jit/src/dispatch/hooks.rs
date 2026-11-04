@@ -1,13 +1,11 @@
 //! `jit hooks` handlers.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult, Outcome};
 use crate::{cli::HooksCommands, output::hooks::HooksInstallResponse, storage::IssueStore};
 
 const NOT_GIT_REPOSITORY: &str = "Not in a git repository (no .git directory found)";
 
-fn install<S: IssueStore>(
-    ctx: &CommandContext<'_, S>,
-) -> anyhow::Result<Outcome<HooksInstallResponse>> {
+fn install<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<HooksInstallResponse> {
     let paths = ctx.executor.require_worktree_paths()?;
     anyhow::ensure!(
         paths.is_git_repository(),

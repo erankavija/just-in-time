@@ -36,6 +36,7 @@ permanent_paths = [
     "dev/index.md",
     "dev/TESTING.md",
     "dev/authoring-conventions.md",
+    "dev/benchmarks/suite-profile.json",
 ]
 # Areas whose contents are per-issue work products, so one issue owns a
 # whole directory; the remaining managed areas hold dated or generated

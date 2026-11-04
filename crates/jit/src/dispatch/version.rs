@@ -1,10 +1,10 @@
 //! `jit version` handler, which runs before repository bootstrap.
 
-use super::Outcome;
+use super::HandlerResult;
 use crate::build_info::{version_info, VersionInfo};
 
-fn show() -> anyhow::Result<Outcome<VersionInfo>> {
-    Ok(Outcome::success(version_info()))
+fn show() -> HandlerResult<VersionInfo> {
+    Ok(version_info().into())
 }
 
 command_group! {

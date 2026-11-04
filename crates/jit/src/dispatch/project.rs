@@ -1,14 +1,13 @@
 //! `jit project` handlers.
 
-use super::{CommandContext, Outcome};
+use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::ProjectCommands;
 use crate::commands::ProjectRenderResult;
-use crate::storage::{IssueStore, RepositoryStateStore};
 
-fn render<S: IssueStore + RepositoryStateStore>(
+fn render<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     name: Option<String>,
-) -> anyhow::Result<Outcome<ProjectRenderResult>> {
+) -> HandlerResult<ProjectRenderResult> {
     let response = ctx.executor.items().project_render(name.as_deref())?;
     let message = format!("Rendered {} projection(s)", response.count());
     Ok(Outcome::success_with(response, message))
@@ -16,7 +15,7 @@ fn render<S: IssueStore + RepositoryStateStore>(
 
 command_group! {
     command: ProjectCommands,
-    storage: [IssueStore + RepositoryStateStore],
+    storage: [HandlerStore],
     leaves: {
         "project_render" => ProjectCommands::Render { name } => render(name) -> ProjectRenderResult,
     }

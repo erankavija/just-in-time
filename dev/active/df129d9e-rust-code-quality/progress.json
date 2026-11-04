@@ -918,7 +918,7 @@
       "kind": "max-rework",
       "issue": "4a01ccba",
       "summary": "quiet evidence predates final change",
-      "status": "open"
+      "status": "resolved: D-01; done"
     },
     {
       "date": "2026-11-04",
@@ -1004,7 +1004,8 @@
     "Codex brief TMPDIR=$PWD/target/tmp puts temp dirs inside the git tree; claim/archive tests that need a non-git directory then fail (handoff-11 trap). Use /mnt/nvme/jit/tmp/df129d9e-workers.",
     "test_strict_lease_exempt_paths_write_for_their_stated_reason took 12-13 s in parallel runs (not on the 4a01ccba list); relevant to f487aeef's per-test limits.",
     "Codex workers attempted `jit recover` despite the no-tracker-writes rule; briefs now name it explicitly.",
-    "Lead review asked for a shared test helper (shared-test-contracts) that the code-review then read as recreating a removed wrapper against REQ-03; check a rework instruction against the issue's literal criteria before sending it."
+    "Lead review asked for a shared test helper (shared-test-contracts) that the code-review then read as recreating a removed wrapper against REQ-03; check a rework instruction against the issue's literal criteria before sending it.",
+    "Lead's 4575a03d Notes correction searched only architecture/ paths and wrongly said the f2532a2d copies were gone; they were under eval/. Search the whole archive dir before asserting absence."
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
@@ -1275,10 +1276,10 @@
     },
     "4a01ccba": {
       "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43).",
-      "status": "escalated",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "test refactors needing judgement on seams; f487aeef stays held (D-43)",
-      "review": "b1ed23165 landed; cargo-ci passed; code-review 32037cf7: F1 sleep-polling readiness in serve test (REQ-02), F2 no same-method remeasurement evidence (REQ-01). Rework 1 to same worker. Rework 1 at 5e3f82d8b landed; code-review R2 (e973c700) failed only on quiet-host (loads 9-14 vs <4). One rework left; asked 6a for a host-quiet window or a D-01 ruling. Quiet-window evidence ff8a8d1a9 (loads 1.82/3.32/3.94; medians 0.629/0.062/2.131 s). First landing failed on unrelated flaky server test; steward allowed one fresh attempt. Fresh landing passed cargo-ci; code-review R3 (13b970de): 50 ms real deadline in serve test (REQ-02). Rework 2 of 2 (last): injected clock in StartupWatch. Rework 2 at 82745633d: lead PASS; WatchClock seam, stepped test clock, 0.01 s, no real wait. Landed; code-review 2a14530e: quiet evidence predates injected clock (REQ-01). Escalated: proposed single-test locked remeasure + D-01."
+      "review": "b1ed23165 landed; cargo-ci passed; code-review 32037cf7: F1 sleep-polling readiness in serve test (REQ-02), F2 no same-method remeasurement evidence (REQ-01). Rework 1 to same worker. Rework 1 at 5e3f82d8b landed; code-review R2 (e973c700) failed only on quiet-host (loads 9-14 vs <4). One rework left; asked 6a for a host-quiet window or a D-01 ruling. Quiet-window evidence ff8a8d1a9 (loads 1.82/3.32/3.94; medians 0.629/0.062/2.131 s). First landing failed on unrelated flaky server test; steward allowed one fresh attempt. Fresh landing passed cargo-ci; code-review R3 (13b970de): 50 ms real deadline in serve test (REQ-02). Rework 2 of 2 (last): injected clock in StartupWatch. Rework 2 at 82745633d: lead PASS; WatchClock seam, stepped test clock, 0.01 s, no real wait. Landed; code-review 2a14530e: quiet evidence predates injected clock (REQ-01). Escalated: proposed single-test locked remeasure + D-01. Evidence landing; code-review rerun passed; closed."
     },
     "8a14e8e9": {
       "status": "done",
@@ -1338,9 +1339,25 @@
       "review": "lead PASS at fd2221df3 (Codex); stored resolutions + per-root reachability; +29 lines (b697a3f7 ledger)"
     },
     "4575a03d": {
-      "status": "claimed",
+      "status": "landing",
       "epic": "v1-release (taken on per 6a)",
-      "note": "gates cargo-ci, code-review added; Notes amended (ac1c71c64)"
+      "note": "gates cargo-ci, code-review added; Notes amended (ac1c71c64)",
+      "vendor": "Claude Sonnet",
+      "reason": "v1-release bug blocking b697a3f7 track B",
+      "review": "lead PASS: retains_source_in_place (permanent or outside root), 7 archive copies removed, REQ-06 config commit separate; lead repointed 7 doc links (97af5f750); Notes corrected (2fbfbda6c). Worker briefly ran git checkout --detach (restored)."
+    },
+    "8fbf8c43": {
+      "status": "landing",
+      "vendor": "Claude Sonnet",
+      "reason": "N2 handler aliases; before f87f9b00/3f816619/24a982b7; no renames",
+      "review": "lead PASS: HandlerResult<R>, HandlerStore trait (blanket impl), From<R> for Outcome replaces Outcome::success; no renames; -31"
+    },
+    "1ade3e6f": {
+      "status": "landing",
+      "vendor": "Claude Opus",
+      "reason": "b697a3f7 track B; large config assembler",
+      "epic": "b697a3f7",
+      "review": "lead PASS at db05aa795: declarations::assemble_configuration; JitConfig::load and ConfigManager::load route through it; -191 (b697a3f7 ledger); 5013 workspace tests passed (worker). Minor: ConfigManager::load rustdoc still says 'from config.toml'."
     }
   },
   "handoff": {
@@ -1384,7 +1401,7 @@
         "7cd27db8 (30334066)"
       ]
     },
-    "status": "criteria checked; paused for quiet window",
+    "status": "f56bad8d, f7a59f5f done; 1ade3e6f, 4575a03d dispatched; next track A 945f9181 (after 3f816619 sequencing) and ceaaf0ab after 4575a03d",
     "criteria_check_2026_11_04": {
       "945f9181": "valid; line cites drifted; large; touches commands/{issue,dependency,template,mod}, overlaps 3f816619/5687e281 files",
       "1ade3e6f": "valid; cites drifted; large; misses ConfigManager::load/EffectiveConfig::load callers",
@@ -1400,5 +1417,6 @@
       "rules": "from 03:30 no new dispatch/landing/CI; by 03:55 no cargo/npm/test from lead or workers; hold until 6a releases",
       "mechanism": "background timer touches the landing hold file at 03:30; lead stops any running worker cargo by 03:55 (TaskStop on owned tasks)"
     }
-  ]
+  ],
+  "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)"
 }

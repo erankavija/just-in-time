@@ -77,9 +77,8 @@ products of one issue, so archiving that issue takes them with it: selected
 documents in `managed_paths` move to the archive mirror. A permanent area holds
 living documentation, a configured item-kind source, or a documented invocation
 path, so its source stays where readers and configuration already point:
-selected documents in `permanent_paths` are copied to the mirror while their
-source remains in place; “permanent” prevents source deletion, not mirror
-publication. The table above assigns each shipped area to one of the two
+selected documents in `permanent_paths` are retained in place with no mirror
+copy, so no frozen second copy of a living document exists. The table above assigns each shipped area to one of the two
 classes.
 
 `development_root` is the outer boundary of both. A document it does not
