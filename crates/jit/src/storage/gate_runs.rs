@@ -26,8 +26,8 @@ mod tests {
         let spec = CaptureSpec::new(
             [
                 VirtualPath::GATE_RUNS,
-                VirtualPath::gate_run_directory(&run_id),
-                VirtualPath::gate_run_record(&run_id),
+                VirtualPath::gate_run_issue_directory(&draft.issue_id),
+                VirtualPath::gate_run_record(&draft.issue_id, &run_id),
             ],
             CaptureBudget {
                 max_listings: 0,

@@ -322,6 +322,7 @@ mod tests {
     #[test]
     fn test_relevant_gate_run_result() {
         let e = make_data_event(&VirtualPath::gate_run_record(
+            &jit::test_utils::issue_id(1),
             &jit::test_utils::gate_run_id(1),
         ));
         assert!(is_graph_relevant(&e));

@@ -10,20 +10,19 @@ use crate::output::ErrorCode;
 use crate::storage::{IssueStore, RepositoryStateStore};
 
 fn show<S: IssueStore>(ctx: &CommandContext<'_, S>) -> anyhow::Result<Outcome<ConfigShowResponse>> {
-    Ok(Outcome::Success {
-        response: ConfigShowResponse(ctx.executor.config().effective_config_snapshot()?),
-        message: Some("Effective configuration".to_owned()),
-    })
+    Ok(Outcome::success_with(
+        ConfigShowResponse(ctx.executor.config().effective_config_snapshot()?),
+        "Effective configuration",
+    ))
 }
 
 fn get<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     key: String,
 ) -> anyhow::Result<Outcome<ConfigGetResponse>> {
-    Ok(Outcome::Success {
-        response: ConfigGetResponse(ctx.executor.config().get_config(&key)?),
-        message: None,
-    })
+    Ok(Outcome::success(ConfigGetResponse(
+        ctx.executor.config().get_config(&key)?,
+    )))
 }
 
 fn set<S: IssueStore + RepositoryStateStore>(
@@ -31,10 +30,9 @@ fn set<S: IssueStore + RepositoryStateStore>(
     key: String,
     value: String,
 ) -> anyhow::Result<Outcome<ConfigSetResponse>> {
-    Ok(Outcome::Success {
-        response: ConfigSetResponse(ctx.executor.config().set_config(&key, &value)?),
-        message: None,
-    })
+    Ok(Outcome::success(ConfigSetResponse(
+        ctx.executor.config().set_config(&key, &value)?,
+    )))
 }
 
 /// An invalid configuration source is a registered validation failure; its
@@ -44,10 +42,7 @@ fn validate<S: IssueStore>(
 ) -> anyhow::Result<Outcome<ConfigValidateResponse>> {
     let response = ConfigValidateResponse(ctx.executor.config().validate()?);
     Ok(if response.0.valid {
-        Outcome::Success {
-            response,
-            message: Some("Configuration is valid".to_owned()),
-        }
+        Outcome::success_with(response, "Configuration is valid")
     } else {
         Outcome::Findings {
             code: ErrorCode::ValidationFailed,
@@ -63,10 +58,10 @@ fn validate<S: IssueStore>(
 fn show_hierarchy<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
 ) -> anyhow::Result<Outcome<TypeHierarchyResponse>> {
-    Ok(Outcome::Success {
-        response: TypeHierarchyResponse(ctx.executor.config().declared_type_hierarchy()?),
-        message: Some("Type hierarchy".to_owned()),
-    })
+    Ok(Outcome::success_with(
+        TypeHierarchyResponse(ctx.executor.config().declared_type_hierarchy()?),
+        "Type hierarchy",
+    ))
 }
 
 command_group! {

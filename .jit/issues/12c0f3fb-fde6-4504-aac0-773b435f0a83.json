@@ -1,0 +1,44 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T03:18:56.889270675Z",
+  "context": {},
+  "created_at": "2026-11-04T02:59:09.222916626Z",
+  "dependencies": [
+    "b23faa59-8451-4fc4-97b8-a139d1b210e6"
+  ],
+  "description": "The handler contract registers only group-enum leaves that run over an opened repository and render without the output mode, so most top-level commands, every pre-bootstrap command and every quiet-sensitive arm cannot migrate onto it. This extends the contract at its source with the forms those arms need.\n\n## Background\n\n`command_group!` in `crates/jit/src/dispatch/mod.rs` generates `dispatch(command: $command, ctx: &CommandContext<'_, S>, out, err)` and `output_schema(cmd_path)` from a list of `path => pattern => handler(args) -> response` leaves, where `$command` is a group enum matched exhaustively. `emit_outcome` in `crates/jit/src/output/emit.rs` renders a success through `HumanRender::render_human(&self)` and registers each leaf's schema through `OutputSchema::of::<T>()` (`crates/jit/src/schema.rs`). The pathfinder b23faa59 exercised one group-enum leaf only.\n\nWave 7 workers found four gaps:\n- Pre-bootstrap leaves: `version` and `init` run before `open_repository` builds the executor, so no `CommandContext` exists (f930acf2, 8f297e60).\n- Top-level leaves: `Search`, `Version`, `Init`, `Apply`, `Validate`, `Serve`, `Recover`, `Status`, `List` and `Rdeps` are struct or unit variants of `Commands` itself (`crates/jit/src/cli.rs`), not group enums.\n- Quiet mode: old arms hide header and footer lines under `-q` through `OutputContext::print_info`, but `render_human` receives no mode.\n- Concrete stores: archive execution exists only on `JsonFileStorage`, so its group cannot be generic over a storage bound; 3cf69ecf added a local `storage: JsonFileStorage` rule for it.\n- Split groups: `IssueCommands` and the gate commands are migrated by several issues in different waves, and an exhaustive `match` cannot register a group whose other leaves still live in `main.rs`; 10751360 added a local `unmigrated:` clause for it.\n- Union responses: `graph export` declares a `oneOf` of its summary and full shapes (`schema.rs`), and `OutputSchema::of::<T>()` registers one type.\n\nHandlers written so far repeat per-leaf ceremony the form does not own. A success is built as a four-line `Ok(Outcome::Success { response, message })` in every leaf, and c9103fcf adds a private `success` helper for it. Issue-id resolution is reimplemented per group: `resolve_issue_arg` and `resolve_issue_filter_arg` in `main.rs`, a private `resolve_issue` in c9103fcf, and moves of each into `dispatch/mod.rs` by b25c2e54 and 20fc3b92. Success warnings are printed from inside handlers through `OutputContext::print_warning` (30 sites in `main.rs`), which writes `Warning: …` to stderr only in human, non-quiet mode, bypassing the emitter.\n\nEmitter-routed JSON has sorted object keys, since `JsonOutput::to_json_string` serializes through `serde_json::Value`; key order is not part of any payload contract.\n\n`graph export --output` also prints a human line under `--json`. Under the stream rule that line is the graph handler's to fix, not a form: the written path goes in the JSON response, and the line prints only in human mode.\n\n## Success Criteria\n\n- [hard] REQ-01: `command_group!` has one executor-free form that generates the same `dispatch` and `output_schema` shape with `OutputMode` in place of `CommandContext`, for leaves that run before repository bootstrap.\n- [hard] REQ-02: `command_group!` has one single-leaf form that registers a top-level `Commands` variant's dispatch and schema. A struct variant carries its fields as a `clap::Args` type so its command line is unchanged, and a unit variant registers with no argument type. It combines with the executor-free form.\n- [hard] REQ-03: `HumanRender::render_human` takes the `OutputMode`, `emit_outcome` passes it, and the existing `render_human` impls are updated with their output unchanged.\n- [hard] REQ-04: A registered leaf can declare a union success schema (`oneOf` over its response shapes), and the schema registry emits it in place of a single type.\n- [hard] REQ-05: `command_group!` has one concrete-store form that binds a group to one named store type, for operations only that store implements, and generates the same `dispatch` and `output_schema` shape.\n- [hard] REQ-06: `command_group!` has one transitional pass-through form: a split group lists the variants it does not own yet, and its `dispatch` returns them unchanged to the caller. The form is interim by design; 5687e281 removes it.\n- [hard] REQ-07: The form owns the per-leaf ceremony: `Outcome` constructors build a success with or without a message, a success carries its warnings and the emitter renders them (in human, non-quiet mode, as `Warning:` lines on stderr; under `--json`, on neither stream), and `dispatch/` holds the one issue-id resolver handlers use. Handlers write only their own logic and rendering, and no handler module defines a private equivalent.\n- [hard] REQ-08: Each form is proven by one unit test through a real or test-only handler, covering dispatch, schema lookup and emitted output, and the generated schema and CLI output of every real command are unchanged.\n\n## Decisions\n\n- D-01: Every arm-shape extension of the handler contract lands here, at its source, with its own criteria and review. Wave 7 issues reuse these forms and add none of their own (steward ruling, 2026-11-04, under `@/inv/convention-convergence`). A hand-written dispatch, an optional executor in `CommandContext`, a non-exhaustive `Commands` match and an emitter side channel for human lines under `--json` were rejected.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-38). Contract: abe555e9; pathfinder: b23faa59.\n",
+  "documents": [],
+  "done_at": "2026-11-04T03:36:29.273414744Z",
+  "first_ready_at": "2026-11-04T02:59:09.222916626Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "da5e6320-fa43-4c10-87f8-e7657407f61b",
+      "status": "passed",
+      "updated_at": "2026-11-04T03:31:37.280124590Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0e41f5c0-15c2-41f8-bfb1-02c726d0f53f",
+      "status": "passed",
+      "updated_at": "2026-11-04T03:36:07.366207264Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "12c0f3fb-fde6-4504-aac0-773b435f0a83",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:command-dispatch",
+    "satisfies:df129d9e/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "done",
+  "title": "Handler contract covers every arm shape",
+  "updated_at": "2026-11-04T03:36:29.273414744Z"
+}

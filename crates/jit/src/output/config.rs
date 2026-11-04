@@ -5,7 +5,7 @@
 
 use super::{
     render_config_get_value, render_config_snapshot, render_validation_findings, FindingsSummary,
-    HumanRender,
+    HumanRender, OutputMode,
 };
 use crate::commands::{ConfigGetOutcome, ConfigSetOutcome, ConfigValidationReport};
 use crate::declarations::rules::Severity;
@@ -20,7 +20,7 @@ use std::collections::HashMap;
 pub struct ConfigShowResponse(pub Value);
 
 impl HumanRender for ConfigShowResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!(
             "Effective Configuration:\n\n{}",
             render_config_snapshot(&self.0)
@@ -33,7 +33,7 @@ impl HumanRender for ConfigShowResponse {
 pub struct ConfigGetResponse(pub ConfigGetOutcome);
 
 impl HumanRender for ConfigGetResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!("{}\n", render_config_get_value(&self.0.value))
     }
 }
@@ -43,7 +43,7 @@ impl HumanRender for ConfigGetResponse {
 pub struct ConfigSetResponse(pub ConfigSetOutcome);
 
 impl HumanRender for ConfigSetResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!(
             "Set {} = {} in {}\n",
             self.0.key,
@@ -59,7 +59,7 @@ impl HumanRender for ConfigSetResponse {
 pub struct ConfigValidateResponse(pub ConfigValidationReport);
 
 impl HumanRender for ConfigValidateResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let findings: Vec<_> = self
             .0
             .errors
@@ -88,12 +88,40 @@ impl HumanRender for ConfigValidateResponse {
 pub struct TypeHierarchyResponse(pub HashMap<String, u8>);
 
 impl HumanRender for TypeHierarchyResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, mode: OutputMode) -> String {
         let mut sorted: Vec<_> = self.0.iter().collect();
         sorted.sort_by_key(|(_, level)| **level);
-        sorted.into_iter().fold(
-            "Type Hierarchy:\n\n".to_owned(),
-            |out, (type_name, level)| format!("{out}  {type_name} → Level {level}\n"),
-        )
+        let header = if mode.quiet {
+            ""
+        } else {
+            "Type Hierarchy:\n\n"
+        };
+        sorted
+            .into_iter()
+            .fold(header.to_owned(), |out, (type_name, level)| {
+                format!("{out}  {type_name} → Level {level}\n")
+            })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_render_type_hierarchy_quiet_omits_header_and_keeps_levels() {
+        let response = TypeHierarchyResponse(HashMap::from([("epic".to_owned(), 2)]));
+
+        let loud = response.render_human(OutputMode {
+            json: false,
+            quiet: false,
+        });
+        let quiet = response.render_human(OutputMode {
+            json: false,
+            quiet: true,
+        });
+
+        assert!(loud.starts_with("Type Hierarchy:\n"));
+        assert_eq!(quiet, "  epic → Level 2\n");
     }
 }

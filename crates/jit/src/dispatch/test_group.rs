@@ -22,7 +22,7 @@ pub(super) struct CountResponse {
 }
 
 impl HumanRender for CountResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!("{}: {}\n", self.label, self.issues)
     }
 }
@@ -33,7 +33,7 @@ pub(super) struct FlagReport {
 }
 
 impl HumanRender for FlagReport {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!("flagged: {}\n", self.reason)
     }
 }
@@ -45,10 +45,7 @@ fn count<S: IssueStore>(
     label: String,
 ) -> anyhow::Result<Outcome<CountResponse>> {
     let issues = ctx.executor.storage().list_issues()?.len();
-    Ok(Outcome::Success {
-        response: CountResponse { label, issues },
-        message: None,
-    })
+    Ok(Outcome::success(CountResponse { label, issues }))
 }
 
 fn flag<S: IssueStore>(
@@ -134,7 +131,7 @@ fn test_dispatch_success_human_writes_response_rendering() {
         label: "open".to_owned(),
         issues: harness.storage.list_issues().unwrap().len(),
     };
-    assert_eq!(run.out, expected.render_human());
+    assert_eq!(run.out, expected.render_human(OutputMode::default()));
     assert_eq!(run.status.unwrap(), ExitCode::Success);
     assert!(run.err.is_empty());
 }
@@ -166,7 +163,7 @@ fn test_dispatch_findings_human_writes_report_and_unprefixed_message_line() {
     let report = FlagReport {
         reason: "drift".to_owned(),
     };
-    assert_eq!(run.out, report.render_human());
+    assert_eq!(run.out, report.render_human(OutputMode::default()));
     assert_eq!(run.err, "flagged because drift\n");
     assert_eq!(run.status.unwrap(), FINDINGS_CODE.exit_code());
 }
@@ -230,7 +227,9 @@ fn test_output_schema_test_leaves_are_distinct_from_every_real_command_path() {
     }
     let shadowed: Vec<_> = paths
         .iter()
-        .filter(|path| output_schema(path).is_some())
+        .filter(|path| {
+            output_schema(path).is_some() || super::test_forms::output_schema(path).is_some()
+        })
         .collect();
     assert!(shadowed.is_empty(), "{shadowed:?}");
 }

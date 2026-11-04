@@ -63,7 +63,7 @@ fn test_gate_status_no_prior_runs_shows_not_run_message() {
 
 #[test]
 fn test_issue_show_errors_on_corrupt_gate_run() {
-    // A corrupt result.json must make `issue show --json` fail loudly instead
+    // A corrupt run record must make `issue show --json` fail loudly instead
     // of silently omitting the run. The deserialize cause and offending path
     // are in the error's source chain.
     let temp = JitCli::initialised().unwrap();
@@ -79,7 +79,7 @@ fn test_issue_show_errors_on_corrupt_gate_run() {
         serde_json::from_value(issue["gates_status"]["test-gate"]["run_id"].clone()).unwrap();
 
     let result_path = temp.root().join(".jit").join(
-        jit::repository_state::VirtualPath::gate_run_record(&run_id)
+        jit::repository_state::VirtualPath::gate_run_record(&issue_id.parse().unwrap(), &run_id)
             .relative()
             .as_path(),
     );
@@ -1120,9 +1120,12 @@ fn test_issue_responses_do_not_open_unreferenced_gate_runs() {
     let parent = cli.create_issue(["--title", "Parent"]).unwrap();
     cli.run(["dep", "add", &parent, &child]).unwrap();
     let path = cli.root().join(".jit").join(
-        jit::repository_state::VirtualPath::gate_run_record(&jit::test_utils::gate_run_id(1))
-            .relative()
-            .as_path(),
+        jit::repository_state::VirtualPath::gate_run_record(
+            &child.parse().unwrap(),
+            &jit::test_utils::gate_run_id(1),
+        )
+        .relative()
+        .as_path(),
     );
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(path, "{ corrupt unreferenced run").unwrap();
