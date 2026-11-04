@@ -964,8 +964,9 @@ impl CommandSchema {
             row(
                 "dep add",
                 4,
-                "The edge would create a cycle, or a redundant \
-                 (transitively-implied) edge was rejected.",
+                "The edge would create a cycle (CYCLE_DETECTED), or a redundant \
+                 (transitively-implied) edge was rejected (VALIDATION_FAILED), \
+                 in human and JSON output alike.",
                 false,
             ),
             row(

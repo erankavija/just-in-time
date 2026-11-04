@@ -17,6 +17,7 @@ mod apply;
 mod archive;
 mod claim;
 pub mod config;
+mod dep;
 mod emit;
 mod events;
 pub mod failure;
@@ -32,6 +33,7 @@ pub use claim::{
     ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
     ClaimRenewResponse, LeaseListResponse, LeasesKey, RecoverResponse,
 };
+pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 pub use search::{SearchHit, SearchKey, SearchQuery, SearchResponse};
 pub use serve::{ServeResponse, WebUiSource};

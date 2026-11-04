@@ -35,7 +35,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `search` | `1` | ripgrep is not installed (RIPGREP_NOT_FOUND) or ran and failed (SEARCH_FAILED). |  |
 | `search` | `10` | ripgrep could not be spawned or the search root could not be resolved (I/O failure). |  |
 | `any command that writes an issue` | `4` | An enforcing validation rule rejected the write (the shared write-validation path blocks on rule findings). |  |
-| `dep add` | `4` | The edge would create a cycle, or a redundant (transitively-implied) edge was rejected. |  |
+| `dep add` | `4` | The edge would create a cycle (CYCLE_DETECTED), or a redundant (transitively-implied) edge was rejected (VALIDATION_FAILED), in human and JSON output alike. |  |
 | `apply` | `4` | The template delta would close a dependency cycle through existing issues; the apply is rejected before any node is created. |  |
 | `init` | `2` | The `--values-file` path cannot be read. |  |
 | `issue update, issue claim, issue claim-next` | `4` | A state transition is blocked by unmet dependencies or unpassed gates. |  |

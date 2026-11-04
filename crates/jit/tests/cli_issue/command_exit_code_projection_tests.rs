@@ -631,7 +631,13 @@ fn invoke_dep_add_cycle(json: bool) -> Vec<Output> {
     cli.run(["dep", "add", &second, &first]).unwrap();
 
     // first -> second closes the cycle.
-    vec![output_in_form(&cli, &["dep", "add", &first, &second], json)]
+    let output = output_in_form(&cli, &["dep", "add", &first, &second], json);
+    if json {
+        let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(envelope["error"]["code"], "CYCLE_DETECTED");
+        assert!(output.stderr.is_empty());
+    }
+    vec![output]
 }
 
 /// Build a dependency-blocked pair: `(dependency, dependent)`, where `dependent`

@@ -652,6 +652,12 @@ fn dependency_batch_error_code(batch: &crate::errors::DependencyBatchRejectedErr
         .iter()
         .map(|(_, error)| classify_code(error))
         .find(|code| code.exit_code() != ExitCode::ValidationFailed)
+        .or_else(|| {
+            batch
+                .rejected()
+                .first()
+                .map(|(_, error)| classify_code(error))
+        })
         .unwrap_or(ErrorCode::ValidationFailed)
 }
 
@@ -1799,6 +1805,7 @@ mod derived_guidance_tests {
         let classified = classify(&error);
         let dedicated = dependency_batch_json_error(batch_error);
 
+        assert_eq!(classified.error.code, dedicated.error.code);
         assert_eq!(classified.exit_code(), dedicated.exit_code());
         assert_eq!(classified.error.details, dedicated.error.details);
         assert_eq!(classified.error.suggestions, dedicated.error.suggestions);

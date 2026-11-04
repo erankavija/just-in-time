@@ -17,13 +17,13 @@ mod output_macros;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
-    Cli, Commands, DepCommands, DocCommands, GateCommands, GraphCommands, IssueCommands,
-    ProfileCommands, ProjectCommands,
+    Cli, Commands, DocCommands, GateCommands, GraphCommands, IssueCommands, ProfileCommands,
+    ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
-    apply, archive, claim, config, events, init, invariant, item, resolve_issue, search, serve,
-    version, CommandContext,
+    apply, archive, claim, config, dep, events, init, invariant, item, resolve_issue, search,
+    serve, version, CommandContext,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
@@ -722,70 +722,6 @@ fn print_dependency_tree(nodes: &[jit::output::DependencyTreeNode], prefix: &str
             print_dependency_tree(&node.children, &new_prefix, false);
         }
     }
-}
-
-/// Resolve a `jit dep add` batch's targets, naming every unresolvable one in a
-/// single [`DependencyBatchRejectedError`](jit::errors::DependencyBatchRejectedError).
-fn resolve_dependency_args<S: IssueStore>(
-    storage: &S,
-    from_id: &IssueId,
-    requested: &[String],
-) -> Result<Vec<IssueId>> {
-    let (resolved, rejected): (Vec<_>, Vec<_>) = requested
-        .iter()
-        .map(|id| (id, resolve_issue(storage, id)))
-        .partition(|(_, result)| result.is_ok());
-    if rejected.is_empty() {
-        resolved.into_iter().map(|(_, result)| result).collect()
-    } else {
-        Err(jit::errors::DependencyBatchRejectedError::new(
-            from_id.clone(),
-            rejected
-                .into_iter()
-                .filter_map(|(id, result)| result.err().map(|error| (id.clone(), error)))
-                .collect(),
-        )
-        .into())
-    }
-}
-
-/// Resolve `jit dep rm` targets against `from_id`'s own stored dependencies,
-/// so an edge whose target was deleted stays removable (jit:f847df3f). Returns
-/// the ids the targets name, in order, and the targets naming none; each target
-/// matches only the edges no earlier target named.
-///
-/// # Errors
-///
-/// [`InvalidIdPrefixError`](jit::domain::identity::InvalidIdPrefixError) before
-/// any read, or [`AmbiguousIdError`](jit::storage::AmbiguousIdError).
-fn resolve_dependency_removal_args<S: IssueStore>(
-    storage: &S,
-    from_id: &IssueId,
-    requested: &[String],
-) -> Result<(Vec<IssueId>, Vec<String>)> {
-    let prefixes = requested
-        .iter()
-        .map(|id| id.parse::<IssueIdPrefix>())
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    let stored = storage.load_issue(from_id)?.dependencies;
-    prefixes.into_iter().try_fold(
-        (Vec::new(), Vec::new()),
-        |(mut matched, mut unmatched): (Vec<IssueId>, Vec<String>), prefix| {
-            let remaining = stored
-                .iter()
-                .filter(|id| !matched.contains(id))
-                .cloned()
-                .collect::<Vec<_>>();
-            match jit::storage::resolve_dependency_id(&prefix, &remaining) {
-                Ok(id) => matched.push(id),
-                Err(error) if error.is::<jit::storage::IssueNotFoundError>() => {
-                    unmatched.push(prefix.as_str().to_string())
-                }
-                Err(error) => return Err(error),
-            }
-            Ok((matched, unmatched))
-        },
-    )
 }
 
 /// Build the [`IssueShowResponse`](jit::output::IssueShowResponse) for a single
@@ -2374,168 +2310,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         Commands::Apply(args) => {
             return apply::dispatch(args, &ctx, &mut io::stdout(), &mut io::stderr());
         }
-        Commands::Dep(dep_cmd) => match dep_cmd {
-            DepCommands::Add {
-                from_id,
-                to_ids,
-                reduce,
-            } => {
-                use jit::commands::RedundancyPolicy;
-                let policy = if reduce {
-                    RedundancyPolicy::Reduce
-                } else {
-                    RedundancyPolicy::Reject
-                };
-                let output_ctx = OutputContext::new(quiet, json);
-                let from_id = match resolve_issue(&storage, &from_id) {
-                    Ok(id) => id,
-                    Err(e) => handle_json_error!(
-                        json,
-                        e,
-                        command_json_error(&e, jit::output::ErrorCode::DependencyError)
-                    ),
-                };
-                match resolve_dependency_args(&storage, &from_id, &to_ids).and_then(|to_ids| {
-                    executor
-                        .graph()
-                        .add_dependencies_with_policy(&from_id, &to_ids, policy)
-                }) {
-                    Ok(result) => {
-                        for warning in &result.warnings {
-                            output_ctx.print_warning(warning)?;
-                        }
-                        if json {
-                            use jit::output::JsonOutput;
-                            let response = serde_json::json!({
-                                "from_id": from_id,
-                                "added": result.added,
-                                "already_exist": result.already_exist,
-                                "skipped": result.skipped,
-                                "message": format!("Added {} dependencies to issue {}", result.added.len(), from_id)
-                            });
-                            let output = JsonOutput::success(response);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            if !result.added.is_empty() {
-                                let _ = output_ctx.print_success(format!(
-                                    "Added {} dependenc{}:",
-                                    result.added.len(),
-                                    if result.added.len() == 1 { "y" } else { "ies" }
-                                ));
-                                for dep in &result.added {
-                                    println!("  • {} → {}", from_id, dep);
-                                }
-                            }
-                            if !result.already_exist.is_empty() {
-                                println!("Already exist ({}):", result.already_exist.len());
-                                for dep in &result.already_exist {
-                                    println!("  • {}", dep);
-                                }
-                            }
-                            if !result.skipped.is_empty() {
-                                println!("Skipped ({}):", result.skipped.len());
-                                for (dep, reason) in &result.skipped {
-                                    println!("  • {}: {}", dep, reason);
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        // A rejected-batch failure (jit:c8518f2a) names every
-                        // rejected edge; anything else (an empty `dep_ids`, say)
-                        // falls through to the generic fallback below.
-                        if let Some(batch) =
-                            e.downcast_ref::<jit::errors::DependencyBatchRejectedError>()
-                        {
-                            if json {
-                                let json_error =
-                                    jit::output::failure::dependency_batch_json_error(batch);
-                                let code = json_error.exit_code().code();
-                                println!("{}", json_error.to_json_string()?);
-                                std::process::exit(code);
-                            }
-                            return Err(e);
-                        }
-                        // `handle_json_error!` refines the fallback when the
-                        // failure is a typed id-resolution error (ambiguous /
-                        // too-short prefix), consistent with `dep rm`.
-                        handle_json_error!(
-                            json,
-                            e,
-                            command_json_error(&e, jit::output::ErrorCode::DependencyError)
-                        );
-                    }
-                }
-            }
-            DepCommands::Rm { from_id, to_ids } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let from_id = match resolve_issue(&storage, &from_id) {
-                    Ok(id) => id,
-                    Err(e) => handle_json_error!(
-                        json,
-                        e,
-                        command_json_error(&e, jit::output::ErrorCode::DependencyError)
-                    ),
-                };
-                match resolve_dependency_removal_args(&storage, &from_id, &to_ids).and_then(
-                    |(to_ids, unmatched)| {
-                        let result = executor.graph().remove_dependencies(&from_id, &to_ids)?;
-                        for warning in &result.warnings {
-                            output_ctx.print_warning(warning)?;
-                        }
-                        let not_found = result
-                            .not_found
-                            .iter()
-                            .map(ToString::to_string)
-                            .chain(unmatched)
-                            .collect::<Vec<_>>();
-                        Ok((result.removed, not_found))
-                    },
-                ) {
-                    Ok((removed, not_found)) => {
-                        if json {
-                            use jit::output::JsonOutput;
-                            let response = serde_json::json!({
-                                "from_id": from_id,
-                                "removed": removed,
-                                "not_found": not_found,
-                                "message": format!("Removed {} dependencies from issue {}", removed.len(), from_id)
-                            });
-                            let output = JsonOutput::success(response);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            if !removed.is_empty() {
-                                let _ = output_ctx.print_success(format!(
-                                    "Removed {} dependenc{}:",
-                                    removed.len(),
-                                    if removed.len() == 1 { "y" } else { "ies" }
-                                ));
-                                for dep in &removed {
-                                    println!("  • {}", dep);
-                                }
-                            }
-                            if !not_found.is_empty() {
-                                println!("Not found ({}):", not_found.len());
-                                for dep in &not_found {
-                                    println!("  • {}", dep);
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        // `handle_json_error!` refines the fallback when the
-                        // failure is a typed id-resolution error (ambiguous /
-                        // too-short prefix), so those carry their distinguishing
-                        // code and exit 2 instead of the generic DEPENDENCY_ERROR.
-                        handle_json_error!(
-                            json,
-                            e,
-                            command_json_error(&e, jit::output::ErrorCode::DependencyError)
-                        );
-                    }
-                }
-            }
-        },
+        Commands::Dep(command) => {
+            return dep::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
         Commands::Gate(gate_cmd) => match gate_cmd {
             GateCommands::Define {
                 key,
