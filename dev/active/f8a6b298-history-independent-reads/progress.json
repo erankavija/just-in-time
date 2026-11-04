@@ -446,7 +446,7 @@
     },
     {
       "item": "5ee85aed holistic-review 2528dd8f: F1 story REQ-01 omits epic REQ-05 indefinite-limit exception (recommend amend, DEC-28, full sweep); F2 external evidence despite user decision",
-      "status": "pending with just-in-time-6a"
+      "status": "resolved: steward F1 amend (DEC-28), F2 prompt fix 2e2c8ee3; rerun 66ed30c1 passed"
     }
   ],
   "rework_counts": {
