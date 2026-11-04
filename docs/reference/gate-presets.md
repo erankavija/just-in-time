@@ -33,21 +33,26 @@ it never passes where that fails. Finding the repository wrong records `failed`;
 being unable to load or read what it needs records `error`. Its verdict is never
 reused, and declared inputs do not enable reuse, because it depends on records
 the input digest excludes.
-- `issue_validation` runs declarative validation for the gated issue.
+- `issue_validation` reports the gated issue's per-issue view.
 - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label
 from the gated issue, where the target is a full issue id or unique prefix, and
-runs scoped validation for that target. Its checker table must set
-`label_namespace`.
-- `rule_validation` names one configured graph rule with `rule` and evaluates it
-with the gated issue as its sole firing subject. The complete repository may be
-used for graph and identifier-resolution context, but unrelated issues cannot
-contribute findings. A missing, disabled, or non-matching rule is a fault.
+reports that target's scope view. Its checker table must set `label_namespace`.
+- `rule_validation` names one configured graph rule with `rule` and reports its
+selected-rule view with the gated issue as the sole firing subject. A missing,
+disabled, or non-matching rule is a fault.
 - `review_placeholder` passes so a workflow can be installed before an external
 reviewer is selected, but records an advisory structured finding and prints
 `WARNING: EXTERNAL REVIEW PLACEHOLDER`. Whole-repository validation also warns
 while any gate uses it. Replace it with an `exec` checker (for example, `jit gate
 update <key> --checker-command <command>`) before treating the gate as review
 evidence.
+
+Each validation checker reports what `jit validate` reports for its selection
+of the one whole-repository report: `repository_validation` the whole report,
+the others their [view](worktree-validate.md#views). Rules therefore evaluate
+over the whole repository for every checker, and the view decides which
+findings, including configuration errors, the checker sees. A rule pass that
+fails records an `error` run, never a clean selection.
 
 An in-process checker that cannot judge the repository records an `error` run:
 configuration or declarations that do not load, a broken repository structure, or

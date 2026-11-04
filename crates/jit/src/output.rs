@@ -27,12 +27,15 @@ mod graph;
 pub mod hooks;
 mod init;
 mod invariant;
+mod issue;
 mod item;
 mod project;
 mod search;
 mod serve;
+pub mod snapshot;
 mod validate;
 mod version;
+mod worktree;
 
 pub use validate::*;
 
@@ -44,6 +47,9 @@ pub use claim::{
 pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 pub use graph::{GraphExportOutput, GraphExportText, GraphExportWritten};
+pub use issue::{
+    IssueListing, IssueProjection, IssueSearchResults, IssueShowOutput, IssueStatusOutput,
+};
 pub use search::{SearchHit, SearchKey, SearchQuery, SearchResponse};
 pub use serve::{ServeResponse, WebUiSource};
 
@@ -1431,6 +1437,12 @@ collection_keys! {
     /// Collection key of [`GraphTreeResponse`].
     GraphTreeNodesKey = "nodes" as "GraphTreeResponse";
     IssuesKey = "issues";
+    /// Collection key of [`IssueListResponse`].
+    ListedIssuesKey = "issues" as "IssueListResponse";
+    /// Collection key of [`IssueSearchResponse`].
+    SearchedIssuesKey = "issues" as "IssueSearchResponse";
+    /// Collection key of [`IssueChildrenResponse`].
+    ChildrenKey = "issues" as "IssueChildrenResponse";
     DivergencesKey = "divergences";
     ByStateKey = "by_state";
     GatesKey = "gates";
@@ -1441,14 +1453,15 @@ collection_keys! {
     NamespacesKey = "namespaces" as "NamespacesResponse";
     /// Collection key of [`LabelValuesResponse`].
     ValuesKey = "values" as "LabelValuesResponse";
-    WorktreesKey = "worktrees";
+    /// Collection key of [`WorktreeListResponse`].
+    WorktreesKey = "worktrees" as "WorktreeListResponse";
     /// Collection key of [`GatePresetListResponse`].
     PresetsKey = "presets" as "GatePresetListResponse";
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)
 /// Uses MinimalIssue for efficiency - contains only id, title, state, priority
-pub type IssueListResponse = ListEnvelope<IssuesKey, MinimalIssue>;
+pub type IssueListResponse = ListEnvelope<ListedIssuesKey, MinimalIssue>;
 
 /// Full-record response for `jit query … --full --json`.
 ///
@@ -1465,7 +1478,7 @@ pub type IssueListFullResponse = ListEnvelope<IssuesKey, Issue>;
 ///
 /// The [`IssueListResponse`] shape plus the echoed `query`: lean
 /// [`MinimalIssue`] entries with no gate fields.
-pub type IssueSearchResponse = ListEnvelope<IssuesKey, MinimalIssue, IssueSearchQuery>;
+pub type IssueSearchResponse = ListEnvelope<SearchedIssuesKey, MinimalIssue, IssueSearchQuery>;
 
 /// Full-record response for `jit issue search … --full --json`.
 ///
@@ -2242,7 +2255,7 @@ impl From<&Issue> for ContainerHeader {
 ///
 /// `issues` holds one compact status projection per resolvable direct child,
 /// ascending short id.
-pub type IssueChildrenResponse = ListEnvelope<IssuesKey, IssueStatusResponse, ChildrenScope>;
+pub type IssueChildrenResponse = ListEnvelope<ChildrenKey, IssueStatusResponse, ChildrenScope>;
 
 /// Fields of [`IssueChildrenResponse`] beside its `issues`.
 #[derive(Debug, Serialize, JsonSchema)]

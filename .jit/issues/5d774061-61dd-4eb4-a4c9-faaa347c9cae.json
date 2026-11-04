@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:9876a23a-lead",
+  "claimed_at": "2026-11-04T09:33:25.952702380Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
   "dependencies": [
@@ -11,10 +12,19 @@
   ],
   "description": "Measure the validation views and the side paths on a copy of this repository with a release build, and record the run as evidence for the per-issue bound.\n\n## Background\n\n- `scripts/benchmark-mutation-cost.sh` builds fixture copies of this repository (`git clone --shared` plus `.jit` sync), waits until the 1-minute load average is below `BENCH_MAX_LOAD` (default 2.0, polled for at most 30 minutes, `:16-17,216-222`), and times commands as the median of three runs; its committed run is `dev/benchmarks/publication-cost-722878d4/`.\n- Before this work, `jit validate <id>` took about three times as long as whole-repository `jit validate` on this repository (`dev/active/9876a23a-one-validation-report/investigation.md`, capture part, REQ-08 row). After it, per-issue validation does a subset of whole validation's work, so the expected margin is small and host load during multi-agent work is high.\n\n## Success Criteria\n\n- [hard] REQ-01: The harness, generalised in `scripts/benchmark-mutation-cost.sh`, times `jit validate` and `jit validate <id>` in at least five interleaved pairs (one of each per pair, alternating which runs first) on a fresh copy of this repository with a release binary, records the load threshold it applied and the load before and after, and times `jit validate --scope <container>`, `jit validate <id> --explain`, `jit issue create` (human, `--json`, `--quiet`) and `jit validate --fix --dry-run` as medians of at least five runs.\n- [hard] REQ-02: `dev/active/9876a23a-one-validation-report/benchmark/README.md` records one run with the commit, the binary, the fixture's issue count, the load threshold and loads, every median, each pair's difference (per-issue minus whole) with their median and spread, and the raw timings beside it.\n- [hard] REQ-03: The README states whether the median pair difference is at most zero, which is the REQ-08 bound.\n\n## Notes\n\n- A run whose median pair difference exceeds zero is reported as a blocking finding against the per-issue view change, and is not fixed inside this measurement.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T09:44:21.575291462Z",
+  "first_ready_at": "2026-11-04T09:32:39.815718402Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "a6d6a349-2c87-47bc-a2da-c897ad896128",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:42:26.621276878Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5d774061-61dd-4eb4-a4c9-faaa347c9cae",
   "labels": [
     "type:task",
@@ -26,7 +36,7 @@
     "satisfies:9876a23a/REQ-08"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Measure validation views on this repository",
-  "updated_at": "2026-11-04T06:52:53.907643232Z"
+  "updated_at": "2026-11-04T09:44:21.575291462Z"
 }

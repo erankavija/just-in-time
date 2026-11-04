@@ -7,7 +7,7 @@
     "083c9a91-9582-4af5-a38a-bac606392d17",
     "12c0f3fb-fde6-4504-aac0-773b435f0a83"
   ],
-  "description": "The claim and recover arms call claim free functions over raw storage and substitute claim-specific fallback codes. This moves them to library handlers that go through the executor.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `ClaimCommands::{Acquire, Release, Renew, Heartbeat, Status, List, ForceEvict}` resolve the issue argument through `resolve_issue_arg` and call the claims facade (`executor.claims()`, `crates/jit/src/commands/claim.rs`), build bodies with `json!` (`status` and `list` with inline `count`/`leases`), and report failures through `claim_json_error` with per-verb fallback codes such as `CLAIM_ACQUIRE_ERROR` (exit 3) while the human path uses the classifier. `Commands::Recover` calls `execute_recover(&storage, ..)` and fails through `exit_recovery_failed` (`RECOVERY_FAILED`, `exit(1)` on the human path). Every claim leaf and `recover` falls back to `CommandResponse` in the schema. The executor now exposes the claims operations as a family.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `claim acquire|release|renew|heartbeat|status|list|force-evict` and `recover` to handlers in `crates/jit/src/dispatch/claim.rs` that call the executor's claims family, and `main.rs` makes no `execute_claim_*` or `execute_recover` call and keeps no `claim_json_error` or `exit_recovery_failed`.\n- [hard] REQ-02: Each leaf returns its registered response type, lease lists are `ListEnvelope` instantiations, and the schema names a typed response for every one of them.\n- [hard] REQ-03: The handlers return failures as errors with no substituted code or `std::process::exit`; tests assert that a claim failure the classifier maps differently (for example a lock timeout) now reports its classified code on both paths instead of the per-verb claim code.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "description": "The claim and recover arms call claim free functions over raw storage and substitute claim-specific fallback codes. This moves them to library handlers that go through the executor.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `ClaimCommands::{Acquire, Release, Renew, Heartbeat, Status, List, ForceEvict}` resolve the issue argument through `resolve_issue_arg` and call the claims facade (`executor.claims()`, `crates/jit/src/commands/claim.rs`), build bodies with `json!` (`status` and `list` with inline `count`/`leases`), and report failures through `claim_json_error` with per-verb fallback codes such as `CLAIM_ACQUIRE_ERROR` (exit 3) while the human path uses the classifier. `Commands::Recover` calls `execute_recover(&storage, ..)` and fails through `exit_recovery_failed` (`RECOVERY_FAILED`, `exit(1)` on the human path). Every claim leaf and `recover` falls back to `CommandResponse` in the schema. The executor now exposes the claims operations as a family.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\nOn main, `run()` in `crates/jit/src/main.rs` parses the arguments and calls `dispatch()` in `main.rs`, which holds the command match; the arms and inline code this issue places in `run()` live in `dispatch()`.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `claim acquire|release|renew|heartbeat|status|list|force-evict` and `recover` to handlers in `crates/jit/src/dispatch/claim.rs` that call the executor's claims family, and `main.rs` makes no `execute_claim_*` or `execute_recover` call and keeps no `claim_json_error` or `exit_recovery_failed`.\n- [hard] REQ-02: Each leaf returns its registered response type, lease lists are `ListEnvelope` instantiations, and the schema names a typed response for every one of them.\n- [hard] REQ-03: The handlers return failures as errors with no substituted code or `std::process::exit`; tests assert that a claim failure the classifier maps differently (for example a lock timeout) now reports its classified code on both paths instead of the per-verb claim code.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Decisions\n\n- D-01: REQ-06's unchanged success payloads and human output exclude the `issue_id` field and `Issue:` line of `claim heartbeat` and `claim force-evict`. main's 62b8fa62d (614a6f97) introduced them before this handler ported those arms (steward ruling, 2026-11-04).\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
   "first_ready_at": "2026-11-03T23:08:01.601620118Z",
   "gates_required": [
@@ -15,7 +15,26 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "21d8bb7a-33e6-49dc-a154-8bd53758050c",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:13:32.658312181Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cdebd1af-5645-4418-a1e7-af6c51509962",
+      "status": "failed",
+      "updated_at": "2026-11-04T09:18:57.300244847Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "52cdd51e-9211-416c-af99-88ed2dd0bb9d",
+      "status": "passed",
+      "updated_at": "2026-11-04T09:13:32.788221287Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "66790c84-f39f-4004-ba9d-4ceb83a1e8d6",
   "labels": [
     "type:task",
@@ -34,5 +53,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Claim and recover commands move to library handlers",
-  "updated_at": "2026-11-04T02:59:46.500674312Z"
+  "updated_at": "2026-11-04T09:41:19.720435976Z"
 }

@@ -11,6 +11,7 @@
   ],
   "description": "Aggregate the work that turns every validation view and built-in validation gate checker into a selection of the one report.\n\n## Success Criteria\n\n- [hard] REQ-01: Whole, per-issue, scope, rule and explain validation select from one report computed from one capture; only whole validation and the repository-validation checker read event-log history and gate runs.\n- [hard] REQ-02: Each built-in validation checker reports what `jit validate` reports for its selection.\n- [hard] REQ-03: One property test owns the selection contract.\n- [hard] REQ-04: No executor-side validation pass copy or checker pipeline remains, and nothing under the validation layer names `commands`.",
   "documents": [],
+  "first_ready_at": "2026-11-04T10:27:19.786074608Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
@@ -28,7 +29,7 @@
     "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Every validation view is a selection of the report",
-  "updated_at": "2026-11-03T23:04:01.735195324Z"
+  "updated_at": "2026-11-04T10:27:19.786074608Z"
 }

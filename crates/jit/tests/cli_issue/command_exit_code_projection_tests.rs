@@ -869,6 +869,66 @@ fn invoke_hooks_external_io_failure(json: bool) -> Vec<Output> {
     vec![output_hooks_in_form(&cli, json)]
 }
 
+/// A repository whose worktree identity record exists, in a Git checkout.
+fn worktree_identity_repo() -> JitCli {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("Initial commit").unwrap();
+    cli.run(["worktree", "info"]).unwrap();
+    cli
+}
+
+/// Both inspection commands that read the identity record, in one form.
+fn worktree_inspection_outputs(cli: &JitCli, json: bool) -> Vec<Output> {
+    [["worktree", "info"], ["worktree", "list"]]
+        .iter()
+        .map(|args| output_in_form(cli, args, json))
+        .collect()
+}
+
+/// Without a `git` executable the branch and worktree queries fail `NotFound`.
+fn invoke_worktree_git_missing(json: bool) -> Vec<Output> {
+    let cli = worktree_identity_repo();
+    [["worktree", "info"], ["worktree", "list"]]
+        .iter()
+        .map(|args| {
+            let mut command = cli.command(args);
+            command.env("PATH", cli.root().join("no-such-bin"));
+            if json {
+                command.arg("--json");
+            }
+            command.output().unwrap()
+        })
+        .collect()
+}
+
+/// An unreadable worktree identity record is a denied filesystem operation.
+#[cfg(unix)]
+fn invoke_worktree_identity_permission_denied(json: bool) -> Vec<Output> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let cli = worktree_identity_repo();
+    let record = cli.root().join(".jit/worktree.json");
+    let mut denied = fs::metadata(&record).unwrap().permissions();
+    denied.set_mode(0o000);
+    fs::set_permissions(&record, denied).unwrap();
+
+    let outputs = worktree_inspection_outputs(&cli, json);
+
+    let mut restored = fs::metadata(&record).unwrap().permissions();
+    restored.set_mode(0o644);
+    fs::set_permissions(&record, restored).unwrap();
+    outputs
+}
+
+/// A directory at the worktree identity record is a non-permission I/O failure.
+fn invoke_worktree_identity_io_failure(json: bool) -> Vec<Output> {
+    let cli = worktree_identity_repo();
+    let record = cli.root().join(".jit/worktree.json");
+    fs::remove_file(&record).unwrap();
+    fs::create_dir(&record).unwrap();
+    worktree_inspection_outputs(&cli, json)
+}
+
 row_bindings! {
     test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
     test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
@@ -914,6 +974,10 @@ row_bindings! {
     #[cfg(unix)]
     test_command_exit_codes_hooks_install_permission_denied_emits_5: ("hooks install", 5, false) => invoke_hooks_permission_denied;
     test_command_exit_codes_hooks_install_external_io_failure_emits_10: ("hooks install", 10, false) => invoke_hooks_external_io_failure;
+    test_command_exit_codes_worktree_git_missing_emits_3: ("worktree info, worktree list", 3, false) => invoke_worktree_git_missing;
+    #[cfg(unix)]
+    test_command_exit_codes_worktree_identity_permission_denied_emits_5: ("worktree info, worktree list", 5, false) => invoke_worktree_identity_permission_denied;
+    test_command_exit_codes_worktree_identity_io_failure_emits_10: ("worktree info, worktree list", 10, false) => invoke_worktree_identity_io_failure;
 }
 
 /// Guard: **every** projected row, exception and standard alike, has exactly one

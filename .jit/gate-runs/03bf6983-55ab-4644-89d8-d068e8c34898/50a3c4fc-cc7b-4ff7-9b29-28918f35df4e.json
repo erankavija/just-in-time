@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "170f5859c15bc2ef7983b064aaa4d68c33f6cebe",
+  "completed_at": "2026-11-04T10:26:47.768416602Z",
+  "duration_ms": 145194,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed change removes validation-layer command references and relocates overlay-capture tests while preserving their assertions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "03bf6983-55ab-4644-89d8-d068e8c34898",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "50a3c4fc-cc7b-4ff7-9b29-28918f35df4e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T10:24:22.574017647Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3f561673e `test(jit:03bf6983): validation-layer tests and prose stop naming commands`\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/convention-convergence (.jit/invariants.toml); @/issue/9876a23a/requirement/REQ-05 and REQ-06 (issue source)\nGate evidence: cargo-ci — passed (exit 0; 2026-11-04T10:24:02.723252801+00:00)\nTruncation recovery: bounded per-file patches, current source ranges, and moved-test inventories after the initial combined patch was truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed change removes validation-layer command references and relocates overlay-capture tests while preserving their assertions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

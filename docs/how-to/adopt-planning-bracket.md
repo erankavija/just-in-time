@@ -406,8 +406,9 @@ jit validate --scope epic-123
 ```
 
 `--scope` remains the broad explicit-subtree validation surface. Use it when you
-intentionally want every applicable rule in that bracket subtree; the gate's
-`rule_validation` checker is narrower by design.
+intentionally want the findings of every rule applicable in that bracket
+subtree, evaluated over the whole repository; the gate's `rule_validation`
+checker is narrower by design.
 
 The `jit-breakdown` skill performs the batch and external wiring. Planning
 metadata is accepted for authoring but is neither persisted nor exported.
