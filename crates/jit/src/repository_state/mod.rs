@@ -119,7 +119,8 @@ pub fn finalize_gate_registry_edit(
     let mut actions = record_plan.delta().actions().to_vec();
     actions.extend(compose_complete(&overlaid, &declarations)?);
     let delta = RepositoryDelta::new(layout, actions)?;
-    Ok(MaterializationPlan::new(base, delta))
+    MaterializationPlan::new(base, delta, context)
+        .map_err(|error| GateRegistryEditError::Mutation(error).into())
 }
 
 /// A typed failure raised while finalizing a gate-registry edit.
@@ -466,6 +467,9 @@ pub struct MaterializationPlan {
     image: RepositoryImage,
     /// Exact normalized delta.
     delta: RepositoryDelta,
+    /// The delta storage publishes: `delta`, plus the generic event append an
+    /// event-less write over a present data root carries.
+    publication: RepositoryDelta,
     /// Per-projection row counts produced by a configured-projection render.
     projection_counts: std::collections::BTreeMap<String, usize>,
     profile_targets: Vec<ProfileTargetMaterialization>,
@@ -571,6 +575,11 @@ impl MaterializationPlan {
         &self.delta
     }
 
+    /// The delta storage publishes; reports read [`Self::delta`].
+    pub fn publication(&self) -> &RepositoryDelta {
+        &self.publication
+    }
+
     /// Return the count produced for one configured projection in this plan.
     pub(crate) fn projection_count(&self, name: &str) -> Option<usize> {
         self.projection_counts.get(name).copied()
@@ -589,16 +598,28 @@ impl MaterializationPlan {
         &self.applied_profiles
     }
 
-    /// Close a delta over the image it was derived from.
-    pub(crate) fn new(image: &RepositoryImage, delta: RepositoryDelta) -> Self {
-        Self {
+    /// Close a delta over the image it was derived from, composing its
+    /// publication with `context`'s event identity and timestamp.
+    ///
+    /// # Errors
+    ///
+    /// [`MutationError::Capture`] when the publication needs the generic event
+    /// and `image` did not capture the event log's tail.
+    pub(crate) fn new(
+        image: &RepositoryImage,
+        delta: RepositoryDelta,
+        context: &MutationContext,
+    ) -> Result<Self, MutationError> {
+        let publication = mutation::publication_of(image, &delta, context)?;
+        Ok(Self {
             image: image.clone(),
             delta,
+            publication,
             projection_counts: std::collections::BTreeMap::new(),
             profile_targets: Vec::new(),
             profile_contributions: Vec::new(),
             applied_profiles: std::collections::BTreeSet::new(),
-        }
+        })
     }
 
     fn with_projection_counts(mut self, counts: std::collections::BTreeMap<String, usize>) -> Self {
@@ -653,8 +674,6 @@ pub enum MaterializationRequest<'a> {
     Initialize {
         /// Fully rendered semantic scaffold contribution.
         scaffold: &'a InitializationScaffold,
-        /// Stable mutation identity and time authority.
-        context: &'a MutationContext,
     },
     /// Derive one complete profile-selection application over an existing
     /// repository. The collection is dependency-first and unique; selector
@@ -663,21 +682,21 @@ pub enum MaterializationRequest<'a> {
         /// Parsed package metadata and neutral canonical claims for the whole
         /// selected closure.
         profiles: &'a [ProfileApplicationInput],
-        /// Stable mutation identity and time authority.
-        context: &'a MutationContext,
         /// Requested lifecycle operation recorded when this selection changes
         /// repository-owned state.
         operation: crate::domain::ProfileLifecycleOperation,
     },
 }
 
-/// Invoke the constrained closed producer graph for one typed request.
+/// Invoke the constrained closed producer graph for one typed request;
+/// `context` stamps the events the plan publishes.
 ///
 /// The direct request match is deliberately closed: callers cannot register
 /// callbacks or choose individual producer families. Adding a family requires
 /// extending this function.
 pub fn derive_materialization(
     image: &RepositoryImage,
+    context: &MutationContext,
     request: MaterializationRequest<'_>,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
     let (derivation, projection_counts) = match request {
@@ -696,13 +715,12 @@ pub fn derive_materialization(
             let delta = derive_repair(image, &declarations)?;
             (MaterializationDerivation::new(delta), Default::default())
         }
-        MaterializationRequest::Initialize { scaffold, context } => (
+        MaterializationRequest::Initialize { scaffold } => (
             initialize::derive_initialization(image, scaffold, context)?,
             Default::default(),
         ),
         MaterializationRequest::ApplyProfileSelection {
             profiles,
-            context,
             operation,
         } => (
             initialize::derive_profile_applications(
@@ -721,7 +739,7 @@ pub fn derive_materialization(
         profile_contributions,
         applied_profiles,
     } = derivation;
-    Ok(MaterializationPlan::new(image, delta)
+    Ok(MaterializationPlan::new(image, delta, context)?
         .with_projection_counts(projection_counts)
         .with_profile_targets(profile_targets)
         .with_profile_contributions(profile_contributions)
@@ -738,7 +756,8 @@ pub fn derive_materialization(
 /// default rules and their schemas, plus every configured projection — from that
 /// edited configuration, with `declarations` supplying the gates and rules,
 /// exactly as [`derive_semantic_mutation`] does. The
-/// authored `config.toml` write carries the captured base preimage, and every
+/// authored `config.toml` write, emitted only when the edit changes its bytes,
+/// carries the captured base preimage, and every
 /// derived action its own base preimage, so `session.apply` revalidates against
 /// exactly what was captured.
 ///
@@ -747,6 +766,7 @@ pub fn derive_materialization(
 /// authored-declaration edits adopt this same pattern per caller.
 pub fn finalize_config_edit(
     base: &RepositoryImage,
+    context: &MutationContext,
     edited_config_bytes: &[u8],
     declarations: RepositoryDeclarations<'_>,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
@@ -762,13 +782,22 @@ pub fn finalize_config_edit(
     // set derives the coupled schemas/rule-membership/projections from the edited
     // configuration over the overlaid image (their targets keep their base
     // preimages, since only `config.toml` is overlaid).
-    let mut actions = vec![RepositoryAction::WriteFile {
-        path: config_path.clone(),
-        owner: RepositoryActionOwner::AuthoredConfig,
-        expected: ExpectedPreimage::of(base.entry(&config_path).map_err(ProducerError::from)?),
-        bytes: edited_config_bytes.to_vec(),
-        mode: FileMode::Regular,
-    }];
+    // An unchanged edit writes nothing, so a no-op publishes no record.
+    let base_entry = base.entry(&config_path).map_err(ProducerError::from)?;
+    let unchanged = base
+        .file_bytes(&config_path)
+        .map_err(ProducerError::from)?
+        .is_some_and(|bytes| bytes == edited_config_bytes);
+    let mut actions = (!unchanged)
+        .then(|| RepositoryAction::WriteFile {
+            path: config_path.clone(),
+            owner: RepositoryActionOwner::AuthoredConfig,
+            expected: ExpectedPreimage::of(base_entry),
+            bytes: edited_config_bytes.to_vec(),
+            mode: FileMode::Regular,
+        })
+        .into_iter()
+        .collect::<Vec<_>>();
     let edited_declarations = RepositoryDeclarations {
         item_kinds: resolved_item_kinds(&edited_config),
         config: &edited_config,
@@ -777,7 +806,7 @@ pub fn finalize_config_edit(
     };
     actions.extend(compose_complete(&overlaid, &edited_declarations)?);
     let delta = RepositoryDelta::new(base.layout(), actions)?;
-    Ok(MaterializationPlan::new(base, delta))
+    Ok(MaterializationPlan::new(base, delta, context)?)
 }
 
 /// Pure derivation failure.
@@ -807,6 +836,9 @@ pub enum RepositoryStateError {
     /// A producer read an uncaptured path or malformed captured bytes.
     #[error("materialization producer failed: {0}")]
     Producer(#[from] ProducerError),
+    /// Composing the plan's event append failed.
+    #[error(transparent)]
+    Mutation(#[from] MutationError),
     /// A gate-registry edit finalization failed.
     #[error(transparent)]
     GateRegistryEdit(#[from] GateRegistryEditError),
@@ -1054,7 +1086,9 @@ mod tests {
         MaterializationPlan::new(
             image,
             RepositoryDelta::new(image.layout(), actions).unwrap(),
+            &MutationContext::preview(),
         )
+        .unwrap()
     }
 
     #[test]
@@ -1375,10 +1409,168 @@ mod tests {
             rules: &rules,
         };
         assert!(matches!(
-            finalize_config_edit(&base, MALFORMED_ITEM_KINDS.as_bytes(), declarations),
+            finalize_config_edit(
+                &base,
+                &MutationContext::preview(),
+                MALFORMED_ITEM_KINDS.as_bytes(),
+                declarations
+            ),
             Err(RepositoryStateError::Producer(
                 ProducerError::Configuration(ConfigurationAssemblyError::ItemKinds(_))
             ))
+        ));
+    }
+
+    fn write(path: &VirtualPath, bytes: &[u8]) -> RepositoryAction {
+        RepositoryAction::WriteFile {
+            path: path.clone(),
+            owner: RepositoryActionOwner::RepositoryStateMutation,
+            expected: ExpectedPreimage::Absent,
+            bytes: bytes.to_vec(),
+            mode: FileMode::Regular,
+        }
+    }
+
+    /// The events a publication appends, decoded.
+    fn published_events(plan: &MaterializationPlan) -> Vec<crate::domain::Event> {
+        plan.publication()
+            .actions()
+            .iter()
+            .filter_map(|action| match action {
+                RepositoryAction::AppendEvents { bytes, .. } => Some(bytes),
+                _ => None,
+            })
+            .flat_map(|bytes| {
+                bytes
+                    .split(|byte| *byte == b'\n')
+                    .filter(|line| !line.is_empty())
+                    .map(|line| serde_json::from_slice(line).unwrap())
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_materialization_plan_new_publishes_an_event_less_write_with_one_files_published_event()
+    {
+        let (config, note) = (
+            VirtualPath::CONFIG,
+            VirtualPath::worktree("note.md").unwrap(),
+        );
+        let image = ImageBuilder::new()
+            .file(config.clone(), b"old")
+            .entry(note.clone(), RepositoryEntry::Absent)
+            .build();
+        let delta = RepositoryDelta::new(
+            image.layout(),
+            vec![write(&note, b"note"), write(&config, b"new")],
+        )
+        .unwrap();
+
+        let plan =
+            MaterializationPlan::new(&image, delta.clone(), &MutationContext::preview()).unwrap();
+
+        assert_eq!(
+            plan.delta(),
+            &delta,
+            "reports keep reading the derived delta"
+        );
+        let events = published_events(&plan);
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].body(),
+            &crate::domain::EventBody::draft_files_published(vec![
+                config.repository_relative(),
+                note.repository_relative(),
+            ])
+        );
+        assert_eq!(
+            plan.publication().file_writes().collect::<Vec<_>>(),
+            delta.file_writes().collect::<Vec<_>>(),
+            "the publication adds only the append"
+        );
+    }
+
+    #[test]
+    fn test_materialization_plan_new_rebuilds_the_same_publication_from_a_reused_context() {
+        let config = VirtualPath::CONFIG;
+        let image = ImageBuilder::new().file(config.clone(), b"old").build();
+        let delta = RepositoryDelta::new(image.layout(), vec![write(&config, b"new")]).unwrap();
+        let context = MutationContext::deterministic(
+            [7; 32],
+            chrono::DateTime::from_timestamp(1, 0).unwrap(),
+        );
+
+        let first = MaterializationPlan::new(&image, delta.clone(), &context).unwrap();
+        let retried = MaterializationPlan::new(&image, delta, &context).unwrap();
+
+        assert_eq!(first.publication(), retried.publication());
+    }
+
+    #[test]
+    fn test_materialization_plan_new_publishes_the_derived_delta_when_no_generic_event_is_due() {
+        let config = VirtualPath::CONFIG;
+        let present = ImageBuilder::new().file(config.clone(), b"old").build();
+        let absent_root = ImageBuilder::new()
+            .entry(config.clone(), RepositoryEntry::Absent)
+            .build();
+        let appending = finalize(
+            present.layout(),
+            &present,
+            &MutationContext::preview(),
+            &[MutationIntent::RecordEvent {
+                phase: 0,
+                event: Box::new(crate::domain::EventBody::draft_files_published(Vec::new())),
+            }],
+            None,
+        )
+        .unwrap()
+        .delta()
+        .clone();
+        let cases = [
+            (
+                "empty delta",
+                &present,
+                RepositoryDelta::new(present.layout(), Vec::new()),
+            ),
+            ("domain event", &present, Ok(appending)),
+            (
+                "absent data root",
+                &absent_root,
+                RepositoryDelta::new(absent_root.layout(), vec![write(&config, b"new")]),
+            ),
+        ];
+
+        for (case, image, delta) in cases {
+            let delta = delta.unwrap();
+            let plan = MaterializationPlan::new(image, delta.clone(), &MutationContext::preview())
+                .unwrap();
+            assert_eq!(plan.publication(), &delta, "{case}");
+        }
+    }
+
+    #[test]
+    fn test_materialization_plan_new_refuses_a_generic_event_over_an_image_without_the_event_log() {
+        let config = VirtualPath::CONFIG;
+        let spec = CaptureSpec::new(
+            [config.clone()],
+            CaptureBudget {
+                max_listings: 0,
+                max_bytes: u64::MAX,
+                max_depth: usize::MAX,
+            },
+        )
+        .unwrap();
+        let image = ImageBuilder::new()
+            .with_spec(spec)
+            .file(config.clone(), b"old")
+            .build();
+        let delta = RepositoryDelta::new(image.layout(), vec![write(&config, b"new")]).unwrap();
+
+        assert!(matches!(
+            MaterializationPlan::new(&image, delta, &MutationContext::preview()),
+            Err(MutationError::Capture(CaptureError::UndiscoveredRepositoryPath(path)))
+                if path == VirtualPath::EVENTS
         ));
     }
 }

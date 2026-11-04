@@ -963,7 +963,9 @@
     "24a982b7": 1,
     "f87f9b00": 1,
     "d58f80c9": 1,
-    "01a88d32": 1
+    "01a88d32": 1,
+    "b674382e": 1,
+    "c517b88b": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1072,16 +1074,19 @@
         "f87f9b00": -114,
         "3f816619": -105,
         "b23b1bf3": -53,
-        "5687e281": -175
+        "5687e281": -175,
+        "da30b92a": -8
       },
       "epic_net_running": 951,
-      "epic_net_latest": 284,
-      "merges_latest": 94,
-      "crate_main_latest": 73361,
+      "epic_net_latest": 276,
+      "merges_latest": 95,
+      "crate_main_latest": 73483,
       "file_latest": "ledger-2026-11-05.txt",
       "projected_end": "+70..+250 (ceiling +375)",
       "b697a3f7_merges": {
-        "945f9181": 4
+        "945f9181": 4,
+        "c517b88b": 129,
+        "c517b88b-r1": 1
       }
     },
     "survey_2026_11_04": "output+dispatch: ~29 high-confidence, ~75 speculative, ~20 contract-changing (5 dead ErrorCodes, 0eca332a); ~150-250 legacy output helpers die after main.rs migrates. Projected REQ-10 end ~9,200-9,400. Reported to 6a for the user's decision.",
@@ -1437,17 +1442,18 @@
       "epic": "b697a3f7"
     },
     "c517b88b": {
-      "status": "dispatched",
+      "status": "done",
       "vendor": "Claude Opus",
       "reason": "b697a3f7 track B; large (plan context, files_published event, both backends); worker checks criteria first",
-      "epic": "b697a3f7"
+      "epic": "b697a3f7",
+      "note": "F1 fixed (context.begin before files_published); gate-run ID overlap checked: all three gate-run plan paths (mod.rs captured issue mutation, precheck error, release) carry gate events, so the generic event never shares a plan with a gate run"
     },
     "5687e281": {
       "status": "done",
       "vendor": "Claude Opus"
     },
     "da30b92a": {
-      "status": "dispatched",
+      "status": "done",
       "vendor": "Codex gpt-6.1-sol",
       "reason": "redispatch after 5687e281"
     },
@@ -1459,6 +1465,11 @@
     "ae3f4f8b": {
       "status": "dispatched",
       "vendor": "Codex gpt-6-astra"
+    },
+    "eaca3f52": {
+      "status": "dispatched",
+      "vendor": "Claude Opus",
+      "epic": "b697a3f7"
     }
   },
   "handoff": {
@@ -1526,5 +1537,14 @@
     "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)",
     "b23b1bf3": "gate_evaluate-many is the last legacy schema-table row; test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema targets it: repoint or delete with the row (or leave to da30b92a)"
   },
-  "coordination": "All other lead sessions closed by the user (6a, 2026-11-04); df129d9e lead is the only active lead. Escalations and milestone ledgers go to 6a."
+  "coordination": "All other lead sessions closed by the user (6a, 2026-11-04); df129d9e lead is the only active lead. Escalations and milestone ledgers go to 6a.",
+  "incidents": [
+    {
+      "date": "2026-11-04",
+      "issue": "c517b88b",
+      "merge": "973bb01b6",
+      "what": "cargo-ci gate suite-build link failure (undefined hidden drop_glue symbol for btree SplitResult<..PinnedTargetRead..>) with sccache in use; branch CI on the same commit passed minutes earlier",
+      "ruling": "6a: one re-evaluation with CARGO_CI_NO_SCCACHE=1 under the same locks; a repeat failure is a content verdict; a recurrence that disappears without sccache goes to 6a (would make authoritative runs sccache-free)"
+    }
+  ]
 }

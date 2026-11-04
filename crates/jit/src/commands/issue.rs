@@ -86,7 +86,7 @@ fn derive_issue_deletion(
             issue.clone()
         })
         .collect::<Vec<_>>();
-    let readiness = derive_readiness_intents(issues, &projected, &graph)?;
+    let readiness = derive_readiness_intents(issues, &projected, &graph, ReadinessScope::Affected)?;
 
     let mut intents = std::iter::once(MutationIntent::DeleteIssue {
         issue_id: target_id.clone(),

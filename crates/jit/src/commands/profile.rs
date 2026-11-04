@@ -572,6 +572,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 .collect::<Result<Vec<_>, RepositoryLayoutError>>()?,
         )?;
         let budget = package_tree_capture_budget(destination);
+        let context = super::production_mutation_context();
 
         with_mutation_session(
             self.exec.storage(),
@@ -590,7 +591,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                     .into());
                 }
 
-                let plan = finalize_package_tree_capture(&image, &capture)?;
+                let plan = finalize_package_tree_capture(&image, &context, &capture)?;
                 let targets = plan
                     .delta()
                     .file_writes()
@@ -1051,9 +1052,9 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
         };
         let preview = derive_materialization(
             &base,
+            context,
             MaterializationRequest::ApplyProfileSelection {
                 profiles: &inputs,
-                context,
                 operation: ProfileLifecycleOperation::Apply,
             },
         )?;
@@ -1089,9 +1090,9 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
         }
         let plan = derive_materialization(
             &probe,
+            context,
             MaterializationRequest::ApplyProfileSelection {
                 profiles: &inputs,
-                context,
                 operation: ProfileLifecycleOperation::Apply,
             },
         )?;

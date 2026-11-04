@@ -19,7 +19,7 @@
 use super::{
     CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction,
     RepositoryActionOwner, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout,
-    RepositoryLayoutError, VirtualPath,
+    RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
 use crate::declarations::GateRegistry;
 use crate::domain::event_catalog::EventTag;
@@ -716,7 +716,7 @@ pub fn finalize(
     preimages: Option<&[Issue]>,
 ) -> Result<MaterializationPlan, MutationError> {
     let delta = finalize_delta(layout, image, context, intents, preimages)?;
-    Ok(MaterializationPlan::new(image, delta))
+    MaterializationPlan::new(image, delta, context)
 }
 
 /// The issue as persisted for `draft` created at `now`.
@@ -1258,7 +1258,12 @@ pub(crate) fn finalize_audit_append(
         return Ok(None);
     }
     context.begin();
-    let pending = events
+    compose_event_action(image, context, drafted_events(events))
+}
+
+/// Pending events for drafted `(phase, body)` pairs, in drafting order.
+fn drafted_events(events: Vec<(u8, EventBody)>) -> Vec<PendingEvent> {
+    events
         .into_iter()
         .enumerate()
         .map(|(ordinal, (phase, body))| {
@@ -1272,8 +1277,50 @@ pub(crate) fn finalize_audit_append(
                 body,
             }
         })
+        .collect()
+}
+
+/// The delta a plan publishes: `delta` plus one `files_published` append when
+/// it writes over a data root `image` shows present and carries no event
+/// append, so every redo record over a present root grows the event log;
+/// otherwise `delta` itself.
+///
+/// A captured data-root entry that exists is the presence evidence: an absent
+/// root captures every data-root path absent.
+pub(super) fn publication_of(
+    image: &RepositoryImage,
+    delta: &RepositoryDelta,
+    context: &MutationContext,
+) -> Result<RepositoryDelta, MutationError> {
+    let appends = delta
+        .actions()
+        .iter()
+        .any(|action| matches!(action, RepositoryAction::AppendEvents { .. }));
+    let root_present = image.entries().iter().any(|(path, entry)| {
+        path.root_class() == RepositoryRootClass::Data && !matches!(entry, RepositoryEntry::Absent)
+    });
+    if delta.actions().is_empty() || appends || !root_present {
+        return Ok(delta.clone());
+    }
+    let paths = delta
+        .actions()
+        .iter()
+        .map(|action| action.path().repository_relative())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
         .collect();
-    compose_event_action(image, context, pending)
+    // Restart the frozen order so a retry over the reused context rebuilds the
+    // same publication.
+    context.begin();
+    let append = compose_event_action(
+        image,
+        context,
+        drafted_events(vec![(0, EventBody::draft_files_published(paths))]),
+    )?;
+    Ok(RepositoryDelta::new(
+        image.layout(),
+        delta.actions().iter().cloned().chain(append).collect(),
+    )?)
 }
 
 /// Build the write action for an issue, using the captured preimage so a create

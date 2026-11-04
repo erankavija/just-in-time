@@ -9,13 +9,33 @@
   ],
   "description": "The schema's per-command success types come from the handler registry instead of a hand-kept match table, so every visible command names its typed response.\n\n## Background\n\n`get_output_schema_for_command(cmd_path)` in `crates/jit/src/schema.rs` matches `\"group_sub\"` strings to `schema_for!(T)` and falls back to `(None, \"CommandResponse\")`. The table has drifted: its `\"graph_downstream\"` key matches no path (`downstream` is only an alias of `graph rdeps`), so `graph rdeps` and `rdeps` report `CommandResponse` although they emit `GraphDownstreamResponse`. Command groups now run as library handlers in `crates/jit/src/dispatch/`, one module per group, each returning `anyhow::Result<Outcome<R>>` with `R` its registered response type, and one registration per group generates both dispatch and a per-leaf response lookup. During migration `generate()` consulted the registry first and the table second. `CommandSchema::generate()` must remain the derivation authority with `get_output_schema_for_command`, `hidden_commands()` and `builtin_global_flags()` reachable from it. Clap-hidden items are already excluded from the schema.\n\n## Success Criteria\n\n- [hard] REQ-01: `get_output_schema_for_command` remains reachable from `generate()` and answers only from the handler registry; its hand-written path-to-type table no longer exists.\n- [hard] REQ-02: No executable command path in the generated schema reports `CommandResponse` as its success type.\n- [hard] REQ-03: A schema test walks the visible executable paths of `Cli::command()` and fails when any has no registered response.\n- [hard] REQ-04: Commands whose schema output changes from `CommandResponse` to a typed response, `graph rdeps` among them, are covered by a schema test stating the typed response, and existing schema suites pass without weakened assertions.\n- [hard] REQ-05: MCP tool generation and its unit and integration tests pass against the regenerated schema.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "done_at": "2026-11-04T17:25:30.429054376Z",
   "first_ready_at": "2026-11-04T16:16:18.003870977Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ad3be569-fa1f-42e6-892a-54015835f4ac",
+      "status": "passed",
+      "updated_at": "2026-11-04T17:14:56.442736396Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0a2de734-06a8-4091-b1db-820f8219ea5e",
+      "status": "passed",
+      "updated_at": "2026-11-04T17:18:27.943971363Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "8371aab9-b4d9-4f1e-a56f-038f60f26c44",
+      "status": "passed",
+      "updated_at": "2026-11-04T17:15:14.086913873Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "da30b92a-f0b8-41f3-bbc5-605ed0f739fb",
   "labels": [
     "type:task",
@@ -27,7 +47,7 @@
     "satisfies:df129d9e/REQ-05"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Derive output schemas from the handler registry",
-  "updated_at": "2026-11-04T16:44:17.009851633Z"
+  "updated_at": "2026-11-04T17:25:30.429054376Z"
 }

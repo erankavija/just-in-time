@@ -76,6 +76,7 @@ wire_vocabulary! {
         GateDefinitionRemoved = "gate_definition_removed",
         ProfileLifecycle = "profile_lifecycle",
         LinkedCheckoutWriteOverridden = "linked_checkout_write_overridden",
+        FilesPublished = "files_published",
     }
 }
 
@@ -103,7 +104,8 @@ impl EventTag {
             | EventTag::GateDefinitionRemoved => EventScope::Registry,
             EventTag::ArtifactArchiveExecuted
             | EventTag::ProfileLifecycle
-            | EventTag::LinkedCheckoutWriteOverridden => EventScope::Repository,
+            | EventTag::LinkedCheckoutWriteOverridden
+            | EventTag::FilesPublished => EventScope::Repository,
         }
     }
 
@@ -161,6 +163,11 @@ impl EventTag {
                 "An explicit per-invocation override permitted a state-mutating command inside a \
                  linked checkout that the declared write stance refuses; the record names the \
                  checkout, the refusing stance, and the permitting override."
+            }
+            EventTag::FilesPublished => {
+                "A write that records no domain event, such as `jit config set` or \
+                 `jit project render`, reached its commit point; the record names the sorted \
+                 repository-relative paths it wrote, made or deleted."
             }
         }
     }
@@ -269,6 +276,9 @@ impl EventTag {
                     LinkedCheckoutWriteStance::Allow,
                 )
             }
+            EventTag::FilesPublished => {
+                EventBody::draft_files_published(vec![".jit/config.toml".to_string()])
+            }
         };
         Event::new(
             "00000000-0000-0000-0000-000000000000".to_string(),
@@ -310,6 +320,7 @@ impl EventBody {
             EventBody::LinkedCheckoutWriteOverridden { .. } => {
                 EventTag::LinkedCheckoutWriteOverridden
             }
+            EventBody::FilesPublished { .. } => EventTag::FilesPublished,
         }
     }
 }
@@ -614,6 +625,7 @@ mod tests {
             BTreeSet::from(
                 [
                     EventTag::ArtifactArchiveExecuted,
+                    EventTag::FilesPublished,
                     EventTag::GateDefinitionCreated,
                     EventTag::GateDefinitionRemoved,
                     EventTag::GateDefinitionUpdated,

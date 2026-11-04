@@ -111,9 +111,9 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 let delta_overlay = crate::repository_state::action_overrides(
                     derive_materialization(
                         &probe,
+                        &context,
                         MaterializationRequest::Initialize {
                             scaffold: &scaffold,
-                            context: &context,
                         },
                     )?
                     .delta()
@@ -140,9 +140,9 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 }
                 let plan = derive_materialization(
                     &base,
+                    &context,
                     MaterializationRequest::Initialize {
                         scaffold: &scaffold,
-                        context: &context,
                     },
                 )?;
                 if plan.delta().actions().iter().any(|action| {

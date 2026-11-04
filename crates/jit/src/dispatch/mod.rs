@@ -283,8 +283,8 @@ pub fn resolve_gate_key_for(
     Ok(resolve_gate_key(positional, flag, command)?.parse()?)
 }
 
-/// The `output_schema` lookup of every migrated group, consulted by
-/// [`crate::CommandSchema::generate`] before its legacy table. Test builds
+/// The `output_schema` lookup of every group, consulted by
+/// [`crate::CommandSchema::generate`]. Test builds
 /// also register the test-only groups, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     apply::output_schema,
