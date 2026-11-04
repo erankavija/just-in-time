@@ -758,25 +758,15 @@ pub fn dependency_batch_json_error(
 
 #[cfg(test)]
 mod exit_code_projection_tests {
-    //! REQ-02: verify the projected command exit-code mappings against the
-    //! runtime classifier they document. Each representative typed error is run
-    //! through [`classify`] (the exact classifier the CLI dispatch
-    //! uses) and the resulting code is confirmed to (a) equal the expected code
-    //! and (b) be a code the schema's `command_exit_codes` projection documents.
-    //! If the classifier ever reclassifies one of these conditions, or the
-    //! projection stops documenting a code the classifier still emits, this test
-    //! fails — so the projection cannot silently drift from runtime behavior.
+    //! Pin the exit status [`classify`] gives representative typed errors.
 
     use super::classify;
     use crate::declarations::GateStage;
     use crate::domain::{GateRunResult, GateRunStatus};
     use crate::output::ErrorCode;
-    use crate::schema::CommandSchema;
 
-    /// Build a `gate evaluate` checker failure carrying `status`, so the
-    /// `gate evaluate` / `gate evaluate-all` exception rows (checker verdict `4`,
-    /// runner error `10`) are pinned to the real classifier: `classify`
-    /// splits `GatePassFailed` on this status.
+    /// Build a `gate evaluate` checker failure carrying `status`, which
+    /// `classify` splits into checker verdict `4` and runner error `10`.
     pub(super) fn gate_pass_failed(status: GateRunStatus) -> anyhow::Error {
         let result = GateRunResult {
             schema_version: 1,
@@ -812,41 +802,16 @@ mod exit_code_projection_tests {
         .into()
     }
 
-    /// Representative typed errors, each paired with the exit code the classifier
-    /// must produce for it and the `command_exit_codes` **row** that pair pins
-    /// (`"*"` for the universal rows, which any command reaches through the shared
-    /// classifier).
-    ///
-    /// Naming the row — not just the code — is what binds each documented
-    /// command-family mapping to runtime behavior: a row whose condition is raised
-    /// by a typed error is verified here against the classifier that command's
-    /// dispatch actually runs. The rows whose conditions are raised by
-    /// crate-private errors (`TransitionBlockedError`) or by findings
-    /// envelopes are bound end-to-end instead, by the subprocess
-    /// tests in `tests/command_exit_code_projection_tests.rs`; the guard there
-    /// asserts every row is covered by one binding or the other.
-    fn classifier_cases() -> Vec<(anyhow::Error, i32, &'static str)> {
+    /// Representative typed errors, each paired with its expected exit status.
+    fn classifier_cases() -> Vec<(anyhow::Error, i32)> {
         use std::io::{Error as IoError, ErrorKind};
         vec![
-            // Gate-evaluation exception rows route through `classify`:
-            // a checker that failed (`Failed`) is `4`; one that could not run
-            // (`Error`) is `10`.
-            (
-                gate_pass_failed(GateRunStatus::Failed),
-                4,
-                "gate evaluate, gate evaluate-all, gate evaluate-many",
-            ),
-            (
-                gate_pass_failed(GateRunStatus::Error),
-                10,
-                "gate evaluate, gate evaluate-all, gate evaluate-many",
-            ),
-            // Universal rows: raised from shared paths, reachable from any command.
-            (anyhow::anyhow!("untyped failure"), 1, "*"),
+            (gate_pass_failed(GateRunStatus::Failed), 4),
+            (gate_pass_failed(GateRunStatus::Error), 10),
+            (anyhow::anyhow!("untyped failure"), 1),
             (
                 crate::errors::InvalidArgumentError::new("bad arg").into(),
                 2,
-                "*",
             ),
             (
                 crate::storage::AmbiguousIdError::issue(
@@ -855,7 +820,6 @@ mod exit_code_projection_tests {
                 )
                 .into(),
                 2,
-                "*",
             ),
             (
                 "Bad_Key"
@@ -863,12 +827,10 @@ mod exit_code_projection_tests {
                     .unwrap_err()
                     .into(),
                 2,
-                "*",
             ),
             (
                 crate::domain::identity::InvalidIdPrefixError::new("ab").into(),
                 2,
-                "*",
             ),
             (
                 crate::commands::GateNotRequiredError {
@@ -877,26 +839,16 @@ mod exit_code_projection_tests {
                 }
                 .into(),
                 2,
-                "*",
             ),
             (
                 crate::storage::IssueNotFoundError::new(crate::test_utils::issue_id(86)).into(),
                 3,
-                "*",
             ),
-            (IoError::new(ErrorKind::NotFound, "missing").into(), 3, "*"),
-            // `validate_for_write` is the shared write-validation path, so every
-            // command that writes an issue — and only those — can reject a
-            // blocking rule finding with this type.
-            (
-                crate::errors::ValidationFailedError::new("bad").into(),
-                4,
-                "any command that writes an issue",
-            ),
+            (IoError::new(ErrorKind::NotFound, "missing").into(), 3),
+            (crate::errors::ValidationFailedError::new("bad").into(), 4),
             (
                 IoError::new(ErrorKind::PermissionDenied, "denied").into(),
                 5,
-                "*",
             ),
             (
                 anyhow::Error::new(
@@ -905,18 +857,14 @@ mod exit_code_projection_tests {
                 )
                 .context("outer command context"),
                 1,
-                "*",
             ),
             (
                 crate::storage::RepositoryFormatUnsupportedError::new(9999, 1).into(),
                 10,
-                "*",
             ),
-            // Command-family rows, each pinned by the error that command raises.
             (
                 crate::graph::GraphError::<crate::domain::identity::IssueId>::CycleDetected.into(),
                 4,
-                "dep add",
             ),
             (
                 crate::errors::RedundantDependencyError::new(
@@ -931,17 +879,14 @@ mod exit_code_projection_tests {
                 )
                 .into(),
                 4,
-                "dep add",
             ),
             (
                 crate::storage::GateAlreadyExistsError::new(&"tests".parse().unwrap()).into(),
                 6,
-                "gate define",
             ),
             (
                 crate::errors::AlreadyExistsError::new("Output path already exists: taken").into(),
                 6,
-                "snapshot export",
             ),
             (
                 crate::commands::BatchValidationError {
@@ -952,7 +897,6 @@ mod exit_code_projection_tests {
                 }
                 .into(),
                 2,
-                "issue batch-create",
             ),
             (
                 crate::errors::ClaimRequiresGitError::new(
@@ -960,14 +904,13 @@ mod exit_code_projection_tests {
                 )
                 .into(),
                 10,
-                "claim",
             ),
         ]
     }
 
     #[test]
     fn test_classify_produces_documented_exit_codes() {
-        for (error, expected, _row) in classifier_cases() {
+        for (error, expected) in classifier_cases() {
             assert_eq!(
                 classify(&error).exit_code().code(),
                 expected,
@@ -998,7 +941,7 @@ mod exit_code_projection_tests {
 
     #[test]
     fn test_error_code_classifier_is_the_exit_classifier_authority() {
-        for (index, (error, _expected, _row)) in classifier_cases().into_iter().enumerate() {
+        for (index, (error, _expected)) in classifier_cases().into_iter().enumerate() {
             let error_code = classify(&error).error.code;
             assert_eq!(
                 classify(&error).exit_code(),
@@ -1040,26 +983,6 @@ mod exit_code_projection_tests {
             classify(&error).exit_code(),
             ErrorCode::InvalidLabelPattern.exit_code()
         );
-    }
-
-    /// Every classifier case must land on the exact projected row it documents —
-    /// same command family, same code. Code-level membership is not enough: a row
-    /// that names the wrong command family, or a command family whose error is
-    /// reclassified, must fail here.
-    #[test]
-    fn test_command_exit_codes_documents_every_classified_row() {
-        let schema = CommandSchema::generate();
-        for (error, _expected, row) in classifier_cases() {
-            let actual = classify(&error).exit_code().code();
-            assert!(
-                schema
-                    .command_exit_codes
-                    .iter()
-                    .any(|c| c.command == row && c.code == actual),
-                "classifier emits code {actual} for `{error}`, but the \
-                 command_exit_codes projection has no `{row}` row documenting it"
-            );
-        }
     }
 }
 

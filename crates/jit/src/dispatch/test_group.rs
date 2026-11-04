@@ -12,6 +12,7 @@ use serde_json::Value;
 pub(super) enum TestCommand {
     Count { label: String },
     Flag { reason: String },
+    Undeclared { code: ErrorCode },
     Fail,
 }
 
@@ -59,6 +60,19 @@ fn flag<S: IssueStore>(
     ))
 }
 
+fn undeclared<S: IssueStore>(
+    _ctx: &CommandContext<'_, S>,
+    code: ErrorCode,
+) -> HandlerResult<CountResponse> {
+    Ok(Outcome::findings(
+        code,
+        "undeclared",
+        FlagReport {
+            reason: String::new(),
+        },
+    ))
+}
+
 fn fail<S: IssueStore>(_ctx: &CommandContext<'_, S>) -> HandlerResult<FlagReport> {
     anyhow::bail!("handler failed")
 }
@@ -68,7 +82,9 @@ command_group! {
     storage: [IssueStore],
     leaves: {
         "test_count" => TestCommand::Count { label } => count(label) -> CountResponse,
-        "test_flag" => TestCommand::Flag { reason } => flag(reason) -> CountResponse,
+        "test_flag" => TestCommand::Flag { reason } => flag(reason)
+            findings ValidationFailed "flagged" -> CountResponse,
+        "test_undeclared" => TestCommand::Undeclared { code } => undeclared(code) -> CountResponse,
         "test_fail" => TestCommand::Fail => fail() -> FlagReport,
     }
 }
@@ -166,6 +182,29 @@ fn test_dispatch_findings_human_writes_report_and_unprefixed_message_line() {
     assert_eq!(run.out, report.render_human(OutputMode::default()));
     assert_eq!(run.err, "flagged because drift\n");
     assert_eq!(run.status.unwrap(), FINDINGS_CODE.exit_code().into());
+}
+
+#[test]
+fn test_dispatch_findings_under_undeclared_code_fails_without_writing() {
+    let command = TestCommand::Undeclared {
+        code: ErrorCode::GateFailed,
+    };
+    let run = run(&TestHarness::new(), command, true);
+
+    assert!(run
+        .status
+        .unwrap_err()
+        .to_string()
+        .contains("test_undeclared"));
+    assert!(run.out.is_empty() && run.err.is_empty());
+}
+
+#[test]
+fn test_dispatch_findings_under_universal_code_need_no_declaration() {
+    let code = ErrorCode::LockTimeout;
+    let run = run(&TestHarness::new(), TestCommand::Undeclared { code }, true);
+
+    assert_eq!(run.status.unwrap(), code.exit_code().into());
 }
 
 #[test]
