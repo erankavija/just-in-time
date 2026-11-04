@@ -1,7 +1,7 @@
 {
   "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
   "epic_short_id": "9876a23a",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -159,7 +159,7 @@
       "issues": [
         {
           "short_id": "6ba4f623",
-          "status": "rework 1 done 673c5daaa (-32 prod); lead review PASS; awaiting host release for CI, land, gates",
+          "status": "done 92aa09e0c (rework 1; merge fix for a main test)",
           "worker": "claude opus",
           "worker_reason": "central contract validation-report"
         }

@@ -25,7 +25,7 @@
     "satisfies:9876a23a/REQ-05"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Invariant check computes drift from captured declarations",
-  "updated_at": "2026-11-03T23:04:07.270040114Z"
+  "updated_at": "2026-11-04T02:23:40.439139483Z"
 }

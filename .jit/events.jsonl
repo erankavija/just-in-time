@@ -23481,3 +23481,10 @@
 {"fields":["description"],"id":"6cb759a7-7560-4ea4-8840-d13d146a92ad","issue_id":"26307dfd-9eac-4f43-90dd-183ad38d1814","timestamp":"2026-11-04T02:18:55.212769826Z","type":"issue_updated","updated_by":"issue-update"}
 {"gate_key":"cargo-ci","id":"ba6d398a-d10f-4cf2-a995-1d9b2bdbe153","issue_id":"6ba4f623-99fb-420a-9c47-3f3655db3815","timestamp":"2026-11-04T02:19:03.701968971Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"793a2177-1817-4b1d-8091-6bcca98cb456","issue_id":"1eb949a5-7b70-4b32-92f3-aa5e2f703d44","timestamp":"2026-11-04T02:21:05.288672974Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"1cbf71d3-eb8c-415f-b9db-6f6a167cd80d","issue_id":"6ba4f623-99fb-420a-9c47-3f3655db3815","timestamp":"2026-11-04T02:23:23.108173385Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"f54e9279-c09e-4a6a-9c79-e71cefdd6295","issue_id":"6ba4f623-99fb-420a-9c47-3f3655db3815","timestamp":"2026-11-04T02:23:40.235283685Z","to":"done","type":"issue_state_changed"}
+{"id":"b004c8dd-d6b8-410f-ba3d-f8fe586af86c","issue_id":"6ba4f623-99fb-420a-9c47-3f3655db3815","timestamp":"2026-11-04T02:23:40.235283685Z","type":"issue_completed"}
+{"from":"backlog","id":"f6f730d4-59f8-44ff-923e-100379150ab8","issue_id":"2b5f452c-ac5a-46ed-8a56-d862f0d93d04","timestamp":"2026-11-04T02:23:40.358550090Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"5bc55767-a4ac-4cc5-8ebd-630c0b4ce8bc","issue_id":"3acaa5a3-ff38-43f6-a252-5984b3cad2d9","timestamp":"2026-11-04T02:23:40.439139483Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"0401ccc7-93a1-4c8f-91a3-3155049cec74","issue_id":"612ee9d4-d14a-45a8-b1e5-8bedec9951ce","timestamp":"2026-11-04T02:23:40.516324346Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"e65a8056-1cdc-49e5-b940-df7514588b19","issue_id":"c1af05ac-cacb-46e5-895c-840276c0e9a6","timestamp":"2026-11-04T02:23:40.594600365Z","to":"ready","type":"issue_state_changed"}
