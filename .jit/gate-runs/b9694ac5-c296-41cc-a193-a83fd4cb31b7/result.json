@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "417a3573ff2f8243bc7036b80af5d39f8cd2e852",
+  "completed_at": "2026-11-04T05:02:11.974553355Z",
+  "duration_ms": 214011,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f8a6b298-history-independent-reads/format4-dry-run.sh",
+        "id": "F1",
+        "line": 68,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/944edb32/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "The dry-run driver assumes .git is a directory, so linked checkouts omit or fail on their required common-dir jit state."
+      }
+    ],
+    "summary": "The dry-run driver does not copy shared JIT state from linked checkouts.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "944edb32-2fe3-481e-9086-4cffaef7cfc8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b9694ac5-c296-41cc-a193-a83fd4cb31b7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T04:58:37.962661303Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6420 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a4ec-675c-7d52-9312-4132f60a1325\n--------\nuser\n--- 6407 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 71a1023f, 3b147fc (both reachable from HEAD)\nPolicy sources: AGENTS.md\nResolved items: @/issue/944edb32/requirement/REQ-01–REQ-06 (issue description); @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: code-review failed, exit 1 (run 33a42940); its prior F1 and F2 are addressed by 3b147fc\nTruncation recovery: recovered the truncated combined patch through bounded current-file and per-path reads\n\n1. **[blocking, issue-impact, high] F1:** The dry-run driver does not copy `<common-dir>/jit` for a linked checkout. It only copies `$repo/.git/jit` at [format4-dry-run.sh:68](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/format4-dry-run.sh:68), but linked worktrees have `.git` as a file; it consequently skips the shared lease state, and its later digest unconditionally requires `.git/jit` at line 76. Derive the source control-plane directory using `git -C \"$repo\" rev-parse --git-common-dir` before copying it. This leaves REQ-05 unmet for the documented shared-worktree layout.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The dry-run driver does not copy shared JIT state from linked checkouts.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The dry-run driver assumes .git is a directory, so linked checkouts omit or fail on their required common-dir jit state.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/format4-dry-run.sh\",\"line\":68,\"references\":[\"@/issue/944edb32/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

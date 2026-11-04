@@ -789,7 +789,7 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             .keys()
             .cloned()
             .collect::<BTreeSet<_>>(),
-        expected_keys(&["count", "profiles"])
+        expected_keys(&["count", "profiles", "warnings"])
     );
     assert_eq!(
         property_keys(show_schema, "ProfileShowEntry"),
@@ -832,7 +832,7 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             .keys()
             .cloned()
             .collect::<BTreeSet<_>>(),
-        expected_keys(&["count", "profiles"])
+        expected_keys(&["count", "profiles", "warnings"])
     );
     assert_eq!(
         property_keys(apply_schema, "ProfileApplyResult"),

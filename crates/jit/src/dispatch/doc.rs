@@ -132,11 +132,10 @@ fn assets_list<S: IssueStore + RepositoryStateStore>(
     path: &str,
     rescan: bool,
 ) -> anyhow::Result<Outcome<AssetListResult>> {
-    let result = ctx
-        .executor
-        .documents()
-        .list_document_assets(&issue(ctx, id)?, path, rescan)?;
-    let warnings = result.extras.warnings.clone();
+    let (result, warnings) =
+        ctx.executor
+            .documents()
+            .list_document_assets(&issue(ctx, id)?, path, rescan)?;
     let message = format!("{} assets found", result.extras.summary.total);
     Ok(Outcome::success_with(result, message).with_warnings(warnings))
 }
@@ -164,6 +163,7 @@ fn check_links<S: IssueStore + RepositoryStateStore>(
             code: ErrorCode::ValidationFailed,
             message,
             report: Box::new(result),
+            warnings: Vec::new(),
         }
     })
 }

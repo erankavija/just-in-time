@@ -8,6 +8,7 @@
   ],
   "description": "The HTTP server stops keeping its own error-to-status mappings and projects the library's failure classification into a status.\n\n## Background\n\n`crates/server/src/routes.rs` handlers return `Result<Json<T>, StatusCode>`. `path_read_error_status` maps `PathReadError` (NotFound/CommitNotFound → 404, InvalidPath/OutsideRepoRoot → 400, Other → 500) for seven document routes, and about eighteen blanket `map_err(|_| StatusCode::…)` sites map any error to 500 (`list_issues`, `get_graph`, `get_status`, `search_issues`, `list_gates`, `get_strategic_types`, `get_hierarchy`, `get_namespaces`) or 404 (`get_issue`, `get_gate_definition`, `list_gate_runs`, `get_gate_run`). These disagree with the CLI: `get_issue` reports an IO failure as 404, and `OutsideRepoRoot` is exit 1 in the CLI but 400 over HTTP. The server already depends on `jit` and can call `jit::output::failure::classify(&anyhow::Error) -> JsonError`; document reads return `Result<_, PathReadError>`, which converts with `anyhow::Error::from`. HTTP types stay out of the `jit` crate.\n\n## Success Criteria\n\n- [hard] REQ-01: The server crate holds one function mapping `ErrorCode` to `StatusCode` by an exhaustive `match` with no wildcard arm, so a new code fails to compile until it is mapped.\n- [hard] REQ-02: Every route's failure status is that function applied to `classify`'s code for the error; `path_read_error_status` and every blanket `map_err(|_| StatusCode::…)` are gone.\n- [hard] REQ-03: Route tests derive expected statuses from the classification of the induced failure, and one owning unit test covers the code-to-status projection.\n- [hard] REQ-04: Each route whose status changes for a failure has a test stating the new status, and the remaining server route tests pass without weakened assertions.\n\n## Notes\n\nWhere the CLI and the server disagreed today, the classification wins. 0f8efc37 REQ-07 later wraps the handlers in one helper that calls this projection. Embedded static-asset 404s are not error classification and are out of scope. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "done_at": "2026-11-04T05:08:01.748876779Z",
   "first_ready_at": "2026-11-03T21:42:01.609178846Z",
   "gates_required": [
     "cargo-ci",
@@ -15,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "796d66a7-6262-4a99-9cb1-92301c7b56be",
+      "run_id": "4117b925-38f0-427e-b6ae-557c5ae42bba",
       "status": "passed",
-      "updated_at": "2026-11-04T03:22:32.238884530Z",
+      "updated_at": "2026-11-04T05:04:26.731767318Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "008d2b16-f93a-4283-833a-9d6c8ba42644",
-      "status": "failed",
-      "updated_at": "2026-11-04T03:28:18.412738737Z",
+      "run_id": "237e24c2-fb67-471e-9ca5-585d1caabe4d",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:07:52.586594232Z",
       "updated_by": "auto:executor"
     }
   },
@@ -37,7 +38,7 @@
     "satisfies:df129d9e/REQ-14"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Derive server HTTP statuses from the library classification",
-  "updated_at": "2026-11-04T03:28:18.412738737Z"
+  "updated_at": "2026-11-04T05:08:01.748876779Z"
 }

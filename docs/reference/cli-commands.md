@@ -3535,8 +3535,10 @@ report as `error.details`, including its `count` and `findings` fields.
 
 ### `jit search`
 
-Grep the `.jit/` data directory: the stored issue records, the event log, and the
-other files jit keeps there. Matching is delegated to
+Grep the `.jit/` data directory: the stored issue records and the other files
+jit keeps there. A search without an explicit file selection excludes the history
+files: the event log, the gate-run records, and the record scratch directory. An
+explicit `--glob` can still select them. Matching is delegated to
 [ripgrep](https://github.com/BurntSushi/ripgrep), which must be on `PATH`.
 
 ```bash
