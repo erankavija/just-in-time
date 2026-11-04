@@ -2166,13 +2166,12 @@ mod tests {
         seed_repo_file(&storage, ".jit/config.toml", "");
         let layout = storage.repository_layout();
         let spec = || {
-            CaptureSpec::new(
+            let mut spec = CaptureSpec::new(
                 [
                     VirtualPath::data("config.toml").unwrap(),
                     VirtualPath::data("invariants.toml").unwrap(),
                     VirtualPath::data("rules.toml").unwrap(),
                     VirtualPath::data("gates.toml").unwrap(),
-                    VirtualPath::data("events.jsonl").unwrap(),
                 ],
                 CaptureBudget {
                     max_listings: 0,
@@ -2180,7 +2179,9 @@ mod tests {
                     max_depth: 4,
                 },
             )
-            .unwrap()
+            .unwrap();
+            spec.discover_tail(VirtualPath::EVENTS).unwrap();
+            spec
         };
         let request = CapturedGateRegistryMutation::Define(GateDefinition {
             version: 1,

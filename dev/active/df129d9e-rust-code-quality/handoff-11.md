@@ -12,7 +12,7 @@ Outgoing lead: session c12148f1 (`agent:df129d9e-lead`). Incoming lead: just-in-
 - Wave in progress: wave 7 of 13 (handler migrations onto the library handler contract). Waves 1–6 are done.
 - Children summary (label `epic:rust-code-quality`): 54 done, 14 in_progress, 1 ready (4a01ccba), 19 backlog. Counted after c9103fcf closed; recount with `jit query all --label epic:rust-code-quality --json`.
 - Wave 7 done this session: b23faa59 (pathfinder), 1eb949a5 (per-test measurement), 12c0f3fb (handler contract covers every arm shape), e5d618ee (server statuses from classification), 8a14e8e9 (ENOSPC is a host fault in cargo-ci), 153c9851 (config), 9529b9ac (warnings in every JSON response), c9103fcf (doc). Standalone, outside the epic: 26307dfd (mcp-ci tests the built binary) done; 8c67b21a ready, not started.
-- Active claims: every wave 7 in_progress issue is assigned to `agent:df129d9e-lead` with a 24 h lease (`jit claim acquire <id> --ttl 86400`). Release or take them over as below.
+- Active claims: none. All 19 leases were released at handoff; assignees stay `agent:df129d9e-lead`. Re-acquire with `jit claim acquire <id> --ttl 86400` (jit caps indefinite leases at 2 per agent).
 - Open escalations: none awaiting the user. All open points below have steward rulings.
 - Progress file: [progress.json](progress.json) (rework counts, per-issue vendor and notes, pitfalls, line target).
 

@@ -1,16 +1,31 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-04T07:03:40.075506346Z",
   "context": {},
   "created_at": "2026-11-04T06:50:09.550452947Z",
   "dependencies": [],
   "description": "Each worker worktree gets its own temporary directory, which the reclaim script removes with the worktree, so temporary files left by a worker's killed tests never outlive the worktree.\n\n## Background\n\nWorkers run builds and tests inside worktrees that `.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh` creates and `reclaim-worker-worktree.sh` removes. Their test processes write temporary directories to whatever `TMPDIR` the worker's shell has. Tests killed by a timeout or a cancelled run leave those directories behind, and with many workers in parallel they accumulate in a shared temporary directory until it runs out of space or inodes.\n\n## Success Criteria\n\n- [hard] REQ-01: Dispatch creates one temporary directory per worktree, outside the worktree and outside every directory reclaim harvests into the cache pool, and the agent prompt header it prints tells the worker to export it as `TMPDIR` for every build and test.\n- [hard] REQ-02: Reclaim removes that worktree's temporary directory with everything under it, including when the worktree is reclaimed with `LEAD_RECLAIM_FORCE=1`, and never copies it into the cache pool.\n- [hard] REQ-03: The location of the per-worktree temporary directories has one default and one override variable, documented in the script headers and the worktree dispatch protocol reference.\n- [hard] REQ-04: The worktree cache self-test shows that a file left in a worktree's temporary directory is gone after reclaim and absent from the pool.\n",
   "documents": [],
+  "done_at": "2026-11-04T07:46:43.299716782Z",
   "first_ready_at": "2026-11-04T06:50:09.550452947Z",
   "gates_required": [
     "worktree-cache-test",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "caf8d746-bf6e-4e51-b733-ad8d85de79e2",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:46:24.954795481Z",
+      "updated_by": "auto:executor"
+    },
+    "worktree-cache-test": {
+      "run_id": "d9982783-11a0-4ca8-8b85-30c1ef4d1880",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:42:13.612668232Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b51291e4-8f88-44fe-92e6-90790e235ca3",
   "labels": [
     "epic:rust-code-quality",
@@ -20,7 +35,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Worker worktrees own and remove their temporary directory",
-  "updated_at": "2026-11-04T06:50:09.550452947Z"
+  "updated_at": "2026-11-04T07:46:43.299716782Z"
 }

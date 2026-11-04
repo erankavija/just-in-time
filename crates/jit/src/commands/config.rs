@@ -321,7 +321,10 @@ impl<S: IssueStore> ConfigOps<'_, S> {
             )?;
             let declarations = crate::repository_state::declarations_from_image(&overlaid)?;
             let plan = finalize_config_edit(&base, &edited_bytes, declarations.borrowed())?;
-            let proposed = apply_overlay(&base, super::validation_overlay(&base, plan.delta())?)?;
+            let proposed = apply_overlay(
+                &base,
+                crate::repository_state::action_overrides(plan.delta().actions()),
+            )?;
             let validation = crate::validation::report(
                 &crate::validation::CapturedValidation::from_image(&proposed),
                 &crate::validation::ReportInputs {
