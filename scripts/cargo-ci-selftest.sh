@@ -341,7 +341,7 @@ EOF
   check "selected sccache fails compiles: the gate exits with the infrastructure status" \
     test "$rc" -eq 75
   check "selected sccache fails compiles: the diagnosis names the wrapper" \
-    grep -qF "compiler wrapper 'sccache'" "$out"
+    grep -qE "compiler wrapper '[^']*sccache-caller-tmpdir.sh'" "$out"
   check "selected sccache fails compiles: the diagnosis carries the wrapper's error" \
     grep -qF "Failed to create temp dir" "$out"
   check "selected sccache fails compiles: no verdict on repository content" \
@@ -535,6 +535,52 @@ EOF
     check "$name lock free at the first attempt: that attempt holds it, so no wait goes silent" \
       test "$arrival_took_lock" = no
     git -C "$repo" clean -fdxq
+  done
+}
+
+# A run owns its temporary directory: a file a test leaves in the TMPDIR it was
+# given is gone once the run ends, whether the run passed or failed. The caller's
+# TMPDIR is a directory this test owns, so it also holds what the run leaves.
+test_run_removes_its_temporary_directory() {
+  local fixture="$scratch/tmpdir-owned" status
+  mkdir -p "$fixture/bin" "$fixture/repo"
+  cat >"$fixture/bin/cargo" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  --version) echo "$SELFTEST_CARGO_VERSION" ;;
+  "nextest --version") echo "cargo-nextest 0.9.133 (selftest fixture)" ;;
+  check*) ;;
+  "nextest run --workspace")
+    echo "$TMPDIR" >"$SELFTEST_SEEN"
+    : >"$TMPDIR/left-by-a-test"
+    "$RUSTC_WRAPPER" rustc
+    echo "Summary [1s] 1 tests run: 1 passed, 0 skipped"
+    exit "$SELFTEST_SUITE_STATUS"
+    ;;
+  *) echo "test result: ok. 1 passed; 0 failed; 0 ignored" ;;
+esac
+EOF
+  printf '#!/usr/bin/env bash\necho "$TMPDIR" >"$SELFTEST_SERVER_TMPDIR"\n' >"$fixture/bin/sccache"
+  chmod +x "$fixture/bin/cargo" "$fixture/bin/sccache"
+  for status in 0 1; do
+    local caller="$fixture/caller-$status"
+    mkdir -p "$caller"
+    (
+      cd "$fixture/repo" || exit 3
+      PATH="$fixture/bin:$PATH" TMPDIR="$caller" \
+        SELFTEST_CARGO_VERSION="$real_cargo_version" \
+        SELFTEST_SEEN="$fixture/seen-$status" \
+        SELFTEST_SUITE_STATUS="$status" \
+        SELFTEST_SERVER_TMPDIR="$fixture/server-$status" \
+        CARGO_CI_NO_LOCK=1 \
+        "$gate" --suite
+    ) >"$fixture/out-$status" 2>&1
+    check "run owning its TMPDIR (suite status $status): a compiler-cache server started by a step keeps the caller's" \
+      test "$(cat "$fixture/server-$status")" = "$caller"
+    check "run owning its TMPDIR (suite status $status): the tests see a directory inside the caller's" \
+      grep -qF "$caller/" "$fixture/seen-$status"
+    check "run owning its TMPDIR (suite status $status): a file a test left is gone and nothing else remains" \
+      test -z "$(ls -A "$caller")"
   done
 }
 
@@ -1071,6 +1117,7 @@ run_test test_classifier_enospc_exit_paths
 run_test test_build_lock_status_propagation
 run_test test_script_build_lock_wait
 run_test test_unrunnable_compiler_wrapper
+run_test test_run_removes_its_temporary_directory
 
 run_test run_scenario healthy "healthy_mainline" "healthy_worker" pass
 run_test run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail

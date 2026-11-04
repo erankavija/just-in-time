@@ -13,15 +13,15 @@
   ],
   "gates_status": {
     "code-review": {
-      "run_id": "efb94dd6-698d-4fa7-84d9-b64065186c8e",
+      "run_id": "19301ebb-cf5b-489d-9d64-c1ece1223237",
       "status": "failed",
-      "updated_at": "2026-11-04T07:24:06.968481665Z",
+      "updated_at": "2026-11-04T07:32:21.429411797Z",
       "updated_by": "auto:executor"
     },
     "worktree-cache-test": {
-      "run_id": "c0ae71a2-63aa-4b40-a522-e74c755679c7",
+      "run_id": "93a9ae9f-e628-4157-8e11-5f156ae446cc",
       "status": "passed",
-      "updated_at": "2026-11-04T07:20:29.959589627Z",
+      "updated_at": "2026-11-04T07:28:11.346787535Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,5 +36,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Worker worktrees own and remove their temporary directory",
-  "updated_at": "2026-11-04T07:24:06.968481665Z"
+  "updated_at": "2026-11-04T07:32:21.429411797Z"
 }
