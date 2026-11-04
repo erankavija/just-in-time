@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "36c24277-d15d-4331-b8f9-c22f78ddc5f4",
+      "status": "passed",
+      "updated_at": "2026-11-04T14:14:48.994645517Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "543cb772-ad78-44a3-a1a3-ef0930b02e2a",
+      "status": "passed",
+      "updated_at": "2026-11-04T14:18:23.407856623Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8fbf8c43-88a7-4671-8402-865a872075ff",
   "labels": [
     "epic:rust-code-quality",
@@ -23,5 +36,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Handlers share one result alias and store bound",
-  "updated_at": "2026-11-04T13:59:56.889960086Z"
+  "updated_at": "2026-11-04T14:18:23.407856623Z"
 }
