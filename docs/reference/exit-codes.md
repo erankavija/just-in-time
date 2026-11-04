@@ -43,6 +43,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `apply` | `4` | The template delta would close a dependency cycle through existing issues; the apply is rejected before any node is created. |  |
 | `init` | `2` | The `--values-file` path cannot be read. |  |
 | `issue update, issue claim, issue claim-next` | `4` | A state transition is blocked by unmet dependencies or unpassed gates. |  |
+| `gate define, gate update, gate remove, gate add, gate list, gate show, gate preset list, gate preset show, gate preset create` | `1` | A registry or preset file could not be parsed, or an untyped command failure occurred. Other typed failures use the universal codes. |  |
 | `gate define` | `6` | The gate key is already registered. |  |
 | `issue delete` | `2` | Deletion was refused for missing operator confirmation (JIT_ALLOW_DELETION=1 not set in the process environment). |  |
 | `issue batch-create` | `2` | The batch file failed pre-validation; no issues were created. |  |
@@ -62,7 +63,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `item list, item search, item show, item resolve` | `2` | The repository configuration failed to load, or an item address was not a qualified id. |  |
 | `config validate` | `4` | The repo or environment-variable configuration failed to load or carried an invalid value. |  |
 | `doc check-links` | `4` | One or more documents have broken links. Documents with only risky-link warnings exit `0`: warnings are reported, never fatal. | yes |
-| `gate preset apply` | `3` | A preset target was not found, so the application failed. |  |
+| `gate preset apply` | `3` | One or more preset targets failed; the findings report retains successful targets and per-target errors. | yes |
 | `project render` | `2` | The requested projection name is not declared in repository configuration. |  |
 | `serve, serve --stop, serve --status` | `1` | The daemon PID state could not be parsed (exits 0 on success). |  |
 | `*` | `141` | A downstream reader closed the pipe while jit was still writing. | yes |

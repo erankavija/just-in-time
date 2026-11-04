@@ -121,7 +121,7 @@ fn test_schema_has_standardized_json_output_types() {
         .unwrap();
     assert_eq!(
         gate_list.output.as_ref().unwrap().success,
-        "GateListResponse"
+        jit::schema::OutputSchema::of::<jit::output::GateListResponse>().success
     );
 
     let label_namespaces = schema

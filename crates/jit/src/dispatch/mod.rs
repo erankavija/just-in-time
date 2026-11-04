@@ -138,6 +138,45 @@ pub fn resolve_issue_filter<S: IssueStore>(
     }
 }
 
+/// Select the positional-or-flag gate argument before contextual validation.
+///
+/// Returns an invalid-argument error when both or neither are provided.
+pub fn resolve_gate_key(
+    positional: Option<String>,
+    flag: Option<String>,
+    command: &str,
+) -> anyhow::Result<String> {
+    let value = match (positional, flag) {
+        (Some(value), None) | (None, Some(value)) => value,
+        (Some(_), Some(_)) => {
+            return Err(crate::errors::InvalidArgumentError::new(format!(
+                "provide the gate key as a positional argument OR via --gate, not both.\n\
+             Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
+             Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
+            ))
+            .into())
+        }
+        (None, None) => {
+            return Err(crate::errors::InvalidArgumentError::new(format!(
+                "a gate key is required; provide it as a positional argument or via --gate.\n\
+             Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
+             Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
+            ))
+            .into())
+        }
+    };
+    Ok(value)
+}
+
+/// Select and parse one positional-or-flag gate key.
+pub fn resolve_gate_key_for(
+    positional: Option<String>,
+    flag: Option<String>,
+    command: &str,
+) -> anyhow::Result<crate::domain::identity::GateKey> {
+    Ok(resolve_gate_key(positional, flag, command)?.parse()?)
+}
+
 /// The `output_schema` lookup of every migrated group, consulted by
 /// [`crate::CommandSchema::generate`] before its legacy table. Test builds
 /// also register the test-only groups, whose leaf paths no real command uses.
@@ -150,6 +189,7 @@ pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     dep::output_schema,
     doc::output_schema,
     events::output_schema,
+    gate::output_schema,
     graph::output_schema,
     graph::rdeps::output_schema,
     hooks::output_schema,
@@ -358,6 +398,7 @@ pub mod config;
 pub mod dep;
 pub mod doc;
 pub mod events;
+pub mod gate;
 pub mod graph;
 pub mod hooks;
 pub mod init;

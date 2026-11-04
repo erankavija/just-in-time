@@ -284,8 +284,8 @@ confirmation = "invoked"
 path = "gate define"
 argv = ["gate", "define", "survey-gate", "--title", "Duplicate Gate", "--description", "Duplicate definition probe", "--json"]
 setup = ["init", "duplicate-gate:survey-gate"]
-expected_failure = "GATE_ERROR: Gate 'survey-gate' already exists"
-expected_code = "GATE_ERROR"
+expected_failure = "ALREADY_EXISTS: Gate 'survey-gate' already exists"
+expected_code = "ALREADY_EXISTS"
 confirmation = "invoked"
 
 [[arms]]
@@ -349,8 +349,8 @@ path = "gate list"
 argv = ["gate", "list", "--json"]
 setup = ["init", "malformed-gate-registry"]
 setup_notes = "Replace .jit/gates.toml with the malformed TOML `[[gates]` after initialization."
-expected_failure = "GATE_ERROR: Failed to deserialize gate registry"
-expected_code = "GATE_ERROR"
+expected_failure = "PARSE_ERROR: Failed to deserialize gate registry"
+expected_code = "PARSE_ERROR"
 confirmation = "invoked"
 
 [[arms]]
@@ -382,8 +382,8 @@ path = "gate preset list"
 argv = ["gate", "preset", "list", "--json"]
 setup = ["init", "malformed-preset:survey-preset"]
 setup_notes = "Create .jit/config/gate-presets/survey-preset.json containing only `{` after initialization."
-expected_failure = "PRESET_ERROR: Failed to parse custom gate preset file 'survey-preset.json'"
-expected_code = "PRESET_ERROR"
+expected_failure = "PARSE_ERROR: Failed to parse custom gate preset file 'survey-preset.json'"
+expected_code = "PARSE_ERROR"
 confirmation = "invoked"
 
 [[arms]]
@@ -406,8 +406,8 @@ confirmation = "invoked"
 path = "gate preset create"
 argv = ["gate", "preset", "create", "00000000-0000-0000-0000-000000000000", "survey-preset", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
-expected_failure = "PRESET_ERROR: Issue not found: 00000000-0000-0000-0000-000000000000"
-expected_code = "PRESET_ERROR"
+expected_failure = "ISSUE_NOT_FOUND: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
 
 [[arms]]

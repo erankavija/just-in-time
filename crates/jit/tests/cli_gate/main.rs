@@ -4,6 +4,7 @@
 
 mod bracket_coverage_gate_run_test;
 mod gate_cli_integration_test;
+mod gate_definition_dispatch_test;
 mod gate_evaluate_all_test;
 mod gate_evaluate_exit_code_test;
 mod gate_evaluate_rerun_test;

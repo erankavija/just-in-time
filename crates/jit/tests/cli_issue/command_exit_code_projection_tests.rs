@@ -566,8 +566,14 @@ fn invoke_doc_check_links(json: bool) -> Vec<Output> {
     )]
 }
 
+fn invoke_gate_registry_parse_failure(json: bool) -> Vec<Output> {
+    let cli = JitCli::initialised().unwrap();
+    fs::write(cli.root().join(".jit/gates.toml"), "[[gates]").unwrap();
+    vec![output_in_form(&cli, &["gate", "list"], json)]
+}
+
 /// `jit gate preset apply` on a well-formed but nonexistent id, which fails
-/// through the ordinary not-found classifier.
+/// as a preset findings outcome.
 fn invoke_gate_preset_apply_missing_target(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
     vec![output_in_form(
@@ -985,7 +991,8 @@ row_bindings! {
     test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", 4, false) => invoke_config_validate;
     test_command_exit_codes_doc_check_links_emits_4: ("doc check-links", 4, true) => invoke_doc_check_links;
     test_command_exit_codes_init_missing_values_file_emits_2: ("init", 2, false) => invoke_init_missing_values_file;
-    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, false) => invoke_gate_preset_apply_missing_target;
+    test_command_exit_codes_gate_handlers_use_classified_failures: ("gate define, gate update, gate remove, gate add, gate list, gate show, gate preset list, gate preset show, gate preset create", 1, false) => invoke_gate_registry_parse_failure;
+    test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, true) => invoke_gate_preset_apply_missing_target;
     test_command_exit_codes_project_render_unknown_projection_emits_2: ("project render", 2, false) => invoke_project_render_unknown_name;
     test_command_exit_codes_serve_daemon_error_emits_1: ("serve, serve --stop, serve --status", 1, false) => invoke_serve_daemon_error;
     #[cfg(unix)]
