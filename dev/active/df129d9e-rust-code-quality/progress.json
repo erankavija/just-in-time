@@ -882,7 +882,7 @@
     "06ee9b67": 1,
     "71f5296c": 1,
     "66790c84": 1,
-    "d952d057": 1
+    "d952d057": 2
   },
   "surfaced_pitfalls": [
     {
@@ -1156,7 +1156,7 @@
       "status": "dispatched",
       "vendor": "Claude Sonnet",
       "reason": "script change with self-test; steward priority",
-      "review": "lead R1 FAIL (7c): Notes forbid a daemon the run starts inheriting the per-run TMPDIR; an sccache idle-out restart mid-run would. Rework 1 to the same worker."
+      "review": "lead R1 FAIL (7c): Notes forbid a daemon the run starts inheriting the per-run TMPDIR; an sccache idle-out restart mid-run would. Rework 1 to the same worker. Rework 1 (b7d282ab9) passed lead review; branch CI failed: build_profile_policy_tests.rs:227 asserts the old `export RUSTC_WRAPPER=sccache` text. Rework 2 of 2 to the same worker."
     },
     "b51291e4": {
       "status": "dispatched",
