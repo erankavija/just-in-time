@@ -1023,13 +1023,8 @@ pub(super) fn compose_profile_targets_with_context(
     let proposed = apply_overlay(&proposed, schema_overlay)?;
     let declarations = declarations_from_image(&proposed)
         .map_err(|error| ProducerError::DeclarationAssembly(Box::new(error)))?;
-    let projection_actions = compose_configured_projections(
-        &proposed,
-        declarations.config(),
-        &declarations.borrowed(),
-        None,
-    )?
-    .actions;
+    let projection_actions =
+        compose_configured_projections(&proposed, &declarations.borrowed(), None)?.actions;
     for action in projection_actions {
         if let RepositoryAction::WriteFile { path, bytes, .. } = action {
             if let Some(target) = targets.get_mut(&path) {
@@ -1383,14 +1378,12 @@ fn configured_projection_targets(
         Some((bytes, _)) => Some(bytes.as_slice()),
         None => base.file_bytes(&config_path).map_err(ProducerError::from)?,
     };
-    let Some(bytes) = bytes else {
-        return Ok(BTreeSet::new());
-    };
-    let declarations =
-        crate::declarations::parse_configuration(bytes).map_err(ProducerError::from)?;
-    declarations
-        .projections
-        .values()
+    let config = crate::declarations::assemble_configuration(bytes, None, None)
+        .map_err(ProducerError::from)?;
+    config
+        .projection
+        .iter()
+        .flat_map(BTreeMap::values)
         .filter_map(|projection| projection.target.as_deref())
         .map(|target| {
             base.layout()

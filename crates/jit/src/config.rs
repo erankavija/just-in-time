@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Root configuration structure loaded from `.jit/config.toml`.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct JitConfig {
     /// Schema version for migrations (optional).
@@ -61,18 +61,18 @@ pub struct JitConfig {
     pub coordination: Option<CoordinationConfig>,
     /// Graph templates loaded and validated from `.jit/templates.toml`.
     ///
-    /// Not read from `config.toml`: populated by [`JitConfig::load`] from the
-    /// sibling `templates.toml` (absent file → empty registry), so it carries
-    /// `#[serde(skip)]` and defaults to an empty [`TemplateRegistry`].
+    /// Not read from `config.toml`: populated by
+    /// [`assemble_configuration`](crate::declarations::assemble_configuration) from the sibling
+    /// `templates.toml` (absent file → empty registry), so it carries
+    /// `#[serde(skip)]`.
     #[serde(skip)]
     pub templates: crate::templates::TemplateRegistry,
     /// Project invariants loaded from `.jit/invariants.toml`.
     ///
-    /// Not read from `config.toml`: populated by [`JitConfig::load`] from the
-    /// sibling `invariants.toml` (absent file → empty registry) on BOTH load
-    /// paths, so it carries `#[serde(skip)]` and defaults to an empty
-    /// [`InvariantRegistry`](crate::declarations::invariants::InvariantRegistry).
-    /// Kept here so later indexing can project each entry as a project-scoped
+    /// Not read from `config.toml`: populated by
+    /// [`assemble_configuration`](crate::declarations::assemble_configuration) from the sibling
+    /// `invariants.toml` (absent file → empty registry), so it carries
+    /// `#[serde(skip)]`. Kept here so later indexing can project each entry as a project-scoped
     /// (`@`) addressable item.
     #[serde(skip)]
     pub invariants: crate::declarations::invariants::InvariantRegistry,
@@ -130,7 +130,7 @@ pub enum ProjectNameError {
 /// [`ProjectName::from_str`] and TOML deserialization, mirroring the
 /// [`EnforcementMode`] pattern: an invalid value is a
 /// descriptive parse error, not a silent fallback, so a misconfigured
-/// `[project] name` is rejected at [`JitConfig::load`] time and surfaces
+/// `[project] name` is rejected at configuration assembly and surfaces
 /// through `jit config validate`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ProjectName(String);
@@ -398,7 +398,7 @@ pub struct NamespaceConfig {
 /// Each member of the six-tuple `(section, id-pattern, marker(s),
 /// link-namespace(s), scope, source-of-truth)` is modeled as `Option` at the
 /// serde layer, but an **explicitly-declared** `[item_kinds.X]` table MUST set
-/// all six: [`JitConfig::load`] validates this via
+/// all six: configuration assembly validates this via
 /// [`ItemKindConfig::missing_required_fields`] and rejects a partial declaration
 /// with a descriptive [`ItemKindConfigError::MissingFields`]. The `Option`s
 /// survive only so partial-declaration validation can report which fields are
@@ -523,7 +523,7 @@ impl ItemKindConfig {
     /// unset, in declaration order.
     ///
     /// An explicitly-declared `[item_kinds.X]` table must set all six; this
-    /// reports which (if any) are missing so [`JitConfig::load`] can name them in
+    /// reports which (if any) are missing so configuration assembly can name them in
     /// a descriptive error. The optional `source` PATH is not checked. An empty
     /// result means the declaration is complete.
     pub fn missing_required_fields(&self) -> Vec<&'static str> {
@@ -998,7 +998,7 @@ impl Default for ProjectionStyle {
 
 /// An error validating an explicitly-declared `[item_kinds.X]` table.
 ///
-/// Raised by [`JitConfig::validate_item_kinds`] (and thus [`JitConfig::load`])
+/// Raised by [`JitConfig::validate_item_kinds`] (and thus configuration assembly)
 /// when a declared kind omits one or more of its six required fields. A repo with
 /// no `[item_kinds]` table declares no kinds (the engine bakes in none), so there
 /// is nothing to validate in that case.
@@ -1218,86 +1218,34 @@ impl JitConfig {
             .strictness()
     }
 
-    /// Load configuration from `.jit/config.toml` if it exists.
-    ///
-    /// Returns an empty config (all fields None) if the file doesn't exist.
-    /// Returns an error if the file exists but is malformed.
+    /// Load the configuration from the data root's declaration files through
+    /// [`assemble_configuration`](crate::declarations::assemble_configuration).
     pub fn load(layout: &RepositoryLayout) -> Result<Self> {
-        let config_path = layout.resolve(&VirtualPath::CONFIG)?;
-
-        if !config_path.exists() {
-            // No config file - return empty config (will use defaults)
-            return Ok(JitConfig {
-                version: None,
-                project: None,
-                type_hierarchy: None,
-                validation: None,
-                documentation: None,
-                namespaces: None,
-                item_kinds: None,
-                projection: None,
-                worktree: None,
-                coordination: None,
-                // No config.toml means no type hierarchy, so node-`type` checks
-                // are skipped (empty slice); a sibling `templates.toml` is still
-                // loaded and validated, and a load/validation error propagates
-                // exactly as on the config-present path below.
-                templates: crate::templates::TemplateRegistry::load(layout, &[] as &[&str])
-                    .context("invalid .jit/templates.toml")?,
-                // The invariant registry is independent of `config.toml`, so it
-                // loads on this config-absent path too (absent file → empty
-                // registry; a malformed/invalid entry fails config load with a
-                // typed, descriptive error).
-                invariants: crate::declarations::invariants::InvariantRegistry::load(layout)
-                    .context("invalid .jit/invariants.toml")?,
-            });
-        }
-
-        let content =
-            std::fs::read_to_string(&config_path).context("Failed to read config.toml")?;
-
-        // The summary names the offending key even where only the top-level
-        // message is printed; the typed source keeps the parse-error class.
-        let mut config: JitConfig = toml::from_str(&content).map_err(|e| {
-            let summary = format!("Failed to parse config.toml: {}", e.message());
-            anyhow::Error::new(e).context(summary)
-        })?;
-
-        // Load and validate `.jit/templates.toml` at config time: an absent file
-        // is fine (empty registry), an invalid template fails config load with a
-        // descriptive error. Node
-        // `type`s are checked against `[type_hierarchy].types` when a hierarchy
-        // is configured (an empty slice skips that check).
-        let hierarchy_types: Vec<&str> = config
-            .type_hierarchy
-            .as_ref()
-            .map(|h| h.types.keys().map(|s| s.as_str()).collect())
-            .unwrap_or_default();
-        config.templates = crate::templates::TemplateRegistry::load(layout, &hierarchy_types)
-            .context("invalid .jit/templates.toml")?;
-
-        // Every EXPLICITLY-declared `[item_kinds.X]` table must set all six
-        // required fields; reject a partial declaration with a descriptive error
-        // rather than silently filling defaults. A repo with no `[item_kinds]`
-        // table declares no kinds, so there is nothing to validate in that case.
-        config
-            .validate_item_kinds()
-            .context("invalid [item_kinds] in .jit/config.toml")?;
-
-        // Chain-load `.jit/invariants.toml` on the config-present path too, with
-        // the same graceful-absent / typed-error contract as the early return
-        // above, so both load paths populate the registry identically.
-        config.invariants = crate::declarations::invariants::InvariantRegistry::load(layout)
-            .context("invalid .jit/invariants.toml")?;
-
-        Ok(config)
+        let read = |path: &VirtualPath| -> Result<Option<Vec<u8>>> {
+            let resolved = layout.resolve(path)?;
+            match std::fs::read(&resolved) {
+                Ok(bytes) => Ok(Some(bytes)),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                Err(error) => {
+                    Err(error).with_context(|| format!("Failed to read {}", resolved.display()))
+                }
+            }
+        };
+        let config = read(&VirtualPath::CONFIG)?;
+        let templates = read(&VirtualPath::TEMPLATES)?;
+        let invariants = read(&VirtualPath::INVARIANTS)?;
+        Ok(crate::declarations::assemble_configuration(
+            config.as_deref(),
+            templates.as_deref(),
+            invariants.as_deref(),
+        )?)
     }
 
     /// Validate every explicitly-declared `[item_kinds.X]` table, requiring all
     /// six fields (`section`, `id-pattern`, `markers`, `link-namespaces`, `scope`,
     /// `source-of-truth`) on each, and rejecting any `aliases` collision.
     ///
-    /// Called by [`JitConfig::load`]. A `None` registry (no `[item_kinds]` table
+    /// Called by configuration assembly. A `None` registry (no `[item_kinds]` table
     /// at all) declares no kinds (the engine bakes in none) and so validates
     /// trivially. Kinds are checked in name order so the first error is
     /// deterministic. The optional `source` PATH is not one of the six and is not
@@ -1990,8 +1938,8 @@ default_type = "task"
         assert!(chain.contains("strictness"), "{chain}");
     }
 
-    /// Every table of `config.toml` rejects an undeclared key, and both parse
-    /// paths name it in the error's top-level message.
+    /// Every table of `config.toml` rejects an undeclared key, and both disk
+    /// loading and the assembler name it in the error's top-level message.
     #[test]
     fn test_load_rejects_unknown_key_by_name_in_every_table() {
         let key = "undeclared_key";
@@ -2017,9 +1965,10 @@ default_type = "task"
             let loaded = JitConfig::load(&layout)
                 .expect_err("an unknown key must fail to load")
                 .to_string();
-            let declared = crate::declarations::parse_configuration(fragment.as_bytes())
-                .expect_err("an unknown key must fail to parse")
-                .to_string();
+            let declared =
+                crate::declarations::assemble_configuration(Some(fragment.as_bytes()), None, None)
+                    .expect_err("an unknown key must fail to assemble")
+                    .to_string();
             for message in [loaded, declared] {
                 assert!(
                     message.contains(&format!("unknown field `{key}`")),

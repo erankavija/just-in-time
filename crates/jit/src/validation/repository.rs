@@ -240,9 +240,6 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
     let read = move |path: &str| image_read(image, path);
     let read: &ReadBytes<'_> = &read;
     let config = declarations.config();
-    if let Err(error) = config.validate_item_kinds() {
-        return failed(anyhow!(error).context("effective-config validation pass"));
-    }
     let mut passes = vec![RepositoryValidationPass::EffectiveConfig];
 
     let namespaces = crate::config_manager::namespaces_from_config(config);
@@ -979,29 +976,6 @@ mod tests {
         assert_eq!(findings[0].severity, Severity::Warn);
         assert!(findings[0].issue_id.is_none());
         assert!(findings[0].message.contains("a-review, z-review"));
-    }
-
-    #[test]
-    fn test_captured_item_kinds_preserve_effective_configuration_error() {
-        let image = crate::test_harness::image::ImageBuilder::new()
-            .files(&[
-                (
-                    ".jit/config.toml",
-                    Some("[item_kinds.custom]\nsection = \"Items\""),
-                ),
-                (".jit/gates.toml", None),
-                (".jit/rules.toml", None),
-            ])
-            .build();
-        let declarations =
-            crate::repository_state::validation_declarations_from_image(&image).unwrap();
-        let expected = declarations.config().validate_item_kinds().unwrap_err();
-        let report = overlay_report(&image);
-        assert_eq!(
-            failure(&report),
-            format!("effective-config validation pass: {expected}")
-        );
-        assert!(report.passes.is_empty());
     }
 
     #[test]

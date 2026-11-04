@@ -18,7 +18,6 @@ use super::{
     RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath, RECORD_SCRATCH_DIR,
 };
 use crate::config::{JitConfig, ProjectionMode};
-use crate::declarations::invariants::InvariantRegistry;
 use crate::domain::identity::IssueId;
 use crate::repository_state::default_rule_membership_diff_from_identities;
 use std::collections::BTreeMap;
@@ -68,38 +67,24 @@ fn read_text_at(
     }
 }
 
-/// Assemble the repository configuration from the captured declaration bytes.
+/// Assemble the repository configuration from the image's captured declaration
+/// bytes through [`assemble_configuration`](crate::declarations::assemble_configuration).
 ///
-/// `config.toml` supplies the item-kind registry, projection registry, and
-/// validation settings; the sibling `invariants.toml` populates the `#[serde(skip)]`
-/// invariant registry the `full` invariant view renders. An absent `invariants.toml`
-/// is an empty registry, matching the on-disk load boundary.
+/// `config.toml` must lie in the captured closure; a `templates.toml` or
+/// `invariants.toml` outside it is absent, matching the on-disk load boundary.
 pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerError> {
-    let config_bytes = image
-        .file_bytes(&VirtualPath::CONFIG)?
-        .ok_or(ProducerError::MissingCapture(".jit/config.toml"))?;
-    let declarations = crate::declarations::parse_configuration(config_bytes)?;
-    assemble_config_from_declarations(image, &declarations)
-}
-
-/// Assemble the materialization view from the operation's authoritative config
-/// parse plus the captured sibling invariant registry.
-pub(crate) fn assemble_config_from_declarations(
-    image: &RepositoryImage,
-    declarations: &crate::declarations::ConfigurationDeclarations,
-) -> Result<JitConfig, ProducerError> {
-    // An invariants.toml outside the captured closure (or captured absent) is an
-    // empty registry, matching the on-disk load boundary.
-    let invariants_path = VirtualPath::INVARIANTS;
-    let invariants = if image.capture_spec().contains_path(&invariants_path) {
-        match read_text_at(image, &invariants_path)? {
-            Some(text) => InvariantRegistry::from_toml_str(&text)?,
-            None => InvariantRegistry::empty(),
+    let sibling = |path: &VirtualPath| -> Result<Option<&[u8]>, ProducerError> {
+        if image.capture_spec().contains_path(path) {
+            Ok(image.file_bytes(path)?)
+        } else {
+            Ok(None)
         }
-    } else {
-        InvariantRegistry::empty()
     };
-    Ok(declarations.materialization_config(invariants))
+    Ok(crate::declarations::assemble_configuration(
+        image.file_bytes(&VirtualPath::CONFIG)?,
+        sibling(&VirtualPath::TEMPLATES)?,
+        sibling(&VirtualPath::INVARIANTS)?,
+    )?)
 }
 
 /// Enumerate the capture closure for `jit project render`.
@@ -311,10 +296,10 @@ pub fn validate_capture_closure(
 /// action.
 pub(crate) fn compose_configured_projections(
     image: &RepositoryImage,
-    config: &JitConfig,
     declarations: &RepositoryDeclarations<'_>,
     selected: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<ConfiguredProjections, ProducerError> {
+    let config = declarations.config;
     let Some(projections) = config.projection.as_ref() else {
         return Ok(ConfiguredProjections {
             actions: Vec::new(),
@@ -743,15 +728,15 @@ kind = "advisory"
     }
 
     #[test]
-    fn test_assemble_config_reports_missing_capture_with_typed_error() {
+    fn test_assemble_config_absent_config_is_empty_configuration() {
         let image = ImageBuilder::new()
             .files(&[(".jit/config.toml", None)])
             .build();
 
-        assert!(matches!(
-            assemble_config(&image),
-            Err(ProducerError::MissingCapture(".jit/config.toml"))
-        ));
+        let config = assemble_config(&image).unwrap();
+        assert!(config.type_hierarchy.is_none());
+        assert!(config.item_kinds.is_none());
+        assert!(config.projection.is_none());
     }
 
     #[test]
@@ -849,15 +834,13 @@ kind = "advisory"
     }
 
     fn declarations<'a>(
-        config: &'a crate::declarations::ConfigurationDeclarations,
+        config: &'a JitConfig,
         gates: &'a GateRegistry,
         rules: &'a RuleSet,
     ) -> RepositoryDeclarations<'a> {
         RepositoryDeclarations {
-            item_kinds: crate::repository_state::resolved_item_kinds(
-                &config.materialization_config(InvariantRegistry::empty()),
-            ),
-            configuration: config,
+            item_kinds: crate::repository_state::resolved_item_kinds(config),
+            config,
             gates,
             rules,
         }
@@ -895,8 +878,14 @@ kind = "advisory"
         )
     }
 
-    fn config_decls(config: &str) -> crate::declarations::ConfigurationDeclarations {
-        crate::declarations::parse_configuration(config.as_bytes()).unwrap()
+    /// `config` assembled with the fixture invariant registry the images carry.
+    fn config_decls(config: &str) -> JitConfig {
+        crate::declarations::assemble_configuration(
+            Some(config.as_bytes()),
+            None,
+            Some(INVARIANTS.as_bytes()),
+        )
+        .unwrap()
     }
 
     fn agents_with_region(region: &str, inner: &str) -> String {
