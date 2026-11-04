@@ -23,7 +23,7 @@ use jit::cli::{
 use jit::commands::{
     parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
 };
-use jit::dispatch::{invariant, CommandContext};
+use jit::dispatch::{invariant, label, CommandContext};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -5278,52 +5278,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 } // end match query_cmd
             } // end Some(query_cmd)
         }, // end match subcommand
-        Commands::Label(label_cmd) => match label_cmd {
-            jit::cli::LabelCommands::Namespaces => {
-                let output_ctx = OutputContext::new(quiet, json);
-                use jit::config_manager::ConfigManager;
-                let config_mgr = ConfigManager::new(executor.storage().repository_layout()?);
-                let namespaces = config_mgr.get_namespaces()?;
-                if json {
-                    use jit::output::{JsonOutput, NamespacesResponse};
-                    let namespace_names: Vec<String> =
-                        namespaces.namespaces.keys().cloned().collect();
-                    let response = NamespacesResponse::new(namespace_names);
-                    let msg = format!("{} namespace(s)", response.count());
-                    let output = JsonOutput::success(response).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    let _ = output_ctx.print_info("Label Namespaces:\n");
-                    for (name, ns) in &namespaces.namespaces {
-                        println!("  {}", name);
-                        println!("    Description: {}", ns.description);
-                        println!("    Unique: {}", ns.unique);
-                        println!();
-                    }
-                }
-            }
-            jit::cli::LabelCommands::Values { namespace } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let values = executor.issues().list_label_values(&namespace)?;
-                if json {
-                    use jit::output::{JsonOutput, LabelValuesResponse, LabelValuesScope};
-                    let msg = format!("{} value(s)", values.len());
-                    let output = JsonOutput::success(LabelValuesResponse::with_extras(
-                        values,
-                        LabelValuesScope { namespace },
-                    ))
-                    .with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    let _ =
-                        output_ctx.print_info(format!("Values in namespace '{}':\n", namespace));
-                    for value in &values {
-                        println!("  {}", value);
-                    }
-                    let _ = output_ctx.print_info(format!("\nTotal: {}", values.len()));
-                }
-            }
-        },
+        Commands::Label(label_cmd) => {
+            return label::dispatch(label_cmd, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
         Commands::Config(config_cmd) => match config_cmd {
             jit::cli::ConfigCommands::Show => {
                 use jit::output::JsonOutput;

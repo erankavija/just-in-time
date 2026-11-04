@@ -1380,12 +1380,24 @@ collection_keys! {
     GatesKey = "gates";
     ResultsKey = "results";
     ArtifactsKey = "artifacts";
-    NamespacesKey = "namespaces";
     WorktreesKey = "worktrees";
     PresetsKey = "presets";
     EventsKey = "events";
-    ValuesKey = "values";
     LeasesKey = "leases";
+}
+
+pub enum NamespacesKey {}
+
+impl CollectionKey for NamespacesKey {
+    const KEY: &'static str = "namespaces";
+    const SCHEMA_NAME: Option<&'static str> = Some("NamespacesResponse");
+}
+
+pub enum ValuesKey {}
+
+impl CollectionKey for ValuesKey {
+    const KEY: &'static str = "values";
+    const SCHEMA_NAME: Option<&'static str> = Some("LabelValuesResponse");
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)
@@ -2815,8 +2827,41 @@ impl From<crate::domain::artifact_conformance::ReportedArtifact> for ArtifactCon
 // Label Response Types
 // ============================================================================
 
-/// Response for `label namespaces` command
-pub type NamespacesResponse = ListEnvelope<NamespacesKey, String>;
+/// Response for `label namespaces` command.
+pub type NamespacesResponse = ListEnvelope<NamespacesKey, String, NamespacesHumanDetails>;
+
+/// Configuration kept only for rendering the human namespace list.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct NamespacesHumanDetails {
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub namespaces: Vec<crate::domain::LabelNamespace>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub quiet: bool,
+}
+
+impl HumanRender for NamespacesResponse {
+    fn render_human(&self) -> String {
+        let header = if self.extras.quiet {
+            String::new()
+        } else {
+            "Label Namespaces:\n\n".to_owned()
+        };
+        let rows = self
+            .items
+            .iter()
+            .zip(&self.extras.namespaces)
+            .map(|(name, namespace)| {
+                format!(
+                    "  {name}\n    Description: {}\n    Unique: {}\n\n",
+                    namespace.description, namespace.unique
+                )
+            })
+            .collect::<String>();
+        format!("{header}{rows}")
+    }
+}
 
 /// Response for top-level `search` command
 pub type SearchResponse = ListEnvelope<ResultsKey, crate::search::SearchResult, SearchQuery>;
@@ -2840,6 +2885,30 @@ pub type LabelValuesResponse = ListEnvelope<ValuesKey, String, LabelValuesScope>
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct LabelValuesScope {
     pub namespace: String,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub quiet: bool,
+}
+
+impl HumanRender for LabelValuesResponse {
+    fn render_human(&self) -> String {
+        let header = if self.extras.quiet {
+            String::new()
+        } else {
+            format!("Values in namespace '{}':\n\n", self.extras.namespace)
+        };
+        let values = self
+            .items
+            .iter()
+            .map(|value| format!("  {value}\n"))
+            .collect::<String>();
+        let total = if self.extras.quiet {
+            String::new()
+        } else {
+            format!("\nTotal: {}\n", self.count())
+        };
+        format!("{header}{values}{total}")
+    }
 }
 
 /// Response for `claim status` and `claim list`.
@@ -3912,11 +3981,63 @@ mod tests {
             vec!["v1".into(), "v2".into()],
             LabelValuesScope {
                 namespace: "epic".into(),
+                quiet: false,
             },
+        );
+        assert_eq!(
+            response.render_human(),
+            "Values in namespace 'epic':\n\n  v1\n  v2\n\nTotal: 2\n"
         );
         let value = serde_json::to_value(response).unwrap();
         assert_envelope_value(&value, "values", 2);
         assert_eq!(value["namespace"], "epic");
+    }
+
+    #[test]
+    fn test_label_namespaces_response_renders_configuration_without_serializing_it() {
+        let response = NamespacesResponse::with_extras(
+            vec!["type".into()],
+            NamespacesHumanDetails {
+                namespaces: vec![crate::domain::LabelNamespace::new("Issue type", true)],
+                quiet: false,
+            },
+        );
+
+        assert_eq!(
+            response.render_human(),
+            "Label Namespaces:\n\n  type\n    Description: Issue type\n    Unique: true\n\n"
+        );
+        let value = serde_json::to_value(response).unwrap();
+        assert_eq!(value["namespaces"], serde_json::json!(["type"]));
+        assert!(value.get("description").is_none());
+
+        let quiet = NamespacesResponse::with_extras(
+            vec!["type".into()],
+            NamespacesHumanDetails {
+                namespaces: vec![crate::domain::LabelNamespace::new("Issue type", true)],
+                quiet: true,
+            },
+        );
+        assert_eq!(
+            quiet.render_human(),
+            "  type\n    Description: Issue type\n    Unique: true\n\n"
+        );
+    }
+
+    #[test]
+    fn test_label_values_response_honors_quiet_human_rendering() {
+        let response = LabelValuesResponse::with_extras(
+            vec!["task".into()],
+            LabelValuesScope {
+                namespace: "type".into(),
+                quiet: true,
+            },
+        );
+
+        assert_eq!(response.render_human(), "  task\n");
+        let value = serde_json::to_value(response).unwrap();
+        assert_eq!(value["namespace"], "type");
+        assert!(value.get("quiet").is_none());
     }
 
     #[test]

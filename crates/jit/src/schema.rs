@@ -724,10 +724,6 @@ impl CommandSchema {
                 Some(schema_to_value::<ArtifactConformanceResponse>()),
                 "ArtifactConformanceResponse",
             ),
-            "label_namespaces" => (
-                Some(schema_to_value::<NamespacesResponse>()),
-                "NamespacesResponse",
-            ),
             "search" => (Some(schema_to_value::<SearchResponse>()), "SearchResponse"),
             "gate_preset_list" => (
                 Some(schema_to_value::<GatePresetListResponse>()),
@@ -736,10 +732,6 @@ impl CommandSchema {
             "events_tail" | "events_query" => (
                 Some(schema_to_value::<EventListResponse>()),
                 "EventListResponse",
-            ),
-            "label_values" => (
-                Some(schema_to_value::<LabelValuesResponse>()),
-                "LabelValuesResponse",
             ),
             "claim_status" | "claim_list" => (
                 Some(schema_to_value::<LeaseListResponse>()),
