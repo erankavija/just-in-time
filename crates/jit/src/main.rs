@@ -20,7 +20,7 @@ use jit::cli::{Cli, Commands, GateCommands, IssueCommands, ProfileCommands};
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
     apply, archive, claim, config, dep, doc, events, graph, hooks, init, invariant, item, label,
-    project, resolve_issue, search, serve, validate, version, CommandContext,
+    project, resolve_issue, search, serve, snapshot, validate, version, CommandContext,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
@@ -4076,67 +4076,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         },
-        Commands::Snapshot(snapshot_cmd) => match snapshot_cmd {
-            jit::cli::SnapshotCommands::Export {
-                out,
-                format,
-                scope,
-                at,
-                working_tree,
-                committed_only,
-                force,
-            } => {
-                use jit::snapshot::{SnapshotFormat, SnapshotScope};
-
-                // Parse scope
-                let snapshot_scope =
-                    SnapshotScope::parse(&scope, |id| resolve_issue(&storage, id))?;
-
-                // Parse format
-                let snapshot_format = SnapshotFormat::parse(&format)
-                    .with_context(|| format!("Invalid format: {}", format))?;
-
-                // Determine source mode
-                let source_mode = executor.archive().determine_snapshot_source_mode(
-                    at.as_deref(),
-                    working_tree,
-                    committed_only,
-                )?;
-
-                if !force {
-                    executor.validation().validate_silent()?;
-                }
-
-                let (result, warnings) = executor.archive().export_snapshot(
-                    &current_dir,
-                    &snapshot_scope,
-                    &source_mode,
-                    &snapshot_format,
-                    out.as_deref().map(std::path::Path::new),
-                )?;
-
-                for warning in warnings {
-                    eprintln!("Warning: {}", warning);
-                }
-
-                if json {
-                    use jit::output::JsonOutput;
-
-                    let output = JsonOutput::success(&result).with_message(format!(
-                        "Exported {} issues to {}",
-                        result.issue_count, result.path
-                    ));
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!("Snapshot exported to: {}", result.path);
-                    println!("  {} issues", result.issue_count);
-                    println!("  {} documents", result.document_count);
-                    if let Some(size) = result.size_bytes {
-                        println!("  Archive: {} bytes", size);
-                    }
-                }
-            }
-        },
+        Commands::Snapshot(command) => {
+            return snapshot::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
     }
 
     Ok(ExitCode::Success)

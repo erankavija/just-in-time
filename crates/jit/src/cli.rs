@@ -2284,41 +2284,44 @@ pub enum SnapshotCommands {
     ///
     ///   # Export only working tree files (no git)
     ///   jit snapshot export --working-tree
-    Export {
-        /// Output path (default: snapshot-YYYYMMDD-HHMMSS)
-        #[arg(long)]
-        out: Option<String>,
+    Export(SnapshotExportArgs),
+}
 
-        /// Output format: dir or tar
-        #[arg(long, default_value = "dir")]
-        format: String,
+#[derive(Args)]
+pub struct SnapshotExportArgs {
+    /// Output path (default: snapshot-YYYYMMDD-HHMMSS)
+    #[arg(long)]
+    pub out: Option<String>,
 
-        /// Scope: all (default), issue:ID, or label:namespace:value
-        ///
-        /// Examples:
-        ///   --scope all                    All issues
-        ///   --scope issue:abc123           Single issue
-        ///   --scope label:epic:auth        Issues with label epic:auth
-        ///   --scope label:milestone:v1.0   Issues in milestone v1.0
-        #[arg(long, default_value = "all")]
-        scope: String,
+    /// Output format: dir or tar
+    #[arg(long, default_value = "dir")]
+    pub format: String,
 
-        /// Git commit/tag to export (requires git repository)
-        #[arg(long)]
-        at: Option<String>,
+    /// Scope: all (default), issue:ID, or label:namespace:value
+    ///
+    /// Examples:
+    ///   --scope all                    All issues
+    ///   --scope issue:abc123           Single issue
+    ///   --scope label:epic:auth        Issues with label epic:auth
+    ///   --scope label:milestone:v1.0   Issues in milestone v1.0
+    #[arg(long, default_value = "all")]
+    pub scope: String,
 
-        /// Export from working tree instead of git
-        #[arg(long)]
-        working_tree: bool,
+    /// Git commit/tag to export (requires git repository)
+    #[arg(long)]
+    pub at: Option<String>,
 
-        /// Reject if uncommitted docs/assets exist (requires git, implies --at HEAD)
-        #[arg(long)]
-        committed_only: bool,
+    /// Export from working tree instead of git
+    #[arg(long)]
+    pub working_tree: bool,
 
-        /// Skip repository validation before export
-        #[arg(long)]
-        force: bool,
-    },
+    /// Reject if uncommitted docs/assets exist (requires git, implies --at HEAD)
+    #[arg(long)]
+    pub committed_only: bool,
+
+    /// Skip repository validation before export
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Subcommand)]
@@ -2916,7 +2919,7 @@ impl ProjectCommands {
 impl SnapshotCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
-            Self::Export { .. } => true,
+            Self::Export(_) => true,
         }
     }
 }
@@ -3085,7 +3088,7 @@ impl ConfigCommands {
 impl SnapshotCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
-            Self::Export { .. } => false,
+            Self::Export(_) => false,
         }
     }
 }
@@ -3510,15 +3513,17 @@ mod recovery_dispatch_tests {
 
     #[test]
     fn test_snapshot_export_requires_recovery_dispatch() {
-        assert!(Commands::Snapshot(SnapshotCommands::Export {
-            out: None,
-            format: "dir".to_string(),
-            scope: "all".to_string(),
-            at: None,
-            working_tree: false,
-            committed_only: false,
-            force: false,
-        })
-        .requires_recovery_dispatch());
+        assert!(
+            Commands::Snapshot(SnapshotCommands::Export(SnapshotExportArgs {
+                out: None,
+                format: "dir".to_string(),
+                scope: "all".to_string(),
+                at: None,
+                working_tree: false,
+                committed_only: false,
+                force: false,
+            }))
+            .requires_recovery_dispatch()
+        );
     }
 }
