@@ -194,7 +194,7 @@ fn test_risky_relative_links_warns() {
     let json = cli
         .run_json(["doc", "check-links", "--scope", "all"])
         .unwrap();
-    assert!(!json["warnings"].as_array().unwrap().is_empty());
+    assert!(!json["link_warnings"].as_array().unwrap().is_empty());
     assert!(json["errors"].as_array().unwrap().is_empty());
 }
 
@@ -276,7 +276,7 @@ fn test_json_output_structure() {
     // success field removed
     assert!(json["valid"].is_boolean());
     assert!(json["errors"].is_array());
-    assert!(json["warnings"].is_array());
+    assert!(json["link_warnings"].is_array());
     assert!(json["summary"].is_object());
     assert!(json["summary"]["total_documents"].is_number());
 }
@@ -439,7 +439,7 @@ fn test_directory_link_target_is_navigation_not_a_missing_asset_or_scan_error() 
         "an existing directory is navigation, not a missing asset: {report}"
     );
     assert!(
-        report["warnings"]
+        report["link_warnings"]
             .as_array()
             .expect("warnings array")
             .iter()
@@ -509,7 +509,7 @@ fn test_pinned_directory_link_target_is_navigation_at_its_commit() {
         "the pinned directory target must remain navigation: {report}"
     );
     assert!(
-        report["warnings"]
+        report["link_warnings"]
             .as_array()
             .expect("warnings array")
             .iter()

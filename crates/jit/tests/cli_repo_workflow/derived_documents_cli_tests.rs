@@ -127,7 +127,7 @@ fn test_doc_check_links_checks_and_tracks_a_derived_document() {
         "the derived document's links are checked: {report}"
     );
     assert!(
-        findings("warnings")
+        findings("link_warnings")
             .iter()
             .all(|warning| warning["link"] != "design.md"),
         "a link to a derived document targets a tracked document: {report}"

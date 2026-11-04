@@ -2079,7 +2079,7 @@ pub struct SnapshotExportResult {
 pub struct LinkCheckResult {
     pub valid: bool,
     pub errors: Vec<serde_json::Value>,
-    pub warnings: Vec<serde_json::Value>,
+    pub link_warnings: Vec<serde_json::Value>,
     #[serde(skip)]
     pub scope: String,
     pub summary: LinkCheckSummary,

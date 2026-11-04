@@ -2858,7 +2858,7 @@ jit doc check-links [--scope all|issue:<ID>] [--json]
 `--scope` defaults to `all`. The exit code carries the verdict per the
 [exit-code reference](exit-codes.md#command-specific-mappings): `0` unless a link is
 broken, which exits `4` (`VALIDATION_FAILED`); warnings are reported in the output and the JSON
-result but never change the exit status. JSON reports `valid`, `errors`, `warnings`, and a `summary`;
+result but never change the exit status. JSON reports `valid`, `errors`, `link_warnings`, and a `summary`;
 with a broken link they arrive as the failure envelope's `error.details`.
 
 The documents in scope include each issue's derived documents, which are also

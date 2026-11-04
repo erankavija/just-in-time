@@ -245,7 +245,10 @@ impl HumanRender for LinkCheckResult {
             "Checking {} document(s) in scope '{}'...\n\n",
             summary.total_documents, self.scope
         );
-        for (heading, findings) in [("Errors found", &self.errors), ("Warnings", &self.warnings)] {
+        for (heading, findings) in [
+            ("Errors found", &self.errors),
+            ("Warnings", &self.link_warnings),
+        ] {
             if findings.is_empty() {
                 continue;
             }
@@ -261,7 +264,7 @@ impl HumanRender for LinkCheckResult {
             }
             rendered.push('\n');
         }
-        if self.errors.is_empty() && self.warnings.is_empty() {
+        if self.errors.is_empty() && self.link_warnings.is_empty() {
             rendered.push_str("All documents valid\n");
         }
         let _ = writeln!(

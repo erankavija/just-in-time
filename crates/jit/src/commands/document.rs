@@ -1172,7 +1172,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             return Ok(crate::commands::LinkCheckResult {
                 valid: true,
                 errors: Vec::new(),
-                warnings: Vec::new(),
+                link_warnings: Vec::new(),
                 scope: scope.to_string(),
                 summary: crate::commands::LinkCheckSummary {
                     total_documents: 0,
@@ -1381,7 +1381,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         Ok(crate::commands::LinkCheckResult {
             valid: errors.is_empty(),
             errors,
-            warnings,
+            link_warnings: warnings,
             scope: scope.to_string(),
             summary: crate::commands::LinkCheckSummary {
                 total_documents: all_documents.len(),
