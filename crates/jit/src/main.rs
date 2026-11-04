@@ -23,7 +23,7 @@ use jit::cli::{
 use jit::commands::{
     parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
 };
-use jit::dispatch::{invariant, CommandContext};
+use jit::dispatch::{invariant, version, CommandContext};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -1387,16 +1387,7 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
         .ok_or_else(|| anyhow::anyhow!("No command provided. Use --help for usage."))?;
 
     if let Commands::Version = &command {
-        let info = jit::build_info::version_info();
-        if json {
-            let output = JsonOutput::success(&info);
-            println!("{}", output.to_json_string()?);
-        } else {
-            println!("Version: {}", info.version);
-            println!("Profile: {}", info.build_profile);
-            println!("Target: {}", info.target);
-        }
-        return Ok(ExitCode::Success);
+        return version::dispatch((), mode, &mut io::stdout(), &mut io::stderr());
     }
 
     let current_dir = env::current_dir()?;

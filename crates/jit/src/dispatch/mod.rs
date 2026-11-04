@@ -6,6 +6,10 @@
 //! group's `dispatch` and its `output_schema` lookup; a group joins the schema
 //! by adding that lookup to [`REGISTERED_GROUPS`].
 //!
+//! A leaf that runs before repository bootstrap, where no executor exists,
+//! registers through the executor-free form of `command_group!`, whose
+//! `dispatch` takes the [`OutputMode`] in place of a context.
+//!
 //! `main.rs` builds one [`CommandContext`] after bootstrap and gives each
 //! migrated group one arm,
 //! `return group::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr())`;
@@ -47,6 +51,7 @@ pub enum Outcome<R> {
 /// also register the test-only group, whose leaf paths no real command uses.
 pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     invariant::output_schema,
+    version::output_schema,
     #[cfg(test)]
     test_group::output_schema,
 ];
@@ -72,12 +77,43 @@ pub fn registered_output_schema(cmd_path: &str) -> Option<OutputSchema> {
 /// }
 /// ```
 ///
+/// Leaves that run before repository bootstrap omit `storage`; their handlers
+/// take no context and the generated `dispatch(command, mode, out, err)` takes
+/// the [`OutputMode`] instead.
+///
 /// It generates `dispatch(command, ctx, out, err) -> anyhow::Result<ExitCode>`,
 /// which runs the leaf's handler and renders its outcome through
 /// [`crate::output::emit_outcome`], and `output_schema(cmd_path)`, which
 /// returns the leaf's response schema.
 // Child modules declared below reach it by textual scope.
 macro_rules! command_group {
+    (
+        command: $command:ty,
+        leaves: {
+            $( $path:literal => $pattern:pat => $handler:ident ( $($arg:expr),* $(,)? ) -> $response:ty ),+ $(,)?
+        }
+    ) => {
+        pub fn dispatch(
+            command: $command,
+            mode: $crate::output::OutputMode,
+            out: &mut dyn ::std::io::Write,
+            err: &mut dyn ::std::io::Write,
+        ) -> ::anyhow::Result<$crate::output::ExitCode> {
+            match command {
+                $( $pattern => {
+                    let outcome: $crate::dispatch::Outcome<$response> = $handler($($arg),*)?;
+                    $crate::output::emit_outcome(&outcome, mode, out, err)
+                } )+
+            }
+        }
+
+        pub fn output_schema(cmd_path: &str) -> Option<$crate::schema::OutputSchema> {
+            match cmd_path {
+                $( $path => Some($crate::schema::OutputSchema::of::<$response>()), )+
+                _ => None,
+            }
+        }
+    };
     (
         command: $command:ty,
         storage: [$($bound:tt)+],
@@ -111,3 +147,4 @@ macro_rules! command_group {
 pub mod invariant;
 #[cfg(test)]
 mod test_group;
+pub mod version;
