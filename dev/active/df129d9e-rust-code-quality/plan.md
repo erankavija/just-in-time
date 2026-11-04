@@ -43,11 +43,11 @@ No call site chooses or substitutes a code. Where a call site needs a code its e
 
 ### `output-mode` [implementation-produced] — One global output mode
 
-`Cli` declares `--json` once with `global = true`, beside `--quiet`. `OutputMode { json, quiet }` is built once from the parsed `Cli` and is the only source of the flag for handlers and for failure rendering. `run()` hands the mode back to `main()` with its result, so no code reads raw argv.
+`Cli` declares `--json` once with `global = true`, beside `--quiet`. `OutputMode { json, quiet }` is built once from the parsed `Cli` and is the only source of the flag for handlers and for failure rendering. `run()` passes that mode to dispatch and failure rendering, then returns `RunStatus` to `main()`; no code recovers the output mode from raw argv.
 
 ### `json-mode-streams` [plan-fixed] — One rendering per invocation
 
-Once clap has accepted the arguments, a failing `--json` invocation writes exactly one envelope to stdout and nothing to stderr. In human mode a failure prints one `Error:` diagnostic to stderr. This retires the propagated-failure `Error:` line that is printed today alongside the envelope (D-6). Parse failures follow `parser-diagnostics-outside-envelope`, and success-path warnings stay on stderr as documented.
+Once clap has accepted the arguments, a failing `--json` invocation writes exactly one envelope to stdout and nothing to stderr. In human mode a propagated failure prints one `Error:` diagnostic to stderr. The propagated-failure `Error:` line is absent from JSON output (D-6). Parse failures follow `parser-diagnostics-outside-envelope`. Warnings appear in the top-level `warnings` array under `--json` and on stderr in human, non-quiet mode (epic D-04).
 
 ### `parser-diagnostics-outside-envelope` [plan-fixed] — Parse failures stay clap's
 
@@ -71,7 +71,7 @@ Handlers return typed command or domain results. Output owns rendering and envel
 
 ### `handler-contract` [implementation-produced] — Library-side command handlers
 
-`crates/jit/src/dispatch/` holds one module per command group. A handler takes its parsed arguments and a `CommandContext` carrying the executor and the `output-mode`, and returns `anyhow::Result<Outcome<R>>`, where `R` is its registered response type. `Outcome` is either a success or a findings result carrying an `ErrorCode` (`findings-envelope`). One registration per group generates both the group's dispatch and the schema's per-leaf response lookup, so they cannot drift. `main()` renders an `Outcome` through one output emitter and a failure through `failure-classification`. Until every group has migrated, schema generation consults the registry first and the legacy table second (D-2).
+`crates/jit/src/dispatch/` holds one module per command group. A handler takes its parsed arguments and a `CommandContext` carrying the executor and the `output-mode`, and returns `anyhow::Result<Outcome<R>>`, where `R` is its registered response type. `Outcome` carries a success, findings with an `ErrorCode` (`findings-envelope`), or a child-process passthrough status. One registration per group generates both the group's dispatch and the schema's per-leaf response lookup, so they cannot drift. The generated group dispatch renders the outcome through one output emitter. `run()` renders propagated failures through `failure-classification` and returns `RunStatus` to `main()` for the sole process exit. Schema generation consults only the handler registry; no legacy table or generic leaf fallback remains.
 
 ### `executor-family-facades` [implementation-produced] — Narrow executor capabilities
 
