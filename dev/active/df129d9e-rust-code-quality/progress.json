@@ -1384,11 +1384,11 @@
       "review": "lead PASS at 6d721625c: ProposedLayoutViolation domain error, typed repository_inputs errors, no anyhow in domain types; +19 (b697a3f7 ledger). Worker checked out the merge base to measure (forbidden; restored). Landing CI: all tests passed, suite-clock budget failed (38.9 s vs 30 s) from a cold doctest build (25.2 s; cold 20.3 s / warm 3.2 s on rerun). Asked 6a for a fresh landing. Steward approved one fresh landing (D-56); land-one now retries a budget-only overrun with a cold doctest step once."
     },
     "3f816619": {
-      "status": "merging",
+      "status": "landing",
       "vendor": "Claude Opus",
       "reason": "largest remaining move (~580 main.rs lines, 10 leaves)",
       "review": "lead PASS at b2cda2c59: ten write leaves in dispatch/issue.rs, unmigrated clause and output_macros.rs gone, batch-create payload per REQ-03; -101. Awaiting steward D-01 (uniform warnings rule) before landing.",
-      "note": "landing conflicted with main (24a982b7 overlap); worker merging"
+      "note": "worker merged main (551de466c, 55aeef4c7); one listing helper; -105"
     },
     "5d09e74b": {
       "status": "done",
@@ -1465,7 +1465,8 @@
   "f487aeef_hold": "user fixing cargo-pool-run in dotfiles; held until user says done (6a, 2026-11-04)",
   "notes_for_tasks": {
     "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)",
-    "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)"
+    "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)",
+    "b23b1bf3": "gate_evaluate-many is the last legacy schema-table row; test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema targets it: repoint or delete with the row (or leave to da30b92a)"
   },
   "coordination": "All other lead sessions closed by the user (6a, 2026-11-04); df129d9e lead is the only active lead. Escalations and milestone ledgers go to 6a."
 }
