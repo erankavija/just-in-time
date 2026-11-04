@@ -19,9 +19,9 @@
       "updated_by": "auto:executor"
     },
     "worktree-cache-test": {
-      "run_id": "93a9ae9f-e628-4157-8e11-5f156ae446cc",
+      "run_id": "d9982783-11a0-4ca8-8b85-30c1ef4d1880",
       "status": "passed",
-      "updated_at": "2026-11-04T07:28:11.346787535Z",
+      "updated_at": "2026-11-04T07:42:13.612668232Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,5 +36,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Worker worktrees own and remove their temporary directory",
-  "updated_at": "2026-11-04T07:32:21.429411797Z"
+  "updated_at": "2026-11-04T07:42:13.612668232Z"
 }
