@@ -1349,6 +1349,21 @@ mod tests {
         assert_eq!(expected, StatusCode::BAD_REQUEST);
     }
 
+    /// An unreadable issue index fails id resolution as a server fault, not a missing issue.
+    #[tokio::test]
+    async fn test_get_issue_reports_an_unreadable_index_as_a_server_error() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        std::fs::write(temp.path().join(".jit/index.json"), "{").unwrap();
+        let prefix = "abcd".parse().unwrap();
+        let expected = status_of_error(executor.storage().resolve_issue_id(&prefix).unwrap_err());
+
+        let response = test_app(executor).get("/issues/abcd").await;
+
+        response.assert_status(expected);
+        assert_eq!(expected, StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
     #[tokio::test]
     async fn test_health_check() {
         let server = test_app(memory_executor_declaring(
