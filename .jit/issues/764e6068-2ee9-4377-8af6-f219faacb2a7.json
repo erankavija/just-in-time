@@ -16,9 +16,6 @@
   "id": "764e6068-2ee9-4377-8af6-f219faacb2a7",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:history-boundary",
     "component:cli",
     "component:testing",
     "per:@/charter/D-19",
@@ -28,5 +25,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "History commands report a log holding retired-tag records",
-  "updated_at": "2026-11-02T23:41:55.162215960Z"
+  "updated_at": "2026-11-04T22:42:44.013236008Z"
 }

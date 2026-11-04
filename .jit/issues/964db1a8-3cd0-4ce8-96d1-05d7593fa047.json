@@ -16,9 +16,6 @@
   "id": "964db1a8-3cd0-4ce8-96d1-05d7593fa047",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-gate-runs",
     "component:web",
     "per:@/charter/D-19",
     "satisfies:f8a6b298/REQ-01",
@@ -27,5 +24,5 @@
   "priority": "normal",
   "state": "rejected",
   "title": "The web client types reused-verdict provenance with its source issue",
-  "updated_at": "2026-11-02T23:41:47.073478982Z"
+  "updated_at": "2026-11-04T22:42:44.427552295Z"
 }
