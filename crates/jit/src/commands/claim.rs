@@ -726,9 +726,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
             .resolve(&crate::repository_state::VirtualPath::CONFIG)?
             .is_file()
         {
-            let executor = crate::commands::CommandExecutor::new(storage.clone())
-                .with_layout(layout)
-                .unwrap();
+            let executor =
+                crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout)?;
             report.derived_state_repaired = executor.validation().repair_derived_state(false)?.0;
         }
 
@@ -2106,6 +2105,25 @@ mod tests {
             events_after.len(),
             "coordinator-only operations must not append repository events"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_recover_propagates_layout_binding_mismatch() -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let other = TempDir::new()?;
+        let mut paths = create_test_paths(&temp);
+        paths.worktree_root = other.path().to_path_buf();
+
+        let error = CommandExecutor::new(storage)
+            .with_worktree_paths(paths)
+            .claims()
+            .recover()
+            .unwrap_err();
+        assert!(matches!(
+            error.downcast_ref::<crate::storage::RepositoryStateStoreError>(),
+            Some(crate::storage::RepositoryStateStoreError::RetryableConflict { .. })
+        ));
         Ok(())
     }
 

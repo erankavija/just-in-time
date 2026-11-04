@@ -390,9 +390,7 @@ fn initialize_profiled_repository_fixture(
     let storage = InMemoryStorage::rooted_at(repository);
     storage.seed_repository_tree_fixture(repository)?;
     let layout = storage.repository_layout();
-    let executor = CommandExecutor::new(storage.clone())
-        .with_layout(layout.clone())
-        .unwrap();
+    let executor = CommandExecutor::new(storage.clone()).with_layout(layout.clone())?;
     let selection = executor.profiles().select_profiles(
         &[PathBuf::from(&selected)],
         &crate::commands::ProfileVariableOptions::default(),
@@ -835,8 +833,7 @@ pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     let storage = JsonFileStorage::new(&jit_root);
     let layout = discover_repository_layout(temp.path(), &jit_root)?;
     CommandExecutor::new(storage.clone())
-        .with_layout(layout)
-        .unwrap()
+        .with_layout(layout)?
         .profiles()
         .initialize_fresh_repository(temp.path(), None)?;
     // Claim coordination tests use this as a synthetic Git control directory.
