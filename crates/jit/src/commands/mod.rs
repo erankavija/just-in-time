@@ -2011,7 +2011,6 @@ pub struct AssetListScope {
     pub issue_id: IssueId,
     pub document_path: String,
     pub summary: AssetSummary,
-    pub warnings: Vec<String>,
 }
 
 /// Document content display result

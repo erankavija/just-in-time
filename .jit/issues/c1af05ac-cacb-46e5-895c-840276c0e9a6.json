@@ -10,12 +10,26 @@
   ],
   "description": "Assert, against the validation report's own passes, every case the executor-side dangling-link, drift and placeholder unit tests cover, so those executor copies can be deleted without losing a property.\n\n## Background\n\n- The executor-pass unit tests (`crates/jit/src/commands/validate.rs:3009-3326`) cover enforces-rule and enforces-gate links, unresolvable qualified ids, explicit kind forms, the named-project form, unqualified links and an invariant link.\n- The report's item-link, drift and placeholder tests live in `crates/jit/src/validation/repository.rs` (from about `:977`); `jit::test_harness` builds closed images for them.\n\n## Success Criteria\n\n- [hard] REQ-01: Each case the listed executor-pass tests cover is asserted once by a report test built on the shared image builder, with the same expected finding or absence.\n- [hard] REQ-02: The report suite passes; the executor-pass tests are left in place.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-04T06:25:52.829140526Z",
   "first_ready_at": "2026-11-04T02:23:40.594600365Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3e584dc9-4785-436b-83bb-9fa4235c2494",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:45:37.501645099Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cbef1a48-7fbc-495b-bfe0-7b7ede351050",
+      "status": "passed",
+      "updated_at": "2026-11-04T05:50:12.563053832Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c1af05ac-cacb-46e5-895c-840276c0e9a6",
   "labels": [
     "type:task",
@@ -29,7 +43,7 @@
     "satisfies:9876a23a/REQ-05"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Report pass tests cover the executor-pass cases",
-  "updated_at": "2026-11-04T05:19:16.429137900Z"
+  "updated_at": "2026-11-04T06:25:52.829140526Z"
 }
