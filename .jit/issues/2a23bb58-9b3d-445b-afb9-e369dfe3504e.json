@@ -15,9 +15,6 @@
   "id": "2a23bb58-9b3d-445b-afb9-e369dfe3504e",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-gate-runs",
     "component:storage",
     "enforces:@/invariant/canonical-cutover",
     "satisfies:f8a6b298/REQ-01",
@@ -26,5 +23,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "This repository's gate runs are rewritten into the per-issue layout",
-  "updated_at": "2026-11-02T23:41:53.929948499Z"
+  "updated_at": "2026-11-04T22:42:43.173150600Z"
 }

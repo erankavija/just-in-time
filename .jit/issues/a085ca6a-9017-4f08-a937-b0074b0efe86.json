@@ -16,9 +16,6 @@
   "id": "a085ca6a-9017-4f08-a937-b0074b0efe86",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-leases",
     "component:storage",
     "per:@/charter/D-19",
     "enforces:@/invariant/convention-convergence",
@@ -28,5 +25,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "A held lease lock loads, lists and applies lease changes",
-  "updated_at": "2026-11-02T23:41:49.864239468Z"
+  "updated_at": "2026-11-04T22:42:44.736490616Z"
 }
