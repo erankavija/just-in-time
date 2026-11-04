@@ -3,6 +3,20 @@
 use serde_json::Value;
 
 #[test]
+fn test_schema_dependency_leaves_publish_response_types() {
+    let schema = jit::schema::CommandSchema::generate();
+    let leaves = schema.commands["dep"].subcommands.as_ref().unwrap();
+    for (leaf, response) in [
+        ("add", "DependencyAddResponse"),
+        ("rm", "DependencyRemoveResponse"),
+    ] {
+        let output = leaves[leaf].output.as_ref().unwrap();
+        assert_eq!(output.success, response);
+        assert!(output.success_schema.is_some());
+    }
+}
+
+#[test]
 fn test_schema_flag_outputs_json() {
     let cli = jit::test_cli::JitCli::uninitialised().unwrap();
     let schema = cli.run(["--schema"]).unwrap();

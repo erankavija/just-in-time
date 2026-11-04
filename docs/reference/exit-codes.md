@@ -33,7 +33,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `*` | `10` | The repository's on-disk format is not the one this binary accepts, or a filesystem/subprocess I/O operation failed. |  |
 | `*` | `11` | A lock wait expired while another jit process held the lock (`JIT_LOCK_TIMEOUT`); the command changed nothing and may be retried. |  |
 | `any command that writes an issue` | `4` | An enforcing validation rule rejected the write (the shared write-validation path blocks on rule findings). |  |
-| `dep add` | `4` | The edge would create a cycle, or a redundant (transitively-implied) edge was rejected. |  |
+| `dep add` | `4` | The edge would create a cycle (CYCLE_DETECTED), or a redundant (transitively-implied) edge was rejected (VALIDATION_FAILED), in human and JSON output alike. |  |
 | `apply` | `4` | The template delta would close a dependency cycle through existing issues; the apply is rejected before any node is created. |  |
 | `issue update, issue claim, issue claim-next` | `4` | A state transition is blocked by unmet dependencies or unpassed gates. |  |
 | `gate define` | `6` | The gate key is already registered. |  |

@@ -765,18 +765,37 @@ fn test_off_mode_another_agents_lease_refuses_nothing() {
 }
 
 #[test]
-fn test_warn_mode_dep_add_warns_and_writes() {
+fn test_warn_mode_dependency_writes_warn_only_in_human_non_quiet_mode() {
     let repo = Repo::new();
     repo.set_mode("warn");
 
-    let output = repo.other(&["dep", "add", &repo.x, &repo.y]);
-
-    assert_ok(&output);
-    assert!(stderr(&output).contains(OWNER), "{}", stderr(&output));
-    assert!(repo.record(&repo.x)["dependencies"]
-        .as_array()
-        .unwrap()
-        .contains(&repo.y.clone().into()));
+    for flags in [&[][..], &["--quiet"][..], &["--json"][..]] {
+        for verb in ["add", "rm"] {
+            let args = ["dep", verb, &repo.x, &repo.y]
+                .into_iter()
+                .chain(flags.iter().copied())
+                .collect::<Vec<_>>();
+            let output = repo.other(&args);
+            assert_ok(&output);
+            if flags.is_empty() {
+                assert!(stderr(&output).contains(OWNER), "{}", stderr(&output));
+            } else {
+                assert!(output.stderr.is_empty(), "{}", stderr(&output));
+            }
+            if flags.contains(&"--json") {
+                let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+                let collection = if verb == "add" { "added" } else { "removed" };
+                assert_eq!(response[collection], serde_json::json!([repo.y]));
+            }
+            assert_eq!(
+                repo.record(&repo.x)["dependencies"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&repo.y.clone().into()),
+                verb == "add"
+            );
+        }
+    }
 }
 
 #[test]

@@ -13,10 +13,12 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use thiserror::Error;
 
+mod dep;
 mod emit;
 pub mod failure;
 mod invariant;
 
+pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
 pub use emit::{emit_outcome, HumanRender, Report, Response};
 
 use crate::declarations::{GateMode, GateStage};

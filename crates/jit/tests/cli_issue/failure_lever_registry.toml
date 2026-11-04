@@ -134,16 +134,16 @@ confirmation = "invoked"
 path = "dep add"
 argv = ["dep", "add", "missing-from", "missing-to", "--json"]
 setup = ["init", "no-issue:missing-from"]
-expected_failure = "DEPENDENCY_ERROR: Issue not found: missing-from"
-expected_code = "DEPENDENCY_ERROR"
+expected_failure = "ISSUE_NOT_FOUND: Issue not found: missing-from"
+expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
 
 [[arms]]
 path = "dep rm"
 argv = ["dep", "rm", "missing-from", "missing-to", "--json"]
 setup = ["init", "no-issue:missing-from"]
-expected_failure = "DEPENDENCY_ERROR: Issue not found: missing-from"
-expected_code = "DEPENDENCY_ERROR"
+expected_failure = "ISSUE_NOT_FOUND: Issue not found: missing-from"
+expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
 
 [[arms]]
