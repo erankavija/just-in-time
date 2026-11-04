@@ -23,7 +23,7 @@
     "satisfies:c8e79465/REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Compile server modules through the library",
-  "updated_at": "2026-11-04T22:25:08.352808650Z"
+  "updated_at": "2026-11-04T23:06:53.853956706Z"
 }

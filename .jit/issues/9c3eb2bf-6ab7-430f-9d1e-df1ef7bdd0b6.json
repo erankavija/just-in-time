@@ -23,7 +23,7 @@
     "satisfies:a236e81e/REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Reject incompatible repository layout bindings",
-  "updated_at": "2026-11-04T22:25:07.291094312Z"
+  "updated_at": "2026-11-04T23:06:53.853956706Z"
 }
