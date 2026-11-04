@@ -848,23 +848,35 @@ pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()
     use std::io::Write;
 
     let path = storage.root().join("events.jsonl");
-    let mut log = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)?;
+    let mut log = std::io::BufWriter::new(
+        fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)?,
+    );
     let mut written = fs::metadata(&path)?.len();
+    // One serialized event is the template; each line differs from it by the
+    // event id and the issue id, so the log grows without per-line serialization.
+    let template_issue = crate::domain::Issue::draft(
+        issue_id(0),
+        "Accumulated history".to_string(),
+        String::new(),
+    );
+    let template_issue_id = template_issue.id.to_string();
+    let template_event_id = "01J00000000000000000000000".to_string();
+    let template = serde_json::to_string(&stamped_event(
+        crate::domain::EventBody::draft_issue_created(&template_issue),
+        template_event_id.clone(),
+        chrono::Utc::now(),
+    ))?;
     let mut ordinal = 0_u64;
     while written <= bytes {
-        let issue = crate::domain::Issue::draft(
-            issue_id(u128::from(ordinal)),
-            format!("Accumulated history {ordinal}"),
-            String::new(),
-        );
-        let line = serde_json::to_string(&stamped_event(
-            crate::domain::EventBody::draft_issue_created(&issue),
-            format!("01J0000000000000000000{ordinal:04}"),
-            chrono::Utc::now(),
-        ))?;
+        let line = template
+            .replace(&template_issue_id, issue_id(u128::from(ordinal)).as_ref())
+            .replace(
+                &template_event_id,
+                &format!("01J0000000000000000000{ordinal:04}"),
+            );
         writeln!(log, "{line}")?;
         written += line.len() as u64 + 1;
         ordinal += 1;
