@@ -4,7 +4,7 @@ use super::{
     render_issue_rows, ContainerProgressResponse, HumanRender, IssueChildrenResponse, IssueColumn,
     IssueListFullResponse, IssueListResponse, IssueRow, IssueSearchFullResponse,
     IssueSearchResponse, IssueShowListResponse, IssueShowResponse, IssueShowSummaryResponse,
-    IssueStatusListResponse, IssueStatusResponse,
+    IssueStatusListResponse, IssueStatusResponse, OutputMode,
 };
 use crate::commands::ItemShowResult;
 use crate::domain::list_envelope::CollectionKey;
@@ -59,7 +59,7 @@ impl IssueProjection {
 }
 
 impl HumanRender for IssueProjection {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         format!("{}\n", self.text)
     }
 }
@@ -81,22 +81,22 @@ pub enum IssueShowOutput {
 }
 
 impl HumanRender for IssueShowOutput {
-    fn render_human(&self) -> String {
+    fn render_human(&self, mode: OutputMode) -> String {
         match self {
-            Self::Issue(issue) => issue.render_human(),
+            Self::Issue(issue) => issue.render_human(mode),
             Self::Summary(summary) => format!(
                 "Issue {}: {} [{}]\n",
                 summary.short_id, summary.title, summary.state
             ),
-            Self::Many(many) => many.items.iter().map(HumanRender::render_human).collect(),
-            Self::Item(item) => item.render_human(),
-            Self::Projection(projection) => projection.render_human(),
+            Self::Many(many) => many.items.iter().map(|r| r.render_human(mode)).collect(),
+            Self::Item(item) => item.render_human(mode),
+            Self::Projection(projection) => projection.render_human(mode),
         }
     }
 }
 
 impl HumanRender for IssueShowResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let mut text = format!(
             "ID: {}\nTitle: {}\nDescription: {}\nState: {}\nPriority: {}\nAssignee: {:?}\n",
             self.id, self.title, self.description, self.state, self.priority, self.assignee
@@ -158,7 +158,7 @@ impl HumanRender for IssueShowResponse {
 }
 
 impl HumanRender for ItemShowResult {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let item = &self.item;
         let owner = match (&self.issue_full_id, &self.issue_title) {
             (Some(id), Some(title)) => format!("Issue:        {id} | {title}"),
@@ -182,7 +182,7 @@ pub enum IssueStatusOutput {
 }
 
 impl HumanRender for IssueStatusOutput {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let lines = |statuses: &[IssueStatusResponse]| {
             statuses
                 .iter()
@@ -197,7 +197,7 @@ impl HumanRender for IssueStatusOutput {
 }
 
 impl HumanRender for IssueChildrenResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let mut text: String = self
             .items
             .iter()
@@ -209,7 +209,7 @@ impl HumanRender for IssueChildrenResponse {
 }
 
 impl HumanRender for ContainerProgressResponse {
-    fn render_human(&self) -> String {
+    fn render_human(&self, _: OutputMode) -> String {
         let mut text = format!(
             "{} [{}] title: {}\n",
             self.container.short_id,
@@ -290,20 +290,17 @@ impl IssueSearchResults {
     }
 }
 
-macro_rules! impl_quiet_render {
-    ($($listing:ty),+) => {$(
-        impl HumanRender for $listing {
-            fn render_human(&self) -> String {
-                self.render(false)
-            }
-            fn render_quiet(&self) -> String {
-                self.render(true)
-            }
-        }
-    )+};
+impl HumanRender for IssueListing {
+    fn render_human(&self, mode: OutputMode) -> String {
+        self.render(mode.quiet)
+    }
 }
 
-impl_quiet_render!(IssueListing, IssueSearchResults);
+impl HumanRender for IssueSearchResults {
+    fn render_human(&self, mode: OutputMode) -> String {
+        self.render(mode.quiet)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -316,6 +313,7 @@ mod tests {
         let outcome = Outcome::Success {
             response: listing,
             message: None,
+            warnings: Vec::new(),
         };
         emit_outcome(
             &outcome,
@@ -350,6 +348,6 @@ mod tests {
             serde_json::to_value(&fields).unwrap(),
             serde_json::json!({"title": "T"})
         );
-        assert_eq!(field.render_human(), "ready\n");
+        assert_eq!(field.render_human(OutputMode::default()), "ready\n");
     }
 }

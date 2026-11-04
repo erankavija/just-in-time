@@ -1,38 +1,26 @@
 //! `jit issue` read handlers.
 
-use super::{CommandContext, Outcome};
+use super::{resolve_issue, CommandContext, Outcome};
 use crate::cli::{IssueCommands, IssueFilterArgs};
-use crate::domain::identity::{IssueId, IssueIdPrefix};
+use crate::commands::ItemShowResult;
 use crate::domain::MinimalIssue;
 use crate::errors::InvalidArgumentError;
 use crate::output::{
-    ContainerProgressResponse, IssueChildrenResponse, IssueListFullResponse, IssueListResponse,
-    IssueListing, IssueProjection, IssueSearchFullResponse, IssueSearchQuery, IssueSearchResponse,
-    IssueSearchResults, IssueShowListResponse, IssueShowOutput, IssueShowResponse,
-    IssueShowSummaryResponse, IssueStatusListResponse, IssueStatusOutput, IssueStatusResponse,
+    emit_outcome, ContainerProgressResponse, ExitCode, IssueChildrenResponse,
+    IssueListFullResponse, IssueListResponse, IssueListing, IssueProjection,
+    IssueSearchFullResponse, IssueSearchQuery, IssueSearchResponse, IssueSearchResults,
+    IssueShowListResponse, IssueShowOutput, IssueShowResponse, IssueShowSummaryResponse,
+    IssueStatusListResponse, IssueStatusOutput, IssueStatusResponse,
 };
 use crate::schema::OutputSchema;
 use crate::storage::IssueStore;
-
-fn success<R>(response: R, message: impl Into<Option<String>>) -> Outcome<R> {
-    Outcome::Success {
-        response,
-        message: message.into(),
-    }
-}
-
-fn resolve<S: IssueStore>(ctx: &CommandContext<'_, S>, requested: &str) -> anyhow::Result<IssueId> {
-    ctx.executor
-        .storage()
-        .resolve_issue_id(&requested.parse::<IssueIdPrefix>()?)
-}
 
 fn show_response<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     requested: &str,
 ) -> anyhow::Result<IssueShowResponse> {
     let issues = ctx.executor.issues();
-    issues.show_response(issues.show_issue(&resolve(ctx, requested)?)?)
+    issues.show_response(issues.show_issue(&resolve_issue(ctx.executor.storage(), requested)?)?)
 }
 
 fn show<S: IssueStore>(
@@ -56,26 +44,28 @@ fn show<S: IssueStore>(
             .iter()
             .map(|id| show_response(ctx, id))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        return Ok(success(
-            IssueShowOutput::Many(IssueShowListResponse::new(shown)),
-            None,
-        ));
+        return Ok(Outcome::success(IssueShowOutput::Many(
+            IssueShowListResponse::new(shown),
+        )));
     };
     // A `<issue>/<self-id>` argument addresses an item; issue ids never
     // contain '/'.
     if !projecting && !summary && requested.contains('/') {
         let item = ctx.executor.items().show_item(requested)?;
-        return Ok(success(IssueShowOutput::Item(item), None));
+        return Ok(Outcome::success(IssueShowOutput::Item(item)));
     }
     let issues = ctx.executor.issues();
-    let issue = issues.show_issue(&resolve(ctx, requested)?)?;
+    let issue = issues.show_issue(&resolve_issue(ctx.executor.storage(), requested)?)?;
     if summary && ctx.mode.json && !projecting {
         let summary = IssueShowSummaryResponse::from(&issue);
         let message = format!(
             "Issue {}: {} [{}]",
             summary.short_id, summary.title, summary.state
         );
-        return Ok(success(IssueShowOutput::Summary(summary), message));
+        return Ok(Outcome::success_with(
+            IssueShowOutput::Summary(summary),
+            message,
+        ));
     }
     let shown = issues.show_response(issue)?;
     if projecting {
@@ -89,7 +79,7 @@ fn show<S: IssueStore>(
             Some(name) => IssueProjection::field(&value, &name).ok_or_else(|| unknown(&name))?,
             None => IssueProjection::fields(&value, &fields).map_err(|e| unknown(&e.0))?,
         };
-        return Ok(success(IssueShowOutput::Projection(projection), None));
+        return Ok(Outcome::success(IssueShowOutput::Projection(projection)));
     }
     let message = format!(
         "Issue {}: {} [{}]",
@@ -97,7 +87,10 @@ fn show<S: IssueStore>(
         shown.title,
         shown.state
     );
-    Ok(success(IssueShowOutput::Issue(Box::new(shown)), message))
+    Ok(Outcome::success_with(
+        IssueShowOutput::Issue(Box::new(shown)),
+        message,
+    ))
 }
 
 /// `jit issue list`, `jit list`, `jit query all` and bare `jit query`.
@@ -121,7 +114,7 @@ pub(super) fn list<S: IssueStore>(
             issues.iter().map(MinimalIssue::from).collect(),
         ))
     };
-    Ok(success(listing, message))
+    Ok(Outcome::success_with(listing, message))
 }
 
 fn search<S: IssueStore>(
@@ -163,7 +156,7 @@ fn search<S: IssueStore>(
             echoed,
         ))
     };
-    Ok(success(results, message))
+    Ok(Outcome::success_with(results, message))
 }
 
 fn status<S: IssueStore>(
@@ -173,44 +166,82 @@ fn status<S: IssueStore>(
     let issues = ctx.executor.issues();
     let statuses = ids
         .iter()
-        .map(|id| issues.issue_status_response(issues.show_issue(&resolve(ctx, id)?)?))
+        .map(|id| {
+            issues.issue_status_response(
+                issues.show_issue(&resolve_issue(ctx.executor.storage(), id)?)?,
+            )
+        })
         .collect::<anyhow::Result<Vec<IssueStatusResponse>>>()?;
     // A single id stays a bare object, like `issue show`.
     let output = match <[IssueStatusResponse; 1]>::try_from(statuses) {
         Ok([only]) => IssueStatusOutput::One(only),
         Err(many) => IssueStatusOutput::Many(IssueStatusListResponse::new(many)),
     };
-    Ok(success(output, None))
+    Ok(Outcome::success(output))
 }
 
 fn children<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
 ) -> anyhow::Result<Outcome<IssueChildrenResponse>> {
-    let response = ctx.executor.issues().issue_children(&resolve(ctx, &id)?)?;
-    Ok(success(response, None))
+    let response = ctx
+        .executor
+        .issues()
+        .issue_children(&resolve_issue(ctx.executor.storage(), &id)?)?;
+    Ok(Outcome::success(response))
 }
 
 fn progress<S: IssueStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
 ) -> anyhow::Result<Outcome<ContainerProgressResponse>> {
-    let response = ctx.executor.issues().issue_progress(&resolve(ctx, &id)?)?;
-    Ok(success(response, None))
+    let response = ctx
+        .executor
+        .issues()
+        .issue_progress(&resolve_issue(ctx.executor.storage(), &id)?)?;
+    Ok(Outcome::success(response))
 }
 
 command_group! {
     command: IssueCommands,
     storage: [IssueStore],
     leaves: {
-        "issue_show" => IssueCommands::Show { ids, summary, field, fields } => show(ids, summary, field, fields) -> IssueShowOutput,
-        "issue_list" => IssueCommands::List { filters, full } => list(filters, full) -> IssueListing,
-        "issue_search" => IssueCommands::Search { query, filters, full } => search(query, filters, full) -> IssueSearchResults,
-        "issue_status" => IssueCommands::Status { ids } => status(ids) -> IssueStatusOutput,
+        "issue_show" => IssueCommands::Show { ids, summary, field, fields } => show(ids, summary, field, fields) -> IssueShowOutput
+            as union [IssueShowResponse, IssueShowSummaryResponse, IssueShowListResponse, ItemShowResult, IssueProjection]
+            "Single id: a bare IssueShowResponse (IssueShowSummaryResponse with --summary; the addressed item for an <issue>/<self-id> argument; the projected value with --field/--fields). Multiple ids: the {count, issues} envelope of full IssueShowResponse objects in argument order.",
+        "issue_list" => IssueCommands::List { filters, full } => list(filters, full) -> IssueListing
+            as union [IssueListResponse, IssueListFullResponse]
+            "Default shape: lean MinimalIssue entries (id, short_id, title, state, priority) with no gate fields. With --full: complete stored issue records, whose gate list is carried under gates_required / gates_status.",
+        "issue_search" => IssueCommands::Search { query, filters, full } => search(query, filters, full) -> IssueSearchResults
+            as union [IssueSearchResponse, IssueSearchFullResponse]
+            "Default shape: lean MinimalIssue entries with no gate fields, plus the echoed query. With --full: complete stored issue records, whose gate list is carried under gates_required / gates_status.",
+        "issue_status" => IssueCommands::Status { ids } => status(ids) -> IssueStatusOutput
+            as union [IssueStatusResponse, IssueStatusListResponse]
+            "Single id: a bare IssueStatusResponse. Multiple ids: the {count, issues} envelope of IssueStatusResponse objects in argument order.",
         "issue_children" => IssueCommands::Children { id } => children(id) -> IssueChildrenResponse,
         "issue_progress" => IssueCommands::Progress { id } => progress(id) -> ContainerProgressResponse,
     },
-    unmigrated: _ => Err(anyhow::anyhow!("not an issue read command"))
+    unmigrated: IssueCommands::Create { .. }
+        | IssueCommands::BatchCreate { .. }
+        | IssueCommands::Update { .. }
+        | IssueCommands::Delete { .. }
+        | IssueCommands::Assign { .. }
+        | IssueCommands::Claim { .. }
+        | IssueCommands::Unassign { .. }
+        | IssueCommands::Reject { .. }
+        | IssueCommands::Release { .. }
+        | IssueCommands::ClaimNext { .. }
+}
+
+/// Run the `list` handler and render it, for `jit query all` and bare `jit query`.
+pub fn emit_list<S: IssueStore>(
+    ctx: &CommandContext<'_, S>,
+    filters: IssueFilterArgs,
+    full: bool,
+    out: &mut dyn std::io::Write,
+    err: &mut dyn std::io::Write,
+) -> anyhow::Result<ExitCode> {
+    emit_outcome(&list(ctx, filters, full)?, ctx.mode, out, err)
 }
 
 /// The top-level `list` alias shares `issue list`'s response.
@@ -225,19 +256,21 @@ mod tests {
     use crate::dispatch::registered_output_schema;
 
     #[test]
-    fn test_registered_output_schema_names_a_typed_response_for_every_issue_read_leaf() {
-        let names = [
-            ("issue_show", "IssueShowOutput"),
-            ("issue_list", "IssueListing"),
-            ("list", "IssueListing"),
-            ("issue_search", "IssueSearchResults"),
-            ("issue_status", "IssueStatusOutput"),
-            ("issue_children", "IssueChildrenResponse"),
-            ("issue_progress", "ContainerProgressResponse"),
-        ];
-        for (path, name) in names {
-            let registered = registered_output_schema(path).unwrap();
-            assert_eq!(registered.success, name, "{path}");
+    fn test_registered_output_schema_types_every_issue_read_leaf_and_unions_the_multi_shape_ones() {
+        for (path, union) in [
+            ("issue_show", true),
+            ("issue_list", true),
+            ("list", true),
+            ("issue_search", true),
+            ("issue_status", true),
+            ("issue_children", false),
+            ("issue_progress", false),
+        ] {
+            let schema = registered_output_schema(path)
+                .unwrap()
+                .success_schema
+                .unwrap();
+            assert_eq!(schema.get("oneOf").is_some(), union, "{path}");
         }
     }
 }

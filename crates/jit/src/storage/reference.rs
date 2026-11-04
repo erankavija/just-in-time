@@ -31,7 +31,7 @@
 use crate::declarations::GateStage;
 use crate::domain::event_catalog::EventTag;
 use crate::domain::gate_findings::{GateFinding, GateFindings};
-use crate::domain::identity::{GateRunId, IssueIdPrefix};
+use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use crate::domain::{GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION, SHORT_ID_LENGTH};
 use crate::repository_state::{serialize_event, serialize_gate_run, VirtualPath};
 use anyhow::Result;
@@ -181,9 +181,9 @@ impl GateRunField {
                  of the repository format version in `index.json`."
             ),
             GateRunField::RunId => {
-                "The run's identifier, and the name of its directory under `gate-runs/`. Each \
-                 execution mints a fresh UUID v4, so a rerun records a new directory instead of \
-                 overwriting the previous run."
+                "The run's identifier, and the stem of its record's file name. Each execution \
+                 mints a fresh UUID v4, so a rerun records a new file instead of overwriting the \
+                 previous run."
                     .to_string()
             }
             GateRunField::GateKey => {
@@ -194,9 +194,8 @@ impl GateRunField {
                 code_alternatives(&GateStage::ALL.map(GateStage::as_str))
             ),
             GateRunField::IssueId => {
-                "Full id of the issue the run is about. An issue's runs are selected by matching \
-                 this field across the run directories, so `gate-runs/` is flat rather than \
-                 nested per issue."
+                "Full id of the issue the run is about, and the name of the directory under \
+                 `gate-runs/` that holds the record."
                     .to_string()
             }
             GateRunField::Commit => {
@@ -314,14 +313,26 @@ fn sample_run_id() -> GateRunId {
     ))
 }
 
-/// The run record's path as the reference prints it, with the id as a placeholder.
+/// Issue id used in the reference's example record, which its path names too.
+fn sample_issue_id() -> IssueId {
+    IssueId::from_uuid(uuid::Uuid::from_u128(
+        0x9d1f6c02_4a77_4f2b_8f3d_5e0b7a1c8e64,
+    ))
+}
+
+/// The run record's path as the reference prints it, with the ids as placeholders.
 fn documented_result_path() -> String {
-    let id = sample_run_id();
+    let (issue, run) = (sample_issue_id(), sample_run_id());
     Path::new(".jit")
-        .join(VirtualPath::gate_run_record(&id).relative().as_path())
+        .join(
+            VirtualPath::gate_run_record(&issue, &run)
+                .relative()
+                .as_path(),
+        )
         .display()
         .to_string()
-        .replace(id.as_str(), "<run-id>")
+        .replace(issue.as_str(), "<issue-id>")
+        .replace(run.as_str(), "<run-id>")
 }
 
 /// Fixed timestamp for the reference's sample records, so the projection is
@@ -341,9 +352,7 @@ fn sample_gate_run() -> GateRunResult {
         run_id: sample_run_id(),
         gate_key: "tests".parse().unwrap(),
         stage: GateStage::Postcheck,
-        issue_id: crate::domain::identity::IssueId::from_uuid(uuid::Uuid::from_u128(
-            0x9d1f6c02_4a77_4f2b_8f3d_5e0b7a1c8e64,
-        )),
+        issue_id: sample_issue_id(),
         commit: Some("9f1c0f0a2b3c4d5e6f708192a3b4c5d6e7f80910".to_string()),
         branch: Some("main".to_string()),
         status: GateRunStatus::Passed,
@@ -572,10 +581,10 @@ pub fn render_reference_markdown() -> Result<String> {
          \n\
          Running a gate records its result at `{result_path}`.\n\
          The `<run-id>` is a UUID v4 minted per execution, so runs accumulate: a rerun\n\
-         writes a new directory beside the old one, and the history of a gate on an issue\n\
-         is the set of run directories whose record names that issue. The record is\n\
-         written as pretty-printed JSON in the same redo record as\n\
-         its coupled issue and event updates.\n\
+         writes a new record beside the old one in its issue's directory, and an issue's\n\
+         run history is one listing of that directory. The record is written as\n\
+         pretty-printed JSON in the same redo record as its coupled issue and event\n\
+         updates.\n\
          \n\
          ```json\n\
          {example_run}\n\

@@ -127,6 +127,40 @@ impl OutputSchema {
             error: "ErrorResponse".to_string(),
         }
     }
+
+    /// The output schema of a command whose success is one of several shapes:
+    /// a `oneOf` over `members`, named for the first. Build the members with
+    /// [`UnionMember::of`].
+    pub fn union_of(members: Vec<UnionMember>, description: &str) -> Self {
+        let success = members
+            .first()
+            .map(|member| member.name.clone())
+            .unwrap_or_default();
+        let schemas = members
+            .into_iter()
+            .map(|member| member.schema)
+            .collect::<Vec<_>>();
+        Self {
+            success_schema: Some(json!({ "oneOf": schemas, "description": description })),
+            success,
+            error: "ErrorResponse".to_string(),
+        }
+    }
+}
+
+/// One response shape of a union success schema.
+pub struct UnionMember {
+    name: String,
+    schema: Value,
+}
+
+impl UnionMember {
+    pub fn of<T: JsonSchema>() -> Self {
+        Self {
+            name: T::schema_name(),
+            schema: serde_json::to_value(schema_for!(T)).unwrap_or(json!({})),
+        }
+    }
 }
 
 /// Exit code documentation

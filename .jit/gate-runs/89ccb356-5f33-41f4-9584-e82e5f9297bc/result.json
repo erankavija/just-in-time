@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7c7427fda79b2f9467ca8f0516e55c13de192db0",
+  "completed_at": "2026-11-04T03:24:36.079633358Z",
+  "duration_ms": 324108,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact defects found in the attributed gate-run relayout.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1630015d-101d-4e1b-bc3a-da1026998588",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "89ccb356-5f33-41f4-9584-e82e5f9297bc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T03:19:11.971608993Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9bd45093a, 1a0527051\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/single-source-prose (.jit/invariants.toml); @/issue/1630015d/requirement/REQ-01–REQ-06 and @/issue/f8a6b298/requirement/REQ-01, @/issue/f8a6b298/requirement/REQ-15 (issue descriptions)\nGate evidence: cargo-ci failed (exit 1); doc-review passed (exit 0); docs-mechanical passed (exit 0)\nTruncation recovery: reopened individual patches plus the capture, finalizer, reader, conformance, validation, documentation, and path-constructor regions\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found in the attributed gate-run relayout.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
