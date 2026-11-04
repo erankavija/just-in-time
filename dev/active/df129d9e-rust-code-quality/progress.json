@@ -968,7 +968,8 @@
     "c517b88b": 1,
     "6acd7a05": 1,
     "8b3cce62": 1,
-    "635f23c7": 1
+    "635f23c7": 1,
+    "578ed10d": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1502,9 +1503,10 @@
       "note": "rescoped by plan D-59 to commands-import-no-output (REQ-01..03)"
     },
     "578ed10d": {
-      "status": "dispatched",
+      "status": "rework 1",
       "vendor": "Claude Opus",
-      "epic": "b697a3f7"
+      "epic": "b697a3f7",
+      "note": "merged 56626345e; code-review F1 missing ReadSessionOpen race test (REQ-04)"
     }
   },
   "handoff": {
