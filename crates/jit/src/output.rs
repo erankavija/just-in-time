@@ -941,8 +941,6 @@ wire_vocabulary! {
         ValidationFailed = "VALIDATION_FAILED",
         /// The requested resource already exists.
         AlreadyExists = "ALREADY_EXISTS",
-        /// A requested lifecycle state or transition is invalid.
-        InvalidState = "INVALID_STATE",
         /// Unfinished dependencies block the requested operation.
         Blocked = "BLOCKED",
         /// A quality-gate checker completed without passing.
@@ -976,30 +974,16 @@ wire_vocabulary! {
         /// A profile application was refused because a path it writes differs
         /// from `HEAD`.
         ProfileUncommittedTargets = "PROFILE_UNCOMMITTED_TARGETS",
-        /// A dependency command failed.
-        DependencyError = "DEPENDENCY_ERROR",
-        /// A gate command failed.
-        GateError = "GATE_ERROR",
-        /// A gate-status check failed.
-        GateCheckError = "GATE_CHECK_ERROR",
         /// A gate-preset command failed.
         PresetError = "PRESET_ERROR",
         /// An issue item-address lookup failed before resolving an item.
         ItemNotFound = "ITEM_NOT_FOUND",
-        /// An invariant command failed without a more specific public classification.
-        InvariantCommandFailed = "INVARIANT_COMMAND_FAILED",
         /// A profile command failed without a more specific public classification.
         ProfileError = "PROFILE_ERROR",
         /// The search backend failed while executing a query.
         SearchFailed = "SEARCH_FAILED",
         /// The external ripgrep search tool could not be found.
         RipgrepNotFound = "RIPGREP_NOT_FOUND",
-        /// Worktree identity inspection failed.
-        WorktreeInfoError = "WORKTREE_INFO_ERROR",
-        /// Worktree enumeration failed.
-        WorktreeListError = "WORKTREE_LIST_ERROR",
-        /// Cross-checkout store comparison failed.
-        WorktreeStoreDivergenceError = "WORKTREE_STORE_DIVERGENCE_ERROR",
         /// A command failed without a more specific public classification.
         GenericError = "GENERIC_ERROR",
         /// Repository recovery failed.
@@ -1021,8 +1005,6 @@ impl ErrorCode {
             | ErrorCode::GateNotFound
             | ErrorCode::RepositoryNotFound
             | ErrorCode::DocumentNotFound
-            | ErrorCode::DependencyError
-            | ErrorCode::GateCheckError
             | ErrorCode::PresetError => ExitCode::NotFound,
             ErrorCode::CycleDetected
             | ErrorCode::ValidationFailed
@@ -1032,12 +1014,11 @@ impl ErrorCode {
             | ErrorCode::ProfileUncommittedTargets => ExitCode::ValidationFailed,
             ErrorCode::InvalidArgument
             | ErrorCode::InvalidLabelPattern
-            | ErrorCode::InvalidState
             | ErrorCode::AmbiguousId
             | ErrorCode::InvalidIdPrefix
             | ErrorCode::DeletionNotConfirmed
             | ErrorCode::LinkedCheckoutWriteRefused => ExitCode::InvalidArgument,
-            ErrorCode::AlreadyExists | ErrorCode::GateError => ExitCode::AlreadyExists,
+            ErrorCode::AlreadyExists => ExitCode::AlreadyExists,
             ErrorCode::IoError
             | ErrorCode::RequiresGit
             | ErrorCode::RepositoryFormatUnsupported => ExitCode::ExternalError,
@@ -1045,13 +1026,9 @@ impl ErrorCode {
             ErrorCode::LockTimeout => ExitCode::LockTimeout,
             ErrorCode::ParseError
             | ErrorCode::ItemNotFound
-            | ErrorCode::InvariantCommandFailed
             | ErrorCode::ProfileError
             | ErrorCode::SearchFailed
             | ErrorCode::RipgrepNotFound
-            | ErrorCode::WorktreeInfoError
-            | ErrorCode::WorktreeListError
-            | ErrorCode::WorktreeStoreDivergenceError
             | ErrorCode::GenericError
             | ErrorCode::RecoveryFailed
             | ErrorCode::ServerExited => ExitCode::GenericError,
@@ -1072,7 +1049,6 @@ impl ErrorCode {
             }
             ErrorCode::ValidationFailed => "Repository or domain validation failed.",
             ErrorCode::AlreadyExists => "The requested resource already exists.",
-            ErrorCode::InvalidState => "A lifecycle state or transition is invalid.",
             ErrorCode::Blocked => "Unfinished dependencies block the operation.",
             ErrorCode::GateFailed => "A quality-gate checker did not pass.",
             ErrorCode::IoError => "An input/output or external-system operation failed.",
@@ -1102,22 +1078,13 @@ impl ErrorCode {
                 "A profile application would overwrite paths that differ from HEAD; committing \
                  or discarding those changes lets it proceed."
             }
-            ErrorCode::DependencyError => "A dependency command failed.",
-            ErrorCode::GateError => "A gate command failed.",
-            ErrorCode::GateCheckError => "A gate-status check failed.",
             ErrorCode::PresetError => "A gate-preset command failed.",
             ErrorCode::ItemNotFound => "An issue item-address lookup did not resolve an item.",
-            ErrorCode::InvariantCommandFailed => {
-                "An invariant command failed without a more specific classification."
-            }
             ErrorCode::ProfileError => {
                 "A profile command failed without a more specific classification."
             }
             ErrorCode::SearchFailed => "The search backend failed while executing a query.",
             ErrorCode::RipgrepNotFound => "The external ripgrep search tool was not found.",
-            ErrorCode::WorktreeInfoError => "Worktree identity inspection failed.",
-            ErrorCode::WorktreeListError => "Worktree enumeration failed.",
-            ErrorCode::WorktreeStoreDivergenceError => "Cross-checkout store comparison failed.",
             ErrorCode::GenericError => {
                 "A command failed without a more specific public classification."
             }
@@ -1189,20 +1156,6 @@ impl From<ErrorCode> for String {
     fn from(code: ErrorCode) -> Self {
         code.as_str().to_string()
     }
-}
-
-/// Refine a fallback JSON error when the underlying failure is a typed
-/// id-resolution error.
-///
-/// The generic `--json` error path at each command hands in a call-site fallback
-/// (e.g. `ISSUE_NOT_FOUND`). When the actual failure is an ambiguous-prefix or
-/// too-short-prefix id lookup, that fallback misreports both the code and the
-/// exit class, so this replaces it with the matching argument error
-/// ([`ErrorCode::AmbiguousId`] or [`ErrorCode::InvalidIdPrefix`], exit code 2)
-/// carrying the offending prefix in `details`. Any other error keeps its `fallback` unchanged, so this
-/// is a no-op for the vast majority of call sites.
-pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
-    failure::id_resolution_error(error).unwrap_or(fallback)
 }
 
 /// Helper to create common error responses
@@ -3010,7 +2963,6 @@ mod tests {
             (ErrorCode::InvalidLabelPattern, ExitCode::InvalidArgument),
             (ErrorCode::ValidationFailed, ExitCode::ValidationFailed),
             (ErrorCode::AlreadyExists, ExitCode::AlreadyExists),
-            (ErrorCode::InvalidState, ExitCode::InvalidArgument),
             (ErrorCode::Blocked, ExitCode::ValidationFailed),
             (ErrorCode::GateFailed, ExitCode::ValidationFailed),
             (ErrorCode::IoError, ExitCode::ExternalError),
@@ -3035,21 +2987,11 @@ mod tests {
                 ErrorCode::ProfileUncommittedTargets,
                 ExitCode::ValidationFailed,
             ),
-            (ErrorCode::DependencyError, ExitCode::NotFound),
-            (ErrorCode::GateError, ExitCode::AlreadyExists),
-            (ErrorCode::GateCheckError, ExitCode::NotFound),
             (ErrorCode::PresetError, ExitCode::NotFound),
             (ErrorCode::ItemNotFound, ExitCode::GenericError),
-            (ErrorCode::InvariantCommandFailed, ExitCode::GenericError),
             (ErrorCode::ProfileError, ExitCode::GenericError),
             (ErrorCode::SearchFailed, ExitCode::GenericError),
             (ErrorCode::RipgrepNotFound, ExitCode::GenericError),
-            (ErrorCode::WorktreeInfoError, ExitCode::GenericError),
-            (ErrorCode::WorktreeListError, ExitCode::GenericError),
-            (
-                ErrorCode::WorktreeStoreDivergenceError,
-                ExitCode::GenericError,
-            ),
             (ErrorCode::GenericError, ExitCode::GenericError),
             (ErrorCode::RecoveryFailed, ExitCode::GenericError),
             (ErrorCode::ServerExited, ExitCode::GenericError),
@@ -3180,35 +3122,6 @@ mod tests {
 
         envelope.error.code = ErrorCode::ValidationFailed;
         assert_eq!(envelope.exit_code(), ExitCode::ValidationFailed);
-    }
-
-    #[test]
-    fn test_new_error_code_members_match_plain_failure_classes() {
-        for code in [
-            ErrorCode::DependencyError,
-            ErrorCode::GateCheckError,
-            ErrorCode::PresetError,
-        ] {
-            assert_eq!(code.exit_code(), ExitCode::NotFound, "{code}");
-        }
-
-        assert_eq!(ErrorCode::GateError.exit_code(), ExitCode::AlreadyExists);
-
-        for code in [
-            ErrorCode::ItemNotFound,
-            ErrorCode::InvariantCommandFailed,
-            ErrorCode::ProfileError,
-            ErrorCode::SearchFailed,
-            ErrorCode::RipgrepNotFound,
-            ErrorCode::WorktreeInfoError,
-            ErrorCode::WorktreeListError,
-            ErrorCode::WorktreeStoreDivergenceError,
-            ErrorCode::GenericError,
-            ErrorCode::RecoveryFailed,
-            ErrorCode::ServerExited,
-        ] {
-            assert_eq!(code.exit_code(), ExitCode::GenericError, "{code}");
-        }
     }
 
     #[test]

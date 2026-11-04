@@ -842,7 +842,6 @@ mod tests {
 
         let envelope = classify(&error);
         assert_eq!(envelope.error.code, ErrorCode::IssueNotFound);
-        assert_ne!(envelope.error.code, ErrorCode::GateCheckError);
     }
 
     #[test]

@@ -36,7 +36,6 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::ItemNotFound => StatusCode::NOT_FOUND,
         ErrorCode::InvalidArgument
         | ErrorCode::InvalidLabelPattern
-        | ErrorCode::InvalidState
         | ErrorCode::AmbiguousId
         | ErrorCode::InvalidIdPrefix
         | ErrorCode::DeletionNotConfirmed => StatusCode::BAD_REQUEST,
@@ -53,17 +52,10 @@ fn status_of(code: ErrorCode) -> StatusCode {
         | ErrorCode::ParseError
         | ErrorCode::RequiresGit
         | ErrorCode::RepositoryFormatUnsupported
-        | ErrorCode::DependencyError
-        | ErrorCode::GateError
-        | ErrorCode::GateCheckError
         | ErrorCode::PresetError
-        | ErrorCode::InvariantCommandFailed
         | ErrorCode::ProfileError
         | ErrorCode::SearchFailed
         | ErrorCode::RipgrepNotFound
-        | ErrorCode::WorktreeInfoError
-        | ErrorCode::WorktreeListError
-        | ErrorCode::WorktreeStoreDivergenceError
         | ErrorCode::GenericError
         | ErrorCode::RecoveryFailed
         | ErrorCode::ServerExited => StatusCode::INTERNAL_SERVER_ERROR,
