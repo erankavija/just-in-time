@@ -1061,7 +1061,8 @@
       "since_2026_11_04": {
         "f82a2e4a": -60,
         "10fdad38": -221,
-        "9be5b0de": -23
+        "9be5b0de": -23,
+        "8fbf8c43": -31
       },
       "epic_net_running": 951
     },
@@ -1339,7 +1340,7 @@
       "review": "lead PASS at fd2221df3 (Codex); stored resolutions + per-root reachability; +29 lines (b697a3f7 ledger)"
     },
     "4575a03d": {
-      "status": "landing",
+      "status": "done",
       "epic": "v1-release (taken on per 6a)",
       "note": "gates cargo-ci, code-review added; Notes amended (ac1c71c64)",
       "vendor": "Claude Sonnet",
@@ -1347,7 +1348,7 @@
       "review": "lead PASS: retains_source_in_place (permanent or outside root), 7 archive copies removed, REQ-06 config commit separate; lead repointed 7 doc links (97af5f750); Notes corrected (2fbfbda6c). Worker briefly ran git checkout --detach (restored)."
     },
     "8fbf8c43": {
-      "status": "landing",
+      "status": "done",
       "vendor": "Claude Sonnet",
       "reason": "N2 handler aliases; before f87f9b00/3f816619/24a982b7; no renames",
       "review": "lead PASS: HandlerResult<R>, HandlerStore trait (blanket impl), From<R> for Outcome replaces Outcome::success; no renames; -31"
