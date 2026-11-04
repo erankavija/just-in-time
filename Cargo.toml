@@ -23,10 +23,12 @@ authors = ["erankavija"]
 # to amortize against — every agent worktree run and every local re-check is one
 # (dev/benchmarks/rust-build-budgets/README.md, "Provenance").
 debug = "line-tables-only"
+split-debuginfo = "unpacked"
 incremental = true
 
 [profile.test]
 debug = "line-tables-only"
+split-debuginfo = "unpacked"
 # Test builds are frequent and short-lived; avoid accumulating incremental state on disk.
 incremental = false
 

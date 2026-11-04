@@ -325,7 +325,10 @@ harness that produces both.
 - **Debug info** — `[profile.dev]`/`[profile.test]` in the workspace `Cargo.toml` set
   `debug = "line-tables-only"`: enough for line-number backtraces on a local failure, without
   embedding the full debugger payload (type info, macro expansions) that dominates a test
-  executable's size.
+  executable's size. `split-debuginfo = "unpacked"` moves debug information into separate
+  `.dwo` files; keep the build tree for source-line backtraces. The measured
+  size reduction and a panic reproduction are recorded in
+  [the build-budget derivation](benchmarks/rust-build-budgets/README.md).
 - **Dependency optimization** — `[profile.dev.package."*"]` sets `opt-level = 1`, so third-party
   crates are compiled optimized while workspace crates keep the debug profile's compile times.
   Level 1 is the measured selection over level 2, which ran no faster and cost about twice the
