@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "a9c3acfa-4155-4c13-a528-36f978d5bbcc",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:40:41.105296716Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "db094cac-3bdd-442e-8ed1-e80374f6ab8f",
   "labels": [
     "milestone:v1.0",
@@ -20,5 +27,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Preserve complete graph context during scoped transitions",
-  "updated_at": "2026-11-04T22:29:20.545676029Z"
+  "updated_at": "2026-11-04T22:40:41.105296716Z"
 }
