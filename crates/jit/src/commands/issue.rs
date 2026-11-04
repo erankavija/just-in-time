@@ -1255,7 +1255,10 @@ mod tests {
     }
 
     fn seed_scenario_gates(storage: &InMemoryStorage) {
-        crate::commands::test_helpers::seed_manual_gates(storage, &["tests", "code-review"]);
+        crate::test_harness::seed_memory_gate_keys(
+            storage,
+            &["tests".parse().unwrap(), "code-review".parse().unwrap()],
+        );
     }
 
     #[test]
