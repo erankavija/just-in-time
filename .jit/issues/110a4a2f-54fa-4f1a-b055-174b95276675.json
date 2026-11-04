@@ -26,15 +26,16 @@
       "path": "dev/active/0f8efc37-frontends-share-core/breakdown.json"
     }
   ],
+  "done_at": "2026-11-04T22:23:52.126835610Z",
   "first_ready_at": "2026-11-04T21:59:02.643703922Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "run_id": "d8f0b4fd-84e3-41a3-9b76-7fb8f2fccdd7",
-      "status": "failed",
-      "updated_at": "2026-11-04T22:16:52.559981696Z",
+      "run_id": "7c888b70-8279-4385-88f3-55a1938d13e5",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:23:01.277979505Z",
       "updated_by": "auto:executor"
     }
   },
@@ -51,7 +52,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Plan the server and web shared mechanisms",
-  "updated_at": "2026-11-04T22:18:02.192086631Z"
+  "updated_at": "2026-11-04T22:23:52.126835610Z"
 }

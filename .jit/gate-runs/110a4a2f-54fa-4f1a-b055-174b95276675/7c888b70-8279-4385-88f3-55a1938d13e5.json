@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0267b042c0c6b0b104175ed5699a5f74db9c76ca",
+  "completed_at": "2026-11-04T22:23:01.271111797Z",
+  "duration_ms": 238125,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/0f8efc37-frontends-share-core/breakdown.json",
+        "id": "F1",
+        "line": 30,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/110a4a2f/REQ-02",
+          "@/issue/0f8efc37/REQ-02"
+        ],
+        "severity": "low",
+        "summary": "The layout-binding footprint lists five files although the investigation inventories 31 fallible-builder callers; summarize the additional caller and test groups more concretely."
+      }
+    ],
+    "summary": "All required validation, rendering, and dry-run checks pass; one footprint-clarity advisory remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "110a4a2f-54fa-4f1a-b055-174b95276675",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7c888b70-8279-4385-88f3-55a1938d13e5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T22:19:03.145571475Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. [advisory, issue-impact] `layout-binding` names only five touched files while its cited investigation identifies 31 fallible-builder callers. Make its footprint summarize the additional caller/test groups or state their handling more concretely. [breakdown.json:30](dev/active/0f8efc37-frontends-share-core/breakdown.json:30), [investigation.md:1135](dev/active/0f8efc37-frontends-share-core/investigation.md:1135)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All required validation, rendering, and dry-run checks pass; one footprint-clarity advisory remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The layout-binding footprint lists five files although the investigation inventories 31 fallible-builder callers; summarize the additional caller and test groups more concretely.\",\"file\":\"dev/active/0f8efc37-frontends-share-core/breakdown.json\",\"line\":30,\"references\":[\"@/issue/110a4a2f/REQ-02\",\"@/issue/0f8efc37/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

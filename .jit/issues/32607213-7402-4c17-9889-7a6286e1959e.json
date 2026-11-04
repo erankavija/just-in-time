@@ -7,6 +7,7 @@
   ],
   "description": "Instantiate the reviewed server/web manifest for 0f8efc37 with exact issue and edge fidelity.\n\n## Success Criteria\n\n- [hard] REQ-01: The stored issue graph exactly matches the approved manifest, bracket wiring and external dependencies.\n- [hard] REQ-02: Every active container criterion has coverage and every terminal is one focused implementation/review assignment.",
   "documents": [],
+  "first_ready_at": "2026-11-04T22:23:52.258524613Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
@@ -37,7 +38,7 @@
     "brackets:0f8efc37"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Break down the server and web shared mechanisms",
-  "updated_at": "2026-11-04T21:59:45.821232800Z"
+  "updated_at": "2026-11-04T22:23:52.258524613Z"
 }
