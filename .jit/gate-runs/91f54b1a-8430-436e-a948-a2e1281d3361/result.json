@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "11f0b0c8cf3111a187b0d7f49bf8b85f8e0d6073",
+  "completed_at": "2026-11-04T05:10:55.761734683Z",
+  "duration_ms": 205204,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable format-4 rewrite tooling meets the issue criteria; the prior linked-worktree dry-run defect is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "944edb32-2fe3-481e-9086-4cffaef7cfc8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "91f54b1a-8430-436e-a948-a2e1281d3361",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T05:07:30.557306595Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 71a1023f3, 3b147fc37, eb44ddc46\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/issue/944edb32/requirement/REQ-01 and REQ-05 (issue description, markdown-first)\nGate evidence: code-review failed, exit 1 (prior run b9694ac5; its F1 is addressed); no other required-gate projections\nTruncation recovery: recovered the initial truncated patch through bounded current-file line reads and individual later-commit patches\n\n1. No findings. The prior F1 is resolved: the dry-run copy and idempotence digest now use Git’s common directory for shared JIT state.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable format-4 rewrite tooling meets the issue criteria; the prior linked-worktree dry-run defect is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
