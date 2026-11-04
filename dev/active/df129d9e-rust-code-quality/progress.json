@@ -877,7 +877,7 @@
     "98cc2097": 2,
     "20fc3b92": 1,
     "10751360": 1,
-    "8a14e8e9": 1
+    "8a14e8e9": 2
   },
   "surfaced_pitfalls": [
     {
@@ -1127,7 +1127,7 @@
       "status": "rework",
       "vendor": "Claude Sonnet",
       "reason": "ENOSPC classification (D-47)",
-      "note": "landed 59257f573; cargo-ci and selftest pass; code-review F1: non-test step with ENOSPC plus content error exits 75 (REQ-02)"
+      "note": "follow-up landed 1e2d11ebf; code-review F1 (round 2): same-test assertion plus ENOSPC elsewhere in block exits 75; rework 2 of 2: ENOSPC must be in the panic message"
     }
   }
 }

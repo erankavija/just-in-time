@@ -81,15 +81,22 @@ reports_enospc() {
 }
 
 # Failure markers in a step's output that ENOSPC does not account for. A failed
-# test (nextest FAIL or ABORT, doctest FAILED) counts unless its own output block
-# reports ENOSPC; outside test blocks a rustc `error` line (except the
-# per-crate summary lines), a rustfmt `Diff in` line, or a budget violation
-# counts unless the line itself reports ENOSPC.
+# test (nextest FAIL or ABORT, doctest FAILED) is ENOSPC-caused only when it
+# panicked and every panic message in its block reports ENOSPC; a message runs
+# from the `panicked at` line to the `note:` line or the end of the block, so
+# ENOSPC in captured stdout or elsewhere in the block does not count. Outside
+# test blocks a rustc `error` line (except the per-crate summary lines), a
+# rustfmt `Diff in` line, or a budget violation counts unless the line itself
+# reports ENOSPC.
 count_non_enospc_failures() {
   awk '
     function enospc(line) { return line ~ /No space left on device|os error 28/ }
+    function end_panic() {
+      if (in_panic) { panics[pcur]++; if (msg_hit) good[pcur]++ }
+      in_panic = 0
+    }
     /^[[:space:]]*(TRY [0-9]+ )?[A-Z]+ \[/ {
-      cur = ""
+      end_panic(); cur = ""
       if ($0 ~ /^[[:space:]]*(FAIL|ABORT) \[/) {
         cur = $0
         sub(/^[[:space:]]*[A-Z]+ \[[^]]*\][[:space:]]*/, "", cur)
@@ -97,14 +104,24 @@ count_non_enospc_failures() {
       }
       next
     }
-    /^---- .* stdout ----$/ { cur = $0; sub(/^---- /, "", cur); sub(/ stdout ----$/, "", cur); next }
+    /^---- .* stdout ----$/ { end_panic(); cur = $0; sub(/^---- /, "", cur); sub(/ stdout ----$/, "", cur); next }
     /^test .* \.\.\. FAILED$/ { name = $0; sub(/^test /, "", name); sub(/ \.\.\. FAILED$/, "", name); failed[name] = 1; next }
-    /^(failures:|test result:)/ { cur = ""; next }
-    enospc($0) { if (cur != "") hit[cur] = 1; next }
-    cur != "" { next }
+    /^(failures:|test result:)/ { end_panic(); cur = ""; next }
+    cur != "" && /panicked at / {
+      end_panic(); in_panic = 1; pcur = cur; msg_hit = 0
+      if ($0 !~ /:[0-9]+:[0-9]+:$/) msg_hit = enospc($0)
+      next
+    }
+    cur != "" && /^(note:|--- )/ { end_panic(); next }
+    cur != "" { if (in_panic && enospc($0)) msg_hit = 1; next }
+    enospc($0) { next }
     /^error(\[[A-Za-z0-9]+\])?:/ && !/could not compile|aborting due to|previous error/ { n++; next }
     /^Diff in / || /^  - / { n++ }
-    END { for (name in failed) if (!(name in hit)) n++; print n + 0 }
+    END {
+      end_panic()
+      for (name in failed) if (!(name in panics) || good[name] != panics[name]) n++
+      print n + 0
+    }
   ' "$1"
 }
 
