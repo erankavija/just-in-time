@@ -17,13 +17,13 @@ mod output_macros;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
-    ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
-    GateCommands, GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
+    ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, EventCommands, GateCommands,
+    GraphCommands, IssueCommands, ItemCommands, ProfileCommands, ProjectCommands,
 };
 use jit::commands::{
     parse_profile_selector, CommandExecutor, DescriptionUpdate, ProfileVariableOptions,
 };
-use jit::dispatch::{config, invariant, resolve_issue, resolve_issue_filter, CommandContext};
+use jit::dispatch::{config, doc, invariant, resolve_issue, resolve_issue_filter, CommandContext};
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
 use jit::output::failure::{
@@ -4471,496 +4471,9 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         },
-        Commands::Doc(doc_cmd) => match doc_cmd {
-            DocCommands::Add {
-                id,
-                path,
-                commit,
-                label,
-                doc_type,
-                skip_scan,
-            } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue(&storage, &id)?;
-                let (result, warnings) = executor.documents().add_document_reference(
-                    &id,
-                    &path,
-                    commit.as_deref(),
-                    label.as_deref(),
-                    doc_type.as_deref(),
-                    skip_scan,
-                )?;
-                for warning in warnings {
-                    output_ctx.print_warning(&warning)?;
-                }
-
-                let verb = if result.updated { "Updated" } else { "Added" };
-                if json {
-                    use jit::output::JsonOutput;
-                    let msg = format!("{} document reference on issue {}", verb, result.issue_id);
-                    let output = JsonOutput::success(&result).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!("{} document reference on issue {}", verb, result.issue_id);
-                    println!("  Path: {}", result.document.path);
-                    if let Some(ref c) = result.document.commit {
-                        println!("  Commit: {}", c);
-                    }
-                    if let Some(ref l) = result.document.label {
-                        println!("  Label: {}", l);
-                    }
-                    if let Some(ref t) = result.document.doc_type {
-                        println!("  Type: {}", t);
-                    }
-                    if let Some(ref f) = result.document.format {
-                        println!("  Format: {}", f);
-                    }
-                    if !result.document.assets.is_empty() {
-                        println!("  Assets: {} discovered", result.document.assets.len());
-                    }
-                }
-            }
-            DocCommands::List { id } => {
-                use jit::output::JsonOutput;
-
-                let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue(&storage, &id)?;
-                let result = executor.documents().list_document_references(&id)?;
-
-                if json {
-                    let msg = format!("{} document(s) attached", result.count());
-                    let output = JsonOutput::success(&result).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else if result.items.is_empty() {
-                    output_ctx.print_data(format!(
-                        "No document references for issue {}",
-                        result.extras.issue_id
-                    ))?;
-                } else {
-                    output_ctx.print_data(format!(
-                        "Document references for issue {}:",
-                        result.extras.issue_id
-                    ))?;
-                    for doc in &result.items {
-                        let mut line = format!("  - {}", doc.path);
-                        if let Some(ref label) = doc.label {
-                            line.push_str(&format!(" ({})", label));
-                        }
-                        if let Some(ref commit) = doc.commit {
-                            line.push_str(&format!(" [{}]", &commit[..7.min(commit.len())]));
-                        } else {
-                            line.push_str(" [HEAD]");
-                        }
-                        if let Some(ref doc_type) = doc.doc_type {
-                            line.push_str(&format!(" <{}>", doc_type));
-                        }
-                        output_ctx.print_data(line)?;
-                    }
-                    output_ctx.print_data(format!("\nTotal: {}", result.count()))?;
-                }
-            }
-            DocCommands::Remove { id, path } => {
-                let id = resolve_issue(&storage, &id)?;
-                let (result, warnings) =
-                    executor.documents().remove_document_reference(&id, &path)?;
-                let output_ctx = OutputContext::new(quiet, json);
-                for warning in warnings {
-                    output_ctx.print_warning(&warning)?;
-                }
-
-                if json {
-                    use jit::output::JsonOutput;
-                    let msg = format!(
-                        "Removed document reference {} from issue {}",
-                        result.path, result.issue_id
-                    );
-                    let output = JsonOutput::success(&result).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!(
-                        "Removed document reference {} from issue {}",
-                        result.path, result.issue_id
-                    );
-                }
-            }
-            DocCommands::Show { id, path, at } => {
-                let id = resolve_issue(&storage, &id)?;
-                let result =
-                    executor
-                        .documents()
-                        .show_document_content(&id, &path, at.as_deref())?;
-
-                if json {
-                    use jit::output::JsonOutput;
-                    let msg = "Document content retrieved".to_string();
-                    let output = JsonOutput::success(&result).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!("Document: {}", result.path);
-                    if let Some(ref label) = result.label {
-                        println!("Label: {}", label);
-                    }
-                    println!("Commit: {}", result.commit);
-                    if let Some(ref doc_type) = result.doc_type {
-                        println!("Type: {}", doc_type);
-                    }
-                    println!("\n---\n");
-                    println!("{}", result.content);
-                }
-            }
-            DocCommands::Dir { id, area } => {
-                let output_ctx = OutputContext::new(quiet, json);
-
-                match resolve_issue(&storage, &id).and_then(|full_id| {
-                    executor
-                        .documents()
-                        .resolve_issue_artifact_directory(&full_id, &area)
-                }) {
-                    Ok(response) => {
-                        if json {
-                            use jit::output::JsonOutput;
-                            println!("{}", JsonOutput::success(&response).to_json_string()?);
-                        } else {
-                            // The bare path, so the command composes into a shell
-                            // substitution without anything to strip off it.
-                            output_ctx.print_data(&response.directory)?;
-                        }
-                    }
-                    Err(e) => {
-                        // Every rejection this command states is typed, so the `--json`
-                        // envelope carries the code whose `ErrorCode::exit_code`
-                        // mapping is the exit status `classify` already gives
-                        // that same typed error on the plain-text path: an undeclared
-                        // area is the resolver's `InvalidArgumentError`
-                        // (`INVALID_ARGUMENT`, exit 2), and an id naming no issue is
-                        // `IssueNotFoundError` (`ISSUE_NOT_FOUND`, exit 3).
-                        // `handle_json_error!` refines an ambiguous or too-short prefix
-                        // to its own code, exit 2 on both paths. Any other failure (an
-                        // unreadable `config.toml`, say) is untyped here and returns to
-                        // the top-level handler rather than being relabelled under a code
-                        // whose exit class would disagree with it.
-                        use jit::output::{ErrorCode, JsonError};
-
-                        let json_error = if e
-                            .downcast_ref::<jit::errors::InvalidArgumentError>()
-                            .is_some()
-                        {
-                            command_json_error(&e, ErrorCode::InvalidArgument)
-                        } else if e
-                            .downcast_ref::<jit::storage::IssueNotFoundError>()
-                            .is_some()
-                            || e.downcast_ref::<jit::storage::AmbiguousIdError>().is_some()
-                            || e.downcast_ref::<jit::domain::identity::InvalidIdPrefixError>()
-                                .is_some()
-                        {
-                            JsonError::issue_not_found(&id)
-                        } else {
-                            return Err(e);
-                        };
-                        handle_json_error!(json, e, json_error);
-                    }
-                }
-            }
-            DocCommands::Conformance => {
-                let output_ctx = OutputContext::new(quiet, json);
-                // This command takes no argument it could reject and states no
-                // verdict in its exit status, so it has no typed rejection to
-                // classify: what remains is infrastructure failure (an
-                // unreadable `config.toml`, an unreadable declared area), which
-                // the sibling `doc dir` arm also returns to the top-level
-                // handler rather than relabelling under a code whose exit class
-                // would disagree with it.
-                let report = executor.documents().report_artifact_conformance()?;
-
-                if json {
-                    use jit::output::JsonOutput;
-                    println!("{}", JsonOutput::success(&report).to_json_string()?);
-                } else {
-                    output_ctx.print_data(format!(
-                        "Scanned areas: {}",
-                        if report.extras.areas.is_empty() {
-                            "none declared".to_string()
-                        } else {
-                            report.extras.areas.join(", ")
-                        }
-                    ))?;
-                    if report.items.is_empty() {
-                        // A finding-free report says so rather than trailing
-                        // off after the header, since exit status carries no
-                        // verdict here.
-                        output_ctx.print_data(
-                            "No artifact sits outside its owning issue's canonical directory.",
-                        )?;
-                    } else {
-                        output_ctx.print_data(format!("Artifacts ({}):", report.items.len()))?;
-                    }
-                    for artifact in &report.items {
-                        output_ctx.print_data(format!("  {}", artifact.path))?;
-                        // The advice: where it belongs, or that nothing can be
-                        // said about where it belongs.
-                        match (&artifact.canonical_directory, &artifact.issue_id) {
-                            (Some(directory), Some(issue_id)) => output_ctx.print_data(format!(
-                                "    {} -> {directory} (issue {issue_id})",
-                                artifact.status
-                            ))?,
-                            // A name carrying no short id reached the report
-                            // through the references naming it, so what could
-                            // not be settled is which of them owns it.
-                            _ if artifact.short_id.is_empty() => output_ctx.print_data(format!(
-                                "    {} (several issues reference it)",
-                                artifact.status
-                            ))?,
-                            _ => output_ctx.print_data(format!(
-                                "    {} (no issue answers to {})",
-                                artifact.status, artifact.short_id
-                            ))?,
-                        }
-                    }
-                }
-            }
-            DocCommands::History { id, path } => {
-                use jit::output::JsonOutput;
-
-                let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue(&storage, &id)?;
-                let result = executor.documents().document_history(&id, &path)?;
-
-                if json {
-                    let msg = format!("{} commits in history", result.commits.len());
-                    let output = JsonOutput::success(&result).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    output_ctx.print_data(format!("History for {}:\n", result.path))?;
-                    for commit in &result.commits {
-                        output_ctx.print_data(format!("commit {}", commit.sha))?;
-                        output_ctx.print_data(format!("Author: {}", commit.author))?;
-                        output_ctx.print_data(format!("Date:   {}", commit.date))?;
-                        output_ctx.print_data("")?;
-                        output_ctx.print_data(format!("    {}", commit.message))?;
-                        output_ctx.print_data("")?;
-                    }
-                }
-            }
-            DocCommands::Diff { id, path, from, to } => {
-                let id = resolve_issue(&storage, &id)?;
-                let result =
-                    executor
-                        .documents()
-                        .document_diff(&id, &path, &from, to.as_deref())?;
-
-                if json {
-                    use jit::output::JsonOutput;
-                    let msg = "Document diff retrieved".to_string();
-                    let output = JsonOutput::success(&result).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    print!("{}", result.diff);
-                }
-            }
-            DocCommands::Assets { command } => match command {
-                jit::cli::AssetCommands::List { id, path, rescan } => {
-                    use jit::document::AssetType;
-                    use jit::output::JsonOutput;
-
-                    let output_ctx = OutputContext::new(quiet, json);
-                    let id = resolve_issue(&storage, &id)?;
-                    let result = executor
-                        .documents()
-                        .list_document_assets(&id, &path, rescan)?;
-
-                    // Print warnings first if any
-                    for warning in &result.extras.warnings {
-                        output_ctx.print_warning(warning)?;
-                    }
-
-                    if json {
-                        let msg = format!("{} assets found", result.extras.summary.total);
-                        let output = JsonOutput::success(&result).with_message(msg);
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        let repo_root = executor_layout.worktree_root();
-
-                        output_ctx.print_data(format!(
-                            "Assets for document {} (issue {}):",
-                            result.extras.document_path,
-                            result.extras.issue_id.short_id()
-                        ))?;
-
-                        if result.items.is_empty() {
-                            output_ctx.print_data("  No assets found for this document")?;
-                        } else {
-                            // Categorize and check existence
-                            let per_doc: Vec<_> = result
-                                .items
-                                .iter()
-                                .filter(|a| !a.is_shared && a.asset_type == AssetType::Local)
-                                .map(|a| {
-                                    let exists = a
-                                        .resolved_path
-                                        .as_ref()
-                                        .map(|p| repo_root.join(p).exists())
-                                        .unwrap_or(false);
-                                    (a, exists)
-                                })
-                                .collect();
-                            let shared: Vec<_> = result
-                                .items
-                                .iter()
-                                .filter(|a| a.is_shared && a.asset_type == AssetType::Local)
-                                .map(|a| {
-                                    let exists = a
-                                        .resolved_path
-                                        .as_ref()
-                                        .map(|p| repo_root.join(p).exists())
-                                        .unwrap_or(false);
-                                    (a, exists)
-                                })
-                                .collect();
-                            let external: Vec<_> = result
-                                .items
-                                .iter()
-                                .filter(|a| a.asset_type == AssetType::External)
-                                .collect();
-                            let missing: Vec<_> = result
-                                .items
-                                .iter()
-                                .filter(|a| a.asset_type == AssetType::Missing)
-                                .collect();
-
-                            if !per_doc.is_empty() {
-                                output_ctx.print_data("\nPer-document assets:")?;
-                                for (asset, exists) in &per_doc {
-                                    let status = if *exists { "ok" } else { "missing" };
-                                    output_ctx.print_data(format!(
-                                        "  {} {}",
-                                        status, asset.original_path
-                                    ))?;
-                                    if let Some(ref resolved) = asset.resolved_path {
-                                        output_ctx
-                                            .print_data(format!("     → {}", resolved.display()))?;
-                                    }
-                                    if let Some(ref mime) = asset.mime_type {
-                                        output_ctx.print_data(format!("     MIME: {}", mime))?;
-                                    }
-                                }
-                            }
-
-                            if !shared.is_empty() {
-                                output_ctx.print_data("\nShared assets:")?;
-                                for (asset, exists) in &shared {
-                                    let status = if *exists { "ok" } else { "missing" };
-                                    output_ctx.print_data(format!(
-                                        "  {} {}",
-                                        status, asset.original_path
-                                    ))?;
-                                    if let Some(ref resolved) = asset.resolved_path {
-                                        output_ctx
-                                            .print_data(format!("     → {}", resolved.display()))?;
-                                    }
-                                }
-                            }
-
-                            if !external.is_empty() {
-                                output_ctx.print_data("\nExternal URLs:")?;
-                                for asset in &external {
-                                    output_ctx
-                                        .print_data(format!("  remote {}", asset.original_path))?;
-                                }
-                            }
-
-                            if !missing.is_empty() {
-                                output_ctx.print_data("\nMissing assets:")?;
-                                for asset in &missing {
-                                    output_ctx
-                                        .print_data(format!("  missing {}", asset.original_path))?;
-                                    if let Some(ref resolved) = asset.resolved_path {
-                                        output_ctx.print_data(format!(
-                                            "     Expected at: {}",
-                                            resolved.display()
-                                        ))?;
-                                    }
-                                }
-                            }
-
-                            output_ctx.print_data(format!(
-                                "\nSummary: {} total ({} per-doc, {} shared, {} external, {} missing)",
-                                result.extras.summary.total,
-                                result.extras.summary.per_doc,
-                                result.extras.summary.shared,
-                                result.extras.summary.external,
-                                result.extras.summary.missing
-                            ))?;
-                        }
-                    }
-                }
-            },
-            DocCommands::CheckLinks { scope } => {
-                use jit::document::DocumentScope;
-                use jit::output::JsonOutput;
-
-                let output_ctx = OutputContext::new(quiet, json);
-                let scope = DocumentScope::parse(&scope, |id| resolve_issue(&storage, id))?;
-                let result = executor.documents().check_document_links(&scope)?;
-
-                if json {
-                    let msg = if result.summary.errors == 0 && result.summary.warnings == 0 {
-                        "All links valid".to_string()
-                    } else {
-                        format!(
-                            "{} error(s), {} warning(s)",
-                            result.summary.errors, result.summary.warnings
-                        )
-                    };
-                    let output = JsonOutput::success(&result).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    output_ctx.print_data(format!(
-                        "Checking {} document(s) in scope '{}'...\n",
-                        result.summary.total_documents, result.scope
-                    ))?;
-
-                    if !result.errors.is_empty() {
-                        output_ctx
-                            .print_data(format!("Errors found ({}):", result.errors.len()))?;
-                        for error in &result.errors {
-                            output_ctx.print_data(format!(
-                                "  {} ({}): {}",
-                                error["document"].as_str().unwrap_or(""),
-                                error["type"].as_str().unwrap_or(""),
-                                error["message"].as_str().unwrap_or("")
-                            ))?;
-                        }
-                        output_ctx.print_data("")?;
-                    }
-
-                    if !result.warnings.is_empty() {
-                        output_ctx.print_data(format!("Warnings ({}):", result.warnings.len()))?;
-                        for warning in &result.warnings {
-                            output_ctx.print_data(format!(
-                                "  {} ({}): {}",
-                                warning["document"].as_str().unwrap_or(""),
-                                warning["type"].as_str().unwrap_or(""),
-                                warning["message"].as_str().unwrap_or("")
-                            ))?;
-                        }
-                        output_ctx.print_data("")?;
-                    }
-
-                    if result.errors.is_empty() && result.warnings.is_empty() {
-                        output_ctx.print_data("All documents valid")?;
-                    }
-
-                    output_ctx.print_data(format!(
-                        "Summary: {} document(s) checked, {} error(s), {} warning(s)",
-                        result.summary.total_documents,
-                        result.summary.errors,
-                        result.summary.warnings
-                    ))?;
-                }
-
-                std::process::exit(i32::from(!result.valid));
-            }
-        },
+        Commands::Doc(command) => {
+            return doc::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
         Commands::Archive(archive_cmd) => match archive_cmd {
             ArchiveCommands::Candidates => {
                 let report = executor.archive().archive_candidates()?;
@@ -5860,12 +5373,12 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 let (validation_report, divergence_report) = executor
                     .validation()
                     .validate_repository_report_with_divergences()?;
-                let integrity_error = validation_report.structural_failure.map(|error| {
+                let (structural_failure, rule_report) = validation_report.into_parts();
+                let integrity_error = structural_failure.map(|error| {
                     anyhow::Error::new(jit::errors::ValidationFailedError::new(format!(
                         "Invalid repository: {error:#}"
                     )))
                 });
-                let rule_report = validation_report.rule_report;
                 let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
 
                 // The view-derived report contains the declarative local/graph
@@ -6383,23 +5896,28 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
             ClaimCommands::Renew {
-                lease_id,
+                issue_id,
                 extension,
             } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match executor.claims().renew(&lease_id, extension) {
+                match resolve_issue(&storage, &issue_id)
+                    .and_then(|full_id| executor.claims().renew(&full_id, extension))
+                {
                     Ok((renewed_lease, warnings)) => {
                         if json {
                             let response = serde_json::json!({
+                                "message": format!(
+                                    "Renewed lease {} by {} seconds",
+                                    renewed_lease.lease_id, extension
+                                ),
                                 "lease": renewed_lease,
                                 "warnings": warnings,
-                                "message": format!("Renewed lease {} by {} seconds", lease_id, extension),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Renewed lease: {}", lease_id);
+                            println!("Renewed lease: {}", renewed_lease.lease_id);
                             println!("  Issue: {}", renewed_lease.issue_id);
                             println!("  Extended by: {} seconds", extension);
                             if let Some(expires_at) = renewed_lease.expires_at {
@@ -6422,21 +5940,25 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     }
                 }
             }
-            ClaimCommands::Heartbeat { lease_id } => {
+            ClaimCommands::Heartbeat { issue_id } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match executor.claims().heartbeat(&lease_id) {
-                    Ok(warnings) => {
+                match resolve_issue(&storage, &issue_id)
+                    .and_then(|full_id| executor.claims().heartbeat(&full_id))
+                {
+                    Ok((lease, warnings)) => {
                         if json {
                             let response = serde_json::json!({
-                                "lease_id": lease_id,
+                                "lease_id": lease.lease_id,
+                                "issue_id": lease.issue_id,
                                 "warnings": warnings,
-                                "message": format!("Heartbeat sent for lease {}", lease_id),
+                                "message": format!("Heartbeat sent for lease {}", lease.lease_id),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Heartbeat sent: {}", lease_id);
+                            println!("Heartbeat sent: {}", lease.lease_id);
+                            println!("  Issue: {}", lease.issue_id);
                             let output_ctx = OutputContext::new(quiet, json);
                             for warning in &warnings {
                                 output_ctx.print_warning(warning)?;
@@ -6518,22 +6040,30 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                     }
                 }
             }
-            ClaimCommands::ForceEvict { lease_id, reason } => {
+            ClaimCommands::ForceEvict { issue_id, reason } => {
                 use jit::output::{JsonOutput, OutputContext};
 
-                match executor.claims().force_evict(&lease_id, &reason) {
-                    Ok(warnings) => {
+                // Matched against stored leases, not issues, so a lease on a
+                // deleted issue stays evictable.
+                match issue_id
+                    .parse::<jit::domain::identity::IssueIdPrefix>()
+                    .map_err(anyhow::Error::from)
+                    .and_then(|prefix| executor.claims().force_evict(&prefix, &reason))
+                {
+                    Ok((evicted, warnings)) => {
                         if json {
                             let response = serde_json::json!({
-                                "lease_id": lease_id,
+                                "lease_id": evicted.lease_id,
+                                "issue_id": evicted.issue_id,
                                 "reason": reason,
                                 "warnings": warnings,
-                                "message": format!("Force-evicted lease {}", lease_id),
+                                "message": format!("Force-evicted lease {}", evicted.lease_id),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("Force-evicted lease: {}", lease_id);
+                            println!("Force-evicted lease: {}", evicted.lease_id);
+                            println!("  Issue: {}", evicted.issue_id);
                             println!("  Reason: {}", reason);
                             let output_ctx = OutputContext::new(quiet, json);
                             for warning in &warnings {
@@ -6829,7 +6359,7 @@ fn print_lease(listed: &jit::commands::claim::ListedLease) {
             );
             println!(
                 "     Use 'jit claim heartbeat {}' to refresh",
-                lease.lease_id
+                lease.issue_id.short_id()
             );
         }
     }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "aa6ea4aa06b509fa70a2b800c1c63a87a7a0278e",
+  "completed_at": "2026-11-04T05:46:16.111324306Z",
+  "duration_ms": 226839,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped success criteria are satisfied by the attributed implementation and focused tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "614a6f97-e1fc-4e03-bd44-05949e33078c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9e98aef0-bb70-45c7-bc87-dd7512de9344",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T05:42:29.271354422Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 62b8fa62d (`jit:614a6f97`); uncommitted state excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/issue/f8a6b298/requirement/REQ-05 (.jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json); @/invariant/{canonical-cutover,orthogonal-tests,essential-code-prose} (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed, exit 75; code-review pending\nTruncation recovery: narrowed the truncated broad reference search to dispatch resolution, error classification, coordinator, and workflow-test reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped success criteria are satisfied by the attributed implementation and focused tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -12,11 +12,11 @@ fn check<S: IssueStore>(
 ) -> anyhow::Result<Outcome<InvariantCheckResult>> {
     let result = ctx.executor.items().check_invariants()?;
     Ok(if result.has_drift() {
-        Outcome::Findings {
-            code: ErrorCode::ValidationFailed,
-            message: format!("Enforcement drift: {} finding(s)", result.count()),
-            report: Box::new(result),
-        }
+        Outcome::findings(
+            ErrorCode::ValidationFailed,
+            format!("Enforcement drift: {} finding(s)", result.count()),
+            result,
+        )
     } else {
         Outcome::success_with(result, "No enforcement drift")
     })

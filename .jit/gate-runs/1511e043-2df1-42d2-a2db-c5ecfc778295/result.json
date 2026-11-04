@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f638f91613b6689ca7b2069aa50f75696a14cf35",
+  "completed_at": "2026-11-04T05:21:00.033271664Z",
+  "duration_ms": 257931,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met by the current config handlers, typed schema registrations, preserved output and exit behavior, and passing gate evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "153c9851-dca1-40f3-838b-ee2790fb9318",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1511e043-2df1-42d2-a2db-c5ecfc778295",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T05:16:42.101735297Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 77892c47c, 2c72479b0, ca63c2c1a, 4d42f3150, a719cd98c, da20f199a, f638f9161\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/153c9851/requirement/REQ-01, @/issue/153c9851/requirement/REQ-02, @/issue/153c9851/requirement/REQ-03, @/issue/153c9851/requirement/REQ-04, @/issue/153c9851/requirement/REQ-05, @/issue/153c9851/requirement/REQ-06; @/issue/df129d9e/requirement/REQ-01, @/issue/df129d9e/requirement/REQ-02, @/issue/df129d9e/requirement/REQ-12, @/issue/df129d9e/requirement/REQ-13, @/issue/df129d9e/requirement/REQ-17, @/issue/df129d9e/requirement/REQ-18; @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests; @/gate/jit-validate\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T05:09:20Z); mcp-ci passed (exit 0, 2026-11-04T05:10:58Z)\nTruncation recovery: Focused rereads covered config patches, current handlers, schema rows, exit-code documentation, and config contract tests; unrelated merge paths were outside the config impact cone.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met by the current config handlers, typed schema registrations, preserved output and exit behavior, and passing gate evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

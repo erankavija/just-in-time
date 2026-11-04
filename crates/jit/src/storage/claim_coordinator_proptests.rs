@@ -81,7 +81,7 @@ proptest! {
         // Release some leases (about half)
         let released_count = acquired_count / 2;
         for lease in acquired_leases.iter().take(released_count) {
-            coordinator.force_evict_lease(&lease.lease_id, "test release").unwrap();
+            coordinator.force_evict_lease(&IssueIdPrefix::from(&lease.issue_id), "test release").unwrap();
         }
 
         let stored = read_leases(&coordinator.paths).unwrap().len();
@@ -112,7 +112,7 @@ proptest! {
                 &issue_id, ttl, Some("test lease"),
                 ClaimAcquireLimits::new(100, 100), |_| Ok(()),
             ).unwrap();
-            coordinator.force_evict_lease(&lease.lease_id, "test release").unwrap();
+            coordinator.force_evict_lease(&IssueIdPrefix::from(&lease.issue_id), "test release").unwrap();
         }
 
         let content = std::fs::read_to_string(

@@ -151,6 +151,13 @@ impl WorktreePaths {
         Self::leases_dir(shared_jit).join(format!("{issue_id}.json"))
     }
 
+    /// The stage file a change to the issue's lease record is written to before
+    /// its rename. Its `.tmp` suffix puts an interrupted operation's residue
+    /// under `jit recover`'s temp-file cleanup.
+    pub fn lease_stage_path(shared_jit: &Path, issue_id: &IssueId) -> PathBuf {
+        Self::leases_dir(shared_jit).join(format!("{issue_id}.json.tmp"))
+    }
+
     /// The issue a [`Self::lease_path`] file name names, or `None` for any
     /// other name in the lease directory.
     pub fn lease_record_issue(file_name: &OsStr) -> Option<IssueId> {

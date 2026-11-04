@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T02:24:23.524403909Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "256fcb89-473e-4f28-a622-72232ceae90d",
+      "status": "passed",
+      "updated_at": "2026-11-04T06:57:32.985618813Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c54116ac-98c0-4f74-9ba9-38ff8d04aa09",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:00:49.384467652Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "612ee9d4-d14a-45a8-b1e5-8bedec9951ce",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Validation views are selections of the report",
-  "updated_at": "2026-11-04T02:24:23.524403909Z"
+  "updated_at": "2026-11-04T07:00:49.384467652Z"
 }

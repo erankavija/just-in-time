@@ -228,7 +228,7 @@ rm .git/jit/leases/<issue-id>.json
 ### Coordination-State Repair
 
 `jit validate` reports repository validation findings. Stale locks and expired
-leases are coordination state for `jit recover` to repair; it also removes orphaned `*.tmp` files. It never removes `redo.record`
+leases are coordination state for `jit recover` to repair; it also removes orphaned `*.tmp` files, lease stage files included. It never removes `redo.record`
 from the scratch directory `.jit/tmp/`: that record is a pending mutation's
 commit point. [Stale Temporary Files](../concepts/guarantees.md#stale-temporary-files)
 names what is safe to remove by hand.

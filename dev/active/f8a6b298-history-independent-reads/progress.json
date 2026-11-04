@@ -430,7 +430,7 @@
     },
     {
       "item": "format-4 window bracket.sh denied by permission check",
-      "status": "pending with user directly"
+      "status": "user approved cutover in 52 session; bracket pending green rebuild"
     }
   ],
   "rework_counts": {
@@ -718,6 +718,12 @@
       "vendor": "claude",
       "model": "sonnet",
       "reason": "gate/search docs"
+    },
+    {
+      "id": "7244ecb2",
+      "vendor": "claude",
+      "model": "opus",
+      "reason": "lease interruption matrix; concurrency-critical"
     }
   ],
   "started_at": "2026-11-02T23:48:34.925324+00:00",
@@ -737,6 +743,9 @@
     "a7314585 added LeaseChange::Reclaim and edited the lease-sequence contract in plan.md; batch a plan-review rerun after the wave.",
     "gf2 quiet window 03:52-04:09 held the full-CI lock; released by 6a.",
     "Window bracket (6a): give 6a 15 min warning; 6a stops all tracker writers (88, a4, gf2-4e) and confirms; then rewrite all five, reinstall jit once, verify each with jit validate, report to 6a who releases everyone and lifts the install freeze. Stop and report before reinstalling if any rewrite or validation fails.",
-    "Window blocked 07:3x by Claude Code permission (Modify Shared Resources); awaiting user. 6a released writers; repeat stop sequence after user allows. Bracket script: scratchpad/f8a6-lead/bracket.sh; re-verify green sha before rerun."
+    "Window blocked 07:3x by Claude Code permission (Modify Shared Resources); awaiting user. 6a released writers; repeat stop sequence after user allows. Bracket script: scratchpad/f8a6-lead/bracket.sh; re-verify green sha before rerun.",
+    "Session paused at usage limit 07:35; see handoff.md.",
+    "Lead rotation 08:40: handing to just-in-time-52; see handoff-2.md.",
+    "08:40 lead rotation: just-in-time-52 took over from 3e (handoff-2 a36f603b6). User approved the format-4 cutover directly in 52 session. Order: land 7244ecb2, 725af076, 09ca911e; rebuild green at main HEAD; rerun five-repo dry run; 15-min warning to 6a; bracket."
   ]
 }

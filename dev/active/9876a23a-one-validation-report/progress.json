@@ -171,40 +171,38 @@
       "issues": [
         {
           "short_id": "612ee9d4",
-          "status": "rework 1 + merge c4a8c14d6 reviewed; landing pending",
+          "status": "landing (chain-w7b)",
           "worker": "claude opus",
           "worker_reason": "report-selection contract"
         },
         {
           "short_id": "2b5f452c",
-          "status": "landed 88ce303a1 (rework 3); final code-review F1: duplicate-key rejection stricter than before (REQ-03/04) - escalated to steward",
+          "status": "done (merges d712d8b17, 6d4a8b704, 88ce303a1, c6c3cceb8; reworks 3 + steward D-01, D-02)",
           "worker": "claude opus",
           "worker_reason": "fidelity on parsed records (REQ-10)"
         },
         {
           "short_id": "3acaa5a3",
-          "status": "landed f70dcdf40; code-review passed; cargo-ci forced rerun",
+          "status": "done (merges 7b2cfcdef, 1077419b1, f70dcdf40; reworks 2)",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "drift through report function"
         },
         {
           "short_id": "c1af05ac",
-          "status": "report tests pass after e2082ba9 (merge 4d48054e6); landing pending",
+          "status": "landing (chain-w7b)",
           "worker": "codex gpt-6-luna xhigh",
           "worker_reason": "test relocation"
         },
         {
           "short_id": "e2082ba9",
-          "status": "landed b67342fec; code-review passed; cargo-ci gate error (load) - rerun pending",
+          "status": "done b67342fec",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "bug found by c1af05ac; regression from 001a9c46"
         }
       ]
     }
   ],
-  "held": {
-    "wave7_landing_chain": "running under /dev/shm rule: 3acaa5a3, e2082ba9 cargo-ci (forced), then land 2b5f452c, c1af05ac, 612ee9d4"
-  },
+  "held": {},
   "line_target": {
     "goal": "net production-line reduction",
     "baseline_rev": "120402067",
@@ -264,6 +262,16 @@
         "test_support_as_test": -32,
         "by_issue": {
           "6ba4f623": -32
+        }
+      },
+      {
+        "wave": 7,
+        "partial": true,
+        "test_support_as_test": 178,
+        "by_issue": {
+          "2b5f452c": 149,
+          "3acaa5a3": 9,
+          "e2082ba9": 20
         }
       }
     ]

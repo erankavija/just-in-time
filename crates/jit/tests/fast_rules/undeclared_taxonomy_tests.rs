@@ -179,9 +179,9 @@ fn test_scaffold_declaring_no_taxonomy_still_validates() {
     );
 
     assert!(
-        !report.rule_report.has_errors(),
+        !report.rule_report().has_errors(),
         "unexpected findings: {:?}",
-        report.rule_report.findings,
+        report.rule_report().findings,
     );
 }
 
