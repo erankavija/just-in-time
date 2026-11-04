@@ -24755,3 +24755,6 @@
 {"assignee":"agent:review-ancestry","id":"25e5038d-80a8-4bea-8d57-31ba4f7393ed","issue_id":"2a10917d-4e9d-4fcd-aa26-54910508e363","timestamp":"2026-11-04T22:53:57.821509955Z","type":"issue_claimed"}
 {"from":"ready","id":"dff3bbd6-03fa-495f-9a29-f137445127a1","issue_id":"06177584-1c3e-4344-8116-b60d44c1e3a4","timestamp":"2026-11-04T22:53:58.214421306Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:bounded-dependency-tree","id":"914f1a76-de09-422f-ab56-5e045a3d760c","issue_id":"06177584-1c3e-4344-8116-b60d44c1e3a4","timestamp":"2026-11-04T22:53:58.214421306Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"1600e3f4-9a57-4aac-8c5b-bdc549c6fd4c","issue_id":"db094cac-3bdd-442e-8ed1-e80374f6ab8f","timestamp":"2026-11-04T22:59:55.279929866Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"ready","id":"b7d194b2-4817-408a-9bcc-a0b2c1169921","issue_id":"32607213-7402-4c17-9889-7a6286e1959e","timestamp":"2026-11-04T23:01:22.894263809Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"coverage-preview","id":"a2a70943-23ac-48c3-8ebf-007f4938cfc0","issue_id":"32607213-7402-4c17-9889-7a6286e1959e","timestamp":"2026-11-04T23:01:42.545677295Z","type":"gate_passed","updated_by":"auto:executor"}

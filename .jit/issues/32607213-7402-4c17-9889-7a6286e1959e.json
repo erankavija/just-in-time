@@ -28,9 +28,10 @@
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-11-04T21:59:02.643703922Z",
-      "updated_by": null
+      "run_id": "e442f916-31c6-4103-a4fa-0042de96c349",
+      "status": "passed",
+      "updated_at": "2026-11-04T23:01:42.545677295Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "32607213-7402-4c17-9889-7a6286e1959e",
@@ -47,7 +48,7 @@
     "brackets:0f8efc37"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Break down the server and web shared mechanisms",
-  "updated_at": "2026-11-04T22:55:01.332019942Z"
+  "updated_at": "2026-11-04T23:01:42.545677295Z"
 }
