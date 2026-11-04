@@ -21,6 +21,7 @@ mod dep;
 mod emit;
 mod events;
 pub mod failure;
+mod graph;
 pub mod hooks;
 mod init;
 mod invariant;
@@ -40,6 +41,7 @@ pub use claim::{
 };
 pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
 pub use emit::{emit_outcome, HumanRender, Report, Response};
+pub use graph::{GraphExportOutput, GraphExportText, GraphExportWritten};
 pub use search::{SearchHit, SearchKey, SearchQuery, SearchResponse};
 pub use serve::{ServeResponse, WebUiSource};
 
@@ -256,20 +258,49 @@ pub enum IssueColumn {
     Priority,
 }
 
+/// The fields a human issue-list row shows.
+pub trait ListedIssue {
+    fn id(&self) -> &IssueId;
+    fn title(&self) -> &str;
+    fn state(&self) -> State;
+    fn priority(&self) -> Priority;
+}
+
+macro_rules! listed_issue {
+    ($($ty:ty),+) => {$(
+        impl ListedIssue for $ty {
+            fn id(&self) -> &IssueId {
+                &self.id
+            }
+            fn title(&self) -> &str {
+                &self.title
+            }
+            fn state(&self) -> State {
+                self.state
+            }
+            fn priority(&self) -> Priority {
+                self.priority
+            }
+        }
+    )+};
+}
+
+listed_issue!(Issue, MinimalIssue);
+
 /// One row of a human issue list: the issue and its optional reason lines.
-pub type IssueListRow<'a> = (&'a Issue, Vec<String>);
+pub type IssueListRow<'a, I = Issue> = (&'a I, Vec<String>);
 
 /// Rows with no reason lines.
-pub fn plain_issue_rows(issues: &[Issue]) -> impl Iterator<Item = IssueListRow<'_>> {
+pub fn plain_issue_rows<I: ListedIssue>(issues: &[I]) -> impl Iterator<Item = IssueListRow<'_, I>> {
     issues.iter().map(|issue| (issue, Vec::new()))
 }
 
 /// Render a human issue list: `header`, two-space-indented rows (`id | title`
 /// plus `columns`, then one `    - reason` line per reason), and a blank-line
 /// separated `Total: N` footer. `quiet` drops the header and footer.
-pub fn render_issue_list<'a>(
+pub fn render_issue_list<'a, I: ListedIssue + 'a>(
     header: &str,
-    rows: impl IntoIterator<Item = IssueListRow<'a>>,
+    rows: impl IntoIterator<Item = IssueListRow<'a, I>>,
     columns: &[IssueColumn],
     quiet: bool,
 ) -> String {
@@ -279,11 +310,11 @@ pub fn render_issue_list<'a>(
     let mut total = 0usize;
     for (issue, reasons) in rows {
         total += 1;
-        let _ = write!(lines, "  {} | {}", issue.id, issue.title);
+        let _ = write!(lines, "  {} | {}", issue.id(), issue.title());
         for column in columns {
             let _ = match column {
-                IssueColumn::State => write!(lines, " | {}", issue.state),
-                IssueColumn::Priority => write!(lines, " | {}", issue.priority),
+                IssueColumn::State => write!(lines, " | {}", issue.state()),
+                IssueColumn::Priority => write!(lines, " | {}", issue.priority()),
             };
         }
         lines.push('\n');
@@ -301,10 +332,10 @@ pub fn render_issue_list<'a>(
 
 /// Print [`render_issue_list`]; quiet mode prints the rows alone and an empty
 /// quiet list prints nothing.
-pub fn print_issue_list<'a>(
+pub fn print_issue_list<'a, I: ListedIssue + 'a>(
     ctx: &OutputContext,
     header: &str,
-    rows: impl IntoIterator<Item = IssueListRow<'a>>,
+    rows: impl IntoIterator<Item = IssueListRow<'a, I>>,
     columns: &[IssueColumn],
 ) -> io::Result<()> {
     let rendered = render_issue_list(header, rows, columns, ctx.quiet);
@@ -520,7 +551,10 @@ mod issue_list_render_tests {
 
     #[test]
     fn test_render_issue_list_empty_prints_header_and_zero_total() {
-        assert_eq!(render_issue_list("H", [], &[], false), "H\n\nTotal: 0");
+        assert_eq!(
+            render_issue_list::<Issue>("H", [], &[], false),
+            "H\n\nTotal: 0"
+        );
     }
 }
 
@@ -1348,21 +1382,27 @@ pub struct IssueSearchQuery {
 
 /// Declares the [`CollectionKey`] marker for each list-envelope collection key.
 macro_rules! collection_keys {
-    ($($(#[$meta:meta])* $marker:ident = $key:literal;)+) => {$(
+    ($($(#[$meta:meta])* $marker:ident = $key:literal $(as $schema:literal)?;)+) => {$(
         $(#[$meta])*
         pub enum $marker {}
 
         impl CollectionKey for $marker {
             const KEY: &'static str = $key;
+            $(const SCHEMA_NAME: Option<&'static str> = Some($schema);)?
         }
     )+};
 }
 
 collection_keys! {
+    /// Collection key of [`GraphDownstreamResponse`].
+    DependentsKey = "dependents" as "GraphDownstreamResponse";
+    /// Collection key of [`GraphRootsResponse`].
+    RootsKey = "roots" as "GraphRootsResponse";
+    /// Collection key of [`GraphDepsTreeResponse`].
+    GraphDepsNodesKey = "nodes" as "GraphDepsTreeResponse";
+    /// Collection key of [`GraphTreeResponse`].
+    GraphTreeNodesKey = "nodes" as "GraphTreeResponse";
     IssuesKey = "issues";
-    DependentsKey = "dependents";
-    RootsKey = "roots";
-    NodesKey = "nodes";
     DivergencesKey = "divergences";
     ByStateKey = "by_state";
     GatesKey = "gates";
@@ -1553,7 +1593,8 @@ impl DependencyTreeNode {
 /// `count` is the number of top-level entries in `nodes` (the immediate
 /// dependency nodes; each may carry nested `children`). This differs from
 /// `summary.total`, which counts every unique dependency across the whole tree.
-pub type GraphDepsTreeResponse = ListEnvelope<NodesKey, DependencyTreeNode, DependencyTreeScope>;
+pub type GraphDepsTreeResponse =
+    ListEnvelope<GraphDepsNodesKey, DependencyTreeNode, DependencyTreeScope>;
 
 /// Fields of [`GraphDepsTreeResponse`] beside its `nodes`.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -1663,7 +1704,7 @@ pub struct HierarchyNodeView {
 /// assert_eq!(json["root"], serde_json::Value::Null);
 /// assert_eq!(json["nodes"][0]["parent"], epic_id.as_str());
 /// ```
-pub type GraphTreeResponse = ListEnvelope<NodesKey, HierarchyNodeView, TreeRoot>;
+pub type GraphTreeResponse = ListEnvelope<GraphTreeNodesKey, HierarchyNodeView, TreeRoot>;
 
 /// The scope of a [`GraphTreeResponse`]. `nodes` are ordered by ascending short id.
 #[derive(Debug, Serialize, JsonSchema)]

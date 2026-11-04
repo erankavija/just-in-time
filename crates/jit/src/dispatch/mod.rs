@@ -133,6 +133,8 @@ pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     config::output_schema,
     dep::output_schema,
     events::output_schema,
+    graph::output_schema,
+    graph::rdeps::output_schema,
     hooks::output_schema,
     init::output_schema,
     invariant::output_schema,
@@ -334,6 +336,7 @@ pub mod claim;
 pub mod config;
 pub mod dep;
 pub mod events;
+pub mod graph;
 pub mod hooks;
 pub mod init;
 pub mod invariant;

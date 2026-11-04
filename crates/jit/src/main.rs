@@ -16,13 +16,11 @@ mod output_macros;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use jit::cli::{
-    Cli, Commands, DocCommands, GateCommands, GraphCommands, IssueCommands, ProfileCommands,
-};
+use jit::cli::{Cli, Commands, DocCommands, GateCommands, IssueCommands, ProfileCommands};
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileVariableOptions};
 use jit::dispatch::{
-    apply, archive, claim, config, dep, events, hooks, init, invariant, item, label, project,
-    resolve_issue, search, serve, validate, version, CommandContext,
+    apply, archive, claim, config, dep, events, graph, hooks, init, invariant, item, label,
+    project, resolve_issue, search, serve, validate, version, CommandContext,
 };
 use jit::domain::identity::{GateKey, IssueId, IssueIdPrefix};
 use jit::domain::{Assignee, GateRunResult, Priority, State};
@@ -679,47 +677,6 @@ fn print_gate_run_details(result: &GateRunResult) {
     }
 }
 
-/// Print a dependency tree with tree symbols (├─, └─, │)
-fn print_dependency_tree(nodes: &[jit::output::DependencyTreeNode], prefix: &str, is_root: bool) {
-    let count = nodes.len();
-    for (i, node) in nodes.iter().enumerate() {
-        let is_last = i == count - 1;
-
-        // Determine tree symbols
-        let (connector, child_prefix) = if is_root {
-            ("  ", "  ")
-        } else if is_last {
-            ("└─ ", "   ")
-        } else {
-            ("├─ ", "│  ")
-        };
-
-        // Shared indicator
-        let shared_marker = if node.shared.unwrap_or(false) {
-            " (shared)"
-        } else {
-            ""
-        };
-
-        // Print the node
-        println!(
-            "{}{}{} - {} [{}]{}",
-            prefix,
-            connector,
-            node.short_id,
-            node.title,
-            node.state.as_str(),
-            shared_marker
-        );
-
-        // Recursively print children
-        if !node.children.is_empty() {
-            let new_prefix = format!("{}{}", prefix, child_prefix);
-            print_dependency_tree(&node.children, &new_prefix, false);
-        }
-    }
-}
-
 /// Build the [`IssueShowResponse`](jit::output::IssueShowResponse) for a single
 /// issue id.
 ///
@@ -1099,7 +1056,6 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
     // so `jit rdeps <id>` and `jit list` resolve to `jit graph rdeps` /
     // `jit issue list` and reuse those handlers verbatim.
     let command = match command {
-        Commands::Rdeps { id, depth } => Commands::Graph(GraphCommands::Rdeps { id, depth }),
         Commands::List { filters, full } => Commands::Issue(IssueCommands::List { filters, full }),
         other => other,
     };
@@ -1285,8 +1241,8 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             }
         },
-        Commands::Rdeps { .. } | Commands::List { .. } => {
-            unreachable!("top-level rdeps/list are normalized to canonical commands above")
+        Commands::List { .. } => {
+            unreachable!("top-level list is normalized to its canonical command above")
         }
         Commands::Version => unreachable!("version is handled before repository validation"),
         Commands::Issue(issue_cmd) => {
@@ -3625,220 +3581,17 @@ fn dispatch(cli: Cli, mode: OutputMode) -> Result<ExitCode> {
                 }
             },
         },
-        Commands::Graph(graph_cmd) => match graph_cmd {
-            GraphCommands::Deps { id, depth } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue(&storage, &id)?;
-
-                if json {
-                    // For JSON output, use tree structure
-                    use jit::output::{GraphDepsTreeResponse, JsonOutput};
-
-                    let tree = executor.graph().build_dependency_tree(&id, depth)?;
-                    let summary = jit::commands::graph::compute_dependency_summary(&tree);
-
-                    let response = GraphDepsTreeResponse::with_extras(
-                        tree,
-                        jit::output::DependencyTreeScope {
-                            issue_id: id.clone(),
-                            depth,
-                            summary,
-                        },
-                    );
-                    let msg = format!("{} dependencies", response.extras.summary.total);
-                    let output = JsonOutput::success(response).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    // For human output, use tree structure
-                    let tree = executor.graph().build_dependency_tree(&id, depth)?;
-                    let depth_str = match depth {
-                        0 => "all transitive".to_string(),
-                        1 => "immediate".to_string(),
-                        n => format!("depth {}", n),
-                    };
-
-                    let _ =
-                        output_ctx.print_info(format!("Dependencies of {} ({}):", id, depth_str));
-
-                    if tree.is_empty() {
-                        println!("  (none)");
-                    } else {
-                        // Print summary first
-                        let summary = jit::commands::graph::compute_dependency_summary(&tree);
-                        if summary.total > 0 {
-                            let done_count = summary.by_state.get(&State::Done).unwrap_or(&0);
-                            println!("  Summary: {}/{} complete", done_count, summary.total);
-                            println!();
-                        }
-
-                        // Print tree with indentation
-                        print_dependency_tree(&tree, "", true);
-                    }
-                }
-            }
-            GraphCommands::Rdeps { id, depth } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let id = resolve_issue(&storage, &id)?;
-                let issues = executor.graph().show_rdeps_with_depth(&id, depth)?;
-                if json {
-                    use jit::domain::MinimalIssue;
-                    use jit::output::{GraphDownstreamResponse, JsonOutput};
-
-                    let minimal_issues: Vec<MinimalIssue> =
-                        issues.iter().map(MinimalIssue::from).collect();
-                    let response = GraphDownstreamResponse::with_extras(
-                        minimal_issues,
-                        jit::output::IssueScope {
-                            issue_id: id.clone(),
-                        },
-                    );
-                    let msg = format!("{} dependents", issues.len());
-                    let output = JsonOutput::success(response).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    print_issue_list(
-                        &output_ctx,
-                        &format!("Reverse dependencies of {}:", id),
-                        plain_issue_rows(&issues),
-                        &[],
-                    )?;
-                }
-            }
-            GraphCommands::Roots => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let issues = executor.graph().show_roots()?;
-                if json {
-                    use jit::domain::MinimalIssue;
-                    use jit::output::{GraphRootsResponse, JsonOutput};
-
-                    let minimal_issues: Vec<MinimalIssue> =
-                        issues.iter().map(MinimalIssue::from).collect();
-                    let response = GraphRootsResponse::new(minimal_issues);
-                    let msg = format!("{} root issues", issues.len());
-                    let output = JsonOutput::success(response).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    print_issue_list(
-                        &output_ctx,
-                        "Root issues (no dependencies):",
-                        plain_issue_rows(&issues),
-                        &[],
-                    )?;
-                }
-            }
-            GraphCommands::Tree { root } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let root = root
-                    .map(|root| resolve_issue(&storage, &root))
-                    .transpose()?;
-                let response = executor.graph().resolve_hierarchy_tree(root.as_ref())?;
-
-                if json {
-                    use jit::output::JsonOutput;
-                    let msg = format!("{} nodes", response.count());
-                    let output = JsonOutput::success(response).with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    let scope = match &response.extras.root {
-                        Some(id) => format!("subtree of {}", id.short_id()),
-                        None => "repository".to_string(),
-                    };
-                    let _ = output_ctx.print_info(format!("Resolved hierarchy ({}):", scope));
-                    if response.items.is_empty() {
-                        println!("  (none)");
-                    } else {
-                        for node in &response.items {
-                            let parent = node
-                                .hierarchy
-                                .parent
-                                .as_ref()
-                                .map(IssueId::short_id)
-                                .unwrap_or("-");
-                            println!(
-                                "  {} | parent={} children={} rank={} | {}",
-                                node.short_id,
-                                parent,
-                                node.hierarchy.children.len(),
-                                node.hierarchy.rank,
-                                node.title
-                            );
-                        }
-                    }
-                }
-            }
-            GraphCommands::Export {
-                format,
-                full,
-                scope,
-                output,
-            } => {
-                use jit::commands::GraphExportFormat;
-
-                // `--json` is sugar for `--format json`; combining it with an
-                // explicit conflicting `--format` (dot/mermaid/batch) is a usage
-                // error (exit 2), classified by the typed InvalidArgumentError.
-                if json && matches!(format, Some(f) if f != GraphExportFormat::Json) {
-                    return Err(jit::errors::InvalidArgumentError::new(
-                        "--json conflicts with --format dot/mermaid/batch; use one or the other",
-                    )
-                    .into());
-                }
-                let format = if json {
-                    GraphExportFormat::Json
-                } else {
-                    format.unwrap_or(GraphExportFormat::Dot)
-                };
-
-                // `--full` selects the complete-record JSON node shape and applies
-                // only to `--format json` (or `--json`); pairing it with
-                // dot/mermaid/batch is a usage error (exit 2), classified by the
-                // typed InvalidArgumentError.
-                if full && format != GraphExportFormat::Json {
-                    return Err(jit::errors::InvalidArgumentError::new(
-                        "--full is only valid with --format json",
-                    )
-                    .into());
-                }
-                let output_ctx = OutputContext::new(quiet, false);
-                let scope = scope
-                    .map(|scope| resolve_issue(&storage, &scope))
-                    .transpose()?;
-
-                // `batch` runs a distinct projection (issue definitions plus
-                // reported boundary edges); every other format renders the graph.
-                let graph_output = if format == GraphExportFormat::Batch {
-                    let export = executor.graph().export_graph_batch(scope.as_ref())?;
-                    // Boundary edges never join the array (it must stay a clean
-                    // batch-create payload); they are reported to stderr so no
-                    // crossing edge is dropped silently (REQ-06).
-                    if !export.boundary_edges.is_empty() {
-                        eprintln!(
-                            "Excluded {} edge(s) crossing the scope boundary:",
-                            export.boundary_edges.len()
-                        );
-                        for edge in &export.boundary_edges {
-                            eprintln!("  {} -> {}", edge.from, edge.to);
-                        }
-                    }
-                    serde_json::to_string_pretty(&export.defs)?
-                } else {
-                    executor
-                        .graph()
-                        .export_graph(format, full, scope.as_ref())?
-                };
-
-                if let Some(path) = output {
-                    executor.graph().publish_graph_export(
-                        &current_dir,
-                        std::path::Path::new(&path),
-                        graph_output.as_bytes(),
-                    )?;
-                    let _ = output_ctx.print_success(format!("Graph exported to: {}", path));
-                } else {
-                    println!("{}", graph_output);
-                }
-            }
-        },
+        Commands::Graph(graph_cmd) => {
+            return graph::dispatch(graph_cmd, &ctx, &mut io::stdout(), &mut io::stderr());
+        }
+        Commands::Rdeps { id, depth } => {
+            return graph::rdeps::dispatch(
+                graph::RdepsArgs { id, depth },
+                &ctx,
+                &mut io::stdout(),
+                &mut io::stderr(),
+            );
+        }
         Commands::Events(command) => {
             return events::dispatch(command, &ctx, &mut io::stdout(), &mut io::stderr());
         }

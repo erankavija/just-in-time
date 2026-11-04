@@ -686,44 +686,6 @@ impl CommandSchema {
                 (Some(union), "BlockedListResponse")
             }
 
-            // Graph commands
-            "graph_deps" => (
-                Some(schema_to_value::<GraphDepsTreeResponse>()),
-                "GraphDepsTreeResponse",
-            ),
-            "graph_rdeps" => (
-                Some(schema_to_value::<GraphDownstreamResponse>()),
-                "GraphDownstreamResponse",
-            ),
-            "graph_roots" => (
-                Some(schema_to_value::<GraphRootsResponse>()),
-                "GraphRootsResponse",
-            ),
-            "graph_tree" => (
-                Some(schema_to_value::<GraphTreeResponse>()),
-                "GraphTreeResponse",
-            ),
-            // `graph export --format json` emits two shapes: the default lean
-            // summary nodes (no gate fields) and, under `--full`, complete stored
-            // issue records (gate list under `gates_required` / `gates_status`)
-            // with the resolved hierarchy flattened on. Declaring both via `oneOf`
-            // makes the gate-free summary distinguishable from the full record.
-            "graph_export" => {
-                use crate::visualization::{GraphExportFullResponse, GraphExportSummaryResponse};
-                let union = json!({
-                    "oneOf": [
-                        schema_to_value::<GraphExportSummaryResponse>(),
-                        schema_to_value::<GraphExportFullResponse>(),
-                    ],
-                    "description": "Default shape: lean summary nodes (id, short_id, \
-                        title, state, priority, labels) with no gate fields. With \
-                        --full: complete stored issue records, whose gate list is \
-                        carried under gates_required / gates_status, plus the \
-                        resolved-hierarchy fields (parent, children, cluster, rank)."
-                });
-                (Some(union), "GraphExportSummaryResponse")
-            }
-
             "gate_list" => (
                 Some(schema_to_value::<GateListResponse>()),
                 "GateListResponse",

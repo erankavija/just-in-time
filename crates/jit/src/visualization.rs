@@ -218,6 +218,11 @@ fn mermaid_fill(state: State) -> &'static str {
 /// orchestration loops. For complete node records use [`export_json_full`]
 /// (`--full`); the two share an identical `edges` list.
 pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
+    pretty_document(&summary_document(graph))
+}
+
+/// The summary document of [`export_json`], as a typed response.
+pub fn summary_document(graph: &DependencyGraph<Issue>) -> GraphExportSummaryResponse {
     let all_nodes = graph.nodes_by_id();
 
     let nodes: Vec<GraphExportSummaryNode> = all_nodes
@@ -232,11 +237,15 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
         })
         .collect();
 
-    let response = GraphExportSummaryResponse {
+    GraphExportSummaryResponse {
         nodes,
         edges: build_export_edges(&all_nodes),
-    };
-    serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string())
+    }
+}
+
+/// The pretty JSON text of a document; serialization of these shapes cannot fail.
+pub fn pretty_document<T: Serialize>(document: &T) -> String {
+    serde_json::to_string_pretty(document).unwrap_or_else(|_| "{}".to_string())
 }
 
 /// Export Issue dependency graph as JSON with COMPLETE node records (`--full`).
@@ -265,6 +274,14 @@ pub fn export_json_full(
     graph: &DependencyGraph<Issue>,
     resolution: &crate::graph::hierarchy::HierarchyResolution<'_, Issue>,
 ) -> String {
+    pretty_document(&full_document(graph, resolution))
+}
+
+/// The complete-record document of [`export_json_full`], as a typed response.
+pub fn full_document(
+    graph: &DependencyGraph<Issue>,
+    resolution: &crate::graph::hierarchy::HierarchyResolution<'_, Issue>,
+) -> GraphExportFullResponse {
     let all_nodes = graph.nodes_by_id();
 
     let nodes: Vec<GraphExportFullNode> = all_nodes
@@ -275,11 +292,10 @@ pub fn export_json_full(
         })
         .collect();
 
-    let response = GraphExportFullResponse {
+    GraphExportFullResponse {
         nodes,
         edges: build_export_edges(&all_nodes),
-    };
-    serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string())
+    }
 }
 
 #[cfg(test)]

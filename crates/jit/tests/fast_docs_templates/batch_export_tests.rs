@@ -346,6 +346,8 @@ fn test_scoped_graph_exports_carry_no_out_of_scope_edges() {
             .executor
             .graph()
             .export_graph(format, false, Some(&s.e))
+            .unwrap()
+            .document_text()
             .unwrap();
         assert!(
             output.contains(s.c1.as_str()),
@@ -362,6 +364,8 @@ fn test_scoped_graph_exports_carry_no_out_of_scope_edges() {
         .executor
         .graph()
         .export_graph(GraphExportFormat::Json, true, Some(&s.e))
+        .unwrap()
+        .document_text()
         .unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&full).unwrap();
     let edges = parsed["edges"].as_array().unwrap();
