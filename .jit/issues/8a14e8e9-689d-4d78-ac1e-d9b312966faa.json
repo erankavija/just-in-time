@@ -12,7 +12,20 @@
     "cargo-ci-selftest",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2dd3ef11-f82f-4cea-9ed9-ebc3c150bebe",
+      "status": "passed",
+      "updated_at": "2026-11-04T04:38:34.704066820Z",
+      "updated_by": "auto:executor"
+    },
+    "cargo-ci-selftest": {
+      "run_id": "d5dd67eb-6150-466f-afd4-d85c15e957fc",
+      "status": "passed",
+      "updated_at": "2026-11-04T04:38:41.148407405Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8a14e8e9-689d-4d78-ac1e-d9b312966faa",
   "labels": [
     "type:task",
@@ -24,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "cargo-ci classifies out-of-space failures as environment faults",
-  "updated_at": "2026-11-04T04:32:29.889990758Z"
+  "updated_at": "2026-11-04T04:38:41.148407405Z"
 }
