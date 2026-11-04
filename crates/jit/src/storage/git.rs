@@ -219,12 +219,12 @@ impl GitCheckout {
     ///
     /// # Errors
     ///
-    /// Returns [`GitError::Unavailable`] if git cannot start, or
+    /// Returns [`GitError::GitUnavailable`] if git cannot start, or
     /// [`GitError::UnexpectedOutput`] if git fails for another reason or its
     /// successful output is not one UTF-8 URL.
     pub fn origin_url(&self) -> Result<Option<String>, GitError> {
         const ARGS: [&str; 3] = ["remote", "get-url", "origin"];
-        let output = self.git.run(&self.worktree_root, &ARGS)?;
+        let output = self.git.run(&self.worktree_root, ARGS)?;
         if !output.status.success() {
             if output.status.code() == Some(2) {
                 return Ok(None);
@@ -239,11 +239,8 @@ impl GitCheckout {
             command: ARGS.join(" "),
             output: String::from_utf8_lossy(&output.stdout).into_owned(),
         };
-        let bytes = output.stdout.strip_suffix(b"\n").ok_or_else(unexpected)?;
-        if bytes.is_empty() || bytes.contains(&b'\n') {
-            return Err(unexpected());
-        }
-        let url = std::str::from_utf8(bytes).map_err(|_| unexpected())?;
+        let stdout = std::str::from_utf8(&output.stdout).map_err(|_| unexpected())?;
+        let url = stdout.strip_suffix('\n').ok_or_else(unexpected)?;
         Ok(Some(url.to_owned()))
     }
 

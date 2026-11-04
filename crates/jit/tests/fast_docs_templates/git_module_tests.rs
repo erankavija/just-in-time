@@ -241,15 +241,15 @@ fn test_origin_url_existing_remote_returns_url_with_one_git_process() {
 
     let dir = TempDir::new().unwrap();
     let repository = GitRepository::init(dir.path().join("repo"));
-    let url = "https://example.test/team/repo.git";
-    repository.git(&["remote", "add", "origin", url]);
+    let url = format!("{}\nremote.git", dir.path().display());
+    repository.git(&["remote", "add", "origin", &url]);
     let stand_in = GitStandIn::new();
 
     let result = checkout(Git::with_program(stand_in.program()), repository.root())
         .origin_url()
         .unwrap();
 
-    assert_eq!(result.as_deref(), Some(url));
+    assert_eq!(result.as_deref(), Some(url.as_str()));
     assert_one_origin_url_lookup(&stand_in, repository.root());
 }
 
