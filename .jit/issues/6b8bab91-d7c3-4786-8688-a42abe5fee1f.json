@@ -15,9 +15,6 @@
   "id": "6b8bab91-d7c3-4786-8688-a42abe5fee1f",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:per-key-leases",
     "component:storage",
     "enforces:@/invariant/canonical-cutover",
     "satisfies:f8a6b298/REQ-05",
@@ -26,5 +23,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "This checkout's leases are rewritten into lease records",
-  "updated_at": "2026-11-02T23:41:54.339300848Z"
+  "updated_at": "2026-11-04T22:42:43.911573702Z"
 }

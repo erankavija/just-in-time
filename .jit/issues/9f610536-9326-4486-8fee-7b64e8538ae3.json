@@ -16,9 +16,6 @@
   "id": "9f610536-9326-4486-8fee-7b64e8538ae3",
   "labels": [
     "type:task",
-    "epic:history-independent-reads",
-    "milestone:v1.0",
-    "story:history-boundary",
     "component:storage",
     "per:@/charter/D-18",
     "satisfies:f8a6b298/REQ-12",
@@ -27,5 +24,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "The publish check's event-log rewrite branch is gone",
-  "updated_at": "2026-11-02T23:41:53.091898237Z"
+  "updated_at": "2026-11-04T22:42:44.631837383Z"
 }
