@@ -738,17 +738,9 @@ impl CommandSchema {
                 Some(schema_to_value::<ArtifactConformanceResponse>()),
                 "ArtifactConformanceResponse",
             ),
-            "label_namespaces" => (
-                Some(schema_to_value::<NamespacesResponse>()),
-                "NamespacesResponse",
-            ),
             "gate_preset_list" => (
                 Some(schema_to_value::<GatePresetListResponse>()),
                 "GatePresetListResponse",
-            ),
-            "label_values" => (
-                Some(schema_to_value::<LabelValuesResponse>()),
-                "LabelValuesResponse",
             ),
             "worktree_list" => (
                 Some(schema_to_value::<WorktreeListResponse>()),

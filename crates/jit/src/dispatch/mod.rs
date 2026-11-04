@@ -137,6 +137,7 @@ pub const REGISTERED_GROUPS: &[fn(&str) -> Option<OutputSchema>] = &[
     init::output_schema,
     invariant::output_schema,
     item::output_schema,
+    label::output_schema,
     project::output_schema,
     search::output_schema,
     serve::output_schema,
@@ -336,6 +337,7 @@ pub mod hooks;
 pub mod init;
 pub mod invariant;
 pub mod item;
+pub mod label;
 pub mod project;
 pub mod search;
 pub mod serve;
