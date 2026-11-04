@@ -33,9 +33,10 @@ pub(crate) fn record_drift(
             .unwrap_or_else(|error| Some(error.to_string()))
             .map(|reason| format!("{}: {reason}", path.repository_relative()))
     };
-    let stored = |path: &VirtualPath| captured.image.file_bytes(path);
     let index = match &captured.index {
-        Ok(index) => stored(&VirtualPath::INDEX)?
+        Ok(index) => captured
+            .image
+            .file_bytes(&VirtualPath::INDEX)?
             .and_then(|bytes| report(&VirtualPath::INDEX, index_drift(index, bytes))),
         Err(_) => None,
     };
@@ -44,11 +45,13 @@ pub(crate) fn record_drift(
         .as_deref()
         .unwrap_or_default()
         .iter()
-        .map(|issue| {
-            let path = VirtualPath::issue_record(&issue.id);
-            Ok(stored(&path)?.and_then(|bytes| report(&path, issue_drift(issue, bytes))))
-        })
-        .collect::<Result<Vec<_>>>()?;
+        .zip(&captured.values)
+        .map(|(issue, value)| {
+            report(
+                &VirtualPath::issue_record(&issue.id),
+                issue_drift(issue, value),
+            )
+        });
     let runs = captured_gate_run_ids(records)
         .unwrap_or_default()
         .iter()
@@ -130,9 +133,8 @@ fn index_drift(index: &RepositoryIndex, bytes: &[u8]) -> Result<Option<String>> 
 }
 
 /// Canonical rather than byte-exact: key order is not part of an issue record.
-fn issue_drift(issue: &Issue, bytes: &[u8]) -> Result<Option<String>> {
-    let raw: Value = serde_json::from_slice(bytes)?;
-    Ok((serialize_issue(issue)? != canonical_json(&raw, true)?)
+fn issue_drift(issue: &Issue, value: &Value) -> Result<Option<String>> {
+    Ok((serialize_issue(issue)? != canonical_json(value, true)?)
         .then(|| "re-serializing changes the record".to_string()))
 }
 
@@ -296,14 +298,16 @@ mod tests {
             .collect::<Vec<_>>()
             .join(",");
         assert_eq!(
-            issue_drift(&issue, format!("{{{reversed}}}").as_bytes()).unwrap(),
+            issue_drift(
+                &issue,
+                &serde_json::from_str(&format!("{{{reversed}}}")).unwrap()
+            )
+            .unwrap(),
             None
         );
 
         raw["field_no_reader_knows"] = Value::Bool(true);
-        assert!(issue_drift(&issue, &serde_json::to_vec(&raw).unwrap())
-            .unwrap()
-            .is_some());
+        assert!(issue_drift(&issue, &raw).unwrap().is_some());
     }
 
     #[test]

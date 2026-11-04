@@ -59,27 +59,44 @@ pub struct CapturedValidation<'a> {
     pub(crate) image: Cow<'a, RepositoryImage>,
     pub(crate) index: std::result::Result<RepositoryIndex, Arc<anyhow::Error>>,
     pub(crate) issues: std::result::Result<Vec<Issue>, Arc<anyhow::Error>>,
+    /// The JSON value each of `issues` decoded from, in order; empty when they failed.
+    pub(crate) values: Vec<serde_json::Value>,
 }
 
 impl<'a> CapturedValidation<'a> {
     /// Parse `image`'s index and issue records.
     pub fn from_image(image: &'a RepositoryImage) -> Self {
-        Self::new(Cow::Borrowed(image), load_issues(image))
+        match load_issues(image) {
+            Ok(records) => {
+                let (issues, values) = records.into_iter().unzip();
+                Self::new(Cow::Borrowed(image), Ok(issues), values)
+            }
+            Err(error) => Self::new(Cow::Borrowed(image), Err(error), Vec::new()),
+        }
     }
 
-    fn new(image: Cow<'a, RepositoryImage>, issues: Result<Vec<Issue>>) -> Self {
+    fn new(
+        image: Cow<'a, RepositoryImage>,
+        issues: Result<Vec<Issue>>,
+        values: Vec<serde_json::Value>,
+    ) -> Self {
         Self {
             index: records_pass(load_index(&image)),
             issues: records_pass(issues),
+            values,
             image,
         }
     }
 }
 
 impl CapturedValidation<'static> {
-    /// Parse `image`'s index beside the issue records its capture parsed.
-    pub(crate) fn with_issues(image: RepositoryImage, issues: Vec<Issue>) -> Self {
-        Self::new(Cow::Owned(image), Ok(issues))
+    /// Parse `image`'s index beside the issue records and values its capture parsed.
+    pub(crate) fn with_records(
+        image: RepositoryImage,
+        issues: Vec<Issue>,
+        values: Vec<serde_json::Value>,
+    ) -> Self {
+        Self::new(Cow::Owned(image), Ok(issues), values)
     }
 }
 
@@ -368,7 +385,7 @@ fn load_index(image: &RepositoryImage) -> Result<RepositoryIndex> {
     .context(RepositoryJudgedInvalid(format!("invalid {index_path}")))
 }
 
-fn load_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
+fn load_issues(image: &RepositoryImage) -> Result<Vec<(Issue, serde_json::Value)>> {
     let ids = captured_issue_ids(image)?;
     parse_issue_records(&ids, |path| image.file_bytes(path)).map_err(|error| match error {
         IssueRecordsError::Malformed { id, error } => {

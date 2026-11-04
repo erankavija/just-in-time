@@ -18,6 +18,9 @@ enum BaseCapturePurpose<'a> {
     Archive,
 }
 
+/// A capture's parsed issues and, for validation, the JSON value each decoded from.
+type ParsedIssues = (Vec<Issue>, Vec<serde_json::Value>);
+
 struct CapturedRepairPlan {
     declarations: crate::repository_state::CapturedRepositoryDeclarations,
     plan: Option<crate::repository_state::MaterializationPlan>,
@@ -234,7 +237,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             extra_paths,
             BaseCapturePurpose::Mutation { precheck_target },
         )
-        .map(|captured| captured.map(|(image, issues)| MutationBase { image, issues }))
+        .map(|captured| captured.map(|(image, (issues, _))| MutationBase { image, issues }))
     }
 
     /// Capture the resolved target and lease policy before taking the claims guard.
@@ -261,7 +264,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
         let issues = crate::repository_state::parse_issue_records(&candidates, |path| {
             image.file_bytes(path)
-        })?;
+        })?
+        .into_iter()
+        .map(|(issue, _)| issue)
+        .collect::<Vec<_>>();
         let target_id = super::require_issue_in_capture(&issues, issue_id)?;
         let target = issues
             .into_iter()
@@ -283,7 +289,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 precheck_target: Some(issue_id),
             },
         )?;
-        Ok(grown.map(|(image, issues)| MutationPreflight {
+        Ok(grown.map(|(image, (issues, _))| MutationPreflight {
             image,
             target,
             issues: Some(issues),
@@ -326,7 +332,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
         purpose: BaseCapturePurpose<'_>,
-    ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
+    ) -> Result<Option<(crate::repository_state::RepositoryImage, ParsedIssues)>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath,
         };
@@ -372,7 +378,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     None => super::image_virtual_bytes(image, path),
                 }
             };
-        let mut issues = None::<Vec<Issue>>;
+        let mut issues = None::<ParsedIssues>;
         let mut discover = |image: &RepositoryImage, spec: &mut CaptureSpec| -> Result<()> {
             base(spec)?;
             if spec != image.capture_spec() {
@@ -417,9 +423,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 // A mutation derives from exactly these issues, so they are
                 // parsed once, with the strict reader, and handed back with the
                 // image. Validation parses the overlaid set leniently and reports
-                // defects as findings.
-                let parsed = if mutation {
-                    super::captured_active_issues(image)?
+                // defects as findings; it keeps each record's JSON value for
+                // record fidelity.
+                let (parsed, values) = if mutation {
+                    (super::captured_active_issues(image)?, Vec::new())
                 } else {
                     // Effective bytes: the override (create/replace or proposed
                     // absence) when present, otherwise the captured base bytes.
@@ -430,6 +437,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                             None => image.file_bytes(path),
                         },
                     )?
+                    .into_iter()
+                    .unzip()
                 };
                 if matches!(
                     purpose,
@@ -444,7 +453,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                         precheck_target,
                     )?;
                 }
-                issues = Some(parsed);
+                issues = Some((parsed, values));
             }
             Ok(())
         };
@@ -602,8 +611,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 &[],
                 BaseCapturePurpose::Validation,
             )?
-            .map(|(image, issues)| {
-                crate::validation::CapturedValidation::with_issues(image, issues)
+            .map(|(image, (issues, values))| {
+                crate::validation::CapturedValidation::with_records(image, issues, values)
             }))
     }
 
