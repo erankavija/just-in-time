@@ -964,68 +964,80 @@
     "10751360": {
       "status": "in_progress",
       "vendor": "Claude Sonnet",
-      "reason": "cross-cutting or socket-bound migration"
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "c9103fcf": {
       "status": "in_progress",
       "vendor": "Claude Sonnet",
-      "reason": "cross-cutting or socket-bound migration"
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "66790c84": {
       "status": "in_progress",
       "vendor": "Claude Sonnet",
-      "reason": "cross-cutting or socket-bound migration"
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "8c46fc85": {
       "status": "in_progress",
       "vendor": "Claude Sonnet",
-      "reason": "cross-cutting or socket-bound migration"
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "8f297e60": {
       "status": "in_progress",
       "vendor": "Claude Sonnet",
-      "reason": "cross-cutting or socket-bound migration"
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "f930acf2": {
       "status": "in_progress",
       "vendor": "Claude Sonnet",
-      "reason": "cross-cutting or socket-bound migration"
+      "reason": "cross-cutting or socket-bound migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "e5d618ee": {
       "status": "rework",
       "vendor": "Claude Sonnet",
       "reason": "cross-cutting or socket-bound migration",
-      "note": "lead review FAIL REQ-04: ambiguous-id 400 and gate-run lookup status changes lack tests"
+      "note": "landed 4ec8f06cc; main fails its gate-run test after 1630015d moved gate-run records; fix with worker"
     },
     "20fc3b92": {
       "status": "in_progress",
       "vendor": "Claude Haiku",
-      "reason": "small single-group migration"
+      "reason": "small single-group migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "153c9851": {
       "status": "in_progress",
       "vendor": "Claude Haiku",
-      "reason": "small single-group migration"
+      "reason": "small single-group migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "b25c2e54": {
       "status": "in_progress",
       "vendor": "Claude Haiku",
-      "reason": "small single-group migration"
+      "reason": "small single-group migration",
+      "note": "reviewed; landing paused until e5d618ee's fix restores main"
     },
     "3cf69ecf": {
       "status": "in_progress",
       "vendor": "Claude Haiku",
-      "reason": "small single-group migration"
+      "reason": "small single-group migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "1a4f2ebd": {
       "status": "in_progress",
       "vendor": "Claude Haiku",
-      "reason": "small single-group migration"
+      "reason": "small single-group migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "98cc2097": {
       "status": "in_progress",
       "vendor": "Claude Haiku",
-      "reason": "small single-group migration"
+      "reason": "small single-group migration",
+      "note": "worker holding for 12c0f3fb; resume with its landing commit"
     },
     "0fe46027": {
       "status": "in_progress",
@@ -1073,9 +1085,9 @@
       "reason": "self-contained migration without sockets"
     },
     "12c0f3fb": {
-      "status": "ready",
-      "vendor": null,
-      "reason": "form task (D-38); dispatch after the 05:30 settling window"
+      "status": "in_progress",
+      "vendor": "Claude Sonnet",
+      "reason": "shared handler contract forms (D-38..D-41); one worker, lands before its dependents"
     }
   }
 }
