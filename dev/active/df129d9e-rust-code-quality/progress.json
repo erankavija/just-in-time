@@ -1249,10 +1249,10 @@
     },
     "4a01ccba": {
       "dispatch_note": "Per D-45: measure every listed test on a disk-backed TMPDIR (e.g. /mnt/nvme) as well as /tmp; a test fast only because /tmp is RAM is still slow. Also respect the f487aeef hold (D-43).",
-      "status": "rework",
+      "status": "landing",
       "vendor": "Claude Sonnet",
       "reason": "test refactors needing judgement on seams; f487aeef stays held (D-43)",
-      "review": "b1ed23165 landed; cargo-ci passed; code-review 32037cf7: F1 sleep-polling readiness in serve test (REQ-02), F2 no same-method remeasurement evidence (REQ-01). Rework 1 to same worker. Rework 1 at 5e3f82d8b landed; code-review R2 (e973c700) failed only on quiet-host (loads 9-14 vs <4). One rework left; asked 6a for a host-quiet window or a D-01 ruling. Quiet-window evidence ff8a8d1a9 (loads 1.82/3.32/3.94; medians 0.629/0.062/2.131 s). First landing failed on unrelated flaky server test; steward allowed one fresh attempt. Fresh landing passed cargo-ci; code-review R3 (13b970de): 50 ms real deadline in serve test (REQ-02). Rework 2 of 2 (last): injected clock in StartupWatch."
+      "review": "b1ed23165 landed; cargo-ci passed; code-review 32037cf7: F1 sleep-polling readiness in serve test (REQ-02), F2 no same-method remeasurement evidence (REQ-01). Rework 1 to same worker. Rework 1 at 5e3f82d8b landed; code-review R2 (e973c700) failed only on quiet-host (loads 9-14 vs <4). One rework left; asked 6a for a host-quiet window or a D-01 ruling. Quiet-window evidence ff8a8d1a9 (loads 1.82/3.32/3.94; medians 0.629/0.062/2.131 s). First landing failed on unrelated flaky server test; steward allowed one fresh attempt. Fresh landing passed cargo-ci; code-review R3 (13b970de): 50 ms real deadline in serve test (REQ-02). Rework 2 of 2 (last): injected clock in StartupWatch. Rework 2 at 82745633d: lead PASS; WatchClock seam, stepped test clock, 0.01 s, no real wait."
     },
     "8a14e8e9": {
       "status": "done",
@@ -1286,9 +1286,9 @@
       "review": "lead PASS at 2cad00a53: edge codes via classify_code (generic -> DependencyError), render_checker table, with_warnings takes Display; -60 lines"
     },
     "10fdad38": {
-      "status": "rework",
+      "status": "landing",
       "note": "resumed after quiet window",
-      "review": "lead R1 FAIL: production -234 good; test call sites expanded to 7-line add_dependencies_with_policy (~+470 test lines), violates shared-test-contracts; one shared test helper + wrapped doc examples. Rework 1 to Codex."
+      "review": "lead R1 FAIL: production -234 good; test call sites expanded to 7-line add_dependencies_with_policy (~+470 test lines), violates shared-test-contracts; one shared test helper + wrapped doc examples. Rework 1 to Codex. Rework 1: lead PASS; -222 production; shared add_reducing_edge (lead added its test-support gate)."
     },
     "3b696589": {
       "status": "landing",
