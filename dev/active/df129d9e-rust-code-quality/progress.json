@@ -872,7 +872,7 @@
       "kind": "max-rework",
       "issue": "d952d057",
       "summary": "code-review F1 after 2 reworks; proposed one more rework moving the run dir before the probe and --cargo",
-      "status": "open"
+      "status": "ruled (a): one extra rework, no further allowance; d952d057 D-01"
     }
   ],
   "rework_counts": {
@@ -897,7 +897,7 @@
     "06ee9b67": 1,
     "71f5296c": 1,
     "66790c84": 1,
-    "d952d057": 2,
+    "d952d057": 3,
     "b51291e4": 2
   },
   "surfaced_pitfalls": [
@@ -1169,7 +1169,7 @@
       "note": "follow-up landed 1e2d11ebf; code-review F1 (round 2): same-test assertion plus ENOSPC elsewhere in block exits 75; rework 2 of 2: ENOSPC must be in the panic message"
     },
     "d952d057": {
-      "status": "escalated",
+      "status": "rework",
       "vendor": "Claude Sonnet",
       "reason": "script change with self-test; steward priority",
       "review": "lead R1 FAIL (7c): Notes forbid a daemon the run starts inheriting the per-run TMPDIR; an sccache idle-out restart mid-run would. Rework 1 to the same worker. Rework 1 (b7d282ab9) passed lead review; branch CI failed: build_profile_policy_tests.rs:227 asserts the old `export RUSTC_WRAPPER=sccache` text. Rework 2 of 2 to the same worker. Rework 2 (c8852b99e) passed lead review. Landing attempt failed for host reasons twice (exit 75, then 24/24 TIMEOUT at 20 s under the integrator's advisory run); not landed; relaunch asked of 6a (D-46). Landed e03e459d1 (fresh landing per D-50); cargo-ci and cargo-ci-selftest passed; code-review R1 failed (run 9c1a9f5c): F1 high, wrapper probe and --cargo path run Cargo before the per-run TMPDIR (REQ-01). Reworks exhausted; escalated to 6a with option (a) one more rework."
