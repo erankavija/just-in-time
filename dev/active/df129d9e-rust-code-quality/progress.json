@@ -1004,7 +1004,8 @@
     "Codex brief TMPDIR=$PWD/target/tmp puts temp dirs inside the git tree; claim/archive tests that need a non-git directory then fail (handoff-11 trap). Use /mnt/nvme/jit/tmp/df129d9e-workers.",
     "test_strict_lease_exempt_paths_write_for_their_stated_reason took 12-13 s in parallel runs (not on the 4a01ccba list); relevant to f487aeef's per-test limits.",
     "Codex workers attempted `jit recover` despite the no-tracker-writes rule; briefs now name it explicitly.",
-    "Lead review asked for a shared test helper (shared-test-contracts) that the code-review then read as recreating a removed wrapper against REQ-03; check a rework instruction against the issue's literal criteria before sending it."
+    "Lead review asked for a shared test helper (shared-test-contracts) that the code-review then read as recreating a removed wrapper against REQ-03; check a rework instruction against the issue's literal criteria before sending it.",
+    "Lead's 4575a03d Notes correction searched only architecture/ paths and wrongly said the f2532a2d copies were gone; they were under eval/. Search the whole archive dir before asserting absence."
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",
@@ -1338,16 +1339,18 @@
       "review": "lead PASS at fd2221df3 (Codex); stored resolutions + per-root reachability; +29 lines (b697a3f7 ledger)"
     },
     "4575a03d": {
-      "status": "dispatched",
+      "status": "landing",
       "epic": "v1-release (taken on per 6a)",
       "note": "gates cargo-ci, code-review added; Notes amended (ac1c71c64)",
       "vendor": "Claude Sonnet",
-      "reason": "v1-release bug blocking b697a3f7 track B"
+      "reason": "v1-release bug blocking b697a3f7 track B",
+      "review": "lead PASS: retains_source_in_place (permanent or outside root), 7 archive copies removed, REQ-06 config commit separate; lead repointed 7 doc links (97af5f750); Notes corrected (2fbfbda6c). Worker briefly ran git checkout --detach (restored)."
     },
     "8fbf8c43": {
-      "status": "dispatched",
+      "status": "landing",
       "vendor": "Claude Sonnet",
-      "reason": "N2 handler aliases; before f87f9b00/3f816619/24a982b7; no renames"
+      "reason": "N2 handler aliases; before f87f9b00/3f816619/24a982b7; no renames",
+      "review": "lead PASS: HandlerResult<R>, HandlerStore trait (blanket impl), From<R> for Outcome replaces Outcome::success; no renames; -31"
     },
     "1ade3e6f": {
       "status": "dispatched",
