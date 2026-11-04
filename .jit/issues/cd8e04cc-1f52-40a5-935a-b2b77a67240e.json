@@ -16,21 +16,21 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "158b092b-6d78-40b4-afe1-7e38f3f4ebb7",
+      "run_id": "39b87d19-e8b5-443d-9f03-111a7be55a96",
       "status": "passed",
-      "updated_at": "2026-11-04T10:22:35.584209622Z",
+      "updated_at": "2026-11-04T10:40:23.572463354Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "0989acfc-3997-4642-b217-f993bcb97673",
-      "status": "failed",
-      "updated_at": "2026-11-04T10:27:51.441183956Z",
+      "run_id": "c4570711-2ad4-4511-89bc-dcfcc725417b",
+      "status": "passed",
+      "updated_at": "2026-11-04T10:44:56.874406028Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
-      "run_id": "54cb794e-b8ee-4fc9-946b-b827aad5da82",
+      "run_id": "d523dd79-8582-474e-89b0-da3541d1b826",
       "status": "passed",
-      "updated_at": "2026-11-04T10:22:52.729284125Z",
+      "updated_at": "2026-11-04T10:40:41.732706919Z",
       "updated_by": "auto:executor"
     }
   },
@@ -51,5 +51,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Worktree commands move to library handlers",
-  "updated_at": "2026-11-04T10:27:51.441183956Z"
+  "updated_at": "2026-11-04T10:44:56.874406028Z"
 }

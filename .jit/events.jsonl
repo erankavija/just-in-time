@@ -24094,3 +24094,6 @@
 {"gate_key":"holistic-review","id":"f506ff2b-0c90-46ce-aa26-59e3bbdad78d","issue_id":"b3ef68b5-ae91-4747-a2b2-49ac92cce1ba","timestamp":"2026-11-04T10:32:48.413501568Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"7a142350-7703-419f-b1f4-b6481fdf2821","issue_id":"b3ef68b5-ae91-4747-a2b2-49ac92cce1ba","timestamp":"2026-11-04T10:33:00.313502274Z","to":"done","type":"issue_state_changed"}
 {"id":"0342cd5d-9ca1-4249-a3e2-a22571beba02","issue_id":"b3ef68b5-ae91-4747-a2b2-49ac92cce1ba","timestamp":"2026-11-04T10:33:00.313502274Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"8998b94a-e11c-4cc6-8c84-3c35078a0d72","issue_id":"cd8e04cc-1f52-40a5-935a-b2b77a67240e","timestamp":"2026-11-04T10:40:23.572463354Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"804b345a-71ec-4c91-9b93-f9de532ac694","issue_id":"cd8e04cc-1f52-40a5-935a-b2b77a67240e","timestamp":"2026-11-04T10:40:41.732706919Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"37245d5d-6f0e-4c04-b4c4-5789340fa4a0","issue_id":"cd8e04cc-1f52-40a5-935a-b2b77a67240e","timestamp":"2026-11-04T10:44:56.874406028Z","type":"gate_passed","updated_by":"auto:executor"}
