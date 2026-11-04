@@ -850,6 +850,14 @@ pub(super) const MUTATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget
         max_depth: 32,
     };
 
+/// Capture budget for the record-fidelity pass, which lists one gate-run
+/// directory per issue; the byte limit bounds its growth.
+const RECORD_FIDELITY_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
+    crate::repository_state::CaptureBudget {
+        max_listings: 65_536,
+        ..MUTATION_CAPTURE_BUDGET
+    };
+
 /// The base an issue mutation derives from, from
 /// [`CommandExecutor::capture_mutation_base`].
 pub(crate) struct MutationBase {
@@ -919,7 +927,7 @@ fn capture_record_fidelity_validation(
     session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
     captured: &crate::validation::CapturedValidation<'_>,
 ) -> Result<Option<std::result::Result<(), String>>> {
-    let spec = crate::repository_state::CaptureSpec::new([], MUTATION_CAPTURE_BUDGET)?;
+    let spec = crate::repository_state::CaptureSpec::new([], RECORD_FIDELITY_CAPTURE_BUDGET)?;
     let Some(records) = super::capture_discovering(session, spec, |image, spec| {
         super::discover_gate_records(image, spec)?;
         discover_archive_evidence_records(image, spec)
@@ -2349,6 +2357,36 @@ mod tests {
             );
             std::fs::remove_file(physical).unwrap();
         }
+    }
+
+    #[test]
+    fn test_validate_silent_reads_gate_runs_of_more_issues_than_the_mutation_budget_lists() {
+        use crate::repository_state::VirtualPath;
+        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config("").unwrap();
+        let issues = (0..=MUTATION_CAPTURE_BUDGET.max_listings as u128)
+            .map(crate::test_utils::issue_id)
+            .collect::<Vec<_>>();
+        for issue in &issues {
+            let directory = VirtualPath::gate_run_issue_directory(issue);
+            std::fs::create_dir_all(executor.storage.root().join(directory.relative().as_path()))
+                .unwrap();
+        }
+        let corrupt = VirtualPath::gate_run_record(
+            issues.last().unwrap(),
+            &crate::test_utils::gate_run_id(1),
+        );
+        std::fs::write(
+            executor.storage.root().join(corrupt.relative().as_path()),
+            b"not json",
+        )
+        .unwrap();
+
+        let error = executor.validation().validate_silent().unwrap_err();
+
+        assert!(
+            format!("{error:#}").contains(&corrupt.repository_relative()),
+            "{error:#}"
+        );
     }
 
     #[test]
