@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "6e864058-2a2f-4146-8444-11e0013294f0",
+      "status": "passed",
+      "updated_at": "2026-11-04T22:58:59.016749750Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c06daf50-c151-402a-851a-fa71a9e6d764",
   "labels": [
     "type:story",
@@ -25,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Library-side command dispatch for crates/jit",
-  "updated_at": "2026-11-04T22:50:59.446665928Z"
+  "updated_at": "2026-11-04T22:58:59.016749750Z"
 }
