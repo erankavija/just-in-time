@@ -165,6 +165,14 @@ impl<S: IssueStore> TemplateOps<'_, S> {
         )
     }
 
+    /// The issue `requested` addresses, for the container and anchor ids of an apply.
+    pub fn resolve_issue(
+        &self,
+        requested: &crate::domain::identity::IssueIdPrefix,
+    ) -> Result<IssueId> {
+        self.exec.storage.resolve_issue_id(requested)
+    }
+
     /// Apply an explicit [`GraphTemplate`] — the registry-independent core of
     /// [`apply_template`](Self::apply_template).
     ///

@@ -13,8 +13,10 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use thiserror::Error;
 
+mod apply;
 mod emit;
 pub mod failure;
+mod init;
 mod invariant;
 
 pub use emit::{emit_outcome, HumanRender, Report, Response};
@@ -1337,6 +1339,10 @@ pub struct InitResponse {
     /// Applied profile results when initialization included a profile, one per
     /// package of its dependency closure.
     pub profile: Option<crate::profile::ProfileComposedApplyResult>,
+    /// Whether `--quiet` suppresses the human rendering.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub quiet: bool,
 }
 
 /// Response for `status` command
@@ -1432,6 +1438,34 @@ pub struct TemplateApplyResponse {
     pub created_node_ids_by_role: std::collections::BTreeMap<String, IssueId>,
     pub anchor_dependency_snapshots: std::collections::BTreeMap<String, Vec<IssueId>>,
     pub created_issues: std::collections::BTreeMap<String, Issue>,
+    /// Whether `--quiet` reduces the human rendering to the created ids.
+    #[serde(skip)]
+    #[schemars(skip)]
+    quiet: bool,
+}
+
+impl TemplateApplyResponse {
+    /// The response for `result` applied to `container`.
+    pub fn new(
+        result: crate::commands::TemplateApplyResult,
+        container: IssueId,
+        quiet: bool,
+    ) -> Self {
+        Self {
+            template: result.template,
+            container,
+            anchor_bindings: result.anchor_bindings,
+            created_node_ids_by_role: result.created_node_ids_by_role,
+            anchor_dependency_snapshots: result.anchor_dependency_snapshots,
+            created_issues: result.created_issues,
+            quiet,
+        }
+    }
+
+    /// The `--json` envelope's `message`.
+    pub fn message(&self) -> String {
+        format!("Applied template '{}' to {}", self.template, self.container)
+    }
 }
 
 /// Response for blocked query with reasons (minimal issue + reasons)
