@@ -17,6 +17,12 @@ set -euo pipefail
 # A clean "N passed, 0 failed" summary is trustworthy evidence and keeps
 # .jit/gate-runs/ small. Modelled on ../gf2/scripts/cargo-ci.sh.
 #
+# The run owns and removes its temporary directory: every Cargo, rustc and test
+# process, the wrapper probe and `--cargo` included, runs with TMPDIR set to a
+# directory made inside the caller's TMPDIR, and the directory goes on every
+# exit, including a trapped INT, TERM or HUP. A compiler-wrapper daemon the
+# run starts keeps the caller's TMPDIR (scripts/caller-tmpdir-wrapper.sh).
+#
 # Exit codes:
 #   0 — all steps passed
 #   1 — one or more steps failed on repository content (a verdict)
@@ -231,6 +237,19 @@ if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
   echo "cargo-ci: flock not found; running without host-wide build lock" >&2
 fi
 
+# The run owns one directory inside the caller's temporary directory and every
+# Cargo, rustc and test process below sees it as TMPDIR, so what a killed test
+# leaves behind dies with the run. The caller's TMPDIR is saved first: the
+# compiler-cache wrapper restores it, because a daemon outlives the run.
+export CARGO_CI_CALLER_TMPDIR="${TMPDIR:-/tmp}"
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+export TMPDIR="$WORK/tmp"
+mkdir "$TMPDIR"
+
 BUSY_HOST_OVERRIDE_FOR_BUDGET="${BUSY_HOST_OVERRIDE:-}"
 unset BUSY_HOST_OVERRIDE
 
@@ -267,8 +286,19 @@ ensure_real_cargo
 # deterministic opt-out for cache-sensitive diagnosis. Enabling a wrapper
 # changes Cargo fingerprints, so operators should clean a large pre-existing
 # target directory before opting an established checkout into this default.
+# Whichever wrapper runs goes through one script that restores the caller's
+# TMPDIR, because a daemon it starts or restarts mid-run outlives the run's own.
+# Its stable path keeps Cargo fingerprints stable across runs.
+unset CARGO_CI_CALLER_RUSTC_WRAPPER
+if [ -n "${RUSTC_WRAPPER:-}" ]; then
+  export CARGO_CI_CALLER_RUSTC_WRAPPER="$RUSTC_WRAPPER"
+fi
 if [ -z "${CARGO_CI_NO_SCCACHE:-}" ] && [ -z "${RUSTC_WRAPPER:-}" ] && command -v sccache >/dev/null 2>&1; then
-  export RUSTC_WRAPPER=sccache
+  RUSTC_WRAPPER=sccache
+fi
+if [ -n "${RUSTC_WRAPPER:-}" ]; then
+  RUSTC_WRAPPER="$(cd "$(dirname "$0")" && pwd)/caller-tmpdir-wrapper.sh"
+  export RUSTC_WRAPPER
 fi
 
 # A wrapper that cannot compile would fail every compiling step as if on repository
@@ -294,6 +324,8 @@ ensure_compiler_wrapper_runs() {
     wrapper=$(grep -oE "(process didn't exit successfully: |could not execute process )\`[^\`]*" "$probe/out" |
       tail -1 | sed "s/^[^\`]*\`//" |
       awk '{ for (i = 1; i <= NF && $i !~ /(^|\/)rustc$/; i++) printf "%s%s", (i > 1 ? " " : ""), $i }' || true)
+    [ -z "${RUSTC_WRAPPER:-}" ] || [ "$wrapper" != "$RUSTC_WRAPPER" ] ||
+      wrapper="${CARGO_CI_CALLER_RUSTC_WRAPPER:-sccache}"
     echo "cargo-ci: infrastructure fault (exit 75): compiler wrapper '$wrapper' cannot compile an empty crate; no step ran"
     tail -20 "$probe/out"
     echo "       Repair the wrapper and retry: a shared daemon may need stopping"
@@ -308,7 +340,9 @@ ensure_compiler_wrapper_runs
 
 if [ "${1:-}" = "--cargo" ]; then
   shift
-  exec cargo "$@"
+  cargo_status=0
+  cargo "$@" || cargo_status=$?
+  exit "$cargo_status"
 fi
 
 # The concise reporter below parses cargo-nextest's human summary contract.
@@ -336,9 +370,6 @@ ensure_pinned_nextest
 # 54.1 s against 25.3 s over the clippy and suite-build steps, at no cost to a
 # cold run. The derivation is under "Provenance" in
 # dev/benchmarks/rust-build-budgets/README.md.
-
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
 
 # This run's own scratch state (jit:0708d692): the Cargo artifact stream
 # describing what this run built, so the budget step judges what this run

@@ -173,6 +173,6 @@ The scripts live in this skill's `scripts/` subdirectory and are project-agnosti
 - `.agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh`
 - `.agents/skills/jit-execution-lead/scripts/land.sh`
 
-Read them directly if you need to understand the invariants. They are shellcheck-clean and smoke-tested. Their only configuration is the optional `LEAD_CACHE_POOL`, `LEAD_CACHE_DIRS` and `LEAD_SNAPSHOT_DIR`.
+Read them directly if you need to understand the invariants. They are shellcheck-clean and smoke-tested. Each script's header comment documents its optional environment variables.
 
 Do **not** copy the scripts into individual project trees — the canonical copy lives with the skill, and projects should reference them via the relative path conventions used in this protocol so improvements propagate to every project automatically.

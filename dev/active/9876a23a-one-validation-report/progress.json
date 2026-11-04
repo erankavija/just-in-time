@@ -214,14 +214,14 @@
         {
           "short_id": "728ecfb0",
           "classification": "implementation",
-          "status": "resumed after REQ-03 amendment",
+          "status": "reviewed d9ff90562; landing after pipeline edit",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "property test with independent oracle"
         },
         {
           "short_id": "1f24e3e9",
           "classification": "implementation",
-          "status": "rework 1 (unloadable rules dropped every fix class; planner split)",
+          "status": "rework 2 (duplicate config load; accumulator growth: r1 +67, cumulative -42)",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "multi-file fix derivation over one capture"
         }
@@ -382,7 +382,7 @@
     "2b5f452c": 3,
     "3acaa5a3": 2,
     "612ee9d4": 1,
-    "1f24e3e9": 1
+    "1f24e3e9": 2
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",

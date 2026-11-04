@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f0ed97f2e005c46595a6db41ad984a04aeac896c",
+  "completed_at": "2026-11-04T07:24:06.673573966Z",
+  "duration_ms": 216284,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".agents/skills/jit-execution-lead/scripts/test-worktree-cache.sh",
+        "id": "F1",
+        "line": 86,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "Seed and fallback self-test dispatches leave default-root worker temporary directories outside the fixture cleanup."
+      }
+    ],
+    "summary": "The self-test leaks default-root worker temporary directories outside its fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b51291e4-8f88-44fe-92e6-90790e235ca3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "efb94dd6-698d-4fa7-84d9-b64065186c8e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T07:20:30.388867144Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 1554 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a56e-4892-71d1-912f-71504294fb08\n--------\nuser\n--- 1541 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: af138a794 (`jit:b51291e4`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: worktree-cache-test: passed (exit 0, 2026-11-04T07:20:29Z)\nTruncation recovery: none\n\n1. **Blocking — issue-impact (medium):** The cache self-test dispatches the seed and fallback fixtures without `LEAD_WORKTREE_TMP_ROOT` and never reclaims them ([test-worktree-cache.sh](/home/vkaskivuo/Projects/just-in-time/.agents/skills/jit-execution-lead/scripts/test-worktree-cache.sh:86), [line 118](/home/vkaskivuo/Projects/just-in-time/.agents/skills/jit-execution-lead/scripts/test-worktree-cache.sh:118)). Its cleanup removes only `$FIX`, so each run leaves new directories under the shared default `/tmp/lead-worker-tmp/...` after the fixture worktrees are deleted. Use a fixture-owned override for every dispatch or remove these directories during cleanup. This violates the test ownership and isolation requirement in @/invariant/orthogonal-tests.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The self-test leaks default-root worker temporary directories outside its fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Seed and fallback self-test dispatches leave default-root worker temporary directories outside the fixture cleanup.\",\"file\":\".agents/skills/jit-execution-lead/scripts/test-worktree-cache.sh\",\"line\":86,\"references\":[\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

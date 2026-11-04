@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-04T07:35:53.671706477Z",
+  "dependencies": [
+    "06ee9b67-07c3-48ad-a938-179a83d12564",
+    "1f24e3e9-43bb-44da-aa8c-b4b90d157e94",
+    "2c8c13b2-1079-4400-b0b9-deb107ea34b4"
+  ],
+  "description": "The repository validation success response stops declaring its own `warnings`, and the schema test that enforces this covers enum success responses, so no success payload can shadow the shared envelope `warnings`.\n\n## Background\n\nEvery JSON success response carries an envelope `warnings` field of plain strings, and no success schema may declare a `warnings` field of its own. A schema test enforces this rule, but it inspects only struct-shaped success schemas. The `jit validate` success response is an enum. Its repository variant (`RepositoryValidationResponse`) declares `warnings` as a list of structured validation warnings, which the test does not see. The link-check payload solved the same conflict by renaming its structured list to `link_warnings`.\n\n## Success Criteria\n\n- [hard] REQ-01: The schema test that forbids payload-declared `warnings` inspects every variant of an enum success response as well as struct responses. It fails when any variant declares `warnings`.\n- [hard] REQ-02: No `jit validate` success response declares its own `warnings`. Structured validation warnings use a distinct field name following the link-check precedent, or move into the shared envelope field if they reduce to strings without losing information.\n- [hard] REQ-03: Human output and exit codes of `jit validate` are unchanged. The renamed or moved warnings carry the same entries as before.\n- [hard] REQ-04: The generated command schema, the MCP bridge and any adopter-facing documentation that names the field state the new shape.\n\n## Notes\n\nThe validate success views are being reshaped by the validation-report work. This task builds on the final response shape that work produces.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-04T07:35:53.671706477Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "6acd7a05-b199-43f8-b619-554b536dc420",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:output-contract",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Validate success response declares no payload warnings",
+  "updated_at": "2026-11-04T07:37:16.207895818Z"
+}

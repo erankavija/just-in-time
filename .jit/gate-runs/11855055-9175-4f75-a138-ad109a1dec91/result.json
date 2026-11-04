@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "50c532f9c4ad8a1ef84a786130f3d83a1960cef7",
+  "completed_at": "2026-11-04T07:50:21.790822952Z",
+  "duration_ms": 178085,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/storage-records.md",
+        "id": "F1",
+        "line": 164,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Remove the internal claim that the reusable-verdict reader does not search a run listing."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/storage-records.md",
+        "id": "F2",
+        "line": 180,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Remove the internal claim that execution captures the evidence path to append prior evidence."
+      }
+    ],
+    "summary": "The generated reference is accurate but includes two unnecessary internal implementation details.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "09ca911e-0518-4545-b516-b13cdbfd6834",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "11855055-9175-4f75-a138-ad109a1dec91",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T07:47:23.705382823Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 23746 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a586-e89f-7930-a7ed-58f0f6f1e201\n--------\nuser\n--- 23733 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: leaf task with no resolved children; reviewed its sole tagged commit, `ab4647e0`. No fallback attribution was needed.\n\nDocumentation impact: both records are documented accurately and generated from current source, but two issue-authored implementation details are unnecessary.\n\n1. F1 (medium, blocking, issue-impact) — [storage-records.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-records.md:164) says “It does not search a run listing.” Cut this internal lookup detail; the preceding sentence already identifies the reader and addressed run.\n\n2. F2 (medium, blocking, issue-impact) — [storage-records.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-records.md:180) says execution “captures the same path to append prior evidence.” Cut this internal capture detail; the prior sentence sufficiently identifies the writer and reader.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated reference is accurate but includes two unnecessary internal implementation details.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Remove the internal claim that the reusable-verdict reader does not search a run listing.\",\"file\":\"docs/reference/storage-records.md\",\"line\":164},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Remove the internal claim that execution captures the evidence path to append prior evidence.\",\"file\":\"docs/reference/storage-records.md\",\"line\":180}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

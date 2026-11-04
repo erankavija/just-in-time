@@ -22,6 +22,7 @@
 #   - Creates one worktree per short-id at
 #     .agents/worktrees/agent-<short-id> on branch
 #     worktree-agent-<short-id> anchored to current main HEAD.
+#   - Seeds build caches from LEAD_CACHE_POOL, default <repo>/.agents/cache-pool.
 #   - Creates its temporary directory at
 #     <LEAD_WORKTREE_TMP_ROOT>/<repo-path>/agent-<short-id>, defaulting
 #     LEAD_WORKTREE_TMP_ROOT to /tmp/lead-worker-tmp. Override it with an

@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e03e459d13c7f68b633d383a07762c024c1e3831",
+  "completed_at": "2026-11-04T07:39:01.196104143Z",
+  "duration_ms": 188344,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/cargo-ci.sh",
+        "id": "F1",
+        "line": 317,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/d952d057/requirement/REQ-01",
+          "@/gate/cargo-ci"
+        ],
+        "severity": "high",
+        "summary": "The wrapper probe and --cargo path invoke Cargo before the per-run TMPDIR is created and exported."
+      }
+    ],
+    "summary": "Build paths run before cargo-ci establishes its per-run TMPDIR.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d952d057-f781-455b-9982-05678fd7e0e1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9c1a9f5c-7f3d-42e2-95c6-cafccb83f3ac",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T07:35:52.851223289Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2613 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a57c-5bbf-77c2-8f58-a2a5179511ba\n--------\nuser\n--- 2600 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0128848bb, b7d282ab, fe111ffa7, c8852b99e (all `jit:d952d057`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; issue description\nResolved items: @/issue/d952d057/requirement/REQ-01 (issue description); @/gate/cargo-ci (.jit/gates.toml); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-04T07:35:21Z); cargo-ci-selftest passed (exit 0, 2026-11-04T07:35:45Z)\nTruncation recovery: read individual patches per commit; narrowed current script to lines 240–720 and self-test to lines 520–610.\n\n1. **[blocking][issue-impact]** `scripts/cargo-ci.sh:317` runs `ensure_compiler_wrapper_runs`, whose `cargo check` at line 300 executes before the per-run directory is created and exported at lines 353–359. The documented `--cargo` path also directly `exec`s Cargo at lines 319–321 before that setup. Both are build paths that inherit the caller’s `TMPDIR`, violating REQ-01 and the updated cargo-ci gate contract. The new self-test only exercises `--suite`; its fake `check*` branch does not record `TMPDIR`, so it does not detect this gap. References: `@/issue/d952d057/requirement/REQ-01`, `@/gate/cargo-ci`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Build paths run before cargo-ci establishes its per-run TMPDIR.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The wrapper probe and --cargo path invoke Cargo before the per-run TMPDIR is created and exported.\",\"file\":\"scripts/cargo-ci.sh\",\"line\":317,\"references\":[\"@/issue/d952d057/requirement/REQ-01\",\"@/gate/cargo-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
