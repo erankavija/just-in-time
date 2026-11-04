@@ -1,7 +1,7 @@
 //! `jit snapshot export` handler.
 
 use super::{resolve_issue, CommandContext, Outcome};
-use crate::cli::SnapshotExportArgs;
+use crate::cli::{SnapshotCommands, SnapshotExportArgs};
 use crate::output::snapshot::SnapshotExportResponse;
 use crate::snapshot::{SnapshotFormat, SnapshotScope};
 use crate::storage::{IssueStore, RepositoryStateStore};
@@ -39,10 +39,10 @@ fn export<S: IssueStore + RepositoryStateStore>(
 }
 
 command_group! {
-    command: SnapshotExportArgs,
+    command: SnapshotCommands,
     storage: [IssueStore + RepositoryStateStore],
     leaves: {
-        "snapshot_export" => args => export(args) -> SnapshotExportResponse,
+        "snapshot_export" => SnapshotCommands::Export(args) => export(args) -> SnapshotExportResponse,
     }
 }
 

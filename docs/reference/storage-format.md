@@ -401,7 +401,8 @@ separate from the claims state.
   Claim operations change a record under `locks/claims.lock` by writing a
   synced stage file, renaming it over the record and syncing the directory, or
   by unlinking it; that rename or unlink commits the change. Other names in
-  `leases/`, such as an interrupted operation's stage file, are not leases.
+  `leases/`, such as an interrupted operation's `{issue-id}.json.tmp` stage
+  file, are not leases; `jit recover` removes stale stage files.
   `jit claim list` and `status` read the records without the lock.
 - **`claims.seq`**: the last sequence number handed to `claims.jsonl`, as a
   decimal integer, advanced after each committed change.

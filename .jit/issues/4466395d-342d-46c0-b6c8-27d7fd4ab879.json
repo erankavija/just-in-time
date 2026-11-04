@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-04T07:11:27.968965419Z",
   "context": {},
   "created_at": "2026-10-21T10:39:53.980326737Z",
   "dependencies": [
@@ -9,11 +10,26 @@
   ],
   "description": "Prove end to end that ordinary commands never read history: with the event log, the claims log and other issues' gate runs replaced by garbage, issue reads, gate evaluation, claims and lease operations still succeed.\n\n## Background\n\nOnly history-reporting commands may read the event log, the claims log or gate-run history. Whole-repository `jit validate` and the `repository_validation` checker are history readers, so a fixture gate uses an `exec` checker. Ordinary commands reach the event log only through the bounded end-of-log probe, the claims log not at all, and gate runs only through the run records their issue's gate state names. No end-to-end test shows this. The CLI integration suite `crates/jit/tests/cli_repo_workflow/` hosts one module per topic (`main.rs` lists them), and adding a module adds no build target. An unknown tag or malformed middle line stays an error for the commands that do report history.\n\n## Success Criteria\n\n- [hard] REQ-01: One shared fixture creates a git-initialized repository with a target issue and a second issue, defines a gate with a trivial `exec` checker, runs it on the second issue, and acquires and releases one lease so the claims log exists.\n- [hard] REQ-02: One shared helper replaces `.jit/events.jsonl` with unparseable lines whose last line is unterminated, replaces `.git/jit/claims.jsonl` with unparseable lines, and overwrites the second issue's gate-run records with unparseable bytes.\n- [hard] REQ-03: With that corruption in place, separate tests show that `issue show`, `issue status` and `query available` succeed; that gate evaluation of the target issue succeeds; that `claim acquire` succeeds and appends its claim event; and that lease acquire, renew and release succeed.\n",
   "documents": [],
+  "done_at": "2026-11-04T07:58:38.370419030Z",
+  "first_ready_at": "2026-11-04T07:08:56.393436499Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "88363cf0-c609-44e0-909d-8bbbddaffab0",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:54:51.512027026Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "893afdb7-0309-4f0b-b243-26a6dbad55a3",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:58:37.890865905Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4466395d-342d-46c0-b6c8-27d7fd4ab879",
   "labels": [
     "type:task",
@@ -27,7 +43,7 @@
     "satisfies:f8a6b298/REQ-14"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Ordinary commands succeed over unparseable history",
-  "updated_at": "2026-11-02T23:40:52.783202956Z"
+  "updated_at": "2026-11-04T07:58:38.370419030Z"
 }

@@ -1,0 +1,65 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/cdc840ad-repository-materialization",
+      "planned_deletions": [],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "d66e83b15c94224cfcc4a1f239edefbcdc92c0fb70af09330e66f8ff6e3dc2bd"
+          },
+          "destination": "dev/archive/cdc840ad-repository-materialization/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [],
+      "target": {
+        "id": "cdc840ad-9332-4936-9381-772318967f0f",
+        "kind": "container"
+      }
+    },
+    {
+      "destination_root": "dev/archive/cdc840ad-repository-materialization",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 6298,
+            "sha256": "4577173bf1a3ee0306767a5eb90f3a6574ffecf17e5651026d2c9cde3ea6872b"
+          },
+          "source": "dev/active/49adf23b-inc6-conformance.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 6298,
+            "sha256": "4577173bf1a3ee0306767a5eb90f3a6574ffecf17e5651026d2c9cde3ea6872b"
+          },
+          "destination": "dev/archive/cdc840ad-repository-materialization/dev/active/49adf23b-inc6-conformance.md",
+          "source": "dev/active/49adf23b-inc6-conformance.md"
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/49adf23b-inc6-conformance.md",
+          "issue": "49adf23b-4fe9-48dd-b9c4-89dfb839c7e9",
+          "to_path": "dev/archive/cdc840ad-repository-materialization/dev/active/49adf23b-inc6-conformance.md"
+        }
+      ],
+      "target": {
+        "id": "cdc840ad-9332-4936-9381-772318967f0f",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "cdc840ad-9332-4936-9381-772318967f0f",
+    "kind": "container"
+  }
+}

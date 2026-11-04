@@ -280,11 +280,11 @@ impl<S: IssueStore> TemplateOps<'_, S> {
                 // no authored declaration document for repository validation to
                 // parse. The same typed finalizer still owns every issue, gate
                 // declaration, and event byte.
-                finalize(&layout, &image, &context, &captured.derived.intents)?
+                finalize(&layout, &image, &context, &captured.derived.intents, None)?
             };
             let proposed = crate::repository_state::apply_overlay(
                 &image,
-                super::validation_overlay(&image, plan.delta())?,
+                crate::repository_state::action_overrides(plan.delta().actions()),
             )?;
             captured.derived.result.populate_created_issues(&proposed)?;
             classify_apply(session.apply(&plan), (captured.derived.result, warnings))

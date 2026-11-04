@@ -119,38 +119,20 @@ pub(crate) fn overlaid_issue_ids(
     super::listed_issue_ids(&names)
 }
 
-/// The overrides `actions` project to over `base`: written bytes, deletions'
-/// absence, and the event log as its append leaves it.
+/// Written bytes and deletions from `actions`; appends retain the captured log tail.
 pub fn action_overrides<'a>(
-    base: &RepositoryImage,
     actions: impl IntoIterator<Item = &'a RepositoryAction>,
-) -> Result<BTreeMap<VirtualPath, Option<Vec<u8>>>, CaptureError> {
+) -> BTreeMap<VirtualPath, Option<Vec<u8>>> {
     actions
         .into_iter()
         .filter_map(|action| match action {
             RepositoryAction::WriteFile { path, bytes, .. } => {
-                Some(Ok((path.clone(), Some(bytes.clone()))))
+                Some((path.clone(), Some(bytes.clone())))
             }
-            RepositoryAction::DeleteFile { path, .. } => Some(Ok((path.clone(), None))),
-            // A log read as its tail keeps that tail: nothing over the
-            // overlay can read the bytes before it.
+            RepositoryAction::DeleteFile { path, .. } => Some((path.clone(), None)),
             RepositoryAction::AppendEvents { .. }
-                if matches!(
-                    base.entry(action.path()),
-                    Ok(crate::repository_state::RepositoryEntry::FileTail { .. })
-                ) =>
-            {
-                None
-            }
-            RepositoryAction::AppendEvents { offset, bytes, .. } => {
-                Some(base.file_bytes(action.path()).map(|log| {
-                    let mut log = log.unwrap_or_default().to_vec();
-                    log.truncate(usize::try_from(*offset).unwrap_or(usize::MAX));
-                    log.extend_from_slice(bytes);
-                    (action.path().clone(), Some(log))
-                }))
-            }
-            RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
+            | RepositoryAction::CreateDirectory { .. }
+            | RepositoryAction::SetMode { .. } => None,
         })
         .collect()
 }
@@ -174,7 +156,6 @@ mod tests {
     use super::*;
     use crate::repository_state::{ExpectedPreimage, RepositoryActionOwner};
     use crate::test_harness::image::ImageBuilder;
-    use std::collections::BTreeMap;
 
     #[test]
     fn test_apply_overlay_replaces_captured_file_bytes() {
@@ -188,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn test_action_overrides_extend_the_captured_log_by_its_append() {
+    fn test_action_overrides_event_append_produces_no_byte_override() {
         let base = ImageBuilder::new()
             .file(VirtualPath::EVENTS, "prior\nuncommitted")
             .build();
@@ -198,10 +179,7 @@ mod tests {
             6,
             b"next\n".to_vec(),
         );
-        assert_eq!(
-            action_overrides(&base, [&append]).unwrap(),
-            BTreeMap::from([(VirtualPath::EVENTS, Some(b"prior\nnext\n".to_vec()))])
-        );
+        assert!(!action_overrides([&append]).contains_key(&VirtualPath::EVENTS));
     }
 
     #[test]

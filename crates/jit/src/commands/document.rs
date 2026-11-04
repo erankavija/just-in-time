@@ -518,7 +518,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             if derived.intents.is_empty() {
                 return Ok(SessionStep::Done((derived.outcome, warnings)));
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             Ok(SessionStep::Apply(plan, (derived.outcome, warnings)))
         })
     }
@@ -546,7 +546,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             };
             let issue = captured_issue(&image, &issue_path, issue_id)?;
             let derived = derive_document_remove(issue, path)?;
-            let plan = finalize(&layout, &image, &context, &derived.intents)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             Ok(SessionStep::Apply(plan, derived.outcome))
         })
     }
@@ -1009,6 +1009,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let listed = crate::commands::AssetListResult::with_extras(
             assets,
             crate::commands::AssetListScope {
+                worktree_root: self.exec.require_layout()?.worktree_root().to_path_buf(),
                 issue_id: full_id,
                 document_path: path.to_string(),
                 summary: crate::commands::AssetSummary {
@@ -1090,7 +1091,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
                     )),
                 },
             ];
-            let plan = finalize(&layout, &image, &context, &intents)?;
+            let plan = finalize(&layout, &image, &context, &intents, None)?;
             Ok(SessionStep::Apply(plan, scanned))
         })
     }
@@ -1171,7 +1172,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             return Ok(crate::commands::LinkCheckResult {
                 valid: true,
                 errors: Vec::new(),
-                warnings: Vec::new(),
+                link_warnings: Vec::new(),
                 scope: scope.to_string(),
                 summary: crate::commands::LinkCheckSummary {
                     total_documents: 0,
@@ -1380,7 +1381,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         Ok(crate::commands::LinkCheckResult {
             valid: errors.is_empty(),
             errors,
-            warnings,
+            link_warnings: warnings,
             scope: scope.to_string(),
             summary: crate::commands::LinkCheckSummary {
                 total_documents: all_documents.len(),
@@ -2159,7 +2160,7 @@ mod tests {
             first_scan.format,
             first_scan.assets,
         );
-        let first_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
+        let first_plan = finalize(&layout, &first_image, &context, &first.intents, None).unwrap();
 
         let mut concurrent = storage.load_issue(&id).unwrap();
         concurrent.labels.push("owner:concurrent".into());
@@ -2196,7 +2197,7 @@ mod tests {
             retry_scan.format,
             retry_scan.assets,
         );
-        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents).unwrap();
+        let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents, None).unwrap();
         assert_eq!(event_bytes(&first_plan), event_bytes(&retry_plan));
         retry_session.apply(&retry_plan).unwrap();
 

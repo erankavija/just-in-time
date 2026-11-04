@@ -1,7 +1,7 @@
 {
   "epic_id": "9876a23a-8535-45ad-83f8-ca237f017e70",
   "epic_short_id": "9876a23a",
-  "current_wave": 7,
+  "current_wave": 8,
   "waves": [
     {
       "wave_number": 1,
@@ -171,7 +171,7 @@
       "issues": [
         {
           "short_id": "612ee9d4",
-          "status": "landing (chain-w7b)",
+          "status": "done 9cd3c9138 (rework 1; code-review 0 findings)",
           "worker": "claude opus",
           "worker_reason": "report-selection contract"
         },
@@ -189,7 +189,7 @@
         },
         {
           "short_id": "c1af05ac",
-          "status": "landing (chain-w7b)",
+          "status": "done",
           "worker": "codex gpt-6-luna xhigh",
           "worker_reason": "test relocation"
         },
@@ -198,6 +198,42 @@
           "status": "done b67342fec",
           "worker": "codex gpt-6.1-sol high",
           "worker_reason": "bug found by c1af05ac; regression from 001a9c46"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "short_id": "2c8c13b2",
+          "classification": "implementation",
+          "status": "done 87b38351c (-166)",
+          "worker": "claude opus",
+          "worker_reason": "adds the shared capture-and-report function; DEC-19"
+        },
+        {
+          "short_id": "728ecfb0",
+          "classification": "implementation",
+          "status": "done d95ef1858 (0)",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "property test with independent oracle"
+        },
+        {
+          "short_id": "1f24e3e9",
+          "classification": "implementation",
+          "status": "landed 9af61dd1f (-61); cargo-ci re-run (42 s budget overrun was host noise: 728ecfb0 gate on the same tree 18.2 s)",
+          "worker": "codex gpt-6.1-sol high",
+          "worker_reason": "multi-file fix derivation over one capture"
+        },
+        {
+          "short_id": "86f7e6eb",
+          "status": "landing (-5)",
+          "worker": "codex gpt-6-luna xhigh"
+        },
+        {
+          "short_id": "208edf4c",
+          "status": "reviewed (-100; D-02, REQ-05); lands after 86f7e6eb",
+          "worker": "claude opus"
         }
       ]
     }
@@ -211,7 +247,6 @@
     "wave_merge_deltas": [
       {
         "wave": 1,
-        "default": 113,
         "test_support_as_test": 3,
         "by_issue": {
           "7eb443b2": 8,
@@ -222,7 +257,6 @@
       },
       {
         "wave": 2,
-        "default": 15,
         "test_support_as_test": -1,
         "by_issue": {
           "70ac98fc": 0,
@@ -266,15 +300,26 @@
       },
       {
         "wave": 7,
-        "partial": true,
-        "test_support_as_test": 178,
+        "test_support_as_test": 464,
         "by_issue": {
           "2b5f452c": 149,
           "3acaa5a3": 9,
-          "e2082ba9": 20
+          "e2082ba9": 20,
+          "612ee9d4": 286,
+          "c1af05ac": 0
         }
       }
-    ]
+    ],
+    "running_total": 482,
+    "reestimate_2026_11_04": {
+      "remaining": -950,
+      "epic_end": -470,
+      "range": [
+        -560,
+        -380
+      ],
+      "steward": "accepted by just-in-time-6a"
+    }
   },
   "created_during_execution": [
     {
@@ -346,7 +391,8 @@
     "6ba4f623": 1,
     "2b5f452c": 3,
     "3acaa5a3": 2,
-    "612ee9d4": 1
+    "612ee9d4": 1,
+    "1f24e3e9": 2
   },
   "surfaced_pitfalls": [
     "728ecfb0 REQ-01 still mentions an index/listing disagreement, stale since c47d78c8 (outside approved decisions)",
@@ -354,7 +400,8 @@
     "f8a6b298 15009590 removes ClaimResponse (claim returns stored Issue); 03c59566 Background cites ClaimResponse as the pattern: correct at dispatch",
     "jit-server graceful_shutdown_tests::test_the_drain_assertion_rejects_a_server_that_force_closes_early failed once under load ~10 (5d5a1794 CI); passes alone",
     "6ba4f623: report adds the derived-materialization prefix only when history is supplied (proxy for whole validate / repository_validation, REQ-04); structural failure is Arc<anyhow::Error> with into_parts(). 612ee9d4 should give callers the failed pass so the caller, not a history proxy, decides wording.",
-    "2b5f452c: issue records now decode bytes->Value->Issue once; a duplicated JSON key in a record now loads (last wins) instead of failing, and field-type errors lose line/column. Accepted (no criterion); flag to steward."
+    "2b5f452c: issue records now decode bytes->Value->Issue once; a duplicated JSON key in a record now loads (last wins) instead of failing, and field-type errors lose line/column. Accepted (no criterion); flag to steward.",
+    "728ecfb0 selection proptest: per the 208edf4c worker, about 23 of 24 random images fail the integrity pass first, so the oracle rarely sees a structurally clean report; check against story b3ef68b5 REQ-04 before its gate."
   ],
   "started_at": "2026-11-03T23:40:00+02:00",
   "rejected": [
@@ -373,11 +420,15 @@
     "Codex workers never merge main or run any git write (read-only metadata leaves half-merges or copies main's uncommitted .jit lines); the lead merges main into Codex branches and commits their diffs with git add -A crates.",
     "A cargo-ci gate run that fails instantly with exit_code null and empty output was REUSED from a prior failed run with the same inputs digest (origin.derivation=reused). After an environment-faulted failure, re-evaluate with `jit gate evaluate <id> cargo-ci --force`.",
     "Do not set TMPDIR to /mnt/nvme for tests: ext4 directory order breaks a drift test (3e's bug, fix with 944edb32) and fsync-heavy tests time out. ENOSPC under /tmp is a host fault: rerun.",
-    "/tmp ENOSPC was inode exhaustion (1.0M inodes; ~473K in leaked /tmp/.tmp* test dirs). Authoritative runs (branch CI, cargo-ci gates) use TMPDIR=/dev/shm/jit-ci/9876a23a under the full-CI lock, created before and removed after each run; workers use /mnt/nvme/jit/tmp/9876-workers (steward rule)."
+    "/tmp ENOSPC was inode exhaustion (1.0M inodes; ~473K in leaked /tmp/.tmp* test dirs). Authoritative runs (branch CI, cargo-ci gates) use TMPDIR=/dev/shm/jit-ci/9876a23a under the full-CI lock, created before and removed after each run; workers use /mnt/nvme/jit/tmp/9876-workers (steward rule).",
+    "Edits to land-pipeline.zsh only while no pipeline runs it: zsh reads the script while it executes.",
+    "Wave ordering that reuses another task's code must be a dependency edge, not sub-wave order (steward, 2026-11-04).",
+    "No advisory test suite of this lead (worker or integrator) runs while an authoritative CI run holds the full-CI lock (steward rule, 2026-11-04). Advisory: `flock -o /tmp/jit-ci-turnstile.lock flock -o -s /tmp/jit-full-ci.lock cargo nextest ...`; authoritative: the same turnstile then `-x` (land-pipeline.zsh). The turnstile prevents shared-lock starvation. Overlap pushed 1f24e3e9 cargo-ci to 42 s against the 30 s budget."
   ],
   "plan_reviews": {
     "plan-review 2df01664": "passed after amendment (0 findings)",
     "breakdown-review de9a7557": "passed on rerun after restoring ea843d26 -> de9a7557 (2 advisory findings, no change)"
   },
-  "worker_policy": "User 2026-11-04: Codex gpt-6-luna, gpt-6.1-sol and gpt-6-astra plus Claude, liberally. Host quiet window: no new dispatch from 03:30 EET, no builds from 03:55 until just-in-time-6a releases; workers wait on 88's cargo-hold file."
+  "worker_policy": "User 2026-11-04: Codex gpt-6-luna, gpt-6.1-sol and gpt-6-astra plus Claude, liberally. Host quiet window: no new dispatch from 03:30 EET, no builds from 03:55 until just-in-time-6a releases; workers wait on 88's cargo-hold file.",
+  "lead": "just-in-time-b9 (from a4, 2026-11-04)"
 }

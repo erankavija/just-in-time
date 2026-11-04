@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:9876a23a-lead",
   "claimed_at": "2026-11-04T02:24:23.524403909Z",
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
@@ -9,12 +9,26 @@
   ],
   "description": "Give `ValidationReport` the provenance each finding needs and a selection operation, so every validation view can be computed as a filter of the one report.\n\n## Background\n\n- `ValidationReport` holds findings projected to the wire `ReportedFinding` (`crates/jit/src/validation/report.rs:24`), which keeps the attributed issue, rule, severity and message only. A view also needs each finding's origin (local rule, graph rule and whether it is repository-wide at transition, or a built-in pass), its firing subject (graph findings record it) and whether it is a configuration error. The report also records whether it carries the history verdicts (record fidelity and document references), which only whole `jit validate` and the `repository_validation` gate checker supply; a failed verdict is part of the structural failure.\n- Today each view filters its own pipeline: per-issue in `run_rules` (`crates/jit/src/commands/validate.rs:1643-1758`), scope in `validate_scope` (`:1833-1950`), explain in `explain_rules` (`:1993-2081`), single rule in `rule_validation_outcome` (`:1114-1174`), whose `RuleSelectionFault` (`:1177-1201`) the CLI renders as one error finding and the rule checker records as an `error` run, and the gate checkers in `crates/jit/src/commands/gate_check.rs:413-564`.\n- Scope membership comes from `domain::queries::bracket_scope_ids` (`crates/jit/src/domain/queries.rs:372`) with the container template's breakdown type; rule selection errors come from `validation::graph::select_graph_rule` (`crates/jit/src/validation/graph.rs:409`); explain rows use `Selector::match_failure` and `render_selector` (`commands/validate.rs:2040,2357-2376`, tests `:2851,2862`).\n- The membership of each selection is fixed by the plan's `selection-membership` contract (`dev/active/9876a23a-one-validation-report/plan.md`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each report finding carries its origin, firing subject, attribution and configuration-error flag, and the wire projection is unchanged.\n- [hard] REQ-02: `ValidationReport::select(&Selection)` returns the wire `RuleReport` for `Whole`, `Issue`, `Scope` and `Rule` selections through one membership predicate, and `ValidationReport::explain` returns the `ExplainReport` for an issue. A prefix that resolves to no issue or to several fails with today's not-found or ambiguity error; a report without parsed records fails every selection but `Whole` with its structural error; a `Whole` selection from a report without history verdicts fails with a typed error; a rule that cannot be selected for the issue returns its `RuleSelectionFault`.\n- [hard] REQ-03: `render_selector` and the explain grouping live in the validation layer.\n- [hard] REQ-04: Example unit tests show each selection's membership on one report, including the stated changes: a scope counts a coverage child outside the container's dependency closure, an issue selection omits a configuration error fired by another issue, an issue selection omits `enforcement-drift` and keeps `rules-file`, and only `Whole` reports a failed record-fidelity or document-reference verdict.\n\n## Notes\n\n- Behaviour changes, delivered to users as each view adopts the selection: scope rules see the whole repository; issue and explain configuration errors narrow to the selected issue's subject or rule; issue, explain, scope and rule selections report `rules-file` for an unloadable rule set; issue and explain selections never include `enforcement-drift`.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-04T07:01:27.453519683Z",
   "first_ready_at": "2026-11-04T02:23:40.516324346Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "256fcb89-473e-4f28-a622-72232ceae90d",
+      "status": "passed",
+      "updated_at": "2026-11-04T06:57:32.985618813Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c54116ac-98c0-4f74-9ba9-38ff8d04aa09",
+      "status": "passed",
+      "updated_at": "2026-11-04T07:00:49.384467652Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "612ee9d4-d14a-45a8-b1e5-8bedec9951ce",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:9876a23a/REQ-02"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Validation views are selections of the report",
-  "updated_at": "2026-11-04T02:24:23.524403909Z"
+  "updated_at": "2026-11-04T07:01:27.453519683Z"
 }

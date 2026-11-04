@@ -2,8 +2,10 @@
 
 use super::*;
 use crate::domain::identity::GateKey;
-use crate::domain::type_taxonomy::{
-    detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
+use crate::domain::type_taxonomy::{detect_validation_issues, generate_fixes, ValidationFix};
+use crate::domain::{EventBody, ReadinessCorrection};
+use crate::repository_state::{
+    MutationIntent, RepositoryAction, RepositoryDeclarations, RepositoryImage,
 };
 use crate::validation::report::BuiltInPass;
 use anyhow::Context;
@@ -19,11 +21,36 @@ enum BaseCapturePurpose<'a> {
 }
 
 /// A capture's parsed issues and, for validation, the JSON value each decoded from.
-type ParsedIssues = (Vec<Issue>, Vec<serde_json::Value>);
+type ParsedIssues = (Result<Vec<Issue>>, Vec<serde_json::Value>);
 
 struct CapturedRepairPlan {
     declarations: crate::repository_state::CapturedRepositoryDeclarations,
     plan: Option<crate::repository_state::MaterializationPlan>,
+}
+
+#[derive(Default)]
+struct PlannedFixes {
+    count: usize,
+    messages: Vec<String>,
+    intents: Vec<MutationIntent>,
+    actions: Vec<RepositoryAction>,
+}
+
+impl PlannedFixes {
+    fn merge(mut self, other: Self) -> Self {
+        self.count += other.count;
+        self.messages.extend(other.messages);
+        self.intents.extend(other.intents);
+        self.actions.extend(other.actions);
+        self
+    }
+
+    fn skipped(class: &str, error: impl std::fmt::Display) -> Self {
+        Self {
+            messages: vec![format!("Skipped {class}: {error:#}")],
+            ..Self::default()
+        }
+    }
 }
 
 /// Validation operations of a [`CommandExecutor`].
@@ -39,81 +66,148 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> {
-    /// Validate with optional fix mode.
-    ///
-    /// # Arguments
-    ///
-    /// * `fix` - If true, attempt to fix validation issues
-    /// * `dry_run` - If true, show what would be fixed without applying changes
-    ///
-    /// # Returns
-    ///
-    /// Returns Ok with (count of fixes applied, messages), or Err if validation fails.
-    /// In fix mode a repository that still fails validation with nothing
-    /// repaired is an Err naming the findings `--fix` cannot repair.
-    pub fn validate_with_fix(&self, fix: bool, dry_run: bool) -> Result<(usize, Vec<String>)> {
-        // First run standard validation
-        let validation_result = self.validate_silent();
+    /// Derive all repairs from one capture, publish once, then report the resulting repository.
+    pub fn validate_with_fix(
+        &self,
+        dry_run: bool,
+    ) -> Result<(
+        usize,
+        Vec<String>,
+        crate::validation::ValidationReport,
+        crate::output::DivergenceResponse,
+    )> {
+        use crate::repository_state::{finalize, MaterializationPlan, RepositoryDelta};
+        let layout = self.exec.require_layout()?;
+        let context = production_mutation_context();
+        let (count, mut messages) = with_mutation_session(
+            self.exec.storage(),
+            &layout,
+            "validation repair",
+            |session| {
+                let Some(captured) = self.capture_validation(session)? else {
+                    return Ok(SessionStep::Retry);
+                };
+                let (Ok(original), Ok(_)) = (&captured.issues, &captured.index) else {
+                    return Ok(SessionStep::Done((0, Vec::new())));
+                };
+                let image = &captured.image;
+                let mut projected = original.to_vec();
+                let declarations =
+                    crate::repository_state::validation_declarations_from_image(image);
+                let fixes = match &declarations {
+                    Ok(declarations) => {
+                        self.plan_hierarchy_fixes(declarations.config(), &mut projected, dry_run)?
+                    }
+                    Err(error) => {
+                        PlannedFixes::skipped("hierarchy fixes and derived-state repair", error)
+                    }
+                };
+                let mut fixes = fixes
+                    .merge(plan_reduction_fixes(&mut projected)?)
+                    .merge(plan_readiness_fixes(&mut projected));
+                if let Ok(declarations) = declarations {
+                    let repairs = match declarations.rules_load_error() {
+                        Some(error) => PlannedFixes::skipped(
+                            "derived-state repair",
+                            format_args!("rules.toml could not be loaded: {error:#}"),
+                        ),
+                        None => plan_derived_state_fixes(image, declarations.borrowed()),
+                    };
+                    fixes = fixes.merge(repairs);
+                }
+                fixes.intents.extend(
+                    projected
+                        .into_iter()
+                        .zip(original.iter())
+                        .filter(|(issue, before)| issue != *before)
+                        .map(|(issue, _)| MutationIntent::UpdateIssue {
+                            issue: Box::new(issue),
+                        }),
+                );
+                let issues = finalize(&layout, image, &context, &fixes.intents, Some(original))?;
+                let mut actions = issues.delta().actions().to_vec();
+                for action in fixes.actions {
+                    if let RepositoryAction::AppendEvents { bytes, .. } = &action {
+                        if let Some(RepositoryAction::AppendEvents {
+                            bytes: existing, ..
+                        }) = actions
+                            .iter_mut()
+                            .find(|action| matches!(action, RepositoryAction::AppendEvents { .. }))
+                        {
+                            existing.extend_from_slice(bytes);
+                            continue;
+                        }
+                    }
+                    actions.push(action);
+                }
+                let (count, messages) = (fixes.count, fixes.messages);
+                let plan = MaterializationPlan::new(image, RepositoryDelta::new(&layout, actions)?);
+                if dry_run || plan.delta().actions().is_empty() {
+                    Ok(SessionStep::Done((count, messages)))
+                } else {
+                    Ok(SessionStep::Apply(plan, (count, messages)))
+                }
+            },
+        )?;
+        messages.push(if dry_run {
+            format!("Dry run complete. {count} fixes would be applied.")
+        } else if count > 0 {
+            format!("Applied {count} fixes")
+        } else {
+            "No fixes applied".into()
+        });
+        let (report, divergences) = self.capture_validation_report()?;
+        Ok((count, messages, report, divergences))
+    }
 
-        if validation_result.is_ok() && !fix {
-            return Ok((0, vec![]));
-        }
-
-        // If fix mode is enabled, detect and fix issues
-        if fix {
-            let mut total_fixes = 0;
-            let mut all_messages = Vec::new();
-
-            // Fix type hierarchy issues
-            let (hierarchy_fixes, mut messages) = self.detect_and_fix_hierarchy_issues(dry_run)?;
-            total_fixes += hierarchy_fixes;
-            all_messages.append(&mut messages);
-
-            // Fix transitive reduction violations (both dry-run and actual fix)
-            let (reduction_fixes, mut messages) = self.fix_all_transitive_reductions(dry_run)?;
-            total_fixes += reduction_fixes;
-            all_messages.append(&mut messages);
-
-            // Fix pending state transitions
-            let (transition_fixes, mut messages) = self.check_pending_transitions(dry_run)?;
-            total_fixes += transition_fixes;
-            all_messages.append(&mut messages);
-
-            // Repair derived state (default rules/schemas + configured projections)
-            // through one repair delta in one redo record.
-            let (repair_fixes, mut messages) = self.repair_derived_state(dry_run)?;
-            total_fixes += repair_fixes;
-            all_messages.append(&mut messages);
-
-            if total_fixes == 0 {
-                validation_result.map_err(|error| {
-                    crate::errors::ValidationFailedError::new(format!(
-                        "--fix has no automatic repair for these findings: {error}"
-                    ))
-                })?;
+    fn plan_hierarchy_fixes(
+        &self,
+        config: &crate::config::JitConfig,
+        projected: &mut [Issue],
+        dry_run: bool,
+    ) -> Result<PlannedFixes> {
+        let mut fixes = PlannedFixes::default();
+        let hierarchy = match crate::domain::type_taxonomy::HierarchyConfig::from_declarations(
+            &crate::config_manager::namespaces_from_config(config),
+        ) {
+            Ok(hierarchy) => hierarchy,
+            Err(error) => {
+                return Ok(PlannedFixes::skipped("hierarchy fixes", error));
             }
-
-            // Add summary message
-            if dry_run {
-                all_messages.push(format!(
-                    "\nDry run complete. {} fixes would be applied.",
-                    total_fixes
+        };
+        for issue in projected {
+            let problems = detect_validation_issues(&hierarchy, &issue.id, &issue.labels);
+            for fix in generate_fixes(&problems) {
+                let ValidationFix::ReplaceType {
+                    issue_id,
+                    old_type,
+                    new_type,
+                } = fix;
+                issue
+                    .labels
+                    .retain(|label| label != &label_utils::type_label(&old_type));
+                issue.labels.push(label_utils::type_label(&new_type));
+                if !dry_run {
+                    fixes
+                        .messages
+                        .extend(self.exec.refuse_foreign_lease(&issue_id)?);
+                }
+                fixes.messages.push(format!(
+                    "{} type '{old_type}' with '{new_type}' for issue {issue_id}",
+                    if dry_run { "Would replace" } else { "Replaced" }
                 ));
-            } else if total_fixes > 0 {
-                all_messages.push(format!("\nApplied {} fixes", total_fixes));
-                // Re-run validation to verify fixes worked
-                self.validate_silent()?;
-                all_messages.push("Repository is now valid".to_string());
-            } else {
-                all_messages.push("\nNo fixes needed".to_string());
+                fixes.count += 1;
+                fixes.intents.push(MutationIntent::RecordEvent {
+                    phase: 0,
+                    event: Box::new(EventBody::draft_issue_updated(
+                        issue_id,
+                        "issue-update".into(),
+                        vec!["labels".into()],
+                    )),
+                });
             }
-
-            return Ok((total_fixes, all_messages));
         }
-
-        // Not in fix mode, just propagate the validation error
-        validation_result?;
-        Ok((0, vec![]))
+        Ok(fixes)
     }
 
     /// Validate the exact repository through the closed-image pipeline.
@@ -143,6 +237,99 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
             ));
         }
         Ok(())
+    }
+}
+
+fn plan_reduction_fixes(projected: &mut [Issue]) -> Result<PlannedFixes> {
+    let mut fixes = PlannedFixes::default();
+    for intent in super::dependency::derive_reduced_graph_intents(projected, projected, None)? {
+        match intent {
+            MutationIntent::UpdateIssue { issue } => {
+                if let Some(target) = projected.iter_mut().find(|target| target.id == issue.id) {
+                    let removed = target.dependencies.len() - issue.dependencies.len();
+                    fixes.count += removed;
+                    fixes.messages.push(format!(
+                        "Fixed {removed} redundant dependencies in issue {}",
+                        issue.short_id()
+                    ));
+                    *target = *issue;
+                }
+            }
+            event => fixes.intents.push(event),
+        }
+    }
+    Ok(fixes)
+}
+
+fn plan_readiness_fixes(projected: &mut [Issue]) -> PlannedFixes {
+    let mut fixes = PlannedFixes::default();
+    loop {
+        let resolved = crate::domain::queries::build_issue_map(projected);
+        let corrections = projected
+            .iter()
+            .enumerate()
+            .filter_map(|(index, issue)| {
+                issue
+                    .derive_readiness_correction(&resolved)
+                    .map(|correction| (index, correction))
+            })
+            .collect::<Vec<_>>();
+        if corrections.is_empty() {
+            return fixes;
+        }
+        fixes.count += corrections.len();
+        for (index, correction) in corrections {
+            let issue = &mut projected[index];
+            let from = issue.state;
+            issue.state = match correction {
+                ReadinessCorrection::Promote => State::Ready,
+                ReadinessCorrection::Demote => State::Backlog,
+            };
+            fixes.messages.push(format!(
+                "  → Transitioning {} to {}",
+                issue.short_id(),
+                issue.state.as_str()
+            ));
+            fixes.intents.push(MutationIntent::RecordEvent {
+                phase: 4,
+                event: Box::new(EventBody::draft_issue_state_changed(
+                    issue.id.clone(),
+                    from,
+                    issue.state,
+                )),
+            });
+        }
+    }
+}
+
+fn plan_derived_state_fixes(
+    image: &RepositoryImage,
+    declarations: RepositoryDeclarations<'_>,
+) -> PlannedFixes {
+    use crate::repository_state::{derive_materialization, MaterializationRequest};
+    match derive_materialization(
+        image,
+        MaterializationRequest::RepairDerivedState { declarations },
+    ) {
+        Ok(repair) => {
+            let changed = repair
+                .delta()
+                .actions()
+                .iter()
+                .filter(|action| !matches!(action, RepositoryAction::CreateDirectory { .. }))
+                .map(|action| action.path())
+                .collect::<std::collections::BTreeSet<_>>();
+            PlannedFixes {
+                count: changed.len(),
+                messages: changed
+                    .into_iter()
+                    .map(|path| format!("Repaired derived-state target {path:?}"))
+                    .collect(),
+                actions: repair.delta().actions().to_vec(),
+                ..PlannedFixes::default()
+            }
+        }
+        Err(error) => PlannedFixes::skipped("derived-state repair", error),
     }
 }
 
@@ -237,7 +424,16 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             extra_paths,
             BaseCapturePurpose::Mutation { precheck_target },
         )
-        .map(|captured| captured.map(|(image, (issues, _))| MutationBase { image, issues }))
+        .and_then(|captured| {
+            captured
+                .map(|(image, (issues, _))| {
+                    Ok(MutationBase {
+                        image,
+                        issues: issues?,
+                    })
+                })
+                .transpose()
+        })
     }
 
     /// Capture the resolved target and lease policy before taking the claims guard.
@@ -289,11 +485,15 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 precheck_target: Some(issue_id),
             },
         )?;
-        Ok(grown.map(|(image, (issues, _))| MutationPreflight {
-            image,
-            target,
-            issues: Some(issues),
-        }))
+        grown
+            .map(|(image, (issues, _))| {
+                Ok(MutationPreflight {
+                    image,
+                    target,
+                    issues: Some(issues?),
+                })
+            })
+            .transpose()
     }
 
     /// The base an archive plan reads: the event log's length and tail, with
@@ -408,13 +608,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     .listings
                     .iter()
                     .all(|listing| read.listings().contains(listing));
-            // The base already reads the log in the mode this capture needs.
-            spec.discover_paths(
-                closure
-                    .paths
-                    .into_iter()
-                    .filter(|path| *path != VirtualPath::EVENTS),
-            )?;
+            spec.discover_paths(closure.paths)?;
             spec.discover_listings(closure.listings)?;
             if !closure_read {
                 return Ok(());
@@ -427,21 +621,27 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 // record fidelity. Repair derives from the declarations alone and
                 // decodes no record.
                 let (parsed, values) = if mutation {
-                    (super::captured_active_issues(image)?, Vec::new())
+                    (Ok(super::captured_active_issues(image)?), Vec::new())
                 } else if matches!(purpose, BaseCapturePurpose::Repair) {
-                    (Vec::new(), Vec::new())
+                    (Ok(Vec::new()), Vec::new())
                 } else {
                     // Effective bytes: the override (create/replace or proposed
                     // absence) when present, otherwise the captured base bytes.
-                    crate::repository_state::parse_issue_records(
-                        &issue_ids,
-                        |path| match overrides.get(path) {
+                    match crate::repository_state::parse_issue_records(&issue_ids, |path| {
+                        match overrides.get(path) {
                             Some(value) => Ok(value.as_deref()),
                             None => image.file_bytes(path),
-                        },
-                    )?
-                    .into_iter()
-                    .unzip()
+                        }
+                    }) {
+                        Ok(records) => {
+                            let (issues, values) = records.into_iter().unzip();
+                            (Ok(issues), values)
+                        }
+                        Err(error) if matches!(purpose, BaseCapturePurpose::Validation) => {
+                            (Err(error.into()), Vec::new())
+                        }
+                        Err(error) => return Err(error.into()),
+                    }
                 };
                 if matches!(
                     purpose,
@@ -450,7 +650,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     discover_issue_closure(
                         image,
                         spec,
-                        &parsed,
+                        parsed.as_deref().unwrap_or_default(),
                         &config,
                         &effective_virtual_path,
                         precheck_target,
@@ -535,17 +735,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         )
     }
 
-    /// Repair derived state (default rules/schemas plus every configured
-    /// projection) through one mutation session (`jit validate --fix`).
-    ///
-    /// The complete owned-materialization set is derived from declared authority
-    /// over one captured image (`MaterializationRequest::RepairDerivedState`) and
-    /// applied through the same session; a coherent repository yields an empty
-    /// delta (no action). Repair is ownership-safe by construction — `rules.toml`
-    /// splices only the generated default spans and region projections splice only
-    /// their managed region, so authored content is preserved. In `dry_run` the
-    /// delta is derived but not applied. Returns the number of repaired targets and
-    /// a per-target message. JSON and memory stores execute this same path.
+    /// Repair declaration-derived targets for `jit recover`, without decoding issue records.
     pub(crate) fn repair_derived_state(&self, dry_run: bool) -> Result<(usize, Vec<String>)> {
         use crate::repository_state::RepositoryAction;
 
@@ -595,6 +785,29 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                     return Ok(SessionStep::Done((messages.len(), messages)));
                 }
                 Ok(SessionStep::Apply(plan, (messages.len(), messages)))
+            },
+        )
+    }
+
+    /// Capture the repository once and compute its report without the history
+    /// verdicts, the report every selection but `Whole` reads.
+    pub fn selection_report(&self) -> Result<crate::validation::ValidationReport> {
+        let layout = self.exec.require_layout()?;
+        with_mutation_session(
+            self.exec.storage(),
+            &layout,
+            "repository validation",
+            |session| {
+                let Some(captured) = self.capture_validation(session)? else {
+                    return Ok(SessionStep::Retry);
+                };
+                Ok(SessionStep::Done(crate::validation::report(
+                    &captured,
+                    &crate::validation::ReportInputs {
+                        now: chrono::Utc::now(),
+                        history: None,
+                    },
+                )))
             },
         )
     }
@@ -1020,206 +1233,7 @@ pub(crate) fn plan_content_with_issues(
     )
 }
 
-/// Evaluate one configured graph rule against one issue from a closed image.
-///
-/// The selected issue is the sole firing subject. The complete captured issue
-/// set is retained as graph and resolution context, and all rule/configuration
-/// lookup plus selected plan-document projection comes from the same image.
-/// This is the shared evaluation boundary for the live CLI and native gate checker.
-///
-/// A rule that is missing, disabled, non-graph, or inapplicable to the issue is
-/// a configuration fault, returned as the inner `Err` so each caller chooses its
-/// reporting: the CLI an error finding, the gate checker an `error` run.
-pub(super) fn rule_validation_outcome(
-    image: &crate::repository_state::RepositoryImage,
-    issue_id: &IssueId,
-    rule_name: &str,
-) -> Result<std::result::Result<crate::validation::report::RuleReport, RuleSelectionFault>> {
-    use crate::validation::report::{ReportedFinding, RuleReport};
-
-    let issues = super::captured_active_issues(image)?;
-    let issue = issues
-        .iter()
-        .find(|issue| &issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
-    let declarations = crate::repository_state::declarations_from_image(image)?;
-    let config = crate::repository_state::assemble_config(image)?;
-    let repo_format = config.content_format();
-    let rule = match crate::validation::graph::select_graph_rule(
-        &declarations.rules.rules,
-        rule_name,
-        issue,
-    ) {
-        Ok(rule) => rule,
-        Err(message) => {
-            return Ok(Err(RuleSelectionFault {
-                issue_id: issue.id.clone(),
-                rule: rule_name.to_string(),
-                message,
-            }));
-        }
-    };
-
-    let plan_source_ids =
-        crate::validation::graph::graph_rule_plan_source_ids(rule, issue, &issues);
-    let plan_sources = plan_source_ids
-        .iter()
-        .filter_map(|source_id| {
-            issues
-                .iter()
-                .find(|candidate| &candidate.id == source_id)
-                .cloned()
-        })
-        .collect::<Vec<_>>();
-    let plan_content = plan_content_with_issues(image, &issues, &plan_sources)?;
-    let namespaces = crate::config_manager::namespaces_from_config(&config);
-    let hierarchy = crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-    let context = crate::validation::graph::GraphEvaluationContext {
-        graph_context: &issues,
-        resolution_index: &issues,
-        hierarchy: &hierarchy,
-        repo_default_format: repo_format,
-        now: chrono::Utc::now(),
-        plan_content: &plan_content,
-    };
-    let findings =
-        crate::validation::graph::evaluate_graph_rule(rule, std::slice::from_ref(issue), &context);
-    Ok(Ok(RuleReport {
-        findings: findings
-            .into_iter()
-            .map(|finding| ReportedFinding::new(finding.issue_id, &finding.finding))
-            .collect(),
-    }))
-}
-
-/// A configured rule that cannot be evaluated against the selected issue.
-pub(super) struct RuleSelectionFault {
-    issue_id: IssueId,
-    rule: String,
-    pub(super) message: String,
-}
-
-impl RuleSelectionFault {
-    fn into_report(self) -> crate::validation::report::RuleReport {
-        use crate::declarations::rules::Severity;
-        use crate::validation::engine::Finding;
-        use crate::validation::report::{ReportedFinding, RuleReport};
-
-        RuleReport {
-            findings: vec![ReportedFinding::new(
-                Some(self.issue_id),
-                &Finding {
-                    rule: self.rule,
-                    severity: Severity::Error,
-                    message: self.message,
-                },
-            )],
-        }
-    }
-}
-
 impl<S: IssueStore> ValidationOps<'_, S> {
-    fn detect_and_fix_hierarchy_issues(&self, dry_run: bool) -> Result<(usize, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::config_manager::get_hierarchy_config;
-
-        let config = get_hierarchy_config(&self.exec.storage)?;
-        let issues = self.exec.storage.list_issues()?;
-
-        // Collect all validation issues
-        let mut all_validation_issues = Vec::new();
-
-        for issue in &issues {
-            let validation_issues = detect_validation_issues(&config, &issue.id, &issue.labels);
-            all_validation_issues.extend(validation_issues);
-        }
-
-        if all_validation_issues.is_empty() {
-            return Ok((0, vec![]));
-        }
-
-        // Generate fixes
-        let fixes = generate_fixes(&all_validation_issues);
-
-        if fixes.is_empty() {
-            // We found issues but can't auto-fix them
-            let mut messages = vec![format!(
-                "Found {} validation issues but no automatic fixes available:",
-                all_validation_issues.len()
-            )];
-            for issue in &all_validation_issues {
-                match issue {
-                    ValidationIssue::UnknownType {
-                        issue_id,
-                        unknown_type,
-                        ..
-                    } => {
-                        messages.push(format!(
-                            "  • Issue {} has unknown type '{}'",
-                            issue_id, unknown_type
-                        ));
-                    }
-                }
-            }
-            return Ok((0, messages));
-        }
-
-        // Apply or preview fixes
-        let mut fixes_applied = 0;
-        let mut messages = Vec::new();
-
-        for fix in &fixes {
-            match fix {
-                ValidationFix::ReplaceType {
-                    issue_id,
-                    old_type,
-                    new_type,
-                } => {
-                    if dry_run {
-                        messages.push(format!(
-                            "Would replace type '{}' with '{}' for issue {}",
-                            old_type, new_type, issue_id
-                        ));
-                    } else {
-                        messages.extend(self.exec.refuse_foreign_lease(issue_id)?);
-                        self.apply_type_fix(issue_id, old_type, new_type)?;
-                        messages.push(format!(
-                            "Replaced type '{}' with '{}' for issue {}",
-                            old_type, new_type, issue_id
-                        ));
-                    }
-                    fixes_applied += 1;
-                }
-            }
-        }
-
-        Ok((fixes_applied, messages))
-    }
-
-    fn apply_type_fix(&self, issue_id: &IssueId, old_type: &str, new_type: &str) -> Result<()>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        // Replace the type label
-        let old_label = label_utils::type_label(old_type);
-        let new_label = label_utils::type_label(new_type);
-
-        self.exec
-            .publish_captured_field_update(CapturedFieldUpdate::label_edit(
-                issue_id.clone(),
-                CapturedLabelEdit::ReplaceExact {
-                    old: old_label,
-                    new: new_label,
-                },
-            ))
-            .map(|_| ())
-    }
-
-    // Note: apply_dependency_reversal is removed - we don't reverse dependencies
-    // Type hierarchy is orthogonal to DAG structure
-
     /// Built-in validate pass: report every node→item link label whose qualified
     /// id cannot be resolved as a finding, rather than silently dropping it
     /// (REQ-08 clause i, REQ-03).
@@ -1486,141 +1500,6 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         plan_content_with_issues(&image, &all_issues, emit_for)
     }
 
-    /// Run the declarative rule set (`.jit/rules.toml`) as a per-issue or
-    /// whole-repo report.
-    ///
-    /// When `id` is `Some`, the issue's matching local rules are evaluated, then graph rules are evaluated across
-    /// the whole store and filtered to those that pertain to this issue using
-    /// structured attribution (each graph finding carries its issue id), plus any
-    /// `config-error` finding for a graph rule whose selector applies to this
-    /// issue — so a malformed graph rule is reported, never silently passed. When
-    /// `id` is `None`, local rules run for every issue and graph rules run across
-    /// the store, with every graph finding reported. The result is a pure
-    /// [`RuleReport`](crate::validation::report::RuleReport); rendering and exit
-    /// codes are the caller's concern.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the issue is not
-    /// found, or a matching local rule's schema fails to compile (a
-    /// misconfigured rule never silently disables enforcement).
-    pub fn run_rules(&self, id: Option<&IssueId>) -> Result<crate::validation::report::RuleReport>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::validation::report::{ReportedFinding, RuleReport};
-
-        // If the rule SOURCE is unloadable, do NOT crash the whole report: the
-        // enforcement-drift pass still reports a declared-but-unenforced finding
-        // for a binding into the unloadable source (REQ-01), and the parse problem
-        // itself is surfaced as a config-error finding so validation still fails.
-        // This mirrors how a SEMANTIC config-error (a rule that parses but is
-        // rejected by its evaluator) is already reported as a finding rather than
-        // an early `?`.
-        let ruleset = match self.exec.effective_rules() {
-            Ok(set) => set,
-            Err(e) => {
-                let mut findings: Vec<ReportedFinding> = Vec::new();
-                // The drift pass loads the ruleset tolerantly on its own.
-                for gf in self.enforcement_drift_findings()? {
-                    findings.push(ReportedFinding::new(gf.issue_id.clone(), &gf.finding));
-                }
-                if id.is_none() {
-                    findings.extend(self.review_placeholder_findings()?);
-                }
-                // Surface the unparseable ruleset as an error-severity finding so
-                // the report still fails (config-error prefix keeps it grouped).
-                findings.push(ReportedFinding::new(
-                    None,
-                    &crate::validation::engine::Finding {
-                        rule: BuiltInPass::RulesFile.as_str().to_owned(),
-                        severity: crate::declarations::rules::Severity::Error,
-                        message: format!("config error: {e}"),
-                    },
-                ));
-                return Ok(RuleReport { findings });
-            }
-        };
-        let repo_format = self.exec.cached_config()?.content_format();
-        let issues = self.exec.storage.list_issues()?;
-
-        let mut findings: Vec<ReportedFinding> = Vec::new();
-
-        match id {
-            Some(full_id) => {
-                let issue = self.exec.storage.load_issue(full_id)?;
-
-                // Local rules for this issue only.
-                let evaluation = crate::validation::evaluate_local(&issue, ruleset, repo_format)
-                    .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
-                findings.extend(
-                    evaluation
-                        .findings()
-                        .into_iter()
-                        .map(|f| ReportedFinding::new(Some(issue.id.clone()), f)),
-                );
-
-                // Graph rules across the store. Keep, by EXACT structural
-                // attribution (not substring matching): findings attributed to
-                // this issue, plus any config-error for a graph rule whose
-                // selector applies to this issue (a malformed graph rule must be
-                // reported here, never silently dropped).
-                let applicable_rules: std::collections::HashSet<String> = ruleset
-                    .matching_rules(&issue)
-                    .into_iter()
-                    .map(|r| r.name.clone())
-                    .collect();
-                let mut graph_findings = self.evaluate_graph_rules(&issues)?;
-                // Built-in dangling-item-link pass (REQ-08 clause i, REQ-03):
-                // attributed to issues, so per-issue filtering below keeps only
-                // this issue's dangling links.
-                graph_findings.extend(self.dangling_link_findings(&issues)?);
-                // The enforcement-drift pass is intentionally NOT folded into the
-                // single-issue report: drift is project-scoped (unattributed), not
-                // a property of one issue. It surfaces in the whole-repo report
-                // (the `None` arm below) and gates `validate_silent` / cargo-ci.
-                findings.extend(graph_findings.iter().filter_map(|gf| {
-                    let pertains = gf.issue_id.as_ref() == Some(&issue.id)
-                        || (gf.is_config_error() && applicable_rules.contains(&gf.finding.rule));
-                    pertains.then(|| ReportedFinding::new(Some(issue.id.clone()), &gf.finding))
-                }));
-            }
-            None => {
-                // Local rules for every issue.
-                for issue in &issues {
-                    let evaluation = crate::validation::evaluate_local(issue, ruleset, repo_format)
-                        .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
-                    findings.extend(
-                        evaluation
-                            .findings()
-                            .into_iter()
-                            .map(|f| ReportedFinding::new(Some(issue.id.clone()), f)),
-                    );
-                }
-
-                // Graph rules across the store; every finding is reported,
-                // carrying its structured issue attribution (None for config
-                // errors).
-                let mut graph_findings = self.evaluate_graph_rules(&issues)?;
-                // Built-in dangling-item-link pass (REQ-08 clause i, REQ-03):
-                // every dangling link surfaces in the whole-repo report.
-                graph_findings.extend(self.dangling_link_findings(&issues)?);
-                // Built-in enforcement-drift pass (REQ-01/REQ-02): project-scoped
-                // (unattributed) drift surfaces in the whole-repo report. Gated on
-                // declared invariants, so a repo without any is unaffected.
-                graph_findings.extend(self.enforcement_drift_findings()?);
-                findings.extend(
-                    graph_findings
-                        .iter()
-                        .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
-                );
-                findings.extend(self.review_placeholder_findings()?);
-            }
-        }
-
-        Ok(RuleReport { findings })
-    }
-
     /// Report configured passing review placeholders as project-scoped warnings.
     ///
     /// The registry keys are sorted before rendering so the finding is stable
@@ -1662,288 +1541,6 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         })
     }
 
-    /// Run the declarative rule set over a **container bracket subtree** for use
-    /// as a deterministic gate checker (`jit validate --scope <id>`, T2/D14).
-    ///
-    /// The scope slice is the container's transitive dependency closure
-    /// **including** the `type:breakdown` node `B` but **bounded** so the walk
-    /// stops at `B` (it never pulls in `P` / upstream beyond the breakdown gate).
-    /// See [`bracket_scope_ids`](crate::domain::queries::bracket_scope_ids) for
-    /// the precise membership rule. For each
-    /// in-slice issue, the rules whose `when` selector matches it are evaluated —
-    /// so a rule keyed on `type:breakdown` (the coverage-preview instance, D13)
-    /// fires because `B` is in scope. This decides *whose* rules run; it is
-    /// orthogonal to `child-type-exclude`, which governs only the coverage walk's
-    /// candidate set (D14) and is a separate, coverage-rule-internal concern.
-    ///
-    /// Repo-wide rule kinds (`label-uniqueness`, repo-wide `label-reference`,
-    /// `type-hierarchy`) are EXCLUDED here exactly as they are excluded from
-    /// transition-time enforcement (the CC-2a `is_repo_wide_at_transition`
-    /// filter, R2): they need the whole repository, not a slice, so they remain a
-    /// whole-repo `jit validate` concern and never participate in a `--scope`
-    /// gate.
-    ///
-    /// Both local and graph rules participate: local rules are evaluated per
-    /// in-slice issue; graph rules are evaluated over the slice and attributed
-    /// findings (plus any `config-error` for an applicable rule) are reported. The
-    /// result is a pure [`RuleReport`](crate::validation::report::RuleReport);
-    /// the caller decides the process exit code (4 / `ValidationFailed` on any
-    /// error-severity finding, 0 when clean).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the container is not
-    /// found, or a matching local rule's schema fails to compile.
-    pub fn validate_scope(
-        &self,
-        container_full_id: &IssueId,
-    ) -> Result<crate::validation::report::RuleReport>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::declarations::rules::{RuleScope, Severity};
-        use crate::validation::report::{ReportedFinding, RuleReport};
-
-        let ruleset = self.exec.effective_rules()?;
-        let repo_format = self.exec.cached_config()?.content_format();
-        let all = self.exec.storage.list_issues()?;
-
-        // The breakdown boundary type is template-driven: resolve the container's
-        // `type:` label, look up its graph template, and read that template's
-        // breakdown-node type. No applicable template (a non-bracketed container)
-        // → no boundary, so the scope walk is the full dependency closure (see
-        // `bracket_scope_ids`).
-        let container = all
-            .iter()
-            .find(|i| &i.id == container_full_id)
-            .ok_or_else(|| crate::storage::IssueNotFoundError::new(container_full_id.clone()))?;
-        let container_type = label_utils::type_label_value(&container.labels).map(str::to_string);
-        let templates = &self.exec.cached_config()?.templates;
-        let breakdown_type = container_type
-            .as_deref()
-            .and_then(|ty| templates.template_for_container(ty))
-            .and_then(|t| t.breakdown_type(&templates.roles))
-            .map(str::to_string);
-
-        let scope_ids = crate::domain::queries::bracket_scope_ids(
-            container_full_id,
-            &all,
-            breakdown_type.as_deref(),
-        );
-        // Keep the full issue set alive: it is the resolution index against which a
-        // `container-from-label` pointer resolves, so a valid pointer to a
-        // container outside this slice does not read as dangling (ef0065ad).
-        let slice: Vec<Issue> = all
-            .iter()
-            .filter(|i| scope_ids.contains(&i.id))
-            .cloned()
-            .collect();
-
-        let mut findings: Vec<ReportedFinding> = Vec::new();
-
-        // Local rules: evaluate each in-slice issue against its matching local
-        // rules. (`evaluate_local` itself selects only `RuleScope::Local`,
-        // non-`off` rules whose selector matches.)
-        for issue in &slice {
-            let evaluation = crate::validation::evaluate_local(issue, ruleset, repo_format)
-                .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
-            findings.extend(
-                evaluation
-                    .findings()
-                    .into_iter()
-                    .map(|f| ReportedFinding::new(Some(issue.id.clone()), f)),
-            );
-        }
-
-        // Graph rules: select those whose `when` matches SOME in-slice issue,
-        // minus the repo-wide kinds (R2 / CC-2a), then evaluate over the slice.
-        // This mirrors transition-time graph-rule select-then-slice
-        // precision, but membership here is the bracket subtree, not a
-        // transition neighborhood.
-        let graph_rules: Vec<&crate::declarations::rules::Rule> = ruleset
-            .rules
-            .iter()
-            .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
-            .filter(|rule| !rule.assert.is_repo_wide_at_transition())
-            .filter(|rule| slice.iter().any(|issue| rule.when.matches(issue)))
-            .collect();
-
-        if !graph_rules.is_empty() {
-            let namespaces = self.exec.cached_namespaces().map_err(|e| anyhow!("{e}"))?;
-            let hierarchy =
-                crate::domain::type_taxonomy::HierarchyConfig::from_declarations(namespaces)?;
-            // Resolve external plan docs for the in-scope issues from the captured
-            // validation image so a container whose criteria live in an external
-            // file validates against the FILE (closed-read, no live filesystem).
-            let plan_content = self.image_plan_content(&slice)?;
-            let graph_findings = crate::validation::graph::evaluate_graph_scoped(
-                &graph_rules,
-                &slice,
-                &all,
-                &hierarchy,
-                repo_format,
-                chrono::Utc::now(),
-                &plan_content,
-            );
-            findings.extend(
-                graph_findings
-                    .iter()
-                    .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
-            );
-        }
-
-        // Built-in dangling-item-link pass over the in-slice issues (REQ-08
-        // clause i, REQ-03): a dangling link on a bracket-subtree node fails the
-        // `--scope` gate exactly like a ruleset error-severity finding.
-        findings.extend(
-            self.dangling_link_findings(&slice)?
-                .iter()
-                .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
-        );
-
-        // Built-in enforcement-drift pass (REQ-01/REQ-02): a project-scoped,
-        // declaration-consistency check the scope gate also enforces. Gated on
-        // declared invariants, so a repo without any is unaffected.
-        findings.extend(
-            self.enforcement_drift_findings()?
-                .iter()
-                .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
-        );
-
-        Ok(RuleReport { findings })
-    }
-
-    /// Evaluate one configured graph rule with one selected issue as its sole
-    /// firing subject.
-    ///
-    /// The complete issue set is retained as graph and identifier-resolution
-    /// context, but it cannot become an additional rule subject. Missing,
-    /// disabled, non-graph, and non-matching selections return error findings
-    /// rather than an empty passing report.
-    pub fn validate_rule(
-        &self,
-        issue_id: &IssueId,
-        rule_name: &str,
-    ) -> Result<crate::validation::report::RuleReport>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let image = self.exec.capture_validation_image()?;
-        rule_validation_outcome(&image, issue_id, rule_name)
-            .map(|outcome| outcome.unwrap_or_else(RuleSelectionFault::into_report))
-    }
-
-    /// Build the `--explain` report for one issue: EVERY rule in the ruleset,
-    /// paired with whether its selector matched the issue and, for matched rules,
-    /// whether they passed and their messages.
-    ///
-    /// A rule whose selector excludes the issue is reported as skipped: its
-    /// [`RuleOutcome`](crate::validation::report::RuleOutcome) carries `matched =
-    /// false` and a `skip_reason` naming the excluding selector dimension(s) (the
-    /// state dimension is called out explicitly, e.g. "state predicate did not
-    /// match (issue is 'in_progress', wants 'done')"). Local rules that match are
-    /// evaluated against the issue; matching graph rules are evaluated across the
-    /// whole store and attributed to this issue by EXACT structural attribution
-    /// (each finding carries its issue id), and any `config-error` finding for an
-    /// applicable graph rule is also surfaced — so a malformed graph rule is
-    /// reported as a FAILED outcome, never shown as passing. Widening the report
-    /// to include non-matching rules does not change which rules EXECUTE: only
-    /// matched rules are evaluated.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `.jit/rules.toml` is malformed, the issue is not
-    /// found, or a matching local rule's schema fails to compile.
-    pub fn explain_rules(&self, id: &IssueId) -> Result<crate::validation::report::ExplainReport>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::declarations::rules::RuleScope;
-        use crate::validation::report::{ExplainReport, RuleOutcome};
-
-        let ruleset = self.exec.effective_rules()?;
-        let repo_format = self.exec.cached_config()?.content_format();
-        let issue = self.exec.storage.load_issue(id)?;
-        let issues = self.exec.storage.list_issues()?;
-
-        // Local findings for this issue, grouped by rule name.
-        let local_eval = crate::validation::evaluate_local(&issue, ruleset, repo_format)
-            .map_err(|e| anyhow!("Local rule evaluation failed: {}", e))?;
-        let local_messages = group_messages(
-            local_eval
-                .findings()
-                .into_iter()
-                .map(|f| (f.rule.clone(), f.message.clone())),
-        );
-
-        // Graph findings pertaining to this issue, grouped by rule name, using
-        // EXACT structural attribution: a finding attributed to this issue, or a
-        // config-error (which carries no issue id but must be surfaced so a
-        // malformed graph rule fails rather than silently passes). The
-        // selector-based "applies to this issue" decision is made per-rule below;
-        // including all config-errors here is safe because these messages are
-        // consumed only by the matched arm (non-matching rules are reported as
-        // skipped with no messages).
-        let graph_findings = self.evaluate_graph_rules(&issues)?;
-        let graph_messages = group_messages(graph_findings.iter().filter_map(|gf| {
-            let pertains = gf.issue_id.as_ref() == Some(&issue.id) || gf.is_config_error();
-            pertains.then(|| (gf.finding.rule.clone(), gf.finding.message.clone()))
-        }));
-
-        // EVERY rule in the ruleset becomes one outcome, not just the matching
-        // ones: a rule excluded by its selector is reported with `matched =
-        // false` and a `skip_reason` naming the dimension(s) that excluded the
-        // issue, so `--explain` can show "the state predicate did not match".
-        // Matching rules keep their PASS/FAIL semantics. This widens only the
-        // REPORT; which rules EXECUTE is still decided by `matching_rules`
-        // (here, the per-rule `when.matches` check selecting the matched arm).
-        let outcomes: Vec<RuleOutcome> = ruleset
-            .rules
-            .iter()
-            .map(|rule| {
-                match rule.when.match_failure(&issue) {
-                    // Selector excluded the issue: report it as skipped.
-                    Some(skip_reason) => RuleOutcome {
-                        rule: rule.name.clone(),
-                        scope: rule.scope,
-                        severity: rule.severity,
-                        selector: render_selector(&rule.when),
-                        matched: false,
-                        skip_reason: Some(skip_reason),
-                        passed: true,
-                        messages: Vec::new(),
-                    },
-                    // Selector matched: PASS/FAIL from the evaluated findings.
-                    None => {
-                        let messages = match rule.scope {
-                            RuleScope::Local => {
-                                local_messages.get(&rule.name).cloned().unwrap_or_default()
-                            }
-                            RuleScope::Graph => {
-                                graph_messages.get(&rule.name).cloned().unwrap_or_default()
-                            }
-                        };
-                        RuleOutcome {
-                            rule: rule.name.clone(),
-                            scope: rule.scope,
-                            severity: rule.severity,
-                            selector: render_selector(&rule.when),
-                            matched: true,
-                            skip_reason: None,
-                            passed: messages.is_empty(),
-                            messages,
-                        }
-                    }
-                }
-            })
-            .collect();
-
-        Ok(ExplainReport {
-            issue_id: issue.id,
-            outcomes,
-        })
-    }
-
     pub fn get_status(&self) -> Result<StatusSummary> {
         let issues = self.exec.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
@@ -1969,98 +1566,6 @@ impl<S: IssueStore> ValidationOps<'_, S> {
             gated,
             total: issues.len(),
         })
-    }
-
-    /// Fix transitive reduction violations for all issues.
-    ///
-    /// Returns count of redundant edges fixed (or that would be fixed if dry_run).
-    fn fix_all_transitive_reductions(&self, dry_run: bool) -> Result<(usize, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        self.exec.reduce_all_dependencies(dry_run)
-    }
-
-    /// Reconcile stored readiness with the readiness the dependency graph derives.
-    ///
-    /// Stored state can drift from the graph in both directions: after a worktree
-    /// merge a backlog issue may have every dependency in a terminal state without
-    /// ever auto-transitioning to ready, and an issue can hold `Ready` while a
-    /// dependency that blocks it is unmet. Both are violations of
-    /// `@/invariant/derived-state-coherence` and both are repaired here, through
-    /// the one derivation [`Issue::derive_readiness_correction`] owns.
-    ///
-    /// Uses multiple passes to handle cascading transitions (e.g., when tasks reach a
-    /// terminal state, stories become ready, then epics that depend on those stories
-    /// also become ready).
-    ///
-    /// # Arguments
-    ///
-    /// * `dry_run` - If true, report what would be fixed without applying changes
-    ///
-    /// # Returns
-    ///
-    /// Count of issues transitioned and informational messages
-    fn check_pending_transitions(&self, dry_run: bool) -> Result<(usize, Vec<String>)>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::domain::ReadinessCorrection;
-
-        let mut total_fixed = 0;
-        let mut messages = Vec::new();
-        let max_passes = 10; // Safety limit to prevent infinite loops
-
-        // Keep checking until no more transitions found (cascading transitions)
-        // In dry-run mode, only do one pass since we don't actually change state
-        let num_passes = if dry_run { 1 } else { max_passes };
-
-        for _pass in 0..num_passes {
-            let issues = self.exec.storage.list_issues()?;
-            let resolved = crate::domain::queries::build_issue_map(&issues);
-
-            // Every issue whose stored readiness disagrees with the graph, with the
-            // correction that restores agreement.
-            let corrections = issues
-                .iter()
-                .filter_map(|issue| {
-                    issue
-                        .derive_readiness_correction(&resolved)
-                        .map(|correction| (issue.id.clone(), issue.short_id(), correction))
-                })
-                .collect::<Vec<_>>();
-
-            for (issue_id, short_id, correction) in &corrections {
-                messages.push(match correction {
-                    ReadinessCorrection::Promote => {
-                        format!("  → Transitioning {short_id} to ready (dependencies terminal)")
-                    }
-                    ReadinessCorrection::Demote => {
-                        format!("  → Transitioning {short_id} to backlog (dependencies unmet)")
-                    }
-                });
-
-                if !dry_run {
-                    match correction {
-                        ReadinessCorrection::Promote => {
-                            self.exec.auto_transition_to_ready(issue_id)?
-                        }
-                        ReadinessCorrection::Demote => {
-                            self.exec.auto_transition_to_backlog(issue_id)?
-                        }
-                    };
-                }
-            }
-
-            total_fixed += corrections.len();
-
-            // If no fixes this pass, we're done
-            if corrections.is_empty() {
-                break;
-            }
-        }
-
-        Ok((total_fixed, messages))
     }
 
     /// Validate that the branch still sits on top of `origin/main`.
@@ -2207,45 +1712,6 @@ fn force_evict_remedy(lease: &crate::storage::claim_coordinator::Lease) -> Strin
         "jit claim force-evict {} --reason \"<reason>\"",
         lease.issue_id.short_id()
     )
-}
-
-/// Group `(rule_name, message)` pairs into a map of rule name to its messages,
-/// preserving first-seen order within each rule.
-fn group_messages(
-    pairs: impl IntoIterator<Item = (String, String)>,
-) -> std::collections::HashMap<String, Vec<String>> {
-    pairs.into_iter().fold(
-        std::collections::HashMap::new(),
-        |mut acc, (rule, message)| {
-            acc.entry(rule).or_default().push(message);
-            acc
-        },
-    )
-}
-
-/// Render a rule selector as a compact, human-readable string for `--explain`.
-///
-/// An empty selector (matches everything) renders as `"*"`; otherwise the
-/// present dimensions are joined with `", "` (e.g. `"type=epic, state=ready"`).
-fn render_selector(selector: &crate::declarations::rules::Selector) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    if let Some(t) = &selector.type_ {
-        parts.push(format!("type={t}"));
-    }
-    if let Some(l) = &selector.label {
-        parts.push(format!("label={l}"));
-    }
-    if let Some(s) = &selector.state {
-        parts.push(format!("state={}", s.tokens().join("|")));
-    }
-    if let Some(d) = &selector.has_doc_type {
-        parts.push(format!("has_doc_type={d}"));
-    }
-    if parts.is_empty() {
-        "*".to_string()
-    } else {
-        parts.join(", ")
-    }
 }
 
 /// Format duration in human-readable form
@@ -2504,10 +1970,7 @@ mod tests {
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
 
-        let (fixes, _messages) = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        let (fixes, _messages, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert!(fixes >= 1, "the stale projection region must be repaired");
         let agents = std::fs::read_to_string(repo.path().join("AGENTS.md")).unwrap();
         assert!(
@@ -2519,10 +1982,7 @@ mod tests {
             "the invariant must render into the repaired region: {agents}"
         );
         // A second --fix run is a no-op: the derived state is already coherent.
-        let (again, _) = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        let (again, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert_eq!(again, 0, "repair must be idempotent");
     }
 
@@ -2555,10 +2015,8 @@ mod tests {
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
-        let error = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap_err();
+        let (_, _, report, _) = executor.validation().validate_with_fix(false).unwrap();
+        let error = report.structural_failure.unwrap();
         assert!(format!("{error:#}").contains("invariants"), "{error:#}");
         assert_eq!(std::fs::read(&rules_path).unwrap(), before_rules);
         assert_eq!(std::fs::read(&agents_path).unwrap(), before_agents);
@@ -2592,10 +2050,8 @@ mod tests {
         );
         seed_repo_file(&storage, "AGENTS.md", &agents);
 
-        let error = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap_err();
+        let (_, _, report, _) = executor.validation().validate_with_fix(false).unwrap();
+        let error = report.structural_failure.unwrap();
         assert!(format!("{error:#}").contains("invariants"), "{error:#}");
         assert_eq!(
             storage.read_repo_file(".jit/rules.toml").unwrap().unwrap(),
@@ -2652,16 +2108,170 @@ mod tests {
         let asset = repo.path().join(".agents/skills/jit-manage/SKILL.md");
         std::fs::write(&asset, "EDITED PROFILE ASSET\n").unwrap();
 
-        let (repaired, _) = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        let (repaired, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
 
         assert_eq!(repaired, 0, "no profile-owned target is a repair action");
         assert_eq!(
             std::fs::read_to_string(&asset).unwrap(),
             "EDITED PROFILE ASSET\n"
         );
+    }
+
+    #[test]
+    fn test_validate_fix_reports_malformed_records_without_publishing_repairs() {
+        use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+        let storage = crate::storage::InMemoryStorage::new();
+        let executor = memory_executor(storage.clone());
+        let path = format!(".jit/issues/{}.json", crate::test_utils::issue_id(1));
+        seed_repo_file(&storage, &path, "{");
+        let (count, _, report, _) = executor.validation().validate_with_fix(false).unwrap();
+        assert_eq!(count, 0);
+        assert!(report.structural_failure.is_some());
+        assert_eq!(storage.read_repo_file(&path).unwrap().as_deref(), Some("{"));
+    }
+
+    #[test]
+    fn test_validate_fix_skips_declaration_dependent_repairs_once_and_keeps_other_fixes() {
+        use crate::commands::test_helpers::{
+            memory_executor_declaring, seed_issue, seed_repo_file,
+        };
+        let storage = crate::storage::InMemoryStorage::new();
+        let executor = memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                config: Some("[worktree]\nenforce_leases = \"off\"\n[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"),
+                ..MemoryDeclarations::default()
+            },
+        );
+        seed_repo_file(&storage, ".jit/gates.toml", "not valid TOML");
+        let mut leaf = crate::test_utils::fixture_issue("leaf".into(), String::new());
+        leaf.state = State::Done;
+        let mut middle = crate::test_utils::fixture_issue("middle".into(), String::new());
+        middle.state = State::Done;
+        middle.dependencies = vec![leaf.id.clone()];
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
+        source.state = State::Backlog;
+        source.labels = vec!["type:taks".into()];
+        source.dependencies = vec![middle.id.clone(), leaf.id.clone()];
+        for issue in [&source, &middle, &leaf] {
+            seed_issue(&storage, issue.clone());
+        }
+
+        let (_, messages, report, _) = executor.validation().validate_with_fix(false).unwrap();
+
+        let skipped = messages
+            .iter()
+            .filter(|message| message.starts_with("Skipped"))
+            .collect::<Vec<_>>();
+        assert_eq!(skipped.len(), 1);
+        assert!(skipped[0].contains("hierarchy") && skipped[0].contains("derived-state"));
+        assert!(skipped[0].contains("gates.toml"));
+        let fixed = storage.load_issue(&source.id).unwrap();
+        assert_eq!(fixed.labels, source.labels);
+        assert_eq!(fixed.dependencies, vec![middle.id]);
+        assert_eq!(fixed.state, State::Ready);
+        assert!(report.structural_failure.is_some());
+    }
+
+    #[test]
+    fn test_validate_fix_repairs_readiness_with_unloadable_rules_and_reports_the_finding() {
+        use crate::commands::test_helpers::{memory_executor_declaring, seed_issue};
+        let storage = crate::storage::InMemoryStorage::new();
+        let executor = memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                rules: Some("not valid TOML"),
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let mut issue = crate::test_utils::fixture_issue("unblocked".into(), String::new());
+        issue.state = State::Backlog;
+        seed_issue(&storage, issue.clone());
+
+        let (count, messages, report, _) = executor.validation().validate_with_fix(false).unwrap();
+
+        assert!(count > 0);
+        assert_eq!(storage.load_issue(&issue.id).unwrap().state, State::Ready);
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.reported.rule == "rules-file"));
+        assert!(messages.iter().any(|message| {
+            message.contains("Skipped derived-state repair") && message.contains("rules")
+        }));
+    }
+
+    #[test]
+    fn test_validate_fix_publishes_every_fix_class_once_and_dry_run_publishes_nothing() {
+        use crate::commands::test_helpers::{
+            memory_executor_declaring, seed_issue, seed_repo_file,
+        };
+        use crate::storage::{IssueStore, MutationPoint};
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+        #[derive(Default)]
+        struct Publications(AtomicUsize);
+        impl crate::storage::MutationInterruptionInjector for Publications {
+            fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+                if *point == MutationPoint::BeforeCommitCheck {
+                    self.0.fetch_add(1, Ordering::SeqCst);
+                }
+                Ok(())
+            }
+        }
+        let (_source, storage) =
+            crate::test_utils::profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
+        let executor = memory_executor_declaring(
+            storage.clone(),
+            MemoryDeclarations {
+                after_initialization: true,
+                ..MemoryDeclarations::default()
+            },
+        );
+        let mut leaf = crate::test_utils::fixture_issue("leaf".into(), String::new());
+        leaf.state = State::Done;
+        let mut middle = crate::test_utils::fixture_issue("middle".into(), String::new());
+        middle.state = State::Done;
+        middle.dependencies = vec![leaf.id.clone()];
+        let mut source = crate::test_utils::fixture_issue("source".into(), String::new());
+        source.labels = vec!["type:taks".into()];
+        source.state = State::Backlog;
+        source.dependencies = vec![middle.id.clone(), leaf.id.clone()];
+        for issue in [&source, &middle, &leaf] {
+            seed_issue(&storage, issue.clone());
+        }
+        let agents = storage.read_repo_file("AGENTS.md").unwrap().unwrap();
+        seed_repo_file(
+            &storage,
+            "AGENTS.md",
+            &agents.replacen(
+                "<!-- jit:invariants:begin -->",
+                "<!-- jit:invariants:begin -->\nSTALE",
+                1,
+            ),
+        );
+        let publications = Arc::new(Publications::default());
+        let storage = storage.with_mutation_interruption_view(publications.clone());
+        let executor =
+            CommandExecutor::new(storage.clone()).with_layout(executor.require_layout().unwrap());
+        let (preview, _, _, _) = executor.validation().validate_with_fix(true).unwrap();
+        assert_eq!(publications.0.load(Ordering::SeqCst), 0);
+        assert_eq!(storage.load_issue(&source.id).unwrap(), source);
+        let (fixed, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
+        assert_eq!(fixed, preview);
+        assert_eq!(publications.0.load(Ordering::SeqCst), 1);
+        let fixed = storage.load_issue(&source.id).unwrap();
+        assert!(fixed.labels.contains(&"type:task".into()));
+        assert_eq!(fixed.dependencies, vec![middle.id]);
+        assert_eq!(fixed.state, State::Ready);
+        assert!(!storage
+            .read_repo_file("AGENTS.md")
+            .unwrap()
+            .unwrap()
+            .contains("STALE"));
     }
 
     #[test]
@@ -2695,29 +2305,26 @@ mod tests {
             .issue
             .id;
 
-        let (first, _) = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        let (first, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert!(first > 0);
         let repaired = storage.load_issue(&id).unwrap();
         assert!(repaired.labels.iter().any(|label| label == "type:task"));
         assert!(!repaired.labels.iter().any(|label| label == "type:taks"));
 
-        let (second, _) = executor
-            .validation()
-            .validate_with_fix(true, false)
-            .unwrap();
+        let (second, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert_eq!(second, 0, "a captured type repair must not repeat");
     }
 
     #[test]
-    fn test_apply_type_fix_preserves_concurrent_type_correction() {
+    fn test_validate_fix_rederives_and_preserves_concurrent_type_correction() {
         use crate::commands::test_helpers::{memory_executor, with_apply_race, SessionRaceAction};
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        let executor = memory_executor(storage.clone());
+        let executor = crate::commands::test_helpers::memory_executor_declaring(storage.clone(), MemoryDeclarations {
+            config: Some("[worktree]\nenforce_leases = \"off\"\n[type_hierarchy.types]\ntask = 4\nstory = 3\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"),
+            ..MemoryDeclarations::default()
+        });
         let id = executor
             .issues()
             .create_issue(
@@ -2739,10 +2346,7 @@ mod tests {
         let raced = with_apply_race(storage, SessionRaceAction::Save(Box::new(issue)));
         let executor = memory_executor(raced.clone());
 
-        executor
-            .validation()
-            .apply_type_fix(&id, "taks", "task")
-            .unwrap();
+        executor.validation().validate_with_fix(false).unwrap();
 
         assert_eq!(raced.load_issue(&id).unwrap().labels, ["type:story"]);
     }
@@ -2752,29 +2356,6 @@ mod tests {
         assert_eq!(format_duration(Duration::seconds(1)), "1 second");
         assert_eq!(format_duration(Duration::seconds(30)), "30 seconds");
         assert_eq!(format_duration(Duration::seconds(59)), "59 seconds");
-    }
-
-    #[test]
-    fn test_render_selector_state_single() {
-        use crate::declarations::rules::{Selector, StatePredicate};
-        let sel = Selector {
-            type_: Some("epic".to_string()),
-            state: Some(StatePredicate::single("in_progress")),
-            ..Default::default()
-        };
-        assert_eq!(render_selector(&sel), "type=epic, state=in_progress");
-    }
-
-    #[test]
-    fn test_render_selector_state_list_joins_with_pipe() {
-        use crate::declarations::rules::{Selector, StatePredicate};
-        use crate::domain::State;
-        let (first, second) = (State::Ready, State::InProgress);
-        let sel = Selector {
-            state: Some(StatePredicate::list([first, second].map(State::as_str))),
-            ..Default::default()
-        };
-        assert_eq!(render_selector(&sel), format!("state={first}|{second}"));
     }
 
     #[test]
@@ -3170,44 +2751,6 @@ priority = 100
             msg.contains(BuiltInPass::DanglingItemLink.as_str()) && msg.contains("BOGUS"),
             "expected dangling-link rule failure, got: {msg}"
         );
-    }
-
-    #[test]
-    fn test_run_rules_whole_repo_surfaces_dangling_link() {
-        // REQ-03 via the structured report `jit validate [--json]` consumes:
-        // `run_rules(None)` reports the dangling link as an error finding (which
-        // serializes for `--json`).
-        let target =
-            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
-        let short = target.short_id();
-        let mut node = issue_with_labels("node", "", &[&format!("satisfies:{short}/BOGUS")]);
-        node.dependencies = vec![target.id.clone()];
-        let config = crate::test_utils::shipped_item_kinds_toml();
-        let exec = crate::commands::test_helpers::memory_executor_declaring(
-            InMemoryStorage::new(),
-            MemoryDeclarations {
-                config: Some(&config),
-                invariants: Some(REGISTRY_TOML),
-                ..MemoryDeclarations::default()
-            },
-        );
-        seed_issue(exec.storage(), target);
-        seed_issue(exec.storage(), node);
-
-        let report = exec.validation().run_rules(None).unwrap();
-        assert!(report.has_errors());
-        let dangling: Vec<_> = report
-            .findings
-            .iter()
-            .filter(|f| f.rule == BuiltInPass::DanglingItemLink.as_str())
-            .collect();
-        assert_eq!(dangling.len(), 1);
-        assert!(dangling[0].message.contains("BOGUS"));
-        // The finding serializes (used by `jit validate --json`).
-        let value = serde_json::to_value(&report.findings).unwrap();
-        assert!(value
-            .to_string()
-            .contains(BuiltInPass::DanglingItemLink.as_str()));
     }
 
     /// Shared bases exclude references; a consuming pass requests its own scope.

@@ -203,7 +203,7 @@ pub struct ValidationCaptureClosure {
 /// and listing whole-repository validation reads so it consumes only
 /// image-projected content: the engine registries (`config.toml`,
 /// `invariants.toml`, `rules.toml`, `gates.toml`, `templates.toml`), the
-/// repository index, the event log and the data root's ignore file, every
+/// repository index and the data root's ignore file, every
 /// ordinary issue record plus the complete
 /// `issues` listing, the schema files the effective rules reference and the ones
 /// the current configuration derives, every declared
@@ -232,7 +232,6 @@ pub fn validate_capture_closure(
         VirtualPath::GATES,
         VirtualPath::TEMPLATES,
         VirtualPath::INDEX,
-        VirtualPath::EVENTS,
         // The data root's ignore file, so derived-state repair sees the target
         // its producer composes rather than treating it as uncaptured.
         VirtualPath::DATA_IGNORE,
@@ -775,7 +774,6 @@ kind = "advisory"
             VirtualPath::data("gates.toml").unwrap(),
             VirtualPath::data("templates.toml").unwrap(),
             VirtualPath::data("index.json").unwrap(),
-            VirtualPath::data("events.jsonl").unwrap(),
             VirtualPath::issue_record(&id),
             VirtualPath::worktree("AGENTS.md").unwrap(),
         ] {

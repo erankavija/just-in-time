@@ -1383,7 +1383,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                     declarations.borrowed(),
                 )?
             } else {
-                finalize(&layout, &image, &context, &derived.intents)?
+                finalize(&layout, &image, &context, &derived.intents, None)?
             };
             classify_apply(session.apply(&plan), (derived.result, warnings))
         })
@@ -1488,7 +1488,8 @@ impl<S: IssueStore> GateOps<'_, S> {
                 let intents = [crate::repository_state::MutationIntent::CreateGatePreset {
                     preset: Box::new(preset),
                 }];
-                let plan = crate::repository_state::finalize(&layout, &image, &context, &intents)?;
+                let plan =
+                    crate::repository_state::finalize(&layout, &image, &context, &intents, None)?;
                 Ok(SessionStep::Apply(plan, layout.resolve(&target)?))
             },
         )
@@ -2010,6 +2011,7 @@ mod tests {
             &[MutationIntent::CreateGatePreset {
                 preset: Box::new(preset),
             }],
+            None,
         )
         .unwrap();
 
@@ -2164,13 +2166,12 @@ mod tests {
         seed_repo_file(&storage, ".jit/config.toml", "");
         let layout = storage.repository_layout();
         let spec = || {
-            CaptureSpec::new(
+            let mut spec = CaptureSpec::new(
                 [
                     VirtualPath::data("config.toml").unwrap(),
                     VirtualPath::data("invariants.toml").unwrap(),
                     VirtualPath::data("rules.toml").unwrap(),
                     VirtualPath::data("gates.toml").unwrap(),
-                    VirtualPath::data("events.jsonl").unwrap(),
                 ],
                 CaptureBudget {
                     max_listings: 0,
@@ -2178,7 +2179,9 @@ mod tests {
                     max_depth: 4,
                 },
             )
-            .unwrap()
+            .unwrap();
+            spec.discover_tail(VirtualPath::EVENTS).unwrap();
+            spec
         };
         let request = CapturedGateRegistryMutation::Define(GateDefinition {
             version: 1,

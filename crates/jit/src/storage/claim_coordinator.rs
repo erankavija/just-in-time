@@ -252,6 +252,37 @@ fn lease_record_issues(shared_jit: &Path) -> Result<Vec<IssueId>> {
     Ok(issues)
 }
 
+/// One step of [`LeaseLock::apply`]'s publication, named so an interruption
+/// matrix can stop the operation at it. A point names the state before its step.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum LeasePoint {
+    /// The change is resolved, before the stage file of a stored lease is written.
+    BeforeStage,
+    /// Before the rename or unlink that commits the lease record.
+    BeforeCommit,
+    /// The record is committed, before `claims.seq` advances.
+    BeforeSequence,
+    /// Before the history lines are appended.
+    BeforeHistory,
+    /// The history lines are appended: the operation is complete.
+    AfterHistory,
+}
+
+/// Test seam for interrupting one named step of a lease operation.
+pub(crate) trait LeaseInterruptionInjector: Send + Sync {
+    /// Interrupt the operation at one point, or let it proceed.
+    fn check(&self, point: &LeasePoint) -> std::io::Result<()>;
+}
+
+/// Production injector: every point proceeds.
+struct NoLeaseInterruptions;
+
+impl LeaseInterruptionInjector for NoLeaseInterruptions {
+    fn check(&self, _point: &LeasePoint) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 /// Claim coordinator for atomic lease operations
 #[derive(Clone)]
 pub struct ClaimCoordinator {
@@ -269,6 +300,7 @@ pub struct ClaimCoordinator {
     /// [`SystemClock`] (the real system clock) in production; tests inject a
     /// deterministic clock so TTL boundaries are exercised without real delays.
     clock: Arc<dyn Clock>,
+    interruptions: Arc<dyn LeaseInterruptionInjector>,
 }
 
 /// What a [`LeaseLock::apply`] operation does to its issue's lease.
@@ -389,6 +421,8 @@ impl LeaseLock {
             return Ok(());
         }
         self.coordinator.publish_lease_record(issue_id, next)?;
+        self.coordinator
+            .check_interruption(LeasePoint::BeforeSequence)?;
         let first_seq = self.coordinator.take_claim_seqs(records.len() as u64)?;
         let lines = records
             .iter()
@@ -403,7 +437,11 @@ impl LeaseLock {
                 .map(|json| json + "\n")
             })
             .collect::<serde_json::Result<String>>()?;
-        self.coordinator.append_claim_log(lines.as_bytes())
+        self.coordinator
+            .check_interruption(LeasePoint::BeforeHistory)?;
+        self.coordinator.append_claim_log(lines.as_bytes())?;
+        self.coordinator
+            .check_interruption(LeasePoint::AfterHistory)
     }
 }
 
@@ -532,7 +570,26 @@ impl ClaimCoordinator {
             agent_id,
             fsync: true,
             clock: Arc::new(SystemClock),
+            interruptions: Arc::new(NoLeaseInterruptions),
         }
+    }
+
+    /// Check every [`LeasePoint`] of this coordinator's lease operations
+    /// against `injector`.
+    #[cfg(test)]
+    pub(crate) fn with_interruptions(
+        mut self,
+        injector: Arc<dyn LeaseInterruptionInjector>,
+    ) -> Self {
+        self.interruptions = injector;
+        self
+    }
+
+    /// Put one point to the injector, naming it in the interruption it reports.
+    fn check_interruption(&self, point: LeasePoint) -> Result<()> {
+        self.interruptions
+            .check(&point)
+            .with_context(|| format!("lease operation interrupted at {point:?}"))
     }
 
     /// Override the clock used for lease expiry and eviction (see the `clock`
@@ -762,15 +819,22 @@ impl ClaimCoordinator {
                     fs::create_dir_all(&dir).context("Failed to create lease directory")?;
                     self.sync_directory(&self.paths.shared_jit)?;
                 }
-                let stage = dir.join(format!("{issue_id}.json.stage"));
-                self.replace_file(&stage, &path, &serde_json::to_vec_pretty(lease)?)
+                let stage = WorktreePaths::lease_stage_path(&self.paths.shared_jit, issue_id);
+                self.check_interruption(LeasePoint::BeforeStage)?;
+                self.write_stage(&stage, &serde_json::to_vec_pretty(lease)?)?;
+                self.check_interruption(LeasePoint::BeforeCommit)?;
+                self.rename_into_place(&stage, &path)
             }
-            None => match fs::remove_file(&path) {
-                Ok(()) => self.sync_directory(&dir),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                Err(error) => Err(error)
-                    .with_context(|| format!("Failed to remove lease record {}", path.display())),
-            },
+            None => {
+                self.check_interruption(LeasePoint::BeforeCommit)?;
+                match fs::remove_file(&path) {
+                    Ok(()) => self.sync_directory(&dir),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                    Err(error) => Err(error).with_context(|| {
+                        format!("Failed to remove lease record {}", path.display())
+                    }),
+                }
+            }
         }
     }
 
@@ -797,14 +861,23 @@ impl ClaimCoordinator {
         Ok(last + 1)
     }
 
-    /// Replace `target` with `content` through `stage`: write and sync the
-    /// stage file, rename it over `target`, then sync the directory.
+    /// Replace `target` with `content` through `stage`.
     fn replace_file(&self, stage: &Path, target: &Path, content: &[u8]) -> Result<()> {
+        self.write_stage(stage, content)?;
+        self.rename_into_place(stage, target)
+    }
+
+    /// Write `content` to `stage`, synced.
+    fn write_stage(&self, stage: &Path, content: &[u8]) -> Result<()> {
         if self.fsync {
-            super::atomic_write::write_file_synced(stage, content)?;
+            super::atomic_write::write_file_synced(stage, content)
         } else {
-            fs::write(stage, content).with_context(|| format!("writing {}", stage.display()))?;
+            fs::write(stage, content).with_context(|| format!("writing {}", stage.display()))
         }
+    }
+
+    /// Rename `stage` over `target`, then sync the directory.
+    fn rename_into_place(&self, stage: &Path, target: &Path) -> Result<()> {
         fs::rename(stage, target)
             .with_context(|| format!("renaming {} to {}", stage.display(), target.display()))?;
         target
@@ -1121,7 +1194,11 @@ mod tests {
         let dir = WorktreePaths::leases_dir(&coordinator.paths.shared_jit);
         let issue = crate::test_utils::issue_id(12);
         for name in [
-            format!("{issue}.json.stage"),
+            WorktreePaths::lease_stage_path(&coordinator.paths.shared_jit, &issue)
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned(),
             format!("{}.json", issue.as_str().to_uppercase()),
             "notes.json".to_string(),
             issue.to_string(),
@@ -2662,3 +2739,7 @@ mod tests {
 #[cfg(test)]
 #[path = "claim_coordinator_proptests.rs"]
 mod proptests;
+
+#[cfg(test)]
+#[path = "claim_coordinator_interruption_tests.rs"]
+mod interruption_tests;

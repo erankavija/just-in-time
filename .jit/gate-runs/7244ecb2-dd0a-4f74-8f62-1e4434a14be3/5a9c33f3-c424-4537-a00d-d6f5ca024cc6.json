@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2eb09877ca9fe37d3416c4624b485998f4e7bed0",
+  "completed_at": "2026-11-04T06:56:53.958641601Z",
+  "duration_ms": 242132,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are evidenced by the attributable implementation and focused tests; cargo-ci exit 75 is environment-sensitive evidence, not an attributable defect.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7244ecb2-dd0a-4f74-8f62-1e4434a14be3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5a9c33f3-c424-4537-a00d-d6f5ca024cc6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T06:52:51.826575110Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 035cf6f8 (substantive) and 06db8e2b (empty handoff), both tagged `jit:7244ecb2`\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-19 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes and @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/f8a6b298/requirement/REQ-07 (.jit/issues/f8a6b298-e6b5-4d62-b73c-3f7b217c1a01.json); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci failed, exit 75, 2026-11-04T06:50:45Z (environment-sensitive per its gate definition)\nTruncation recovery: narrowed the initially truncated registry/search output into individual commit patches, targeted source ranges, and resolved-item sources\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are evidenced by the attributable implementation and focused tests; cargo-ci exit 75 is environment-sensitive evidence, not an attributable defect.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

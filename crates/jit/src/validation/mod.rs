@@ -28,7 +28,8 @@
 //!   declared-but-unenforced direction;
 //! - [`record_fidelity`] — whether stored records decode and reproduce what the
 //!   writer would publish, a verdict of whole-repository validation only;
-//! - [`mod@report`] — structured rule reports for `jit validate [--explain]`;
+//! - [`mod@report`] — report findings with provenance, their wire reports, and
+//!   the selections every validation view computes;
 //! - [`repository`] — the one whole-repository [`fn@report`].
 //!
 //! Rendering a [`RuleSet`](crate::declarations::rules::RuleSet) to `rules.toml` +
@@ -45,6 +46,9 @@ pub(crate) mod record_fidelity;
 pub mod report;
 pub mod repository;
 pub mod strictness;
+
+#[cfg(test)]
+mod selection_proptests;
 
 pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
 pub use local::{evaluate_local, LocalEvalError, LocalEvaluation};

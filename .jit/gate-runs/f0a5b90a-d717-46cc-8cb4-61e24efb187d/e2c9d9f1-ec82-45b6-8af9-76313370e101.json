@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "60bb5779c3d3dd344e5a6e6831fd1b9dad1a2b61",
+  "completed_at": "2026-11-04T08:32:01.397095366Z",
+  "duration_ms": 156504,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue’s two tagged documentation patches accurately cover per-issue leases, recovery, and lease validation; the prior blocking finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "f0a5b90a-d717-46cc-8cb4-61e24efb187d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e2c9d9f1-ec82-45b6-8af9-76313370e101",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T08:29:24.892554238Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: this is a leaf task (configured level 4; no DAG-resolved children). I reviewed the two reachable `jit:f0a5b90a` commits individually, including the follow-up that fixed prior F1.\n\nThe affected claim, recovery, validation, coordination, and worktree documentation now matches the current source. Plain `jit validate` is no longer described as checking claim files; `--leases` is accurately scoped. No issue-impact documentation gaps remain.\n\nFindings: none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue’s two tagged documentation patches accurately cover per-issue leases, recovery, and lease validation; the prior blocking finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

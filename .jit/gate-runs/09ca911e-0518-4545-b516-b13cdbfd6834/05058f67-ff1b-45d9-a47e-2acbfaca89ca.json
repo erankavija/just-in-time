@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7af823110ad2fee8cb7aee2d8cb30334fe07d181",
+  "completed_at": "2026-11-04T08:17:18.930561435Z",
+  "duration_ms": 214486,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The storage-record reference accurately documents both new per-key records and prior blocking prose was removed.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "09ca911e-0518-4545-b516-b13cdbfd6834",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "05058f67-ff1b-45d9-a47e-2acbfaca89ca",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-04T08:13:44.443877719Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf issue; reviewed the two reachable `jit:09ca911e` commits individually. The follow-up removes both prior blockers. Current reference accurately documents paths, writers/readers, and type-derived fields; 13 focused reference tests pass.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The storage-record reference accurately documents both new per-key records and prior blocking prose was removed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

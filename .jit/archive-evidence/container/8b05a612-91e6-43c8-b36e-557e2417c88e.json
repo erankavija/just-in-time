@@ -1,0 +1,53 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/8b05a612-production-readiness",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 4725,
+            "sha256": "6ccc6150c26536b72dc3cf736bb0e3359ba95055527324a24cc45ca1b18dc8a0"
+          },
+          "source": "dev/active/8b05a612-production-readiness/v1-production-readiness-scope-brief.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4725,
+            "sha256": "6ccc6150c26536b72dc3cf736bb0e3359ba95055527324a24cc45ca1b18dc8a0"
+          },
+          "destination": "dev/archive/8b05a612-production-readiness/active/v1-production-readiness-scope-brief.md",
+          "source": "dev/active/8b05a612-production-readiness/v1-production-readiness-scope-brief.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "d77a458cce11cee88dc10d624c95ac1166e2e6e27fead5945de4d5bbf9e592ca"
+          },
+          "destination": "dev/archive/8b05a612-production-readiness/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/8b05a612-production-readiness/v1-production-readiness-scope-brief.md",
+          "issue": "8b05a612-91e6-43c8-b36e-557e2417c88e",
+          "to_path": "dev/archive/8b05a612-production-readiness/active/v1-production-readiness-scope-brief.md"
+        }
+      ],
+      "target": {
+        "id": "8b05a612-91e6-43c8-b36e-557e2417c88e",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "8b05a612-91e6-43c8-b36e-557e2417c88e",
+    "kind": "container"
+  }
+}

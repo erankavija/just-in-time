@@ -134,16 +134,16 @@ confirmation = "invoked"
 path = "dep add"
 argv = ["dep", "add", "missing-from", "missing-to", "--json"]
 setup = ["init", "no-issue:missing-from"]
-expected_failure = "DEPENDENCY_ERROR: Issue not found: missing-from"
-expected_code = "DEPENDENCY_ERROR"
+expected_failure = "ISSUE_NOT_FOUND: Issue not found: missing-from"
+expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
 
 [[arms]]
 path = "dep rm"
 argv = ["dep", "rm", "missing-from", "missing-to", "--json"]
 setup = ["init", "no-issue:missing-from"]
-expected_failure = "DEPENDENCY_ERROR: Issue not found: missing-from"
-expected_code = "DEPENDENCY_ERROR"
+expected_failure = "ISSUE_NOT_FOUND: Issue not found: missing-from"
+expected_code = "ISSUE_NOT_FOUND"
 confirmation = "invoked"
 
 [[arms]]
@@ -543,8 +543,8 @@ path = "item list"
 argv = ["item", "list", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Replace .jit/config.toml with `not = valid = toml` after initialization."
-expected_failure = "ITEM_COMMAND_FAILED: invalid .jit/config.toml: Failed to parse config.toml"
-expected_code = "ITEM_COMMAND_FAILED"
+expected_failure = "INVALID_ARGUMENT: invalid .jit/config.toml: Failed to parse config.toml"
+expected_code = "INVALID_ARGUMENT"
 confirmation = "invoked"
 
 [[arms]]
@@ -552,24 +552,24 @@ path = "item search"
 argv = ["item", "search", "survey", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Replace .jit/config.toml with `not = valid = toml` after initialization."
-expected_failure = "ITEM_COMMAND_FAILED: invalid .jit/config.toml: Failed to parse config.toml"
-expected_code = "ITEM_COMMAND_FAILED"
+expected_failure = "INVALID_ARGUMENT: invalid .jit/config.toml: Failed to parse config.toml"
+expected_code = "INVALID_ARGUMENT"
 confirmation = "invoked"
 
 [[arms]]
 path = "item show"
 argv = ["item", "show", "not-a-qualified-address", "--json"]
 setup = ["init"]
-expected_failure = "ITEM_COMMAND_FAILED: 'not-a-qualified-address' is not a qualified id; expected '<short-id>/<self-id>'"
-expected_code = "ITEM_COMMAND_FAILED"
+expected_failure = "INVALID_ARGUMENT: 'not-a-qualified-address' is not a qualified id; expected '<short-id>/<self-id>'"
+expected_code = "INVALID_ARGUMENT"
 confirmation = "invoked"
 
 [[arms]]
 path = "item resolve"
 argv = ["item", "resolve", "not-a-qualified-address", "--json"]
 setup = ["init"]
-expected_failure = "ITEM_COMMAND_FAILED: 'not-a-qualified-address' is not a qualified id; expected '<short-id>/<self-id>'"
-expected_code = "ITEM_COMMAND_FAILED"
+expected_failure = "INVALID_ARGUMENT: 'not-a-qualified-address' is not a qualified id; expected '<short-id>/<self-id>'"
+expected_code = "INVALID_ARGUMENT"
 confirmation = "invoked"
 
 [[arms]]
@@ -585,8 +585,8 @@ confirmation = "invoked"
 path = "project render"
 argv = ["project", "render", "--name", "no-such-projection", "--json"]
 setup = ["init", "no-projection:no-such-projection"]
-expected_failure = "PROJECT_COMMAND_FAILED: unknown projection 'no-such-projection'"
-expected_code = "PROJECT_COMMAND_FAILED"
+expected_failure = "INVALID_ARGUMENT: unknown projection 'no-such-projection'"
+expected_code = "INVALID_ARGUMENT"
 confirmation = "invoked"
 
 [[arms]]
@@ -823,8 +823,8 @@ confirmation = "invoked"
 path = "hooks install"
 argv = ["hooks", "install", "--json"]
 setup = ["init", "git:absent"]
-expected_failure = "HOOKS_INSTALL_ERROR: Not in a git repository (no .git directory found)"
-expected_code = "HOOKS_INSTALL_ERROR"
+expected_failure = "Not in a git repository (no .git directory found)"
+expected_code = "INVALID_ARGUMENT"
 confirmation = "invoked"
 
 [[arms]]

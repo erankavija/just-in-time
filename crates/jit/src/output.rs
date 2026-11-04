@@ -13,13 +13,39 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use thiserror::Error;
 
+mod apply;
+mod archive;
+mod claim;
 pub mod config;
+mod dep;
+mod doc;
 mod emit;
+mod events;
 pub mod failure;
+mod graph;
+pub mod hooks;
+mod init;
 mod invariant;
+mod item;
+mod project;
+mod search;
+mod serve;
 pub mod snapshot;
+mod validate;
+mod version;
 
+pub use validate::*;
+
+pub use archive::ArchiveTargetResponse;
+pub use claim::{
+    ClaimAcquireResponse, ClaimForceEvictResponse, ClaimHeartbeatResponse, ClaimReleaseResponse,
+    ClaimRenewResponse, LeaseListResponse, LeasesKey, RecoverResponse,
+};
+pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
 pub use emit::{emit_outcome, HumanRender, Report, Response};
+pub use graph::{GraphExportOutput, GraphExportText, GraphExportWritten};
+pub use search::{SearchHit, SearchKey, SearchQuery, SearchResponse};
+pub use serve::{ServeResponse, WebUiSource};
 
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::gate_findings::GateFindings;
@@ -234,20 +260,49 @@ pub enum IssueColumn {
     Priority,
 }
 
+/// The fields a human issue-list row shows.
+pub trait ListedIssue {
+    fn id(&self) -> &IssueId;
+    fn title(&self) -> &str;
+    fn state(&self) -> State;
+    fn priority(&self) -> Priority;
+}
+
+macro_rules! listed_issue {
+    ($($ty:ty),+) => {$(
+        impl ListedIssue for $ty {
+            fn id(&self) -> &IssueId {
+                &self.id
+            }
+            fn title(&self) -> &str {
+                &self.title
+            }
+            fn state(&self) -> State {
+                self.state
+            }
+            fn priority(&self) -> Priority {
+                self.priority
+            }
+        }
+    )+};
+}
+
+listed_issue!(Issue, MinimalIssue);
+
 /// One row of a human issue list: the issue and its optional reason lines.
-pub type IssueListRow<'a> = (&'a Issue, Vec<String>);
+pub type IssueListRow<'a, I = Issue> = (&'a I, Vec<String>);
 
 /// Rows with no reason lines.
-pub fn plain_issue_rows(issues: &[Issue]) -> impl Iterator<Item = IssueListRow<'_>> {
+pub fn plain_issue_rows<I: ListedIssue>(issues: &[I]) -> impl Iterator<Item = IssueListRow<'_, I>> {
     issues.iter().map(|issue| (issue, Vec::new()))
 }
 
 /// Render a human issue list: `header`, two-space-indented rows (`id | title`
 /// plus `columns`, then one `    - reason` line per reason), and a blank-line
 /// separated `Total: N` footer. `quiet` drops the header and footer.
-pub fn render_issue_list<'a>(
+pub fn render_issue_list<'a, I: ListedIssue + 'a>(
     header: &str,
-    rows: impl IntoIterator<Item = IssueListRow<'a>>,
+    rows: impl IntoIterator<Item = IssueListRow<'a, I>>,
     columns: &[IssueColumn],
     quiet: bool,
 ) -> String {
@@ -257,11 +312,11 @@ pub fn render_issue_list<'a>(
     let mut total = 0usize;
     for (issue, reasons) in rows {
         total += 1;
-        let _ = write!(lines, "  {} | {}", issue.id, issue.title);
+        let _ = write!(lines, "  {} | {}", issue.id(), issue.title());
         for column in columns {
             let _ = match column {
-                IssueColumn::State => write!(lines, " | {}", issue.state),
-                IssueColumn::Priority => write!(lines, " | {}", issue.priority),
+                IssueColumn::State => write!(lines, " | {}", issue.state()),
+                IssueColumn::Priority => write!(lines, " | {}", issue.priority()),
             };
         }
         lines.push('\n');
@@ -279,10 +334,10 @@ pub fn render_issue_list<'a>(
 
 /// Print [`render_issue_list`]; quiet mode prints the rows alone and an empty
 /// quiet list prints nothing.
-pub fn print_issue_list<'a>(
+pub fn print_issue_list<'a, I: ListedIssue + 'a>(
     ctx: &OutputContext,
     header: &str,
-    rows: impl IntoIterator<Item = IssueListRow<'a>>,
+    rows: impl IntoIterator<Item = IssueListRow<'a, I>>,
     columns: &[IssueColumn],
 ) -> io::Result<()> {
     let rendered = render_issue_list(header, rows, columns, ctx.quiet);
@@ -498,7 +553,10 @@ mod issue_list_render_tests {
 
     #[test]
     fn test_render_issue_list_empty_prints_header_and_zero_total() {
-        assert_eq!(render_issue_list("H", [], &[], false), "H\n\nTotal: 0");
+        assert_eq!(
+            render_issue_list::<Issue>("H", [], &[], false),
+            "H\n\nTotal: 0"
+        );
     }
 }
 
@@ -985,8 +1043,6 @@ wire_vocabulary! {
         ItemCommandFailed = "ITEM_COMMAND_FAILED",
         /// An invariant command failed without a more specific public classification.
         InvariantCommandFailed = "INVARIANT_COMMAND_FAILED",
-        /// A project command failed without a more specific public classification.
-        ProjectCommandFailed = "PROJECT_COMMAND_FAILED",
         /// A profile command failed without a more specific public classification.
         ProfileError = "PROFILE_ERROR",
         /// The search backend failed while executing a query.
@@ -999,26 +1055,12 @@ wire_vocabulary! {
         WorktreeListError = "WORKTREE_LIST_ERROR",
         /// Cross-checkout store comparison failed.
         WorktreeStoreDivergenceError = "WORKTREE_STORE_DIVERGENCE_ERROR",
-        /// Repository hook installation failed.
-        HooksInstallError = "HOOKS_INSTALL_ERROR",
         /// A command failed without a more specific public classification.
         GenericError = "GENERIC_ERROR",
         /// Repository recovery failed.
         RecoveryFailed = "recovery_failed",
-        /// Claim acquisition failed.
-        ClaimAcquireError = "CLAIM_ACQUIRE_ERROR",
-        /// Claim release failed.
-        ClaimReleaseError = "CLAIM_RELEASE_ERROR",
-        /// Claim renewal failed.
-        ClaimRenewError = "CLAIM_RENEW_ERROR",
-        /// Claim heartbeat failed.
-        ClaimHeartbeatError = "CLAIM_HEARTBEAT_ERROR",
-        /// Claim status inspection failed without a more specific classification.
-        ClaimStatusError = "CLAIM_STATUS_ERROR",
-        /// Claim enumeration failed without a more specific classification.
-        ClaimListError = "CLAIM_LIST_ERROR",
-        /// Forced claim eviction failed.
-        ClaimForceEvictError = "CLAIM_FORCE_EVICT_ERROR",
+        /// The foreground server process exited with a failure status.
+        ServerExited = "SERVER_EXITED",
         /// A lock wait expired while another jit process held the lock.
         LockTimeout = "LOCK_TIMEOUT",
     }
@@ -1036,12 +1078,7 @@ impl ErrorCode {
             | ErrorCode::DocumentNotFound
             | ErrorCode::DependencyError
             | ErrorCode::GateCheckError
-            | ErrorCode::PresetError
-            | ErrorCode::ClaimAcquireError
-            | ErrorCode::ClaimReleaseError
-            | ErrorCode::ClaimRenewError
-            | ErrorCode::ClaimHeartbeatError
-            | ErrorCode::ClaimForceEvictError => ExitCode::NotFound,
+            | ErrorCode::PresetError => ExitCode::NotFound,
             ErrorCode::CycleDetected
             | ErrorCode::ValidationFailed
             | ErrorCode::Blocked
@@ -1065,18 +1102,15 @@ impl ErrorCode {
             | ErrorCode::ItemNotFound
             | ErrorCode::ItemCommandFailed
             | ErrorCode::InvariantCommandFailed
-            | ErrorCode::ProjectCommandFailed
             | ErrorCode::ProfileError
             | ErrorCode::SearchFailed
             | ErrorCode::RipgrepNotFound
             | ErrorCode::WorktreeInfoError
             | ErrorCode::WorktreeListError
             | ErrorCode::WorktreeStoreDivergenceError
-            | ErrorCode::HooksInstallError
             | ErrorCode::GenericError
             | ErrorCode::RecoveryFailed
-            | ErrorCode::ClaimStatusError
-            | ErrorCode::ClaimListError => ExitCode::GenericError,
+            | ErrorCode::ServerExited => ExitCode::GenericError,
         }
     }
 
@@ -1135,9 +1169,6 @@ impl ErrorCode {
             ErrorCode::InvariantCommandFailed => {
                 "An invariant command failed without a more specific classification."
             }
-            ErrorCode::ProjectCommandFailed => {
-                "A project command failed without a more specific classification."
-            }
             ErrorCode::ProfileError => {
                 "A profile command failed without a more specific classification."
             }
@@ -1146,24 +1177,15 @@ impl ErrorCode {
             ErrorCode::WorktreeInfoError => "Worktree identity inspection failed.",
             ErrorCode::WorktreeListError => "Worktree enumeration failed.",
             ErrorCode::WorktreeStoreDivergenceError => "Cross-checkout store comparison failed.",
-            ErrorCode::HooksInstallError => "Repository hook installation failed.",
             ErrorCode::GenericError => {
                 "A command failed without a more specific public classification."
             }
             ErrorCode::RecoveryFailed => {
                 "Applying a leftover redo record, or a recovery routine, failed."
             }
-            ErrorCode::ClaimAcquireError => "Claim acquisition failed.",
-            ErrorCode::ClaimReleaseError => "Claim release failed.",
-            ErrorCode::ClaimRenewError => "Claim renewal failed.",
-            ErrorCode::ClaimHeartbeatError => "Claim heartbeat failed.",
-            ErrorCode::ClaimStatusError => {
-                "Claim status inspection failed without a more specific classification."
+            ErrorCode::ServerExited => {
+                "The foreground server process exited with a failure status."
             }
-            ErrorCode::ClaimListError => {
-                "Claim enumeration failed without a more specific classification."
-            }
-            ErrorCode::ClaimForceEvictError => "Forced claim eviction failed.",
             ErrorCode::LockTimeout => {
                 "A lock wait expired while another jit process held the lock; nothing was changed."
             }
@@ -1388,32 +1410,39 @@ pub struct IssueSearchQuery {
 
 /// Declares the [`CollectionKey`] marker for each list-envelope collection key.
 macro_rules! collection_keys {
-    ($($(#[$meta:meta])* $marker:ident = $key:literal;)+) => {$(
+    ($($(#[$meta:meta])* $marker:ident = $key:literal $(as $schema:literal)?;)+) => {$(
         $(#[$meta])*
         pub enum $marker {}
 
         impl CollectionKey for $marker {
             const KEY: &'static str = $key;
+            $(const SCHEMA_NAME: Option<&'static str> = Some($schema);)?
         }
     )+};
 }
 
 collection_keys! {
+    /// Collection key of [`GraphDownstreamResponse`].
+    DependentsKey = "dependents" as "GraphDownstreamResponse";
+    /// Collection key of [`GraphRootsResponse`].
+    RootsKey = "roots" as "GraphRootsResponse";
+    /// Collection key of [`GraphDepsTreeResponse`].
+    GraphDepsNodesKey = "nodes" as "GraphDepsTreeResponse";
+    /// Collection key of [`GraphTreeResponse`].
+    GraphTreeNodesKey = "nodes" as "GraphTreeResponse";
     IssuesKey = "issues";
-    DependentsKey = "dependents";
-    RootsKey = "roots";
-    NodesKey = "nodes";
     DivergencesKey = "divergences";
     ByStateKey = "by_state";
     GatesKey = "gates";
     ResultsKey = "results";
-    ArtifactsKey = "artifacts";
-    NamespacesKey = "namespaces";
+    /// Collection key of [`ArtifactConformanceResponse`].
+    ArtifactsKey = "artifacts" as "ArtifactConformanceResponse";
+    /// Collection key of [`NamespacesResponse`].
+    NamespacesKey = "namespaces" as "NamespacesResponse";
+    /// Collection key of [`LabelValuesResponse`].
+    ValuesKey = "values" as "LabelValuesResponse";
     WorktreesKey = "worktrees";
     PresetsKey = "presets";
-    EventsKey = "events";
-    ValuesKey = "values";
-    LeasesKey = "leases";
 }
 
 /// Generic response for issue list queries (available, all, ready, etc.)
@@ -1460,6 +1489,13 @@ pub struct TemplateApplyResponse {
     pub created_node_ids_by_role: std::collections::BTreeMap<String, IssueId>,
     pub anchor_dependency_snapshots: std::collections::BTreeMap<String, Vec<IssueId>>,
     pub created_issues: std::collections::BTreeMap<String, Issue>,
+}
+
+impl TemplateApplyResponse {
+    /// The `--json` envelope's `message`.
+    pub fn message(&self) -> String {
+        format!("Applied template '{}' to {}", self.template, self.container)
+    }
 }
 
 /// Response for blocked query with reasons (minimal issue + reasons)
@@ -1576,7 +1612,8 @@ impl DependencyTreeNode {
 /// `count` is the number of top-level entries in `nodes` (the immediate
 /// dependency nodes; each may carry nested `children`). This differs from
 /// `summary.total`, which counts every unique dependency across the whole tree.
-pub type GraphDepsTreeResponse = ListEnvelope<NodesKey, DependencyTreeNode, DependencyTreeScope>;
+pub type GraphDepsTreeResponse =
+    ListEnvelope<GraphDepsNodesKey, DependencyTreeNode, DependencyTreeScope>;
 
 /// Fields of [`GraphDepsTreeResponse`] beside its `nodes`.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -1686,7 +1723,7 @@ pub struct HierarchyNodeView {
 /// assert_eq!(json["root"], serde_json::Value::Null);
 /// assert_eq!(json["nodes"][0]["parent"], epic_id.as_str());
 /// ```
-pub type GraphTreeResponse = ListEnvelope<NodesKey, HierarchyNodeView, TreeRoot>;
+pub type GraphTreeResponse = ListEnvelope<GraphTreeNodesKey, HierarchyNodeView, TreeRoot>;
 
 /// The scope of a [`GraphTreeResponse`]. `nodes` are ordered by ascending short id.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -2843,20 +2880,50 @@ impl From<crate::domain::artifact_conformance::ReportedArtifact> for ArtifactCon
 // Label Response Types
 // ============================================================================
 
-/// Response for `label namespaces` command
-pub type NamespacesResponse = ListEnvelope<NamespacesKey, String>;
+/// Response for `label namespaces` command.
+pub type NamespacesResponse = ListEnvelope<NamespacesKey, String, NamespacesHumanDetails>;
 
-/// Response for top-level `search` command
-pub type SearchResponse = ListEnvelope<ResultsKey, crate::search::SearchResult, SearchQuery>;
-
-/// The query a [`SearchResponse`] echoes.
+/// Configuration kept only for rendering the human namespace list.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct SearchQuery {
-    pub query: String,
+pub struct NamespacesHumanDetails {
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub namespaces: Vec<crate::domain::LabelNamespace>,
+}
+
+impl HumanRender for NamespacesResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        let header = if mode.quiet {
+            String::new()
+        } else {
+            "Label Namespaces:\n\n".to_owned()
+        };
+        let rows = self
+            .items
+            .iter()
+            .zip(&self.extras.namespaces)
+            .map(|(name, namespace)| {
+                format!(
+                    "  {name}\n    Description: {}\n    Unique: {}\n\n",
+                    namespace.description, namespace.unique
+                )
+            })
+            .collect::<String>();
+        format!("{header}{rows}")
+    }
 }
 
 /// Response for `gate preset list` command
 pub type GatePresetListResponse = ListEnvelope<PresetsKey, crate::gate_presets::PresetInfo>;
+
+/// Collection key of [`EventListResponse`]. Its schema keeps the response's
+/// name, since no other response carries the `events` key.
+pub enum EventsKey {}
+
+impl CollectionKey for EventsKey {
+    const KEY: &'static str = "events";
+    const SCHEMA_NAME: Option<&'static str> = Some("EventListResponse");
+}
 
 /// Response for `events tail` and `events query`
 pub type EventListResponse = ListEnvelope<EventsKey, crate::domain::Event>;
@@ -2870,8 +2937,26 @@ pub struct LabelValuesScope {
     pub namespace: String,
 }
 
-/// Response for `claim status` and `claim list`.
-pub type LeaseListResponse = ListEnvelope<LeasesKey, crate::commands::claim::ListedLease>;
+impl HumanRender for LabelValuesResponse {
+    fn render_human(&self, mode: OutputMode) -> String {
+        let header = if mode.quiet {
+            String::new()
+        } else {
+            format!("Values in namespace '{}':\n\n", self.extras.namespace)
+        };
+        let values = self
+            .items
+            .iter()
+            .map(|value| format!("  {value}\n"))
+            .collect::<String>();
+        let total = if mode.quiet {
+            String::new()
+        } else {
+            format!("\nTotal: {}\n", self.count())
+        };
+        format!("{header}{values}{total}")
+    }
+}
 
 /// Response for `worktree list` command
 pub type WorktreeListResponse =
@@ -3630,7 +3715,6 @@ mod tests {
             (ErrorCode::ItemNotFound, ExitCode::GenericError),
             (ErrorCode::ItemCommandFailed, ExitCode::GenericError),
             (ErrorCode::InvariantCommandFailed, ExitCode::GenericError),
-            (ErrorCode::ProjectCommandFailed, ExitCode::GenericError),
             (ErrorCode::ProfileError, ExitCode::GenericError),
             (ErrorCode::SearchFailed, ExitCode::GenericError),
             (ErrorCode::RipgrepNotFound, ExitCode::GenericError),
@@ -3640,16 +3724,9 @@ mod tests {
                 ErrorCode::WorktreeStoreDivergenceError,
                 ExitCode::GenericError,
             ),
-            (ErrorCode::HooksInstallError, ExitCode::GenericError),
             (ErrorCode::GenericError, ExitCode::GenericError),
             (ErrorCode::RecoveryFailed, ExitCode::GenericError),
-            (ErrorCode::ClaimAcquireError, ExitCode::NotFound),
-            (ErrorCode::ClaimReleaseError, ExitCode::NotFound),
-            (ErrorCode::ClaimRenewError, ExitCode::NotFound),
-            (ErrorCode::ClaimHeartbeatError, ExitCode::NotFound),
-            (ErrorCode::ClaimStatusError, ExitCode::GenericError),
-            (ErrorCode::ClaimListError, ExitCode::GenericError),
-            (ErrorCode::ClaimForceEvictError, ExitCode::NotFound),
+            (ErrorCode::ServerExited, ExitCode::GenericError),
             (ErrorCode::LockTimeout, ExitCode::LockTimeout),
         ];
 
@@ -3785,11 +3862,6 @@ mod tests {
             ErrorCode::DependencyError,
             ErrorCode::GateCheckError,
             ErrorCode::PresetError,
-            ErrorCode::ClaimAcquireError,
-            ErrorCode::ClaimReleaseError,
-            ErrorCode::ClaimRenewError,
-            ErrorCode::ClaimHeartbeatError,
-            ErrorCode::ClaimForceEvictError,
         ] {
             assert_eq!(code.exit_code(), ExitCode::NotFound, "{code}");
         }
@@ -3800,18 +3872,15 @@ mod tests {
             ErrorCode::ItemNotFound,
             ErrorCode::ItemCommandFailed,
             ErrorCode::InvariantCommandFailed,
-            ErrorCode::ProjectCommandFailed,
             ErrorCode::ProfileError,
             ErrorCode::SearchFailed,
             ErrorCode::RipgrepNotFound,
             ErrorCode::WorktreeInfoError,
             ErrorCode::WorktreeListError,
             ErrorCode::WorktreeStoreDivergenceError,
-            ErrorCode::HooksInstallError,
             ErrorCode::GenericError,
             ErrorCode::RecoveryFailed,
-            ErrorCode::ClaimStatusError,
-            ErrorCode::ClaimListError,
+            ErrorCode::ServerExited,
         ] {
             assert_eq!(code.exit_code(), ExitCode::GenericError, "{code}");
         }
@@ -3942,9 +4011,66 @@ mod tests {
                 namespace: "epic".into(),
             },
         );
+        assert_eq!(
+            response.render_human(OutputMode::default()),
+            "Values in namespace 'epic':\n\n  v1\n  v2\n\nTotal: 2\n"
+        );
         let value = serde_json::to_value(response).unwrap();
         assert_envelope_value(&value, "values", 2);
         assert_eq!(value["namespace"], "epic");
+    }
+
+    #[test]
+    fn test_label_namespaces_response_renders_configuration_without_serializing_it() {
+        let response = NamespacesResponse::with_extras(
+            vec!["type".into()],
+            NamespacesHumanDetails {
+                namespaces: vec![crate::domain::LabelNamespace::new("Issue type", true)],
+            },
+        );
+
+        assert_eq!(
+            response.render_human(OutputMode::default()),
+            "Label Namespaces:\n\n  type\n    Description: Issue type\n    Unique: true\n\n"
+        );
+        let value = serde_json::to_value(response).unwrap();
+        assert_eq!(value["namespaces"], serde_json::json!(["type"]));
+        assert!(value.get("description").is_none());
+
+        let quiet = NamespacesResponse::with_extras(
+            vec!["type".into()],
+            NamespacesHumanDetails {
+                namespaces: vec![crate::domain::LabelNamespace::new("Issue type", true)],
+            },
+        );
+        assert_eq!(
+            quiet.render_human(OutputMode {
+                quiet: true,
+                ..OutputMode::default()
+            }),
+            "  type\n    Description: Issue type\n    Unique: true\n\n"
+        );
+    }
+
+    #[test]
+    fn test_label_values_response_honors_quiet_human_rendering() {
+        let response = LabelValuesResponse::with_extras(
+            vec!["task".into()],
+            LabelValuesScope {
+                namespace: "type".into(),
+            },
+        );
+
+        assert_eq!(
+            response.render_human(OutputMode {
+                quiet: true,
+                ..OutputMode::default()
+            }),
+            "  task\n"
+        );
+        let value = serde_json::to_value(response).unwrap();
+        assert_eq!(value["namespace"], "type");
+        assert!(value.get("quiet").is_none());
     }
 
     #[test]
@@ -3965,7 +4091,7 @@ mod tests {
             lease,
             stale: false,
         };
-        let value = serde_json::to_value(LeaseListResponse::new(vec![listed])).unwrap();
+        let value = serde_json::to_value(LeaseListResponse::listing(vec![listed], true)).unwrap();
         assert_envelope_value(&value, "leases", 1);
         assert!(value["leases"][0]["expires_at"].is_null());
         assert!(value["leases"][0]["branch"].is_null());

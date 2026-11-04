@@ -2857,8 +2857,9 @@ jit doc check-links [--scope all|issue:<ID>] [--json]
 
 `--scope` defaults to `all`. The exit code carries the verdict per the
 [exit-code reference](exit-codes.md#command-specific-mappings): `0` unless a link is
-broken, which exits `1`; warnings are reported in the output and the JSON
-result but never change the exit status. JSON reports `valid`, `errors`, `warnings`, and a `summary`.
+broken, which exits `4` (`VALIDATION_FAILED`); warnings are reported in the output and the JSON
+result but never change the exit status. JSON reports `valid`, `errors`, `link_warnings`, and a `summary`;
+with a broken link they arrive as the failure envelope's `error.details`.
 
 The documents in scope include each issue's derived documents, which are also
 tracked link targets. Each reference is checked at the version it names, the same version `jit
@@ -3274,10 +3275,10 @@ jit validate --branch-drift [--leases] [--json]
 | `<ID>` | The local and graph rules for that issue only. |
 | `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`, a rule failure exits `1`, and invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
-| `--scope <ID>` | Evaluates the rules matching each issue in a container's transitive dependency closure, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
+| `--scope <ID>` | Reports the findings of the issues in a container's transitive dependency closure, bounded at its template's breakdown node, excluding whole-repository rules. Rules evaluate over the whole repository, so coverage children and dependency targets outside the closure count. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
 | `--fix` | Apply automatic rule/graph/state fixes and derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. A repository that still fails validation after nothing was repaired exits `4` with `VALIDATION_FAILED`, naming the findings `--fix` cannot repair; `--fix` and plain `validate` never disagree on validity. |
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
-| `--leases` | Check that active leases are consistent and not stale. |
+| `--leases` | Check lease records for expiry and references to missing worktrees or issues. Plain validation does not check leases. |
 
 **Mode exclusivity.** `--scope` may not be combined with a positional id or with
 `--fix`/`--branch-drift`/`--leases`/`--explain`/`--rule`. `--rule` requires a
@@ -3347,9 +3348,10 @@ Like every mutating command, apply a leftover redo record when the session
 opens ([Publication and Recovery](storage-format.md#publication-and-recovery)),
 then run the repair routines in sequence: repair declaration-derived state
 through the `jit validate --fix` path; in a Git repository, clear claim locks
-left by dead processes (checked by PID), evict expired leases, and reclaim indefinite leases whose
-heartbeat is [stale](claim.md#staleness); and remove orphaned `*.tmp` files
-under `.jit/` older than the [cleanup threshold](runtime-defaults.md).
+left by dead processes (checked by PID), evict expired leases, reclaim indefinite leases whose
+heartbeat is [stale](claim.md#staleness), and remove interrupted lease
+operations' stage files; and remove orphaned `*.tmp` files under `.jit/` and
+under `.git/jit/leases/` older than the [cleanup threshold](runtime-defaults.md).
 
 ```bash
 jit recover [--json]
@@ -3512,9 +3514,8 @@ of a whole-`[projection.*]` run — leaves every target byte-identical. All chan
 targets then publish through one redo record. JSON uses
 the list envelope `{"count": N, "projections": [...]}`, each entry `{name, target,
 mode, style, kinds, count}`. Under `--json` the pre-write guards above surface the
-`VALIDATION_FAILED` envelope; any other command failure (for example, an
-unrecognized `--name`) returns the error envelope with code
-`PROJECT_COMMAND_FAILED`.
+`VALIDATION_FAILED` envelope; an unrecognized `--name` returns the
+`INVALID_ARGUMENT` error envelope and exits `2`.
 
 ### `jit invariant check`
 
@@ -3710,8 +3711,8 @@ An existing hook of the same name is left in place and reported as skipped. No
 hook checks leases; they are enforced when a mutation is written, so a hand edit
 of an issue record is not caught at commit.
 
-JSON returns `{hooks_dir, installed, skipped, message}`. A failure returns the
-error envelope with code `HOOKS_INSTALL_ERROR`.
+JSON returns `{hooks_dir, installed, skipped, message}`. Failures use the shared
+error classifier, which determines the envelope code and process exit status.
 
 Enforcement strictness is configuration, set in `.jit/config.toml`:
 

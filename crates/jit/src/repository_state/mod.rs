@@ -110,7 +110,7 @@ pub fn finalize_gate_registry_edit(
     }
 
     let record_plan =
-        finalize(layout, base, context, intents).map_err(GateRegistryEditError::Mutation)?;
+        finalize(layout, base, context, intents, None).map_err(GateRegistryEditError::Mutation)?;
     let gate_path = VirtualPath::GATES;
     let gate_bytes = crate::declarations::serialize_gate_registry(registry)
         .map_err(GateRegistryEditError::GateDeclaration)?;

@@ -95,6 +95,36 @@ pub fn parse_profile_selector(selector: &str) -> Result<PathBuf, ProfileSelector
     }
 }
 
+/// Parse the ordered `--profile` selector stream of a profile command.
+pub fn parse_profile_selectors(values: &[String]) -> Result<Vec<PathBuf>> {
+    values
+        .iter()
+        .map(|value| {
+            parse_profile_selector(value)
+                .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()).into())
+        })
+        .collect()
+}
+
+/// Parse the ordered `--set NAME=VALUE` assignments of a profile command.
+pub fn parse_profile_variable_assignments(
+    values: &[String],
+) -> Result<Vec<ProfileVariableAssignment>> {
+    values
+        .iter()
+        .map(|assignment| {
+            let (name, value) = assignment.split_once('=').ok_or_else(|| {
+                crate::errors::InvalidArgumentError::new(format!(
+                    "invalid profile variable assignment '{assignment}'; expected NAME=VALUE"
+                ))
+            })?;
+            let name = ProfileVariableName::try_from(name.to_string())
+                .map_err(crate::errors::InvalidArgumentError::new)?;
+            Ok(ProfileVariableAssignment::new(name, value))
+        })
+        .collect()
+}
+
 /// A profile no package location supplies.
 #[derive(Debug, thiserror::Error)]
 #[error("Profile not found: {profile}")]
@@ -213,7 +243,14 @@ fn load_profile_variable_inputs(
     let values_file = options
         .values_file
         .as_deref()
-        .map(fs::read_to_string)
+        .map(|path| {
+            fs::read_to_string(path).map_err(|error| {
+                crate::errors::InvalidArgumentError::new(format!(
+                    "cannot read profile values file '{}': {error}",
+                    path.display()
+                ))
+            })
+        })
         .transpose()?
         .map(|text| toml::from_str::<ProfileValuesFile>(&text))
         .transpose()?
@@ -1019,7 +1056,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 .map(|action| action.path().clone())
                 .filter(|path| path != &VirtualPath::EVENTS),
         );
-        let overrides = super::validation_overlay(preview.image(), preview.delta())?;
+        let overrides = crate::repository_state::action_overrides(preview.delta().actions());
         let Some(probe) =
             self.exec
                 .capture_proposed_base(session, &overrides, &extra_paths, Some(base))?
@@ -1077,7 +1114,7 @@ fn final_validation_refusal(plan: &MaterializationPlan) -> Result<Option<Profile
     if plan.delta().actions().is_empty() {
         return Ok(None);
     }
-    let overrides = super::validation_overlay(plan.image(), plan.delta())?;
+    let overrides = crate::repository_state::action_overrides(plan.delta().actions());
     let proposed = apply_overlay(plan.image(), overrides)?;
     let validation = crate::validation::report(
         &crate::validation::CapturedValidation::from_image(&proposed),
